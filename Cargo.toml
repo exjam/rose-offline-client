@@ -1,0 +1,18 @@
+[package]
+name = "bevy_rose"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+bevy = { git = "https://github.com/bevyengine/bevy", branch = "main", features = ["dds"] }
+clap = "3.1"
+log = "0.4.14"
+roselib = { git = "https://github.com/rminderhoud/rose-tools", branch = "master" }
+bitflags = "1.2"
+lazy_static = "1.4.0"
+anyhow = "1.0.4"
+
+[profile.dev.package."*"]
+opt-level = 3
