@@ -9,7 +9,7 @@ edition = "2021"
 bevy = { git = "https://github.com/bevyengine/bevy", branch = "main", features = ["dds"] }
 clap = "3.1"
 log = "0.4.14"
-roselib = { git = "https://github.com/rminderhoud/rose-tools", branch = "master" }
+roselib = { git = "https://github.com/exjam/rose-tools", branch = "master" }
 bitflags = "1.2"
 lazy_static = "1.4.0"
 anyhow = "1.0.4"
