@@ -27,7 +27,10 @@ use bevy::{
 use bevy_flycam::MovementSettings;
 
 use roselib::{
-    files::{ifo, lit, zon::ZoneTileRotation, HIM, IFO, LIT, STB, TIL, ZMS, ZON, ZSC},
+    files::{
+        ifo, lit, zon::ZoneTileRotation, zsc::SceneBlendMode, HIM, IFO, LIT, STB, TIL, ZMS, ZON,
+        ZSC,
+    },
     io::{PathRoseExt, RoseFile, RoseReader},
 };
 
@@ -724,25 +727,28 @@ fn spawn_zsc_object(
                     let handle = static_mesh_materials.add(StaticMeshMaterial {
                         base_texture: asset_server.load(zsc_material.path.clone()),
                         lightmap_texture,
-                        alpha_mode: if zsc_material.alpha_enabled {
+                        alpha_value: if zsc_material.alpha != 1.0 {
+                            Some(zsc_material.alpha)
+                        } else {
+                            None
+                        },
+                        alpha_mode: if zsc_material.alpha_test_enabled {
+                            AlphaMode::Mask(zsc_material.alpha_ref as f32 / 256.0)
+                        } else if zsc_material.alpha_enabled {
                             AlphaMode::Blend
                         } else {
                             AlphaMode::Opaque
                         },
+                        two_sided: zsc_material.two_sided,
+                        z_write_enabled: zsc_material.z_write_enabled,
+                        z_test_enabled: zsc_material.z_test_enabled,
                         lightmap_uv_offset,
                         lightmap_uv_scale,
                     });
+
                     /*
-                    pub is_skin: bool,
-                    pub alpha_enabled: bool,
-                    pub two_sided: bool,
-                    pub alpha_test_enabled: bool,
-                    pub alpha_ref: u16,
-                    pub z_write_enabled: bool,
-                    pub z_test_enabled: bool,
                     pub blend_mode: SceneBlendMode,
                     pub specular_enabled: bool,
-                    pub alpha: f32,
                     pub glow_type: SceneGlowType,
                     pub glow_color: Color3,
                     */

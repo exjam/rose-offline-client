@@ -16,9 +16,9 @@ use bevy::{
             std140::{AsStd140, Std140},
             BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayoutDescriptor,
             BindGroupLayoutEntry, BindingResource, BindingType, Buffer, BufferBindingType,
-            BufferInitDescriptor, BufferSize, BufferUsages, RenderPipelineDescriptor,
-            SamplerBindingType, ShaderStages, SpecializedMeshPipelineError, TextureSampleType,
-            TextureViewDimension, VertexFormat,
+            BufferInitDescriptor, BufferSize, BufferUsages, CompareFunction,
+            RenderPipelineDescriptor, SamplerBindingType, ShaderStages,
+            SpecializedMeshPipelineError, TextureSampleType, TextureViewDimension, VertexFormat,
         },
         renderer::RenderDevice,
         texture::Image,
@@ -53,17 +53,36 @@ impl Plugin for StaticMeshMaterialPlugin {
     }
 }
 
+// NOTE: These must match the bit flags in shaders/static_mesh_material.wgsl!
+bitflags::bitflags! {
+    #[repr(transparent)]
+    pub struct StaticMeshMaterialFlags: u32 {
+        const ALPHA_MODE_OPAQUE          = (1 << 0);
+        const ALPHA_MODE_MASK            = (1 << 1);
+        const ALPHA_MODE_BLEND           = (1 << 2);
+        const HAS_ALPHA_VALUE            = (1 << 3);
+        const NONE                       = 0;
+    }
+}
+
 #[derive(Clone, AsStd140)]
-pub struct StaticMeshMaterialLightmapUniformData {
-    pub uv_offset: Vec2,
-    pub uv_scale: f32,
+pub struct StaticMeshMaterialUniformData {
+    pub flags: u32,
+    pub alpha_cutoff: f32,
+    pub alpha_value: f32,
+    pub lightmap_uv_offset: Vec2,
+    pub lightmap_uv_scale: f32,
 }
 
 #[derive(Debug, Clone, TypeUuid)]
 #[uuid = "6942088b-c082-457b-aacf-517228cc0c22"]
 pub struct StaticMeshMaterial {
     pub base_texture: Handle<Image>,
+    pub alpha_value: Option<f32>,
     pub alpha_mode: AlphaMode,
+    pub two_sided: bool,
+    pub z_test_enabled: bool,
+    pub z_write_enabled: bool,
 
     // lightmap texture, uv offset, uv scale
     pub lightmap_texture: Option<Handle<Image>>,
@@ -75,7 +94,11 @@ impl Default for StaticMeshMaterial {
     fn default() -> Self {
         Self {
             base_texture: Default::default(),
+            alpha_value: None,
             alpha_mode: AlphaMode::Opaque,
+            two_sided: false,
+            z_test_enabled: true,
+            z_write_enabled: true,
             lightmap_texture: None,
             lightmap_uv_offset: Vec2::new(0.0, 0.0),
             lightmap_uv_scale: 1.0,
@@ -87,10 +110,17 @@ impl Default for StaticMeshMaterial {
 #[derive(Debug, Clone)]
 pub struct GpuStaticMeshMaterial {
     pub bind_group: BindGroup,
+
+    pub uniform_buffer: Buffer,
     pub base_texture: Handle<Image>,
+    pub lightmap_texture: Option<Handle<Image>>,
+
+    pub flags: StaticMeshMaterialFlags,
+    pub alpha_value: Option<f32>,
     pub alpha_mode: AlphaMode,
-    pub has_lightmap: bool,
-    pub lightmap_uniform_buffer: Buffer,
+    pub two_sided: bool,
+    pub z_test_enabled: bool,
+    pub z_write_enabled: bool,
 }
 
 impl RenderAsset for StaticMeshMaterial {
@@ -129,31 +159,50 @@ impl RenderAsset for StaticMeshMaterial {
             return Err(PrepareAssetError::RetryNextUpdate(material));
         };
 
-        let value = StaticMeshMaterialLightmapUniformData {
-            uv_offset: material.lightmap_uv_offset,
-            uv_scale: material.lightmap_uv_scale,
+        let mut flags = StaticMeshMaterialFlags::NONE;
+        let mut alpha_cutoff = 0.5;
+        match material.alpha_mode {
+            AlphaMode::Opaque => flags |= StaticMeshMaterialFlags::ALPHA_MODE_OPAQUE,
+            AlphaMode::Mask(c) => {
+                alpha_cutoff = c;
+                flags |= StaticMeshMaterialFlags::ALPHA_MODE_MASK;
+            }
+            AlphaMode::Blend => flags |= StaticMeshMaterialFlags::ALPHA_MODE_BLEND,
+        };
+        let alpha_value = if let Some(alpha_value) = material.alpha_value {
+            flags |= StaticMeshMaterialFlags::HAS_ALPHA_VALUE;
+            alpha_value
+        } else {
+            1.0
+        };
+
+        let value = StaticMeshMaterialUniformData {
+            flags: flags.bits(),
+            alpha_cutoff,
+            alpha_value,
+            lightmap_uv_offset: material.lightmap_uv_offset,
+            lightmap_uv_scale: material.lightmap_uv_scale,
         };
         let value_std140 = value.as_std140();
-        let lightmap_uniform_buffer =
-            render_device.create_buffer_with_data(&BufferInitDescriptor {
-                label: Some("static_mesh_material_uniform_buffer"),
-                usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
-                contents: value_std140.as_bytes(),
-            });
+        let uniform_buffer = render_device.create_buffer_with_data(&BufferInitDescriptor {
+            label: Some("static_mesh_material_uniform_buffer"),
+            usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
+            contents: value_std140.as_bytes(),
+        });
 
         let bind_group = render_device.create_bind_group(&BindGroupDescriptor {
             entries: &[
                 BindGroupEntry {
                     binding: 0,
-                    resource: BindingResource::TextureView(base_texture_view),
+                    resource: uniform_buffer.as_entire_binding(),
                 },
                 BindGroupEntry {
                     binding: 1,
-                    resource: BindingResource::Sampler(base_texture_sampler),
+                    resource: BindingResource::TextureView(base_texture_view),
                 },
                 BindGroupEntry {
                     binding: 2,
-                    resource: lightmap_uniform_buffer.as_entire_binding(),
+                    resource: BindingResource::Sampler(base_texture_sampler),
                 },
                 BindGroupEntry {
                     binding: 3,
@@ -170,10 +219,15 @@ impl RenderAsset for StaticMeshMaterial {
 
         Ok(GpuStaticMeshMaterial {
             bind_group,
+            uniform_buffer,
             base_texture: material.base_texture,
+            lightmap_texture: material.lightmap_texture,
+            flags,
             alpha_mode: material.alpha_mode,
-            lightmap_uniform_buffer,
-            has_lightmap: material.lightmap_texture.is_some(),
+            alpha_value: material.alpha_value,
+            two_sided: material.two_sided,
+            z_test_enabled: material.z_test_enabled,
+            z_write_enabled: material.z_write_enabled,
         })
     }
 }
@@ -181,6 +235,9 @@ impl RenderAsset for StaticMeshMaterial {
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct StaticMeshMaterialKey {
     has_lightmap: bool,
+    two_sided: bool,
+    z_test_enabled: bool,
+    z_write_enabled: bool,
 }
 
 impl SpecializedMaterial for StaticMeshMaterial {
@@ -188,7 +245,10 @@ impl SpecializedMaterial for StaticMeshMaterial {
 
     fn key(render_asset: &<Self as RenderAsset>::PreparedAsset) -> Self::Key {
         StaticMeshMaterialKey {
-            has_lightmap: render_asset.has_lightmap,
+            has_lightmap: render_asset.lightmap_texture.is_some(),
+            two_sided: render_asset.two_sided,
+            z_test_enabled: render_asset.z_test_enabled,
+            z_write_enabled: render_asset.z_write_enabled,
         }
     }
 
@@ -218,6 +278,73 @@ impl SpecializedMaterial for StaticMeshMaterial {
         }
 
         descriptor.vertex.buffers = vec![layout.get_layout(&vertex_attributes)?];
+
+        if key.two_sided {
+            descriptor.primitive.cull_mode = None;
+        }
+
+        descriptor
+            .depth_stencil
+            .as_mut()
+            .unwrap()
+            .depth_write_enabled = key.z_write_enabled;
+
+        if !key.z_test_enabled {
+            descriptor.depth_stencil.as_mut().unwrap().depth_compare = CompareFunction::Always;
+        }
+
+        /*
+        Ok(RenderPipelineDescriptor {
+            vertex: VertexState {
+                shader: MESH_SHADER_HANDLE.typed::<Shader>(),
+                entry_point: "vertex".into(),
+                shader_defs: shader_defs.clone(),
+                buffers: vec![vertex_buffer_layout],
+            },
+            fragment: Some(FragmentState {
+                shader: MESH_SHADER_HANDLE.typed::<Shader>(),
+                shader_defs,
+                entry_point: "fragment".into(),
+                targets: vec![ColorTargetState {
+                    format: TextureFormat::bevy_default(),
+                    blend, <---
+                    write_mask: ColorWrites::ALL,
+                }],
+            }),
+            layout: Some(vec![self.view_layout.clone(), self.mesh_layout.clone()]),
+            primitive: PrimitiveState {
+                front_face: FrontFace::Ccw,
+                cull_mode: Some(Face::Back),
+                unclipped_depth: false,
+                polygon_mode: PolygonMode::Fill,
+                conservative: false,
+                topology: key.primitive_topology(),
+                strip_index_format: None,
+            },
+            depth_stencil: Some(DepthStencilState {
+                format: TextureFormat::Depth32Float,
+                depth_write_enabled,
+                depth_compare: CompareFunction::Greater,
+                stencil: StencilState {
+                    front: StencilFaceState::IGNORE,
+                    back: StencilFaceState::IGNORE,
+                    read_mask: 0,
+                    write_mask: 0,
+                },
+                bias: DepthBiasState {
+                    constant: 0,
+                    slope_scale: 0.0,
+                    clamp: 0.0,
+                },
+            }),
+            multisample: MultisampleState {
+                count: key.msaa_samples(),
+                mask: !0,
+                alpha_to_coverage_enabled: false,
+            },
+            label: Some(label),
+        })
+        */
         Ok(())
     }
 
@@ -239,9 +366,22 @@ impl SpecializedMaterial for StaticMeshMaterial {
     ) -> bevy::render::render_resource::BindGroupLayout {
         render_device.create_bind_group_layout(&BindGroupLayoutDescriptor {
             entries: &[
-                // Base Texture
+                // Uniform data
                 BindGroupLayoutEntry {
                     binding: 0,
+                    visibility: ShaderStages::FRAGMENT,
+                    ty: BindingType::Buffer {
+                        ty: BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: BufferSize::new(
+                            StaticMeshMaterialUniformData::std140_size_static() as u64,
+                        ),
+                    },
+                    count: None,
+                },
+                // Base Texture
+                BindGroupLayoutEntry {
+                    binding: 1,
                     visibility: ShaderStages::FRAGMENT,
                     ty: BindingType::Texture {
                         multisampled: false,
@@ -252,22 +392,9 @@ impl SpecializedMaterial for StaticMeshMaterial {
                 },
                 // Base Texture Sampler
                 BindGroupLayoutEntry {
-                    binding: 1,
-                    visibility: ShaderStages::FRAGMENT,
-                    ty: BindingType::Sampler(SamplerBindingType::Filtering),
-                    count: None,
-                },
-                // Lightmap uniform data
-                BindGroupLayoutEntry {
                     binding: 2,
                     visibility: ShaderStages::FRAGMENT,
-                    ty: BindingType::Buffer {
-                        ty: BufferBindingType::Uniform,
-                        has_dynamic_offset: false,
-                        min_binding_size: BufferSize::new(
-                            StaticMeshMaterialLightmapUniformData::std140_size_static() as u64,
-                        ),
-                    },
+                    ty: BindingType::Sampler(SamplerBindingType::Filtering),
                     count: None,
                 },
                 // Lightmap Texture
