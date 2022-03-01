@@ -28,10 +28,11 @@ use bevy::{
         render_resource::{
             std140::{AsStd140, Std140},
             AddressMode, BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout,
-            BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingResource, BindingType, Buffer,
-            BufferBindingType, BufferDescriptor, BufferInitDescriptor, BufferSize, BufferUsages,
-            FilterMode, RenderPipelineCache, RenderPipelineDescriptor, SamplerBindingType,
-            SamplerDescriptor, ShaderStages, SpecializedMeshPipeline, SpecializedMeshPipelineError,
+            BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingResource, BindingType,
+            BlendComponent, BlendFactor, BlendOperation, BlendState, Buffer, BufferBindingType,
+            BufferDescriptor, BufferInitDescriptor, BufferSize, BufferUsages, FilterMode,
+            RenderPipelineCache, RenderPipelineDescriptor, SamplerBindingType, SamplerDescriptor,
+            ShaderStages, SpecializedMeshPipeline, SpecializedMeshPipelineError,
             SpecializedMeshPipelines, TextureSampleType, TextureViewDimension,
         },
         renderer::{RenderDevice, RenderQueue},
@@ -154,6 +155,18 @@ impl SpecializedMeshPipeline for WaterMeshMaterialPipeline {
 
         if let Some(fragment_shader) = &self.fragment_shader {
             descriptor.fragment.as_mut().unwrap().shader = fragment_shader.clone();
+            descriptor.fragment.as_mut().unwrap().targets[0].blend = Some(BlendState {
+                color: BlendComponent {
+                    src_factor: BlendFactor::SrcAlpha,
+                    dst_factor: BlendFactor::One,
+                    operation: BlendOperation::Add,
+                },
+                alpha: BlendComponent {
+                    src_factor: BlendFactor::SrcAlpha,
+                    dst_factor: BlendFactor::One,
+                    operation: BlendOperation::Add,
+                },
+            });
         }
         descriptor.layout = Some(vec![
             self.mesh_pipeline.view_layout.clone(),
