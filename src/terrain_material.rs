@@ -21,9 +21,9 @@ use bevy::{
         render_resource::{
             BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout,
             BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingResource, BindingType,
-            FilterMode, RenderPipelineCache, RenderPipelineDescriptor, SamplerBindingType,
-            SamplerDescriptor, ShaderStages, SpecializedMeshPipeline, SpecializedMeshPipelineError,
-            SpecializedMeshPipelines, TextureSampleType, TextureViewDimension,
+            RenderPipelineCache, RenderPipelineDescriptor, SamplerBindingType, ShaderStages,
+            SpecializedMeshPipeline, SpecializedMeshPipelineError, SpecializedMeshPipelines,
+            TextureSampleType, TextureViewDimension,
         },
         renderer::RenderDevice,
         texture::Image,
@@ -109,11 +109,6 @@ impl FromWorld for TerrainMaterialPipeline {
     }
 }
 
-/// A material with "standard" properties used in PBR lighting
-/// Standard property values with pictures here
-/// <https://google.github.io/filament/Material%20Properties.pdf>.
-///
-/// May be created directly from a [`Color`] or an [`Image`].
 #[derive(Debug, Clone, TypeUuid)]
 #[uuid = "7494888b-c082-457b-aacf-517228cc0c22"]
 pub struct TerrainMaterial {
@@ -144,28 +139,27 @@ impl RenderAsset for TerrainMaterial {
 
     fn prepare_asset(
         material: Self::ExtractedAsset,
-        (render_device, pbr_pipeline, gpu_images): &mut SystemParamItem<Self::Param>,
+        (render_device, material_pipeline, gpu_images): &mut SystemParamItem<Self::Param>,
     ) -> Result<Self::PreparedAsset, PrepareAssetError<Self::ExtractedAsset>> {
-        let (lightmap_texture_view, _) =
-            if let Some(gpu_image) = gpu_images.get(&material.lightmap_texture) {
-                (&gpu_image.texture_view, &gpu_image.sampler)
-            } else {
-                return Err(PrepareAssetError::RetryNextUpdate(material));
-            };
-        let (tile_array_texture_view, _) =
-            if let Some(gpu_image) = gpu_images.get(&material.tile_array_texture) {
-                (&gpu_image.texture_view, &gpu_image.sampler)
-            } else {
-                return Err(PrepareAssetError::RetryNextUpdate(material));
-            };
-
-        let sampler_descriptor = SamplerDescriptor {
-            mag_filter: FilterMode::Linear,
-            min_filter: FilterMode::Linear,
-            ..Default::default()
+        let (lightmap_texture_view, lightmap_texture_sampler) = if let Some(result) =
+            material_pipeline
+                .mesh_pipeline
+                .get_image_texture(gpu_images, Some(&material.lightmap_texture))
+        {
+            result
+        } else {
+            return Err(PrepareAssetError::RetryNextUpdate(material));
         };
-        let lightmap_sampler = render_device.create_sampler(&sampler_descriptor);
-        let tile_array_sampler = render_device.create_sampler(&sampler_descriptor);
+
+        let (tile_array_texture_view, tile_array_texture_sampler) = if let Some(result) =
+            material_pipeline
+                .mesh_pipeline
+                .get_image_texture(gpu_images, Some(&material.tile_array_texture))
+        {
+            result
+        } else {
+            return Err(PrepareAssetError::RetryNextUpdate(material));
+        };
 
         let bind_group = render_device.create_bind_group(&BindGroupDescriptor {
             entries: &[
@@ -175,7 +169,7 @@ impl RenderAsset for TerrainMaterial {
                 },
                 BindGroupEntry {
                     binding: 1,
-                    resource: BindingResource::Sampler(&lightmap_sampler),
+                    resource: BindingResource::Sampler(lightmap_texture_sampler),
                 },
                 BindGroupEntry {
                     binding: 2,
@@ -183,11 +177,11 @@ impl RenderAsset for TerrainMaterial {
                 },
                 BindGroupEntry {
                     binding: 3,
-                    resource: BindingResource::Sampler(&tile_array_sampler),
+                    resource: BindingResource::Sampler(tile_array_texture_sampler),
                 },
             ],
             label: Some("pbr_standard_material_bind_group"),
-            layout: &pbr_pipeline.material_layout,
+            layout: &material_pipeline.material_layout,
         });
 
         Ok(GpuTerrainMaterial {

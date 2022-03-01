@@ -23,10 +23,10 @@ use bevy::{
             std140::{AsStd140, Std140},
             BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout,
             BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingResource, BindingType, Buffer,
-            BufferBindingType, BufferInitDescriptor, BufferSize, BufferUsages, FilterMode,
-            RenderPipelineCache, RenderPipelineDescriptor, SamplerBindingType, SamplerDescriptor,
-            ShaderStages, SpecializedMeshPipeline, SpecializedMeshPipelineError,
-            SpecializedMeshPipelines, TextureSampleType, TextureViewDimension,
+            BufferBindingType, BufferInitDescriptor, BufferSize, BufferUsages, RenderPipelineCache,
+            RenderPipelineDescriptor, SamplerBindingType, ShaderStages, SpecializedMeshPipeline,
+            SpecializedMeshPipelineError, SpecializedMeshPipelines, TextureSampleType,
+            TextureViewDimension,
         },
         renderer::RenderDevice,
         texture::Image,
@@ -171,29 +171,24 @@ impl RenderAsset for StaticMeshMaterial {
         material: Self::ExtractedAsset,
         (render_device, material_pipeline, gpu_images): &mut SystemParamItem<Self::Param>,
     ) -> Result<Self::PreparedAsset, PrepareAssetError<Self::ExtractedAsset>> {
-        let (base_texture_view, _) = if let Some(gpu_image) = gpu_images.get(&material.base_texture)
-        {
-            (&gpu_image.texture_view, &gpu_image.sampler)
-        } else {
-            return Err(PrepareAssetError::RetryNextUpdate(material));
-        };
-
-        let (lightmap_texture_view, _) = if let Some(result) = material_pipeline
+        let (base_texture_view, base_texture_sampler) = if let Some(result) = material_pipeline
             .mesh_pipeline
-            .get_image_texture(gpu_images, &material.lightmap_texture)
+            .get_image_texture(gpu_images, Some(&material.base_texture))
         {
             result
         } else {
             return Err(PrepareAssetError::RetryNextUpdate(material));
         };
 
-        let sampler_descriptor = SamplerDescriptor {
-            mag_filter: FilterMode::Linear,
-            min_filter: FilterMode::Linear,
-            ..Default::default()
+        let (lightmap_texture_view, lightmap_texture_sampler) = if let Some(result) =
+            material_pipeline
+                .mesh_pipeline
+                .get_image_texture(gpu_images, material.lightmap_texture.as_ref())
+        {
+            result
+        } else {
+            return Err(PrepareAssetError::RetryNextUpdate(material));
         };
-        let lightmap_sampler = render_device.create_sampler(&sampler_descriptor);
-        let base_texture_sampler = render_device.create_sampler(&sampler_descriptor);
 
         let value = StaticMeshMaterialLightmapUniformData {
             uv_offset: material.lightmap_uv_offset,
@@ -215,7 +210,7 @@ impl RenderAsset for StaticMeshMaterial {
                 },
                 BindGroupEntry {
                     binding: 1,
-                    resource: BindingResource::Sampler(&base_texture_sampler),
+                    resource: BindingResource::Sampler(base_texture_sampler),
                 },
                 BindGroupEntry {
                     binding: 2,
@@ -227,7 +222,7 @@ impl RenderAsset for StaticMeshMaterial {
                 },
                 BindGroupEntry {
                     binding: 4,
-                    resource: BindingResource::Sampler(&lightmap_sampler),
+                    resource: BindingResource::Sampler(lightmap_texture_sampler),
                 },
             ],
             label: Some("static_mesh_material_bind_group"),

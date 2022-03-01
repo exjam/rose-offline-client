@@ -26,13 +26,13 @@ use bevy::{
             SetItemPipeline, TrackedRenderPass,
         },
         render_resource::{
-            std140::{AsStd140, Std140},
+            std140::{AsStd140},
             AddressMode, BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout,
             BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingResource, BindingType,
             BlendComponent, BlendFactor, BlendOperation, BlendState, Buffer, BufferBindingType,
-            BufferDescriptor, BufferInitDescriptor, BufferSize, BufferUsages, FilterMode,
-            RenderPipelineCache, RenderPipelineDescriptor, SamplerBindingType, SamplerDescriptor,
-            ShaderStages, SpecializedMeshPipeline, SpecializedMeshPipelineError,
+            BufferDescriptor, BufferSize, BufferUsages, FilterMode,
+            RenderPipelineCache, RenderPipelineDescriptor, Sampler, SamplerBindingType,
+            SamplerDescriptor, ShaderStages, SpecializedMeshPipeline, SpecializedMeshPipelineError,
             SpecializedMeshPipelines, TextureSampleType, TextureViewDimension,
         },
         renderer::{RenderDevice, RenderQueue},
@@ -138,6 +138,7 @@ pub struct WaterMeshMaterialPipeline {
     pub time_uniform_layout: BindGroupLayout,
     pub vertex_shader: Option<Handle<Shader>>,
     pub fragment_shader: Option<Handle<Shader>>,
+    pub sampler: Sampler,
 }
 
 impl SpecializedMeshPipeline for WaterMeshMaterialPipeline {
@@ -206,6 +207,13 @@ impl FromWorld for WaterMeshMaterialPipeline {
             time_uniform_layout,
             vertex_shader: WaterMeshMaterial::vertex_shader(asset_server),
             fragment_shader: WaterMeshMaterial::fragment_shader(asset_server),
+            sampler: render_device.create_sampler(&SamplerDescriptor {
+                address_mode_u: AddressMode::Repeat,
+                address_mode_v: AddressMode::Repeat,
+                mag_filter: FilterMode::Linear,
+                min_filter: FilterMode::Linear,
+                ..Default::default()
+            }),
         }
     }
 }
@@ -226,7 +234,6 @@ pub struct WaterMeshMaterial {
 pub struct GpuWaterMeshMaterial {
     pub bind_group: BindGroup,
     pub water_texture_array: Handle<Image>,
-    pub uniform_buffer: Buffer,
 }
 
 impl RenderAsset for WaterMeshMaterial {
@@ -246,29 +253,14 @@ impl RenderAsset for WaterMeshMaterial {
         material: Self::ExtractedAsset,
         (render_device, material_pipeline, gpu_images): &mut SystemParamItem<Self::Param>,
     ) -> Result<Self::PreparedAsset, PrepareAssetError<Self::ExtractedAsset>> {
-        let (water_texture_view, _) =
-            if let Some(gpu_image) = gpu_images.get(&material.water_texture_array) {
-                (&gpu_image.texture_view, &gpu_image.sampler)
-            } else {
-                return Err(PrepareAssetError::RetryNextUpdate(material));
-            };
-
-        let sampler_descriptor = SamplerDescriptor {
-            address_mode_u: AddressMode::Repeat,
-            address_mode_v: AddressMode::Repeat,
-            mag_filter: FilterMode::Linear,
-            min_filter: FilterMode::Linear,
-            ..Default::default()
+        let (water_texture_view, _) = if let Some(result) = material_pipeline
+            .mesh_pipeline
+            .get_image_texture(gpu_images, Some(&material.water_texture_array))
+        {
+            result
+        } else {
+            return Err(PrepareAssetError::RetryNextUpdate(material));
         };
-        let water_texture_sampler = render_device.create_sampler(&sampler_descriptor);
-
-        let value = WaterMeshMaterialUniformData { texture_index: 3 };
-        let value_std140 = value.as_std140();
-        let uniform_buffer = render_device.create_buffer_with_data(&BufferInitDescriptor {
-            label: Some("water_mesh_material_uniform_buffer"),
-            usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
-            contents: value_std140.as_bytes(),
-        });
 
         let bind_group = render_device.create_bind_group(&BindGroupDescriptor {
             entries: &[
@@ -278,7 +270,7 @@ impl RenderAsset for WaterMeshMaterial {
                 },
                 BindGroupEntry {
                     binding: 1,
-                    resource: BindingResource::Sampler(&water_texture_sampler),
+                    resource: BindingResource::Sampler(&material_pipeline.sampler),
                 },
             ],
             label: Some("water_mesh_material_bind_group"),
@@ -288,7 +280,6 @@ impl RenderAsset for WaterMeshMaterial {
         Ok(GpuWaterMeshMaterial {
             bind_group,
             water_texture_array: material.water_texture_array,
-            uniform_buffer,
         })
     }
 }

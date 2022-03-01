@@ -261,6 +261,7 @@ pub struct MeshPipeline {
     pub mesh_layout: BindGroupLayout,
     // Dummy texture to use in place of optional textures
     pub dummy_white_gpu_image: GpuImage,
+    pub sampler: Sampler,
 }
 
 impl FromWorld for MeshPipeline {
@@ -297,6 +298,12 @@ impl FromWorld for MeshPipeline {
             label: Some("mesh_layout"),
         });
 
+        let sampler = render_device.create_sampler(&SamplerDescriptor {
+            mag_filter: FilterMode::Linear,
+            min_filter: FilterMode::Linear,
+            ..Default::default()
+        });
+
         // A 1x1x1 'all 1.0' texture to use as a dummy texture to use in place of optional textures
         let dummy_white_gpu_image = {
             let image = Image::new_fill(
@@ -306,7 +313,6 @@ impl FromWorld for MeshPipeline {
                 TextureFormat::bevy_default(),
             );
             let texture = render_device.create_texture(&image.texture_descriptor);
-            let sampler = render_device.create_sampler(&image.sampler_descriptor);
 
             let format_size = image.texture_descriptor.format.pixel_size();
             let render_queue = world.get_resource_mut::<RenderQueue>().unwrap();
@@ -335,7 +341,7 @@ impl FromWorld for MeshPipeline {
             GpuImage {
                 texture,
                 texture_view,
-                sampler,
+                sampler: sampler.clone(),
                 size: Size::new(
                     image.texture_descriptor.size.width as f32,
                     image.texture_descriptor.size.height as f32,
@@ -347,6 +353,7 @@ impl FromWorld for MeshPipeline {
             view_layout,
             mesh_layout,
             dummy_white_gpu_image,
+            sampler,
         }
     }
 }
@@ -355,11 +362,11 @@ impl MeshPipeline {
     pub fn get_image_texture<'a>(
         &'a self,
         gpu_images: &'a RenderAssets<Image>,
-        handle_option: &Option<Handle<Image>>,
+        handle_option: Option<&Handle<Image>>,
     ) -> Option<(&'a TextureView, &'a Sampler)> {
         if let Some(handle) = handle_option {
             let gpu_image = gpu_images.get(handle)?;
-            Some((&gpu_image.texture_view, &gpu_image.sampler))
+            Some((&gpu_image.texture_view, &self.sampler))
         } else {
             Some((
                 &self.dummy_white_gpu_image.texture_view,
