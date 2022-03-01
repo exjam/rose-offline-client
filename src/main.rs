@@ -32,12 +32,15 @@ use roselib::{
 };
 
 use material::{AlphaMode, MaterialPlugin};
-use mesh_pipeline::{
-    MeshRenderPlugin, MESH_ATTRIBUTE_POSITION, MESH_ATTRIBUTE_TERRAIN_TILE_INFO,
-    MESH_ATTRIBUTE_UV1, MESH_ATTRIBUTE_UV2,
+use mesh_pipeline::MeshRenderPlugin;
+use static_mesh_material::{
+    StaticMeshMaterial, StaticMeshMaterialPlugin, STATIC_MESH_ATTRIBUTE_UV1,
+    STATIC_MESH_ATTRIBUTE_UV2, STATIC_MESH_ATTRIBUTE_UV3, STATIC_MESH_ATTRIBUTE_UV4,
 };
-use static_mesh_material::{StaticMeshMaterial, StaticMeshMaterialPlugin};
-use terrain_material::{TerrainMaterial, TerrainMaterialPlugin};
+use terrain_material::{
+    TerrainMaterial, TerrainMaterialPlugin, TERRAIN_MESH_ATTRIBUTE_TILE_INFO,
+    TERRAIN_MESH_ATTRIBUTE_UV1,
+};
 use water_mesh_material::{WaterMeshMaterial, WaterMeshMaterialPlugin};
 
 struct ClientConfiguration {
@@ -229,27 +232,36 @@ impl AssetLoader for ZmsMeshAssetLoader {
             mesh.set_indices(Some(Indices::U16(indices)));
 
             let mut position = Vec::new();
+            let mut colors = Vec::new();
+            let mut normals = Vec::new();
+            let mut tangents = Vec::new();
             let mut uv1 = Vec::new();
             let mut uv2 = Vec::new();
+            let mut uv3 = Vec::new();
+            let mut uv4 = Vec::new();
+            let mut bone_weights = Vec::new();
+            let mut bone_indices = Vec::new();
 
             for vertex in zms.vertices.iter() {
-                /*
-                // TODO: All zms attributes
-                pub position: Vector3<f32>,
-                pub normal: Vector3<f32>,
-                pub color: Color4,
-                pub bone_weights: Vector4<f32>,
-                pub bone_indices: Vector4<i16>,
-                pub tangent: Vector3<f32>,
-                pub uv1: Vector2<f32>,
-                pub uv2: Vector2<f32>,
-                pub uv3: Vector2<f32>,
-                pub uv4: Vector2<f32>,
-                let mut normal = Vec::new();
-                */
-
                 if zms.positions_enabled() {
                     position.push([vertex.position.x, vertex.position.y, vertex.position.z]);
+                }
+
+                if zms.normals_enabled() {
+                    normals.push([vertex.normal.x, vertex.normal.y, vertex.normal.z]);
+                }
+
+                if zms.tangents_enabled() {
+                    tangents.push([vertex.tangent.x, vertex.tangent.y, vertex.tangent.z]);
+                }
+
+                if zms.colors_enabled() {
+                    colors.push([
+                        vertex.color.r,
+                        vertex.color.g,
+                        vertex.color.b,
+                        vertex.color.a,
+                    ]);
                 }
 
                 if zms.uv1_enabled() {
@@ -259,18 +271,69 @@ impl AssetLoader for ZmsMeshAssetLoader {
                 if zms.uv2_enabled() {
                     uv2.push([vertex.uv2.x, vertex.uv2.y]);
                 }
+
+                if zms.uv3_enabled() {
+                    uv3.push([vertex.uv3.x, vertex.uv3.y]);
+                }
+
+                if zms.uv4_enabled() {
+                    uv4.push([vertex.uv4.x, vertex.uv4.y]);
+                }
+
+                if zms.bones_enabled() {
+                    bone_weights.push([
+                        vertex.bone_weights.x,
+                        vertex.bone_weights.y,
+                        vertex.bone_weights.z,
+                        vertex.bone_weights.w,
+                    ]);
+                    bone_indices.push(
+                        (vertex.bone_indices.x as u32 & 0xFF)
+                            | (vertex.bone_indices.y as u32 & 0xFF) << 8
+                            | (vertex.bone_indices.z as u32 & 0xFF) << 16
+                            | (vertex.bone_indices.w as u32 & 0xFF) << 24,
+                    );
+                }
             }
 
             if !position.is_empty() {
-                mesh.insert_attribute(MESH_ATTRIBUTE_POSITION, position);
+                mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, position);
+            }
+
+            if !normals.is_empty() {
+                mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
+            }
+
+            if !colors.is_empty() {
+                mesh.insert_attribute(Mesh::ATTRIBUTE_COLOR, colors);
+            }
+
+            if !tangents.is_empty() {
+                mesh.insert_attribute(Mesh::ATTRIBUTE_TANGENT, tangents);
+            }
+
+            if !bone_weights.is_empty() {
+                mesh.insert_attribute(Mesh::ATTRIBUTE_JOINT_WEIGHT, bone_weights);
+            }
+
+            if !bone_indices.is_empty() {
+                mesh.insert_attribute(Mesh::ATTRIBUTE_JOINT_INDEX, bone_indices);
             }
 
             if !uv1.is_empty() {
-                mesh.insert_attribute(MESH_ATTRIBUTE_UV1, uv1);
+                mesh.insert_attribute(STATIC_MESH_ATTRIBUTE_UV1, uv1);
             }
 
             if !uv2.is_empty() {
-                mesh.insert_attribute(MESH_ATTRIBUTE_UV2, uv2);
+                mesh.insert_attribute(STATIC_MESH_ATTRIBUTE_UV2, uv2);
+            }
+
+            if !uv3.is_empty() {
+                mesh.insert_attribute(STATIC_MESH_ATTRIBUTE_UV3, uv3);
+            }
+
+            if !uv4.is_empty() {
+                mesh.insert_attribute(STATIC_MESH_ATTRIBUTE_UV4, uv4);
             }
 
             load_context.set_default_asset(LoadedAsset::new(mesh));
@@ -447,10 +510,10 @@ fn setup(
 
                 let mut mesh = Mesh::new(PrimitiveTopology::TriangleList);
                 mesh.set_indices(Some(Indices::U16(indices)));
-                mesh.insert_attribute(MESH_ATTRIBUTE_POSITION, positions);
-                mesh.insert_attribute(MESH_ATTRIBUTE_UV1, uvs_lightmap);
-                mesh.insert_attribute(MESH_ATTRIBUTE_UV2, uvs_tile);
-                mesh.insert_attribute(MESH_ATTRIBUTE_TERRAIN_TILE_INFO, tile_ids);
+                mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
+                mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, uvs_lightmap);
+                mesh.insert_attribute(TERRAIN_MESH_ATTRIBUTE_UV1, uvs_tile);
+                mesh.insert_attribute(TERRAIN_MESH_ATTRIBUTE_TILE_INFO, tile_ids);
 
                 commands.spawn().insert_bundle((
                     meshes.add(mesh),
@@ -508,8 +571,8 @@ fn setup(
 
                         let mut mesh = Mesh::new(PrimitiveTopology::TriangleList);
                         mesh.set_indices(Some(indices));
-                        mesh.insert_attribute(MESH_ATTRIBUTE_POSITION, positions);
-                        mesh.insert_attribute(MESH_ATTRIBUTE_UV1, uvs);
+                        mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
+                        mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, uvs);
 
                         commands.spawn().insert_bundle((
                             meshes.add(mesh),

@@ -1,25 +1,21 @@
 use crate::{
     load_internal_asset,
     material::{MaterialPipeline, SpecializedMaterial},
-    mesh_pipeline::{
-        MESH_ATTRIBUTE_POSITION, MESH_ATTRIBUTE_TERRAIN_TILE_INFO, MESH_ATTRIBUTE_UV1,
-        MESH_ATTRIBUTE_UV2,
-    },
 };
 use bevy::{
     asset::{AssetServer, Handle},
     ecs::system::{lifetimeless::SRes, SystemParamItem},
-    prelude::{App, HandleUntyped, Plugin},
+    prelude::{App, HandleUntyped, Mesh, Plugin},
     reflect::TypeUuid,
     render::{
-        mesh::MeshVertexBufferLayout,
+        mesh::{MeshVertexAttribute, MeshVertexBufferLayout},
         prelude::Shader,
         render_asset::{PrepareAssetError, RenderAsset, RenderAssets},
         render_resource::{
             BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayoutDescriptor,
             BindGroupLayoutEntry, BindingResource, BindingType, RenderPipelineDescriptor,
             SamplerBindingType, ShaderStages, SpecializedMeshPipelineError, TextureSampleType,
-            TextureViewDimension,
+            TextureViewDimension, VertexFormat,
         },
         renderer::RenderDevice,
         texture::Image,
@@ -28,6 +24,12 @@ use bevy::{
 
 pub const TERRAIN_MATERIAL_SHADER_HANDLE: HandleUntyped =
     HandleUntyped::weak_from_u64(Shader::TYPE_UUID, 4206939651767701046);
+
+pub const TERRAIN_MESH_ATTRIBUTE_UV1: MeshVertexAttribute =
+    MeshVertexAttribute::new("Vertex_Uv1", 42069421, VertexFormat::Float32x2);
+
+pub const TERRAIN_MESH_ATTRIBUTE_TILE_INFO: MeshVertexAttribute =
+    MeshVertexAttribute::new("Vertex_TileInfo", 42069422, VertexFormat::Sint32x3);
 
 #[derive(Default)]
 pub struct TerrainMaterialPlugin;
@@ -142,10 +144,10 @@ impl SpecializedMaterial for TerrainMaterial {
         layout: &MeshVertexBufferLayout,
     ) -> Result<(), SpecializedMeshPipelineError> {
         let vertex_layout = layout.get_layout(&[
-            MESH_ATTRIBUTE_POSITION.at_shader_location(0),
-            MESH_ATTRIBUTE_UV1.at_shader_location(1),
-            MESH_ATTRIBUTE_UV2.at_shader_location(2),
-            MESH_ATTRIBUTE_TERRAIN_TILE_INFO.at_shader_location(3),
+            Mesh::ATTRIBUTE_POSITION.at_shader_location(0),
+            Mesh::ATTRIBUTE_UV_0.at_shader_location(1),
+            TERRAIN_MESH_ATTRIBUTE_UV1.at_shader_location(2),
+            TERRAIN_MESH_ATTRIBUTE_TILE_INFO.at_shader_location(3),
         ])?;
         descriptor.vertex.buffers = vec![vertex_layout];
         Ok(())

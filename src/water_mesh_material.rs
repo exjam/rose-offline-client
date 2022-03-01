@@ -296,12 +296,18 @@ impl SpecializedMaterial for WaterMeshMaterial {
     fn specialize(
         descriptor: &mut RenderPipelineDescriptor,
         _key: Self::Key,
-        _layout: &MeshVertexBufferLayout,
+        layout: &MeshVertexBufferLayout,
     ) -> Result<(), SpecializedMeshPipelineError> {
-        if let Some(label) = &mut descriptor.label {
-            *label = format!("water_mesh_{}", *label).into();
-        }
+        let vertex_layout = layout.get_layout(&[
+            Mesh::ATTRIBUTE_POSITION.at_shader_location(0),
+            Mesh::ATTRIBUTE_UV_0.at_shader_location(1),
+        ])?;
+        descriptor.vertex.buffers = vec![vertex_layout];
         Ok(())
+    }
+
+    fn vertex_shader(_asset_server: &AssetServer) -> Option<Handle<Shader>> {
+        Some(WATER_MESH_MATERIAL_SHADER_HANDLE.typed())
     }
 
     fn fragment_shader(_asset_server: &AssetServer) -> Option<Handle<Shader>> {

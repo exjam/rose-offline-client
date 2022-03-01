@@ -9,7 +9,7 @@ use bevy::{
     prelude::Image,
     reflect::TypeUuid,
     render::{
-        mesh::{GpuBufferInfo, Mesh, MeshVertexAttribute, MeshVertexBufferLayout},
+        mesh::{GpuBufferInfo, Mesh, MeshVertexBufferLayout},
         render_asset::RenderAssets,
         render_component::{ComponentUniforms, DynamicUniformIndex, UniformComponentPlugin},
         render_phase::{EntityRenderCommand, RenderCommandResult, TrackedRenderPass},
@@ -35,18 +35,6 @@ pub const MESH_STRUCT_HANDLE: HandleUntyped =
 
 pub const MESH_SHADER_HANDLE: HandleUntyped =
     HandleUntyped::weak_from_u64(Shader::TYPE_UUID, 1252377289100772451);
-
-pub const MESH_ATTRIBUTE_POSITION: MeshVertexAttribute =
-    MeshVertexAttribute::new("Vertex_Position", 0, VertexFormat::Float32x3);
-
-pub const MESH_ATTRIBUTE_UV1: MeshVertexAttribute =
-    MeshVertexAttribute::new("Vertex_Uv1", 1, VertexFormat::Float32x2);
-
-pub const MESH_ATTRIBUTE_UV2: MeshVertexAttribute =
-    MeshVertexAttribute::new("Vertex_Uv2", 2, VertexFormat::Float32x2);
-
-pub const MESH_ATTRIBUTE_TERRAIN_TILE_INFO: MeshVertexAttribute =
-    MeshVertexAttribute::new("Vertex_TileInfo", 3, VertexFormat::Sint32x3);
 
 impl Plugin for MeshRenderPlugin {
     fn build(&self, app: &mut App) {
@@ -384,14 +372,9 @@ impl SpecializedMeshPipeline for MeshPipeline {
         key: Self::Key,
         layout: &MeshVertexBufferLayout,
     ) -> Result<RenderPipelineDescriptor, SpecializedMeshPipelineError> {
-        let mut vertex_attributes = vec![MESH_ATTRIBUTE_POSITION.at_shader_location(0)];
+        let vertex_attributes = vec![Mesh::ATTRIBUTE_POSITION.at_shader_location(0)];
 
-        let mut shader_defs = Vec::new();
-        if layout.contains(MESH_ATTRIBUTE_UV1) {
-            shader_defs.push(String::from("HAS_UV1"));
-            vertex_attributes.push(MESH_ATTRIBUTE_UV1.at_shader_location(1));
-        }
-
+        let shader_defs = Vec::new();
         let vertex_buffer_layout = layout.get_layout(&vertex_attributes)?;
 
         let (label, blend, depth_write_enabled);

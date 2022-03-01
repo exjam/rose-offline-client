@@ -1,16 +1,15 @@
 use crate::{
     load_internal_asset,
     material::{AlphaMode, MaterialPipeline, SpecializedMaterial},
-    mesh_pipeline::{MESH_ATTRIBUTE_POSITION, MESH_ATTRIBUTE_UV1, MESH_ATTRIBUTE_UV2},
 };
 use bevy::{
     asset::{AssetServer, Handle},
     ecs::system::{lifetimeless::SRes, SystemParamItem},
     math::Vec2,
-    prelude::{App, HandleUntyped, Plugin},
+    prelude::{App, HandleUntyped, Mesh, Plugin},
     reflect::TypeUuid,
     render::{
-        mesh::MeshVertexBufferLayout,
+        mesh::{MeshVertexAttribute, MeshVertexBufferLayout},
         prelude::Shader,
         render_asset::{PrepareAssetError, RenderAsset, RenderAssets},
         render_resource::{
@@ -19,7 +18,7 @@ use bevy::{
             BindGroupLayoutEntry, BindingResource, BindingType, Buffer, BufferBindingType,
             BufferInitDescriptor, BufferSize, BufferUsages, RenderPipelineDescriptor,
             SamplerBindingType, ShaderStages, SpecializedMeshPipelineError, TextureSampleType,
-            TextureViewDimension,
+            TextureViewDimension, VertexFormat,
         },
         renderer::RenderDevice,
         texture::Image,
@@ -28,6 +27,17 @@ use bevy::{
 
 pub const STATIC_MESH_MATERIAL_SHADER_HANDLE: HandleUntyped =
     HandleUntyped::weak_from_u64(Shader::TYPE_UUID, 6942039651767701046);
+
+pub const STATIC_MESH_ATTRIBUTE_UV1: MeshVertexAttribute = Mesh::ATTRIBUTE_UV_0;
+
+pub const STATIC_MESH_ATTRIBUTE_UV2: MeshVertexAttribute =
+    MeshVertexAttribute::new("Vertex_Uv2", 42069400, VertexFormat::Float32x2);
+
+pub const STATIC_MESH_ATTRIBUTE_UV3: MeshVertexAttribute =
+    MeshVertexAttribute::new("Vertex_Uv3", 42069401, VertexFormat::Float32x2);
+
+pub const STATIC_MESH_ATTRIBUTE_UV4: MeshVertexAttribute =
+    MeshVertexAttribute::new("Vertex_Uv4", 42069402, VertexFormat::Float32x2);
 
 #[derive(Default)]
 pub struct StaticMeshMaterialPlugin;
@@ -187,6 +197,11 @@ impl SpecializedMaterial for StaticMeshMaterial {
         key: Self::Key,
         layout: &MeshVertexBufferLayout,
     ) -> Result<(), SpecializedMeshPipelineError> {
+        let mut vertex_attributes = vec![
+            Mesh::ATTRIBUTE_POSITION.at_shader_location(0),
+            STATIC_MESH_ATTRIBUTE_UV1.at_shader_location(1),
+        ];
+
         if key.has_lightmap {
             descriptor
                 .vertex
@@ -199,20 +214,10 @@ impl SpecializedMaterial for StaticMeshMaterial {
                 .shader_defs
                 .push(String::from("HAS_STATIC_MESH_LIGHTMAP"));
 
-            let vertex_layout = layout.get_layout(&[
-                MESH_ATTRIBUTE_POSITION.at_shader_location(0),
-                MESH_ATTRIBUTE_UV1.at_shader_location(1),
-                MESH_ATTRIBUTE_UV2.at_shader_location(2),
-            ])?;
-            descriptor.vertex.buffers = vec![vertex_layout];
-        } else {
-            let vertex_layout = layout.get_layout(&[
-                MESH_ATTRIBUTE_POSITION.at_shader_location(0),
-                MESH_ATTRIBUTE_UV1.at_shader_location(1),
-            ])?;
-            descriptor.vertex.buffers = vec![vertex_layout];
+            vertex_attributes.push(STATIC_MESH_ATTRIBUTE_UV2.at_shader_location(2));
         }
 
+        descriptor.vertex.buffers = vec![layout.get_layout(&vertex_attributes)?];
         Ok(())
     }
 
