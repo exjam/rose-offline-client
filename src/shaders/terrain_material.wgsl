@@ -4,6 +4,35 @@
 [[group(2), binding(0)]]
 var<uniform> mesh: Mesh;
 
+struct Vertex {
+    [[location(0)]] position: vec3<f32>;
+    [[location(1)]] uv1: vec2<f32>;
+    [[location(2)]] uv2: vec2<f32>;
+    [[location(3)]] terrain_tile_info: vec3<i32>;
+};
+
+struct VertexOutput {
+    [[builtin(position)]] clip_position: vec4<f32>;
+    [[location(0)]] world_position: vec4<f32>;
+    [[location(1)]] uv1: vec2<f32>;
+    [[location(2)]] uv2: vec2<f32>;
+    [[location(3)]] terrain_tile_info: vec3<i32>;
+};
+
+[[stage(vertex)]]
+fn vertex(vertex: Vertex) -> VertexOutput {
+    let world_position = mesh.model * vec4<f32>(vertex.position, 1.0);
+
+    var out: VertexOutput;
+    out.uv1 = vertex.uv1;
+    out.uv2 = vertex.uv2;
+    out.terrain_tile_info = vertex.terrain_tile_info;
+
+    out.world_position = world_position;
+    out.clip_position = view.view_proj * world_position;
+    return out;
+}
+
 [[group(1), binding(0)]]
 var lightmap_texture: texture_2d<f32>;
 [[group(1), binding(1)]]
@@ -14,7 +43,6 @@ var tile_array_texture: texture_2d_array<f32>;
 var tile_array_sampler: sampler;
 
 struct FragmentInput {
-    [[builtin(front_facing)]] is_front: bool;
     [[builtin(position)]] frag_coord: vec4<f32>;
     [[location(0)]] world_position: vec4<f32>;
     [[location(1)]] uv1: vec2<f32>;

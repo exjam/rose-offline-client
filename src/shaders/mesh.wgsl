@@ -28,10 +28,6 @@ struct VertexOutput {
 #ifdef HAS_UV2
     [[location(2)]] uv2: vec2<f32>;
 #endif
-
-#ifdef HAS_TILE_INFO
-    [[location(3)]] terrain_tile_info: vec3<i32>;
-#endif
 };
 
 [[group(2), binding(0)]]
@@ -51,10 +47,6 @@ fn vertex(vertex: Vertex) -> VertexOutput {
     out.uv2 = vertex.uv2;
 #endif
 
-#ifdef HAS_TILE_INFO
-    out.terrain_tile_info = vertex.terrain_tile_info;
-#endif
-
     out.world_position = world_position;
     out.clip_position = view.view_proj * world_position;
     return out;
@@ -68,9 +60,6 @@ struct FragmentInput {
 #endif
 #ifdef HAS_UV2
     [[location(2)]] uv2: vec2<f32>;
-#endif
-#ifdef HAS_TILE_INFO
-    [[location(3)]] terrain_tile_info: vec3<i32>;
 #endif
 };
 

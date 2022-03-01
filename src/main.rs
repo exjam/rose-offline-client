@@ -31,7 +31,7 @@ use roselib::{
     io::{PathRoseExt, RoseFile, RoseReader},
 };
 
-use material::AlphaMode;
+use material::{AlphaMode, MaterialPlugin};
 use mesh_pipeline::{
     MeshRenderPlugin, MESH_ATTRIBUTE_POSITION, MESH_ATTRIBUTE_TERRAIN_TILE_INFO,
     MESH_ATTRIBUTE_UV1, MESH_ATTRIBUTE_UV2,
@@ -119,7 +119,9 @@ fn main() {
     .init_asset_loader::<ZmsMeshAssetLoader>()
     .add_plugin(MeshRenderPlugin)
     .add_plugin(TerrainMaterialPlugin)
+    .add_plugin(MaterialPlugin::<TerrainMaterial>::default())
     .add_plugin(StaticMeshMaterialPlugin)
+    .add_plugin(MaterialPlugin::<StaticMeshMaterial>::default())
     .add_plugin(WaterMeshMaterialPlugin)
     .add_state(AppState::Setup)
     .add_system_set(SystemSet::on_enter(AppState::Setup).with_system(load_zone_tiles))

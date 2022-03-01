@@ -1,37 +1,28 @@
 use crate::{
     load_internal_asset,
-    material::{AlphaMode, DrawMaterial, MaterialPipelineKey, SpecializedMaterial},
-    mesh_pipeline::{MeshPipeline, MeshPipelineKey, MeshUniform},
+    material::{AlphaMode, MaterialPipeline, SpecializedMaterial},
+    mesh_pipeline::{MESH_ATTRIBUTE_POSITION, MESH_ATTRIBUTE_UV1, MESH_ATTRIBUTE_UV2},
 };
 use bevy::{
     asset::{AssetServer, Handle},
-    core_pipeline::{AlphaMask3d, Opaque3d, Transparent3d},
     ecs::system::{lifetimeless::SRes, SystemParamItem},
     math::Vec2,
-    prelude::{
-        error, AddAsset, App, FromWorld, HandleUntyped, Mesh, Msaa, Plugin, Query, Res, ResMut,
-        World,
-    },
+    prelude::{App, HandleUntyped, Plugin},
     reflect::TypeUuid,
     render::{
         mesh::MeshVertexBufferLayout,
         prelude::Shader,
-        render_asset::{PrepareAssetError, RenderAsset, RenderAssetPlugin, RenderAssets},
-        render_component::ExtractComponentPlugin,
-        render_phase::{AddRenderCommand, DrawFunctions, RenderPhase},
+        render_asset::{PrepareAssetError, RenderAsset, RenderAssets},
         render_resource::{
             std140::{AsStd140, Std140},
-            BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout,
-            BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingResource, BindingType, Buffer,
-            BufferBindingType, BufferInitDescriptor, BufferSize, BufferUsages, RenderPipelineCache,
-            RenderPipelineDescriptor, SamplerBindingType, ShaderStages, SpecializedMeshPipeline,
-            SpecializedMeshPipelineError, SpecializedMeshPipelines, TextureSampleType,
+            BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayoutDescriptor,
+            BindGroupLayoutEntry, BindingResource, BindingType, Buffer, BufferBindingType,
+            BufferInitDescriptor, BufferSize, BufferUsages, RenderPipelineDescriptor,
+            SamplerBindingType, ShaderStages, SpecializedMeshPipelineError, TextureSampleType,
             TextureViewDimension,
         },
         renderer::RenderDevice,
         texture::Image,
-        view::{ExtractedView, VisibleEntities},
-        RenderApp, RenderStage,
     },
 };
 
@@ -49,68 +40,6 @@ impl Plugin for StaticMeshMaterialPlugin {
             "shaders/static_mesh_material.wgsl",
             Shader::from_wgsl
         );
-
-        app.add_asset::<StaticMeshMaterial>()
-            .add_plugin(ExtractComponentPlugin::<Handle<StaticMeshMaterial>>::default())
-            .add_plugin(RenderAssetPlugin::<StaticMeshMaterial>::default());
-        if let Ok(render_app) = app.get_sub_app_mut(RenderApp) {
-            render_app
-                .add_render_command::<AlphaMask3d, DrawMaterial<StaticMeshMaterial>>()
-                .add_render_command::<Opaque3d, DrawMaterial<StaticMeshMaterial>>()
-                .add_render_command::<Transparent3d, DrawMaterial<StaticMeshMaterial>>()
-                .init_resource::<StaticMeshMaterialPipeline>()
-                .init_resource::<SpecializedMeshPipelines<StaticMeshMaterialPipeline>>()
-                .add_system_to_stage(RenderStage::Queue, queue_static_mesh_material_meshes);
-        }
-    }
-}
-
-pub struct StaticMeshMaterialPipeline {
-    pub mesh_pipeline: MeshPipeline,
-    pub material_layout: BindGroupLayout,
-    pub vertex_shader: Option<Handle<Shader>>,
-    pub fragment_shader: Option<Handle<Shader>>,
-}
-
-impl SpecializedMeshPipeline for StaticMeshMaterialPipeline {
-    type Key = MaterialPipelineKey<StaticMeshMaterialKey>;
-
-    fn specialize(
-        &self,
-        key: Self::Key,
-        layout: &MeshVertexBufferLayout,
-    ) -> Result<RenderPipelineDescriptor, SpecializedMeshPipelineError> {
-        let mut descriptor = self.mesh_pipeline.specialize(key.mesh_key, layout)?;
-        if let Some(vertex_shader) = &self.vertex_shader {
-            descriptor.vertex.shader = vertex_shader.clone();
-        }
-
-        if let Some(fragment_shader) = &self.fragment_shader {
-            descriptor.fragment.as_mut().unwrap().shader = fragment_shader.clone();
-        }
-        descriptor.layout = Some(vec![
-            self.mesh_pipeline.view_layout.clone(),
-            self.material_layout.clone(),
-            self.mesh_pipeline.mesh_layout.clone(),
-        ]);
-
-        StaticMeshMaterial::specialize(&mut descriptor, key.material_key, layout)?;
-        Ok(descriptor)
-    }
-}
-
-impl FromWorld for StaticMeshMaterialPipeline {
-    fn from_world(world: &mut World) -> Self {
-        let asset_server = world.get_resource::<AssetServer>().unwrap();
-        let render_device = world.get_resource::<RenderDevice>().unwrap();
-        let material_layout = StaticMeshMaterial::bind_group_layout(render_device);
-
-        StaticMeshMaterialPipeline {
-            mesh_pipeline: world.get_resource::<MeshPipeline>().unwrap().clone(),
-            material_layout,
-            vertex_shader: StaticMeshMaterial::vertex_shader(asset_server),
-            fragment_shader: StaticMeshMaterial::fragment_shader(asset_server),
-        }
     }
 }
 
@@ -159,7 +88,7 @@ impl RenderAsset for StaticMeshMaterial {
     type PreparedAsset = GpuStaticMeshMaterial;
     type Param = (
         SRes<RenderDevice>,
-        SRes<StaticMeshMaterialPipeline>,
+        SRes<MaterialPipeline<StaticMeshMaterial>>,
         SRes<RenderAssets<Image>>,
     );
 
@@ -256,20 +185,39 @@ impl SpecializedMaterial for StaticMeshMaterial {
     fn specialize(
         descriptor: &mut RenderPipelineDescriptor,
         key: Self::Key,
-        _layout: &MeshVertexBufferLayout,
+        layout: &MeshVertexBufferLayout,
     ) -> Result<(), SpecializedMeshPipelineError> {
         if key.has_lightmap {
+            descriptor
+                .vertex
+                .shader_defs
+                .push(String::from("HAS_STATIC_MESH_LIGHTMAP"));
             descriptor
                 .fragment
                 .as_mut()
                 .unwrap()
                 .shader_defs
                 .push(String::from("HAS_STATIC_MESH_LIGHTMAP"));
+
+            let vertex_layout = layout.get_layout(&[
+                MESH_ATTRIBUTE_POSITION.at_shader_location(0),
+                MESH_ATTRIBUTE_UV1.at_shader_location(1),
+                MESH_ATTRIBUTE_UV2.at_shader_location(2),
+            ])?;
+            descriptor.vertex.buffers = vec![vertex_layout];
+        } else {
+            let vertex_layout = layout.get_layout(&[
+                MESH_ATTRIBUTE_POSITION.at_shader_location(0),
+                MESH_ATTRIBUTE_UV1.at_shader_location(1),
+            ])?;
+            descriptor.vertex.buffers = vec![vertex_layout];
         }
-        if let Some(label) = &mut descriptor.label {
-            *label = format!("static_mesh_{}", *label).into();
-        }
+
         Ok(())
+    }
+
+    fn vertex_shader(_asset_server: &AssetServer) -> Option<Handle<Shader>> {
+        Some(STATIC_MESH_MATERIAL_SHADER_HANDLE.typed())
     }
 
     fn fragment_shader(_asset_server: &AssetServer) -> Option<Handle<Shader>> {
@@ -343,126 +291,5 @@ impl SpecializedMaterial for StaticMeshMaterial {
     #[inline]
     fn alpha_mode(render_asset: &<Self as RenderAsset>::PreparedAsset) -> AlphaMode {
         render_asset.alpha_mode
-    }
-}
-
-#[allow(clippy::too_many_arguments, clippy::type_complexity)]
-fn queue_static_mesh_material_meshes(
-    opaque_draw_functions: Res<DrawFunctions<Opaque3d>>,
-    alpha_mask_draw_functions: Res<DrawFunctions<AlphaMask3d>>,
-    transparent_draw_functions: Res<DrawFunctions<Transparent3d>>,
-    material_pipeline: Res<StaticMeshMaterialPipeline>,
-    mut pipelines: ResMut<SpecializedMeshPipelines<StaticMeshMaterialPipeline>>,
-    mut pipeline_cache: ResMut<RenderPipelineCache>,
-    msaa: Res<Msaa>,
-    render_meshes: Res<RenderAssets<Mesh>>,
-    render_materials: Res<RenderAssets<StaticMeshMaterial>>,
-    material_meshes: Query<(&Handle<StaticMeshMaterial>, &Handle<Mesh>, &MeshUniform)>,
-    mut views: Query<(
-        &ExtractedView,
-        &VisibleEntities,
-        &mut RenderPhase<Opaque3d>,
-        &mut RenderPhase<AlphaMask3d>,
-        &mut RenderPhase<Transparent3d>,
-    )>,
-) {
-    for (view, visible_entities, mut opaque_phase, mut alpha_mask_phase, mut transparent_phase) in
-        views.iter_mut()
-    {
-        let draw_opaque = opaque_draw_functions
-            .read()
-            .get_id::<DrawMaterial<StaticMeshMaterial>>()
-            .unwrap();
-        let draw_alpha_mask = alpha_mask_draw_functions
-            .read()
-            .get_id::<DrawMaterial<StaticMeshMaterial>>()
-            .unwrap();
-        let draw_transparent = transparent_draw_functions
-            .read()
-            .get_id::<DrawMaterial<StaticMeshMaterial>>()
-            .unwrap();
-
-        let inverse_view_matrix = view.transform.compute_matrix().inverse();
-        let inverse_view_row_2 = inverse_view_matrix.row(2);
-        let msaa_key = MeshPipelineKey::from_msaa_samples(msaa.samples);
-
-        for visible_entity in &visible_entities.entities {
-            if let Ok((material_handle, mesh_handle, mesh_uniform)) =
-                material_meshes.get(*visible_entity)
-            {
-                if let Some(material) = render_materials.get(material_handle) {
-                    if let Some(mesh) = render_meshes.get(mesh_handle) {
-                        let mut mesh_key =
-                            MeshPipelineKey::from_primitive_topology(mesh.primitive_topology)
-                                | msaa_key;
-                        let alpha_mode = StaticMeshMaterial::alpha_mode(material);
-                        if let AlphaMode::Blend = alpha_mode {
-                            mesh_key |= MeshPipelineKey::TRANSPARENT_MAIN_PASS;
-                        }
-
-                        let material_key = StaticMeshMaterial::key(material);
-
-                        let pipeline_id = pipelines.specialize(
-                            &mut pipeline_cache,
-                            &material_pipeline,
-                            MaterialPipelineKey {
-                                mesh_key,
-                                material_key,
-                            },
-                            &mesh.layout,
-                        );
-                        let pipeline_id = match pipeline_id {
-                            Ok(id) => id,
-                            Err(err) => {
-                                error!("{}", err);
-                                continue;
-                            }
-                        };
-
-                        // NOTE: row 2 of the inverse view matrix dotted with column 3 of the model matrix
-                        // gives the z component of translation of the mesh in view space
-                        let mesh_z = inverse_view_row_2.dot(mesh_uniform.transform.col(3));
-                        match alpha_mode {
-                            AlphaMode::Opaque => {
-                                opaque_phase.add(Opaque3d {
-                                    entity: *visible_entity,
-                                    draw_function: draw_opaque,
-                                    pipeline: pipeline_id,
-                                    // NOTE: Front-to-back ordering for opaque with ascending sort means near should have the
-                                    // lowest sort key and getting further away should increase. As we have
-                                    // -z in front of the camera, values in view space decrease away from the
-                                    // camera. Flipping the sign of mesh_z results in the correct front-to-back ordering
-                                    distance: -mesh_z,
-                                });
-                            }
-                            AlphaMode::Mask(_) => {
-                                alpha_mask_phase.add(AlphaMask3d {
-                                    entity: *visible_entity,
-                                    draw_function: draw_alpha_mask,
-                                    pipeline: pipeline_id,
-                                    // NOTE: Front-to-back ordering for alpha mask with ascending sort means near should have the
-                                    // lowest sort key and getting further away should increase. As we have
-                                    // -z in front of the camera, values in view space decrease away from the
-                                    // camera. Flipping the sign of mesh_z results in the correct front-to-back ordering
-                                    distance: -mesh_z,
-                                });
-                            }
-                            AlphaMode::Blend => {
-                                transparent_phase.add(Transparent3d {
-                                    entity: *visible_entity,
-                                    draw_function: draw_transparent,
-                                    pipeline: pipeline_id,
-                                    // NOTE: Back-to-front ordering for transparent with ascending sort means far should have the
-                                    // lowest sort key and getting closer should increase. As we have
-                                    // -z in front of the camera, the largest distance is -far with values increasing toward the
-                                    // camera. As such we can just use mesh_z as the distance
-                                    distance: mesh_z,
-                                });
-                            }
-                        }
-                    }
-                }
-            }
-        }
     }
 }

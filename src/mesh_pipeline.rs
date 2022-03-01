@@ -392,16 +392,6 @@ impl SpecializedMeshPipeline for MeshPipeline {
             vertex_attributes.push(MESH_ATTRIBUTE_UV1.at_shader_location(1));
         }
 
-        if layout.contains(MESH_ATTRIBUTE_UV2) {
-            shader_defs.push(String::from("HAS_UV2"));
-            vertex_attributes.push(MESH_ATTRIBUTE_UV2.at_shader_location(2));
-        }
-
-        if layout.contains(MESH_ATTRIBUTE_TERRAIN_TILE_INFO) {
-            shader_defs.push(String::from("HAS_TILE_INFO"));
-            vertex_attributes.push(MESH_ATTRIBUTE_TERRAIN_TILE_INFO.at_shader_location(3));
-        }
-
         let vertex_buffer_layout = layout.get_layout(&vertex_attributes)?;
 
         let (label, blend, depth_write_enabled);
