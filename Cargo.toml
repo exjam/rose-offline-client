@@ -13,6 +13,7 @@ roselib = { git = "https://github.com/exjam/rose-tools", branch = "master" }
 bitflags = "1.2"
 lazy_static = "1.4.0"
 anyhow = "1.0.4"
+rose-file-readers = { git = "https://github.com/exjam/rose-offline", branch = "main" }
 
 [patch.crates-io]
 bevy = { git = "https://github.com/bevyengine/bevy", rev = "b6a647cc013861b182be5f4c85b60b2709388210" }

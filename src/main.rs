@@ -30,6 +30,7 @@ use roselib::{
     io::{PathRoseExt, RoseFile, RoseReader},
 };
 
+use rose_file_readers::{FileReader, ZmsFile};
 use static_mesh_material::{
     StaticMeshMaterial, StaticMeshMaterialPlugin, STATIC_MESH_ATTRIBUTE_UV1,
     STATIC_MESH_ATTRIBUTE_UV2, STATIC_MESH_ATTRIBUTE_UV3, STATIC_MESH_ATTRIBUTE_UV4,
@@ -214,127 +215,71 @@ impl AssetLoader for ZmsMeshAssetLoader {
         load_context: &'a mut LoadContext,
     ) -> BoxedFuture<'a, Result<(), anyhow::Error>> {
         Box::pin(async move {
-            let mut zms = ZMS::new();
-            let mut reader = RoseReader::new(Cursor::new(bytes));
-            zms.read(&mut reader).unwrap();
+            match ZmsFile::read(FileReader::from(bytes)) {
+                Ok(mut zms) => {
+                    let mut mesh = Mesh::new(PrimitiveTopology::TriangleList);
+                    mesh.set_indices(Some(Indices::U16(zms.indices)));
 
-            let mut mesh = Mesh::new(PrimitiveTopology::TriangleList);
+                    if !zms.position.is_empty() {
+                        for vert in zms.position.iter_mut() {
+                            let y = vert[1];
+                            vert[1] = vert[2];
+                            vert[2] = -y;
+                        }
+                        mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, zms.position);
+                    }
 
-            let mut indices = Vec::new();
-            for index in zms.indices.iter() {
-                indices.push(index.x as u16);
-                indices.push(index.y as u16);
-                indices.push(index.z as u16);
-            }
-            mesh.set_indices(Some(Indices::U16(indices)));
+                    if !zms.normal.is_empty() {
+                        for vert in zms.normal.iter_mut() {
+                            let y = vert[1];
+                            vert[1] = vert[2];
+                            vert[2] = -y;
+                        }
+                        mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, zms.normal);
+                    }
 
-            let mut position = Vec::new();
-            let mut colors = Vec::new();
-            let mut normals = Vec::new();
-            let mut tangents = Vec::new();
-            let mut uv1 = Vec::new();
-            let mut uv2 = Vec::new();
-            let mut uv3 = Vec::new();
-            let mut uv4 = Vec::new();
-            let mut bone_weights = Vec::new();
-            let mut bone_indices = Vec::new();
+                    if !zms.tangent.is_empty() {
+                        for vert in zms.tangent.iter_mut() {
+                            let y = vert[1];
+                            vert[1] = vert[2];
+                            vert[2] = -y;
+                        }
+                        mesh.insert_attribute(Mesh::ATTRIBUTE_TANGENT, zms.tangent);
+                    }
 
-            for vertex in zms.vertices.iter() {
-                if zms.positions_enabled() {
-                    position.push([vertex.position.x, vertex.position.z, -vertex.position.y]);
+                    if !zms.color.is_empty() {
+                        mesh.insert_attribute(Mesh::ATTRIBUTE_COLOR, zms.color);
+                    }
+
+                    if !zms.bone_weights.is_empty() {
+                        mesh.insert_attribute(Mesh::ATTRIBUTE_JOINT_WEIGHT, zms.bone_weights);
+                    }
+
+                    if !zms.bone_indices.is_empty() {
+                        mesh.insert_attribute(Mesh::ATTRIBUTE_JOINT_INDEX, zms.bone_indices);
+                    }
+
+                    if !zms.uv1.is_empty() {
+                        mesh.insert_attribute(STATIC_MESH_ATTRIBUTE_UV1, zms.uv1);
+                    }
+
+                    if !zms.uv2.is_empty() {
+                        mesh.insert_attribute(STATIC_MESH_ATTRIBUTE_UV2, zms.uv2);
+                    }
+
+                    if !zms.uv3.is_empty() {
+                        mesh.insert_attribute(STATIC_MESH_ATTRIBUTE_UV3, zms.uv3);
+                    }
+
+                    if !zms.uv4.is_empty() {
+                        mesh.insert_attribute(STATIC_MESH_ATTRIBUTE_UV4, zms.uv4);
+                    }
+
+                    load_context.set_default_asset(LoadedAsset::new(mesh));
+                    Ok(())
                 }
-
-                if zms.normals_enabled() {
-                    normals.push([vertex.normal.x, vertex.normal.z, -vertex.normal.y]);
-                }
-
-                if zms.tangents_enabled() {
-                    tangents.push([vertex.tangent.x, vertex.tangent.z, -vertex.tangent.y]);
-                }
-
-                if zms.colors_enabled() {
-                    colors.push([
-                        vertex.color.r,
-                        vertex.color.g,
-                        vertex.color.b,
-                        vertex.color.a,
-                    ]);
-                }
-
-                if zms.uv1_enabled() {
-                    uv1.push([vertex.uv1.x, vertex.uv1.y]);
-                }
-
-                if zms.uv2_enabled() {
-                    uv2.push([vertex.uv2.x, vertex.uv2.y]);
-                }
-
-                if zms.uv3_enabled() {
-                    uv3.push([vertex.uv3.x, vertex.uv3.y]);
-                }
-
-                if zms.uv4_enabled() {
-                    uv4.push([vertex.uv4.x, vertex.uv4.y]);
-                }
-
-                if zms.bones_enabled() {
-                    bone_weights.push([
-                        vertex.bone_weights.x,
-                        vertex.bone_weights.y,
-                        vertex.bone_weights.z,
-                        vertex.bone_weights.w,
-                    ]);
-                    bone_indices.push(
-                        (vertex.bone_indices.x as u32 & 0xFF)
-                            | (vertex.bone_indices.y as u32 & 0xFF) << 8
-                            | (vertex.bone_indices.z as u32 & 0xFF) << 16
-                            | (vertex.bone_indices.w as u32 & 0xFF) << 24,
-                    );
-                }
+                Err(error) => Err(anyhow::Error::new(error)),
             }
-
-            if !position.is_empty() {
-                mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, position);
-            }
-
-            if !normals.is_empty() {
-                mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
-            }
-
-            if !colors.is_empty() {
-                mesh.insert_attribute(Mesh::ATTRIBUTE_COLOR, colors);
-            }
-
-            if !tangents.is_empty() {
-                mesh.insert_attribute(Mesh::ATTRIBUTE_TANGENT, tangents);
-            }
-
-            if !bone_weights.is_empty() {
-                mesh.insert_attribute(Mesh::ATTRIBUTE_JOINT_WEIGHT, bone_weights);
-            }
-
-            if !bone_indices.is_empty() {
-                mesh.insert_attribute(Mesh::ATTRIBUTE_JOINT_INDEX, bone_indices);
-            }
-
-            if !uv1.is_empty() {
-                mesh.insert_attribute(STATIC_MESH_ATTRIBUTE_UV1, uv1);
-            }
-
-            if !uv2.is_empty() {
-                mesh.insert_attribute(STATIC_MESH_ATTRIBUTE_UV2, uv2);
-            }
-
-            if !uv3.is_empty() {
-                mesh.insert_attribute(STATIC_MESH_ATTRIBUTE_UV3, uv3);
-            }
-
-            if !uv4.is_empty() {
-                mesh.insert_attribute(STATIC_MESH_ATTRIBUTE_UV4, uv4);
-            }
-
-            load_context.set_default_asset(LoadedAsset::new(mesh));
-            Ok(())
         })
     }
 
