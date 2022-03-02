@@ -86,6 +86,7 @@ fn main() {
             speed: 200.,
         })
         .insert_resource(WindowDescriptor {
+            title: "Definitely not a ROSE client".to_string(),
             present_mode: if disable_vsync {
                 bevy::window::PresentMode::Immediate
             } else {
