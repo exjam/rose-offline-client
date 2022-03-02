@@ -1,5 +1,5 @@
 use bevy::{
-    app::{Events, ManualEventReader},
+    ecs::event::{Events, ManualEventReader},
     input::mouse::MouseMotion,
     prelude::*,
 };
@@ -50,7 +50,7 @@ fn initial_grab_cursor(mut windows: ResMut<Windows>) {
 fn setup_player(mut commands: Commands) {
     commands
         .spawn_bundle(PerspectiveCameraBundle {
-            transform: Transform::from_xyz(5200.0, 5200.0, 5.0).looking_at(Vec3::ZERO, Vec3::Z),
+            transform: Transform::from_xyz(5200.0, 0.0, -5200.0).looking_at(Vec3::ZERO, Vec3::Y),
             ..Default::default()
         })
         .insert(FlyCam);
@@ -62,19 +62,14 @@ fn player_move(
     time: Res<Time>,
     windows: Res<Windows>,
     settings: Res<MovementSettings>,
-    camera_state: ResMut<CameraState>,
     mut query: Query<(&FlyCam, &mut Transform)>,
 ) {
     let window = windows.get_primary().unwrap();
     for (_camera, mut transform) in query.iter_mut() {
         let mut velocity = Vec3::ZERO;
-        let local_y = if camera_state.pitch >= std::f32::consts::PI / 2.0 {
-            -transform.local_y()
-        } else {
-            transform.local_y()
-        };
-        let forward = Vec3::new(local_y.x, local_y.y, 0.0);
-        let right = Vec3::new(local_y.y, -local_y.x, 0.0);
+        let local_z = transform.local_z();
+        let forward = -Vec3::new(local_z.x, 0., local_z.z);
+        let right = Vec3::new(local_z.z, 0., -local_z.x);
 
         for key in keys.get_pressed() {
             if window.cursor_locked() {
@@ -83,8 +78,8 @@ fn player_move(
                     KeyCode::S => velocity -= forward,
                     KeyCode::A => velocity -= right,
                     KeyCode::D => velocity += right,
-                    KeyCode::Space => velocity += Vec3::Z,
-                    KeyCode::LShift => velocity -= Vec3::Z,
+                    KeyCode::Space => velocity += Vec3::Y,
+                    KeyCode::LShift => velocity -= Vec3::Y,
                     _ => (),
                 }
             }
@@ -119,10 +114,10 @@ fn player_look(
                 camera_state.yaw -= (settings.sensitivity * ev.delta.x * window_scale).to_radians();
             }
 
-            camera_state.pitch = camera_state.pitch.clamp(0.0, std::f32::consts::PI);
+            camera_state.pitch = camera_state.pitch.clamp(-1.54, 1.54);
 
             // Order is important to prevent unintended roll
-            transform.rotation = Quat::from_axis_angle(Vec3::Z, camera_state.yaw)
+            transform.rotation = Quat::from_axis_angle(Vec3::Y, camera_state.yaw)
                 * Quat::from_axis_angle(Vec3::X, camera_state.pitch);
         }
     }
@@ -143,6 +138,20 @@ impl Plugin for PlayerPlugin {
             .init_resource::<CameraState>()
             .init_resource::<MovementSettings>()
             .add_startup_system(setup_player)
+            .add_startup_system(initial_grab_cursor)
+            .add_system(player_move)
+            .add_system(player_look)
+            .add_system(cursor_grab);
+    }
+}
+
+/// Same as `PlayerPlugin` but does not spawn a camera
+pub struct NoCameraPlayerPlugin;
+impl Plugin for NoCameraPlayerPlugin {
+    fn build(&self, app: &mut App) {
+        app.init_resource::<InputState>()
+            .init_resource::<CameraState>()
+            .init_resource::<MovementSettings>()
             .add_startup_system(initial_grab_cursor)
             .add_system(player_move)
             .add_system(player_look)

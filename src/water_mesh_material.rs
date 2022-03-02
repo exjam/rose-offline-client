@@ -441,7 +441,7 @@ fn queue_water_mesh_material_meshes(
                             // lowest sort key and getting closer should increase. As we have
                             // -z in front of the camera, the largest distance is -far with values increasing toward the
                             // camera. As such we can just use mesh_z as the distance
-                            distance: -mesh_z,
+                            distance: mesh_z,
                         });
                     }
                 }

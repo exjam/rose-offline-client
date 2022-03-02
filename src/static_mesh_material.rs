@@ -293,58 +293,6 @@ impl SpecializedMaterial for StaticMeshMaterial {
             descriptor.depth_stencil.as_mut().unwrap().depth_compare = CompareFunction::Always;
         }
 
-        /*
-        Ok(RenderPipelineDescriptor {
-            vertex: VertexState {
-                shader: MESH_SHADER_HANDLE.typed::<Shader>(),
-                entry_point: "vertex".into(),
-                shader_defs: shader_defs.clone(),
-                buffers: vec![vertex_buffer_layout],
-            },
-            fragment: Some(FragmentState {
-                shader: MESH_SHADER_HANDLE.typed::<Shader>(),
-                shader_defs,
-                entry_point: "fragment".into(),
-                targets: vec![ColorTargetState {
-                    format: TextureFormat::bevy_default(),
-                    blend, <---
-                    write_mask: ColorWrites::ALL,
-                }],
-            }),
-            layout: Some(vec![self.view_layout.clone(), self.mesh_layout.clone()]),
-            primitive: PrimitiveState {
-                front_face: FrontFace::Ccw,
-                cull_mode: Some(Face::Back),
-                unclipped_depth: false,
-                polygon_mode: PolygonMode::Fill,
-                conservative: false,
-                topology: key.primitive_topology(),
-                strip_index_format: None,
-            },
-            depth_stencil: Some(DepthStencilState {
-                format: TextureFormat::Depth32Float,
-                depth_write_enabled,
-                depth_compare: CompareFunction::Greater,
-                stencil: StencilState {
-                    front: StencilFaceState::IGNORE,
-                    back: StencilFaceState::IGNORE,
-                    read_mask: 0,
-                    write_mask: 0,
-                },
-                bias: DepthBiasState {
-                    constant: 0,
-                    slope_scale: 0.0,
-                    clamp: 0.0,
-                },
-            }),
-            multisample: MultisampleState {
-                count: key.msaa_samples(),
-                mask: !0,
-                alpha_to_coverage_enabled: false,
-            },
-            label: Some(label),
-        })
-        */
         Ok(())
     }
 

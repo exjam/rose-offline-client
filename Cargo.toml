@@ -6,13 +6,16 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-bevy = { git = "https://github.com/bevyengine/bevy", branch = "main", features = ["dds"] }
+bevy = { version = "0.6", features = ["dds"] }
 clap = "3.1"
 log = "0.4.14"
 roselib = { git = "https://github.com/exjam/rose-tools", branch = "master" }
 bitflags = "1.2"
 lazy_static = "1.4.0"
 anyhow = "1.0.4"
+
+[patch.crates-io]
+bevy = { git = "https://github.com/bevyengine/bevy", rev = "b6a647cc013861b182be5f4c85b60b2709388210" }
 
 [profile.dev.package."*"]
 opt-level = 3

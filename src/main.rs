@@ -1,4 +1,3 @@
-mod bevy_flycam;
 mod material;
 mod mesh_pipeline;
 mod static_mesh_material;
@@ -15,8 +14,8 @@ use bevy::{
     math::{Quat, Vec2, Vec3},
     prelude::{
         AddAsset, App, AssetServer, Assets, BuildChildren, Commands, ComputedVisibility,
-        GlobalTransform, Handle, Image, Mesh, Msaa, Res, ResMut, State, SystemSet, Transform,
-        Visibility,
+        GlobalTransform, Handle, Image, Mesh, Msaa, PerspectiveCameraBundle, Res, ResMut, State,
+        SystemSet, Transform, Visibility,
     },
     render::{
         mesh::Indices,
@@ -24,13 +23,11 @@ use bevy::{
     },
     window::WindowDescriptor,
 };
-use bevy_flycam::MovementSettings;
+mod bevy_flycam;
+use bevy_flycam::{FlyCam, MovementSettings, NoCameraPlayerPlugin};
 
 use roselib::{
-    files::{
-        ifo, lit, zon::ZoneTileRotation, zsc::SceneBlendMode, HIM, IFO, LIT, STB, TIL, ZMS, ZON,
-        ZSC,
-    },
+    files::{ifo, lit, zon::ZoneTileRotation, HIM, IFO, LIT, STB, TIL, ZMS, ZON, ZSC},
     io::{PathRoseExt, RoseFile, RoseReader},
 };
 
@@ -114,7 +111,7 @@ fn main() {
         .add_plugin(bevy::core_pipeline::CorePipelinePlugin::default());
 
     // Initialise 3rd party bevy plugins
-    app.add_plugin(bevy_flycam::PlayerPlugin);
+    app.add_plugin(NoCameraPlayerPlugin);
 
     // Initialise rose stuff
     app.insert_resource(ClientConfiguration {
@@ -247,15 +244,15 @@ impl AssetLoader for ZmsMeshAssetLoader {
 
             for vertex in zms.vertices.iter() {
                 if zms.positions_enabled() {
-                    position.push([vertex.position.x, vertex.position.y, vertex.position.z]);
+                    position.push([vertex.position.x, vertex.position.z, -vertex.position.y]);
                 }
 
                 if zms.normals_enabled() {
-                    normals.push([vertex.normal.x, vertex.normal.y, vertex.normal.z]);
+                    normals.push([vertex.normal.x, vertex.normal.z, -vertex.normal.y]);
                 }
 
                 if zms.tangents_enabled() {
-                    tangents.push([vertex.tangent.x, vertex.tangent.y, vertex.tangent.z]);
+                    tangents.push([vertex.tangent.x, vertex.tangent.z, -vertex.tangent.y]);
                 }
 
                 if zms.colors_enabled() {
@@ -364,6 +361,14 @@ fn setup(
     mut textures: ResMut<Assets<Image>>,
     client_configuration: Res<ClientConfiguration>,
 ) {
+    // Create camera
+    commands
+        .spawn_bundle(PerspectiveCameraBundle {
+            transform: Transform::from_xyz(5200.0, 0.0, -5200.0).looking_at(Vec3::ZERO, Vec3::Y),
+            ..Default::default()
+        })
+        .insert(FlyCam);
+
     // Create tile array texture
     let tile_texture_size = textures
         .get(zone_info.tile_image_handles[0].clone())
@@ -460,7 +465,7 @@ fn setup(
                 for block_x in 0..16 {
                     for block_y in 0..16 {
                         let base_x = block_x as f32 * 4.0 * 2.5;
-                        let base_y = block_y as f32 * 4.0 * -2.5;
+                        let base_y = block_y as f32 * 4.0 * 2.5;
 
                         let tile =
                             &zone_info.zone.tiles[tilemap.tiles[block_y][block_x].tile_id as usize];
@@ -484,8 +489,8 @@ fn setup(
 
                                 positions.push([
                                     base_x + x as f32 * 2.5,
-                                    base_y + y as f32 * -2.5,
                                     height,
+                                    base_y + y as f32 * 2.5,
                                 ]);
                                 uvs_tile.push([x as f32 / 4.0, y as f32 / 4.0]);
                                 uvs_lightmap.push([
@@ -521,7 +526,7 @@ fn setup(
                 commands.spawn().insert_bundle((
                     meshes.add(mesh),
                     material.clone(),
-                    Transform::from_xyz(offset_x, offset_y, 0.0),
+                    Transform::from_xyz(offset_x, 0.0, -offset_y),
                     GlobalTransform::default(),
                     Visibility::default(),
                     ComputedVisibility::default(),
@@ -546,22 +551,22 @@ fn setup(
                     for patch in ocean.patches.iter() {
                         let start = Vec3::new(
                             patch.start.x / 100.0,
-                            patch.start.z / 100.0,
                             patch.start.y / 100.0,
+                            -patch.start.z / 100.0,
                         );
                         let end = Vec3::new(
                             patch.end.x / 100.0,
-                            patch.end.z / 100.0,
                             patch.end.y / 100.0,
+                            -patch.end.z / 100.0,
                         );
                         let uv_x = (end.x - start.x) / (ocean.size / 100.0);
-                        let uv_y = (start.y - end.y) / (ocean.size / 100.0);
+                        let uv_y = (end.z - start.z) / (ocean.size / 100.0);
 
                         let vertices = [
-                            ([start.x, end.y, start.z], [uv_x, uv_y]),
+                            ([start.x, start.y, end.z], [uv_x, uv_y]),
                             ([start.x, start.y, start.z], [uv_x, 0.0]),
                             ([end.x, start.y, start.z], [0.0, 0.0]),
-                            ([end.x, end.y, start.z], [0.0, uv_y]),
+                            ([end.x, start.y, end.z], [0.0, uv_y]),
                         ];
                         let indices = Indices::U32(vec![0, 2, 1, 0, 3, 2]);
 
@@ -580,7 +585,7 @@ fn setup(
                         commands.spawn().insert_bundle((
                             meshes.add(mesh),
                             water_material.clone(),
-                            Transform::from_xyz(5200.0, 5200.0, 0.0),
+                            Transform::from_xyz(5200.0, 0.0, -5200.0),
                             GlobalTransform::default(),
                             Visibility::default(),
                             ComputedVisibility::default(),
@@ -641,21 +646,21 @@ fn spawn_zsc_object(
 
     let position = Vec3::new(
         object_instance.position.x,
-        object_instance.position.y,
         object_instance.position.z,
+        -object_instance.position.y,
     ) / 100.0
-        + Vec3::new(5200.0, 5200.0, 0.0);
+        + Vec3::new(5200.0, 0.0, -5200.0);
 
     let scale = Vec3::new(
         object_instance.scale.x,
-        object_instance.scale.y,
         object_instance.scale.z,
+        object_instance.scale.y,
     );
 
     let rotation = Quat::from_xyzw(
         object_instance.rotation.x,
-        object_instance.rotation.y,
         object_instance.rotation.z,
+        -object_instance.rotation.y,
         object_instance.rotation.w,
     );
 
@@ -679,18 +684,18 @@ fn spawn_zsc_object(
             for (part_index, object_part) in object.parts.iter().enumerate() {
                 let part_position = Vec3::new(
                     object_part.position.x,
-                    object_part.position.y,
                     object_part.position.z,
+                    -object_part.position.y,
                 ) / 100.0;
                 let part_scale = Vec3::new(
                     object_part.scale.x,
-                    object_part.scale.y,
                     object_part.scale.z,
+                    object_part.scale.y,
                 );
                 let part_rotation = Quat::from_xyzw(
                     object_part.rotation.x,
-                    object_part.rotation.y,
                     object_part.rotation.z,
+                    -object_part.rotation.y,
                     object_part.rotation.w,
                 );
                 let part_transform = Transform::default()
