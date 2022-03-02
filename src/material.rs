@@ -407,7 +407,7 @@ pub fn queue_material_meshes<M: SpecializedMaterial>(
                                     // lowest sort key and getting further away should increase. As we have
                                     // -z in front of the camera, values in view space decrease away from the
                                     // camera. Flipping the sign of mesh_z results in the correct front-to-back ordering
-                                    distance: -mesh_z,
+                                    distance: mesh_z,
                                 });
                             }
                             AlphaMode::Mask(_) => {
@@ -419,7 +419,7 @@ pub fn queue_material_meshes<M: SpecializedMaterial>(
                                     // lowest sort key and getting further away should increase. As we have
                                     // -z in front of the camera, values in view space decrease away from the
                                     // camera. Flipping the sign of mesh_z results in the correct front-to-back ordering
-                                    distance: -mesh_z,
+                                    distance: mesh_z,
                                 });
                             }
                             AlphaMode::Blend => {
@@ -431,7 +431,7 @@ pub fn queue_material_meshes<M: SpecializedMaterial>(
                                     // lowest sort key and getting closer should increase. As we have
                                     // -z in front of the camera, the largest distance is -far with values increasing toward the
                                     // camera. As such we can just use mesh_z as the distance
-                                    distance: mesh_z,
+                                    distance: -mesh_z,
                                 });
                             }
                         }
