@@ -1,16 +1,13 @@
-use crate::{
-    load_internal_asset,
-    material::{MaterialPipelineKey, SetMaterialBindGroup, SpecializedMaterial},
-    mesh_pipeline::{
-        DrawMesh, MeshPipeline, MeshPipelineKey, MeshUniform, SetMeshBindGroup,
-        SetMeshViewBindGroup,
-    },
-};
+use crate::load_internal_asset;
 use bevy::{
     asset::{AssetServer, Handle},
     core::Time,
     core_pipeline::Transparent3d,
     ecs::system::{lifetimeless::SRes, SystemParamItem},
+    pbr::{
+        DrawMesh, Material, MeshPipeline, MeshPipelineKey, MeshUniform, SetMaterialBindGroup,
+        SetMeshBindGroup, SetMeshViewBindGroup,
+    },
     prelude::{
         error, AddAsset, App, Commands, Entity, FromWorld, HandleUntyped, Mesh, Msaa, Plugin,
         Query, Res, ResMut, World,
@@ -141,14 +138,14 @@ pub struct WaterMeshMaterialPipeline {
 }
 
 impl SpecializedMeshPipeline for WaterMeshMaterialPipeline {
-    type Key = MaterialPipelineKey<WaterMeshMaterialKey>;
+    type Key = MeshPipelineKey;
 
     fn specialize(
         &self,
         key: Self::Key,
         layout: &MeshVertexBufferLayout,
     ) -> Result<RenderPipelineDescriptor, SpecializedMeshPipelineError> {
-        let mut descriptor = self.mesh_pipeline.specialize(key.mesh_key, layout)?;
+        let mut descriptor = self.mesh_pipeline.specialize(key, layout)?;
         if let Some(vertex_shader) = &self.vertex_shader {
             descriptor.vertex.shader = vertex_shader.clone();
         }
@@ -175,7 +172,7 @@ impl SpecializedMeshPipeline for WaterMeshMaterialPipeline {
             self.time_uniform_layout.clone(),
         ]);
 
-        WaterMeshMaterial::specialize(&mut descriptor, key.material_key, layout)?;
+        WaterMeshMaterial::specialize(&mut descriptor, layout)?;
         Ok(descriptor)
     }
 }
@@ -252,14 +249,12 @@ impl RenderAsset for WaterMeshMaterial {
         material: Self::ExtractedAsset,
         (render_device, material_pipeline, gpu_images): &mut SystemParamItem<Self::Param>,
     ) -> Result<Self::PreparedAsset, PrepareAssetError<Self::ExtractedAsset>> {
-        let (water_texture_view, _) = if let Some(result) = material_pipeline
-            .mesh_pipeline
-            .get_image_texture(gpu_images, Some(&material.water_texture_array))
-        {
-            result
-        } else {
+        let water_texture_gpu_image = gpu_images.get(&material.water_texture_array);
+        if water_texture_gpu_image.is_none() {
             return Err(PrepareAssetError::RetryNextUpdate(material));
-        };
+        }
+        let water_texture_view = &water_texture_gpu_image.unwrap().texture_view;
+        let water_texture_sampler = &material_pipeline.sampler;
 
         let bind_group = render_device.create_bind_group(&BindGroupDescriptor {
             entries: &[
@@ -269,7 +264,7 @@ impl RenderAsset for WaterMeshMaterial {
                 },
                 BindGroupEntry {
                     binding: 1,
-                    resource: BindingResource::Sampler(&material_pipeline.sampler),
+                    resource: BindingResource::Sampler(water_texture_sampler),
                 },
             ],
             label: Some("water_mesh_material_bind_group"),
@@ -283,19 +278,9 @@ impl RenderAsset for WaterMeshMaterial {
     }
 }
 
-#[derive(Clone, PartialEq, Eq, Hash)]
-pub struct WaterMeshMaterialKey;
-
-impl SpecializedMaterial for WaterMeshMaterial {
-    type Key = WaterMeshMaterialKey;
-
-    fn key(_render_asset: &<Self as RenderAsset>::PreparedAsset) -> Self::Key {
-        WaterMeshMaterialKey {}
-    }
-
+impl Material for WaterMeshMaterial {
     fn specialize(
         descriptor: &mut RenderPipelineDescriptor,
-        _key: Self::Key,
         layout: &MeshVertexBufferLayout,
     ) -> Result<(), SpecializedMeshPipelineError> {
         let vertex_layout = layout.get_layout(&[
@@ -404,22 +389,17 @@ fn queue_water_mesh_material_meshes(
             if let Ok((material_handle, mesh_handle, mesh_uniform)) =
                 material_meshes.get(*visible_entity)
             {
-                if let Some(material) = render_materials.get(material_handle) {
+                if render_materials.get(material_handle).is_some() {
                     if let Some(mesh) = render_meshes.get(mesh_handle) {
                         let mesh_key =
                             MeshPipelineKey::from_primitive_topology(mesh.primitive_topology)
                                 | msaa_key
                                 | MeshPipelineKey::TRANSPARENT_MAIN_PASS;
 
-                        let material_key = WaterMeshMaterial::key(material);
-
                         let pipeline_id = pipelines.specialize(
                             &mut pipeline_cache,
                             &material_pipeline,
-                            MaterialPipelineKey {
-                                mesh_key,
-                                material_key,
-                            },
+                            mesh_key,
                             &mesh.layout,
                         );
                         let pipeline_id = match pipeline_id {

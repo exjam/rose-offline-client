@@ -1,5 +1,3 @@
-mod material;
-mod mesh_pipeline;
 mod static_mesh_material;
 mod terrain_material;
 mod water_mesh_material;
@@ -12,6 +10,7 @@ use std::{
 use bevy::{
     asset::{AssetLoader, AssetServerSettings, BoxedFuture, LoadContext, LoadState, LoadedAsset},
     math::{Quat, Vec2, Vec3},
+    pbr::{AlphaMode, MeshRenderPlugin},
     prelude::{
         AddAsset, App, AssetServer, Assets, BuildChildren, Commands, ComputedVisibility,
         GlobalTransform, Handle, Image, Mesh, Msaa, PerspectiveCameraBundle, Res, ResMut, State,
@@ -31,8 +30,6 @@ use roselib::{
     io::{PathRoseExt, RoseFile, RoseReader},
 };
 
-use material::{AlphaMode, MaterialPlugin};
-use mesh_pipeline::MeshRenderPlugin;
 use static_mesh_material::{
     StaticMeshMaterial, StaticMeshMaterialPlugin, STATIC_MESH_ATTRIBUTE_UV1,
     STATIC_MESH_ATTRIBUTE_UV2, STATIC_MESH_ATTRIBUTE_UV3, STATIC_MESH_ATTRIBUTE_UV4,
@@ -108,7 +105,8 @@ fn main() {
         .add_plugin(bevy::scene::ScenePlugin::default())
         .add_plugin(bevy::winit::WinitPlugin::default())
         .add_plugin(bevy::render::RenderPlugin::default())
-        .add_plugin(bevy::core_pipeline::CorePipelinePlugin::default());
+        .add_plugin(bevy::core_pipeline::CorePipelinePlugin::default())
+        .add_plugin(bevy::pbr::PbrPlugin::default());
 
     // Initialise 3rd party bevy plugins
     app.add_plugin(NoCameraPlayerPlugin);
@@ -122,9 +120,7 @@ fn main() {
     .init_asset_loader::<ZmsMeshAssetLoader>()
     .add_plugin(MeshRenderPlugin)
     .add_plugin(TerrainMaterialPlugin)
-    .add_plugin(MaterialPlugin::<TerrainMaterial>::default())
     .add_plugin(StaticMeshMaterialPlugin)
-    .add_plugin(MaterialPlugin::<StaticMeshMaterial>::default())
     .add_plugin(WaterMeshMaterialPlugin)
     .add_state(AppState::Setup)
     .add_system_set(SystemSet::on_enter(AppState::Setup).with_system(load_zone_tiles))
@@ -457,6 +453,7 @@ fn setup(
                 });
 
                 let mut positions = Vec::new();
+                let mut normals = Vec::new();
                 let mut uvs_lightmap = Vec::new();
                 let mut uvs_tile = Vec::new();
                 let mut indices = Vec::new();
@@ -487,11 +484,27 @@ fn setup(
                                 let heightmap_y = y + block_y * 4;
                                 let height = heightmap.height(heightmap_x, heightmap_y) / 100.0;
 
+                                let height_l =
+                                    heightmap.height(heightmap_x.max(1) - 1, heightmap_y) / 100.0;
+                                let height_r =
+                                    heightmap.height(heightmap_x.min(62) + 1, heightmap_y) / 100.0;
+                                let height_t =
+                                    heightmap.height(heightmap_x, heightmap_y.max(1) - 1) / 100.0;
+                                let height_b =
+                                    heightmap.height(heightmap_x, heightmap_y.min(62) + 1) / 100.0;
+                                let normal = Vec3::new(
+                                    (height_r - height_l) / 2.0,
+                                    -1.0,
+                                    (height_b - height_t) / 2.0,
+                                )
+                                .normalize();
+
                                 positions.push([
                                     base_x + x as f32 * 2.5,
                                     height,
                                     base_y + y as f32 * 2.5,
                                 ]);
+                                normals.push([normal.x, normal.y, normal.z]);
                                 uvs_tile.push([x as f32 / 4.0, y as f32 / 4.0]);
                                 uvs_lightmap.push([
                                     (block_x as f32 * 4.0 + x as f32) / 64.0,
@@ -519,6 +532,7 @@ fn setup(
                 let mut mesh = Mesh::new(PrimitiveTopology::TriangleList);
                 mesh.set_indices(Some(Indices::U16(indices)));
                 mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
+                mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
                 mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, uvs_lightmap);
                 mesh.insert_attribute(TERRAIN_MESH_ATTRIBUTE_UV1, uvs_tile);
                 mesh.insert_attribute(TERRAIN_MESH_ATTRIBUTE_TILE_INFO, tile_ids);
@@ -563,23 +577,26 @@ fn setup(
                         let uv_y = (end.z - start.z) / (ocean.size / 100.0);
 
                         let vertices = [
-                            ([start.x, start.y, end.z], [uv_x, uv_y]),
-                            ([start.x, start.y, start.z], [uv_x, 0.0]),
-                            ([end.x, start.y, start.z], [0.0, 0.0]),
-                            ([end.x, start.y, end.z], [0.0, uv_y]),
+                            ([start.x, start.y, end.z], [0.0, 1.0, 0.0], [uv_x, uv_y]),
+                            ([start.x, start.y, start.z], [0.0, 1.0, 0.0], [uv_x, 0.0]),
+                            ([end.x, start.y, start.z], [0.0, 1.0, 0.0], [0.0, 0.0]),
+                            ([end.x, start.y, end.z], [0.0, 1.0, 0.0], [0.0, uv_y]),
                         ];
                         let indices = Indices::U32(vec![0, 2, 1, 0, 3, 2]);
 
                         let mut positions = Vec::new();
+                        let mut normals = Vec::new();
                         let mut uvs = Vec::new();
-                        for (position, uv) in &vertices {
+                        for (position, normal, uv) in &vertices {
                             positions.push(*position);
+                            normals.push(*normal);
                             uvs.push(*uv);
                         }
 
                         let mut mesh = Mesh::new(PrimitiveTopology::TriangleList);
                         mesh.set_indices(Some(indices));
                         mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
+                        mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
                         mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, uvs);
 
                         commands.spawn().insert_bundle((
@@ -737,10 +754,10 @@ fn spawn_zsc_object(
                         } else {
                             None
                         },
-                        alpha_mode: if zsc_material.alpha_test_enabled {
-                            AlphaMode::Mask(zsc_material.alpha_ref as f32 / 256.0)
-                        } else if zsc_material.alpha_enabled {
+                        alpha_mode: if zsc_material.alpha_enabled {
                             AlphaMode::Blend
+                        } else if zsc_material.alpha_test_enabled {
+                            AlphaMode::Mask(zsc_material.alpha_ref as f32 / 256.0)
                         } else {
                             AlphaMode::Opaque
                         },

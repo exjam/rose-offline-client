@@ -1,10 +1,8 @@
-use crate::{
-    load_internal_asset,
-    material::{MaterialPipeline, SpecializedMaterial},
-};
+use crate::load_internal_asset;
 use bevy::{
     asset::{AssetServer, Handle},
     ecs::system::{lifetimeless::SRes, SystemParamItem},
+    pbr::{MaterialPipeline, MaterialPlugin, SpecializedMaterial},
     prelude::{App, HandleUntyped, Mesh, Plugin},
     reflect::TypeUuid,
     render::{
@@ -13,12 +11,13 @@ use bevy::{
         render_asset::{PrepareAssetError, RenderAsset, RenderAssets},
         render_resource::{
             BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayoutDescriptor,
-            BindGroupLayoutEntry, BindingResource, BindingType, RenderPipelineDescriptor,
-            SamplerBindingType, ShaderStages, SpecializedMeshPipelineError, TextureSampleType,
-            TextureViewDimension, VertexFormat,
+            BindGroupLayoutEntry, BindingResource, BindingType, FilterMode,
+            RenderPipelineDescriptor, Sampler, SamplerBindingType, SamplerDescriptor, ShaderStages,
+            SpecializedMeshPipelineError, TextureSampleType, TextureViewDimension, VertexFormat,
         },
         renderer::RenderDevice,
         texture::Image,
+        RenderApp,
     },
 };
 
@@ -42,11 +41,28 @@ impl Plugin for TerrainMaterialPlugin {
             "shaders/terrain_material.wgsl",
             Shader::from_wgsl
         );
+
+        app.add_plugin(MaterialPlugin::<TerrainMaterial>::default());
+
+        let render_device = app.world.get_resource::<RenderDevice>().unwrap();
+        let linear_sampler = render_device.create_sampler(&SamplerDescriptor {
+            mag_filter: FilterMode::Linear,
+            min_filter: FilterMode::Linear,
+            ..Default::default()
+        });
+
+        if let Ok(render_app) = app.get_sub_app_mut(RenderApp) {
+            render_app.insert_resource(TerrainMaterialSamplers { linear_sampler });
+        }
     }
 }
 
+pub struct TerrainMaterialSamplers {
+    linear_sampler: Sampler,
+}
+
 #[derive(Debug, Clone, TypeUuid)]
-#[uuid = "7494888b-c082-457b-aacf-517228cc0c22"]
+#[uuid = "6994888b-4202-457b-aacf-517228cc0c22"]
 pub struct TerrainMaterial {
     pub lightmap_texture: Handle<Image>,
     pub tile_array_texture: Handle<Image>,
@@ -63,10 +79,12 @@ pub struct GpuTerrainMaterial {
 impl RenderAsset for TerrainMaterial {
     type ExtractedAsset = TerrainMaterial;
     type PreparedAsset = GpuTerrainMaterial;
+    #[allow(clippy::type_complexity)]
     type Param = (
         SRes<RenderDevice>,
         SRes<MaterialPipeline<TerrainMaterial>>,
         SRes<RenderAssets<Image>>,
+        SRes<TerrainMaterialSamplers>,
     );
 
     fn extract_asset(&self) -> Self::ExtractedAsset {
@@ -75,27 +93,21 @@ impl RenderAsset for TerrainMaterial {
 
     fn prepare_asset(
         material: Self::ExtractedAsset,
-        (render_device, material_pipeline, gpu_images): &mut SystemParamItem<Self::Param>,
+        (render_device, material_pipeline, gpu_images, samplers): &mut SystemParamItem<Self::Param>,
     ) -> Result<Self::PreparedAsset, PrepareAssetError<Self::ExtractedAsset>> {
-        let (lightmap_texture_view, lightmap_texture_sampler) = if let Some(result) =
-            material_pipeline
-                .mesh_pipeline
-                .get_image_texture(gpu_images, Some(&material.lightmap_texture))
-        {
-            result
-        } else {
+        let lightmap_gpu_image = gpu_images.get(&material.lightmap_texture);
+        if lightmap_gpu_image.is_none() {
             return Err(PrepareAssetError::RetryNextUpdate(material));
-        };
+        }
+        let lightmap_texture_view = &lightmap_gpu_image.unwrap().texture_view;
+        let lightmap_texture_sampler = &samplers.linear_sampler;
 
-        let (tile_array_texture_view, tile_array_texture_sampler) = if let Some(result) =
-            material_pipeline
-                .mesh_pipeline
-                .get_image_texture(gpu_images, Some(&material.tile_array_texture))
-        {
-            result
-        } else {
+        let tile_array_gpu_image = gpu_images.get(&material.tile_array_texture);
+        if tile_array_gpu_image.is_none() {
             return Err(PrepareAssetError::RetryNextUpdate(material));
-        };
+        }
+        let tile_array_texture_view = &tile_array_gpu_image.unwrap().texture_view;
+        let tile_array_texture_sampler = &samplers.linear_sampler;
 
         let bind_group = render_device.create_bind_group(&BindGroupDescriptor {
             entries: &[
@@ -122,8 +134,8 @@ impl RenderAsset for TerrainMaterial {
 
         Ok(GpuTerrainMaterial {
             bind_group,
-            lightmap_texture: material.lightmap_texture,
-            tile_array_texture: material.tile_array_texture,
+            lightmap_texture: material.lightmap_texture.clone(),
+            tile_array_texture: material.tile_array_texture.clone(),
         })
     }
 }

@@ -1,11 +1,9 @@
-use crate::{
-    load_internal_asset,
-    material::{AlphaMode, MaterialPipeline, SpecializedMaterial},
-};
+use crate::load_internal_asset;
 use bevy::{
     asset::{AssetServer, Handle},
     ecs::system::{lifetimeless::SRes, SystemParamItem},
     math::Vec2,
+    pbr::{AlphaMode, MaterialPipeline, MaterialPlugin, SpecializedMaterial},
     prelude::{App, HandleUntyped, Mesh, Plugin},
     reflect::TypeUuid,
     render::{
@@ -15,13 +13,15 @@ use bevy::{
         render_resource::{
             std140::{AsStd140, Std140},
             BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayoutDescriptor,
-            BindGroupLayoutEntry, BindingResource, BindingType, Buffer, BufferBindingType,
-            BufferInitDescriptor, BufferSize, BufferUsages, CompareFunction,
-            RenderPipelineDescriptor, SamplerBindingType, ShaderStages,
-            SpecializedMeshPipelineError, TextureSampleType, TextureViewDimension, VertexFormat,
+            BindGroupLayoutEntry, BindingResource, BindingType, BlendState, Buffer,
+            BufferBindingType, BufferInitDescriptor, BufferSize, BufferUsages, CompareFunction,
+            FilterMode, RenderPipelineDescriptor, Sampler, SamplerBindingType, SamplerDescriptor,
+            ShaderStages, SpecializedMeshPipelineError, TextureSampleType, TextureViewDimension,
+            VertexFormat,
         },
         renderer::RenderDevice,
         texture::Image,
+        RenderApp,
     },
 };
 
@@ -50,7 +50,24 @@ impl Plugin for StaticMeshMaterialPlugin {
             "shaders/static_mesh_material.wgsl",
             Shader::from_wgsl
         );
+
+        app.add_plugin(MaterialPlugin::<StaticMeshMaterial>::default());
+
+        let render_device = app.world.get_resource::<RenderDevice>().unwrap();
+        let linear_sampler = render_device.create_sampler(&SamplerDescriptor {
+            mag_filter: FilterMode::Linear,
+            min_filter: FilterMode::Linear,
+            ..Default::default()
+        });
+
+        if let Ok(render_app) = app.get_sub_app_mut(RenderApp) {
+            render_app.insert_resource(StaticMeshMaterialSamplers { linear_sampler });
+        }
     }
+}
+
+pub struct StaticMeshMaterialSamplers {
+    linear_sampler: Sampler,
 }
 
 // NOTE: These must match the bit flags in shaders/static_mesh_material.wgsl!
@@ -126,10 +143,12 @@ pub struct GpuStaticMeshMaterial {
 impl RenderAsset for StaticMeshMaterial {
     type ExtractedAsset = StaticMeshMaterial;
     type PreparedAsset = GpuStaticMeshMaterial;
+    #[allow(clippy::type_complexity)]
     type Param = (
         SRes<RenderDevice>,
         SRes<MaterialPipeline<StaticMeshMaterial>>,
         SRes<RenderAssets<Image>>,
+        SRes<StaticMeshMaterialSamplers>,
     );
 
     fn extract_asset(&self) -> Self::ExtractedAsset {
@@ -138,26 +157,24 @@ impl RenderAsset for StaticMeshMaterial {
 
     fn prepare_asset(
         material: Self::ExtractedAsset,
-        (render_device, material_pipeline, gpu_images): &mut SystemParamItem<Self::Param>,
+        (render_device, material_pipeline, gpu_images, samplers): &mut SystemParamItem<Self::Param>,
     ) -> Result<Self::PreparedAsset, PrepareAssetError<Self::ExtractedAsset>> {
-        let (base_texture_view, base_texture_sampler) = if let Some(result) = material_pipeline
-            .mesh_pipeline
-            .get_image_texture(gpu_images, Some(&material.base_texture))
-        {
-            result
-        } else {
+        let base_gpu_image = gpu_images.get(&material.base_texture);
+        if base_gpu_image.is_none() {
             return Err(PrepareAssetError::RetryNextUpdate(material));
-        };
+        }
+        let base_texture_view = &base_gpu_image.unwrap().texture_view;
+        let base_texture_sampler = &samplers.linear_sampler;
 
-        let (lightmap_texture_view, lightmap_texture_sampler) = if let Some(result) =
-            material_pipeline
-                .mesh_pipeline
-                .get_image_texture(gpu_images, material.lightmap_texture.as_ref())
+        let (lightmap_texture_view, _) = if let Some(result) = material_pipeline
+            .mesh_pipeline
+            .get_image_texture(gpu_images, &material.lightmap_texture)
         {
             result
         } else {
             return Err(PrepareAssetError::RetryNextUpdate(material));
         };
+        let lightmap_texture_sampler = &samplers.linear_sampler;
 
         let mut flags = StaticMeshMaterialFlags::NONE;
         let mut alpha_cutoff = 0.5;
@@ -235,6 +252,7 @@ impl RenderAsset for StaticMeshMaterial {
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct StaticMeshMaterialKey {
     has_lightmap: bool,
+    is_alpha_mask: bool,
     two_sided: bool,
     z_test_enabled: bool,
     z_write_enabled: bool,
@@ -246,6 +264,7 @@ impl SpecializedMaterial for StaticMeshMaterial {
     fn key(render_asset: &<Self as RenderAsset>::PreparedAsset) -> Self::Key {
         StaticMeshMaterialKey {
             has_lightmap: render_asset.lightmap_texture.is_some(),
+            is_alpha_mask: matches!(render_asset.alpha_mode, AlphaMode::Mask(_)),
             two_sided: render_asset.two_sided,
             z_test_enabled: render_asset.z_test_enabled,
             z_write_enabled: render_asset.z_write_enabled,
@@ -370,6 +389,13 @@ impl SpecializedMaterial for StaticMeshMaterial {
 
     #[inline]
     fn alpha_mode(render_asset: &<Self as RenderAsset>::PreparedAsset) -> AlphaMode {
-        render_asset.alpha_mode
+        if !render_asset.z_write_enabled {
+            // When no depth write we need back to front rendering which only happens
+            // in the the transparent pass, by returning AlphaMode::Blend here we tell
+            // pbr::MeshPipeline to use the transparent pass
+            AlphaMode::Blend
+        } else {
+            render_asset.alpha_mode
+        }
     }
 }

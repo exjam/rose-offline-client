@@ -1,5 +1,5 @@
-#import mesh_pipeline::mesh_view_bind_group
-#import mesh_pipeline::mesh_struct
+#import bevy_pbr::mesh_view_bind_group
+#import bevy_pbr::mesh_struct
 
 [[group(2), binding(0)]]
 var<uniform> mesh: Mesh;
