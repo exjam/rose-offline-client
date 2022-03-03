@@ -47,13 +47,18 @@ struct ClientConfiguration {
 }
 
 fn main() {
-    let matches = clap::Command::new("bevy_rose")
+    let mut command = clap::Command::new("bevy_rose")
         .arg(
             clap::Arg::new("data-idx")
                 .long("data-idx")
                 .help("Path to data.idx")
-                .takes_value(true)
-                .default_value("data.idx"),
+                .takes_value(true),
+        )
+        .arg(
+            clap::Arg::new("data-path")
+                .long("data-path")
+                .help("Optional path to extracted data, any files here override ones in data.idx")
+                .takes_value(true),
         )
         .arg(
             clap::Arg::new("zone")
@@ -65,26 +70,41 @@ fn main() {
             clap::Arg::new("disable-vsync")
                 .long("disable-vsync")
                 .help("Disable v-sync to see accurate frame times"),
-        )
-        .get_matches();
-    let data_idx_path = Path::new(matches.value_of("data-idx").unwrap());
+        );
+    let data_path_error = command.error(
+        clap::ErrorKind::ArgumentNotFound,
+        "Must specify at least one of --data-idx or --data-path",
+    );
+    let matches = command.get_matches();
+
     let zone_id = matches
         .value_of("zone")
         .and_then(|str| str.parse::<usize>().ok())
         .unwrap_or(2);
     let disable_vsync = matches.is_present("disable-vsync");
 
-    let vfs = VfsIndex::load(data_idx_path).expect("Failed reading data.idx");
+    let mut data_idx_path = matches.value_of("data-idx").map(Path::new);
+    let data_extracted_path = matches.value_of("data-path").map(Path::new);
+
+    if data_idx_path.is_none() && data_extracted_path.is_none() {
+        if Path::new("data.idx").exists() {
+            data_idx_path = Some(Path::new("data.idx"));
+        } else {
+            data_path_error.exit();
+        }
+    }
+
+    let vfs =
+        VfsIndex::with_paths(data_idx_path, data_extracted_path).expect("Failed to initialise VFS");
 
     let mut app = App::new();
 
     // Initialise bevy engine
     app.insert_resource(Msaa { samples: 4 })
         .insert_resource(AssetServerSettings {
-            asset_folder: data_idx_path
-                .parent()
+            asset_folder: data_extracted_path
                 .map(|p| p.to_string_lossy().to_string())
-                .unwrap_or_else(String::new),
+                .unwrap_or_else(|| "data".to_string()),
             watch_for_changes: false,
         })
         .insert_resource(MovementSettings {
@@ -144,7 +164,6 @@ enum AppState {
 
 struct VfsAssetIo {
     vfs: Arc<VfsIndex>,
-    default_io: Box<dyn AssetIo>,
 }
 
 struct VfsResource {
@@ -167,21 +186,21 @@ impl AssetIo for VfsAssetIo {
 
     fn read_directory(
         &self,
-        path: &Path,
+        _path: &Path,
     ) -> Result<Box<dyn Iterator<Item = PathBuf>>, AssetIoError> {
-        self.default_io.read_directory(path)
+        Ok(Box::new(std::iter::empty::<PathBuf>()))
     }
 
-    fn is_directory(&self, path: &Path) -> bool {
-        self.default_io.is_directory(path)
+    fn is_directory(&self, _path: &Path) -> bool {
+        false
     }
 
-    fn watch_path_for_changes(&self, path: &Path) -> Result<(), AssetIoError> {
-        self.default_io.watch_path_for_changes(path)
+    fn watch_path_for_changes(&self, _path: &Path) -> Result<(), AssetIoError> {
+        Ok(())
     }
 
     fn watch_for_changes(&self) -> Result<(), AssetIoError> {
-        self.default_io.watch_for_changes()
+        Ok(())
     }
 }
 
@@ -190,38 +209,12 @@ struct VfsAssetIoPlugin;
 
 impl Plugin for VfsAssetIoPlugin {
     fn build(&self, app: &mut App) {
-        // must get a hold of the task pool in order to create the asset server
-
-        let task_pool = app
-            .world
-            .get_resource::<bevy::tasks::IoTaskPool>()
-            .expect("`IoTaskPool` resource not found.")
-            .0
-            .clone();
-        let vfs_resource = app
-            .world
-            .get_resource::<VfsResource>()
-            .expect("`VfsResource` resource not found.")
-            .vfs
-            .clone();
-
-        let asset_io = {
-            // the platform default asset io requires a reference to the app
-            // builder to find its configuration
-
-            let default_io = bevy::asset::create_platform_default_asset_io(app);
-
-            // create the custom asset io instance
-
+        app.insert_resource(AssetServer::new(
             VfsAssetIo {
-                vfs: vfs_resource,
-                default_io,
-            }
-        };
-
-        // the asset server is constructed and added the resource manager
-
-        app.insert_resource(AssetServer::new(asset_io, task_pool));
+                vfs: app.world.resource::<VfsResource>().vfs.clone(),
+            },
+            app.world.resource::<bevy::tasks::IoTaskPool>().0.clone(),
+        ));
     }
 }
 
@@ -381,9 +374,6 @@ impl AssetLoader for ZmsMeshAssetLoader {
         &["zms"]
     }
 }
-
-#[derive(Default)]
-pub struct CustomAssetLoader;
 
 #[allow(clippy::too_many_arguments)]
 fn setup(
