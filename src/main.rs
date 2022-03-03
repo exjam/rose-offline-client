@@ -3,18 +3,21 @@ mod terrain_material;
 mod water_mesh_material;
 
 use std::{
-    io::Cursor,
     path::{Path, PathBuf},
+    sync::Arc,
 };
 
 use bevy::{
-    asset::{AssetLoader, AssetServerSettings, BoxedFuture, LoadContext, LoadState, LoadedAsset},
+    asset::{
+        AssetIo, AssetIoError, AssetLoader, AssetServerSettings, BoxedFuture, LoadContext,
+        LoadState, LoadedAsset,
+    },
     math::{Quat, Vec2, Vec3},
     pbr::{AlphaMode, MeshRenderPlugin},
     prelude::{
         AddAsset, App, AssetServer, Assets, BuildChildren, Commands, ComputedVisibility,
-        GlobalTransform, Handle, Image, Mesh, Msaa, PerspectiveCameraBundle, Res, ResMut, State,
-        SystemSet, Transform, Visibility,
+        GlobalTransform, Handle, Image, Mesh, Msaa, PerspectiveCameraBundle, Plugin, Res, ResMut,
+        State, SystemSet, Transform, Visibility,
     },
     render::{
         mesh::Indices,
@@ -25,12 +28,10 @@ use bevy::{
 mod bevy_flycam;
 use bevy_flycam::{FlyCam, MovementSettings, NoCameraPlayerPlugin};
 
-use roselib::{
-    files::{ifo, lit, zon::ZoneTileRotation, HIM, IFO, LIT, STB, TIL, ZMS, ZON, ZSC},
-    io::{PathRoseExt, RoseFile, RoseReader},
+use rose_file_readers::{
+    HimFile, IfoFile, IfoObject, LitFile, LitObject, StbFile, TilFile, VfsFile, VfsIndex, VfsPath,
+    ZmsFile, ZonFile, ZonTileRotation, ZscFile,
 };
-
-use rose_file_readers::{FileReader, ZmsFile};
 use static_mesh_material::{
     StaticMeshMaterial, StaticMeshMaterialPlugin, STATIC_MESH_ATTRIBUTE_UV1,
     STATIC_MESH_ATTRIBUTE_UV2, STATIC_MESH_ATTRIBUTE_UV3, STATIC_MESH_ATTRIBUTE_UV4,
@@ -42,18 +43,17 @@ use terrain_material::{
 use water_mesh_material::{WaterMeshMaterial, WaterMeshMaterialPlugin};
 
 struct ClientConfiguration {
-    data_path: PathBuf,
     zone_id: usize,
 }
 
 fn main() {
     let matches = clap::Command::new("bevy_rose")
         .arg(
-            clap::Arg::new("data-path")
-                .long("data-path")
-                .help("Path to extracted rose data")
-                .required(true)
-                .takes_value(true),
+            clap::Arg::new("data-idx")
+                .long("data-idx")
+                .help("Path to data.idx")
+                .takes_value(true)
+                .default_value("data.idx"),
         )
         .arg(
             clap::Arg::new("zone")
@@ -67,19 +67,24 @@ fn main() {
                 .help("Disable v-sync to see accurate frame times"),
         )
         .get_matches();
-    let data_path = matches.value_of("data-path").unwrap();
+    let data_idx_path = Path::new(matches.value_of("data-idx").unwrap());
     let zone_id = matches
         .value_of("zone")
         .and_then(|str| str.parse::<usize>().ok())
         .unwrap_or(2);
     let disable_vsync = matches.is_present("disable-vsync");
 
+    let vfs = VfsIndex::load(data_idx_path).expect("Failed reading data.idx");
+
     let mut app = App::new();
 
     // Initialise bevy engine
     app.insert_resource(Msaa { samples: 4 })
         .insert_resource(AssetServerSettings {
-            asset_folder: data_path.to_string(),
+            asset_folder: data_idx_path
+                .parent()
+                .map(|p| p.to_string_lossy().to_string())
+                .unwrap_or_else(String::new),
             watch_for_changes: false,
         })
         .insert_resource(MovementSettings {
@@ -103,6 +108,8 @@ fn main() {
         .add_plugin(bevy::diagnostic::DiagnosticsPlugin::default())
         .add_plugin(bevy::input::InputPlugin::default())
         .add_plugin(bevy::window::WindowPlugin::default())
+        .insert_resource(VfsResource { vfs: Arc::new(vfs) })
+        .add_plugin(VfsAssetIoPlugin)
         .add_plugin(bevy::asset::AssetPlugin::default())
         .add_plugin(bevy::scene::ScenePlugin::default())
         .add_plugin(bevy::winit::WinitPlugin::default())
@@ -114,20 +121,17 @@ fn main() {
     app.add_plugin(NoCameraPlayerPlugin);
 
     // Initialise rose stuff
-    app.insert_resource(ClientConfiguration {
-        data_path: PathBuf::from(data_path),
-        zone_id,
-    })
-    .init_resource::<ZoneInfo>()
-    .init_asset_loader::<ZmsMeshAssetLoader>()
-    .add_plugin(MeshRenderPlugin)
-    .add_plugin(TerrainMaterialPlugin)
-    .add_plugin(StaticMeshMaterialPlugin)
-    .add_plugin(WaterMeshMaterialPlugin)
-    .add_state(AppState::Setup)
-    .add_system_set(SystemSet::on_enter(AppState::Setup).with_system(load_zone_tiles))
-    .add_system_set(SystemSet::on_update(AppState::Setup).with_system(check_zone_tile_textures))
-    .add_system_set(SystemSet::on_enter(AppState::Finished).with_system(setup));
+    app.insert_resource(ClientConfiguration { zone_id })
+        .init_resource::<ZoneInfo>()
+        .init_asset_loader::<ZmsMeshAssetLoader>()
+        .add_plugin(MeshRenderPlugin)
+        .add_plugin(TerrainMaterialPlugin)
+        .add_plugin(StaticMeshMaterialPlugin)
+        .add_plugin(WaterMeshMaterialPlugin)
+        .add_state(AppState::Setup)
+        .add_system_set(SystemSet::on_enter(AppState::Setup).with_system(load_zone_tiles))
+        .add_system_set(SystemSet::on_update(AppState::Setup).with_system(check_zone_tile_textures))
+        .add_system_set(SystemSet::on_enter(AppState::Finished).with_system(setup));
 
     app.run();
 }
@@ -138,11 +142,94 @@ enum AppState {
     Finished,
 }
 
+struct VfsAssetIo {
+    vfs: Arc<VfsIndex>,
+    default_io: Box<dyn AssetIo>,
+}
+
+struct VfsResource {
+    vfs: Arc<VfsIndex>,
+}
+
+impl AssetIo for VfsAssetIo {
+    fn load_path<'a>(&'a self, path: &'a Path) -> BoxedFuture<'a, Result<Vec<u8>, AssetIoError>> {
+        Box::pin(async move {
+            if let Some(file) = self.vfs.open_file(path) {
+                match file {
+                    VfsFile::Buffer(buffer) => Ok(buffer),
+                    VfsFile::View(view) => Ok(view.into()),
+                }
+            } else {
+                Err(AssetIoError::NotFound(path.into()))
+            }
+        })
+    }
+
+    fn read_directory(
+        &self,
+        path: &Path,
+    ) -> Result<Box<dyn Iterator<Item = PathBuf>>, AssetIoError> {
+        self.default_io.read_directory(path)
+    }
+
+    fn is_directory(&self, path: &Path) -> bool {
+        self.default_io.is_directory(path)
+    }
+
+    fn watch_path_for_changes(&self, path: &Path) -> Result<(), AssetIoError> {
+        self.default_io.watch_path_for_changes(path)
+    }
+
+    fn watch_for_changes(&self) -> Result<(), AssetIoError> {
+        self.default_io.watch_for_changes()
+    }
+}
+
+/// A plugin used to execute the override of the asset io
+struct VfsAssetIoPlugin;
+
+impl Plugin for VfsAssetIoPlugin {
+    fn build(&self, app: &mut App) {
+        // must get a hold of the task pool in order to create the asset server
+
+        let task_pool = app
+            .world
+            .get_resource::<bevy::tasks::IoTaskPool>()
+            .expect("`IoTaskPool` resource not found.")
+            .0
+            .clone();
+        let vfs_resource = app
+            .world
+            .get_resource::<VfsResource>()
+            .expect("`VfsResource` resource not found.")
+            .vfs
+            .clone();
+
+        let asset_io = {
+            // the platform default asset io requires a reference to the app
+            // builder to find its configuration
+
+            let default_io = bevy::asset::create_platform_default_asset_io(app);
+
+            // create the custom asset io instance
+
+            VfsAssetIo {
+                vfs: vfs_resource,
+                default_io,
+            }
+        };
+
+        // the asset server is constructed and added the resource manager
+
+        app.insert_resource(AssetServer::new(asset_io, task_pool));
+    }
+}
+
 #[derive(Default)]
 struct ZoneInfo {
-    zone: ZON,
-    zsc_deco: ZSC,
-    zsc_cnst: ZSC,
+    zone: ZonFile,
+    zsc_deco: Option<ZscFile>,
+    zsc_cnst: Option<ZscFile>,
     zone_path: PathBuf,
     tile_image_handles: Vec<Handle<Image>>,
     water_image_handles: Vec<Handle<Image>>,
@@ -152,27 +239,33 @@ fn load_zone_tiles(
     mut zone_info: ResMut<ZoneInfo>,
     asset_server: Res<AssetServer>,
     client_configuration: Res<ClientConfiguration>,
+    vfs_resource: Res<VfsResource>,
 ) {
     let zone_id = client_configuration.zone_id;
-    let list_zone = STB::from_path(
-        &client_configuration
-            .data_path
-            .join("3DDATA/STB/LIST_ZONE.STB"),
-    )
-    .unwrap();
-    let zon_file_path = PathBuf::from_rose_path(list_zone.value(zone_id, 2).unwrap());
-    let zsc_deco_path = PathBuf::from_rose_path(list_zone.value(zone_id, 12).unwrap());
-    let zsc_cnst_path = PathBuf::from_rose_path(list_zone.value(zone_id, 13).unwrap());
+    let list_zone = vfs_resource
+        .vfs
+        .read_file::<StbFile, _>("3DDATA/STB/LIST_ZONE.STB")
+        .unwrap();
+    let zon_file_path = VfsPath::from(list_zone.get(zone_id, 1));
+    let zsc_deco_path = VfsPath::from(list_zone.get(zone_id, 11));
+    let zsc_cnst_path = VfsPath::from(list_zone.get(zone_id, 12));
 
-    zone_info.zsc_cnst =
-        ZSC::from_path(&client_configuration.data_path.join(zsc_cnst_path)).unwrap();
-    zone_info.zsc_deco =
-        ZSC::from_path(&client_configuration.data_path.join(zsc_deco_path)).unwrap();
-    zone_info.zone_path = zon_file_path.parent().unwrap().into();
+    zone_info.zsc_cnst = vfs_resource
+        .vfs
+        .read_file::<ZscFile, _>(&zsc_cnst_path)
+        .ok();
+    zone_info.zsc_deco = vfs_resource
+        .vfs
+        .read_file::<ZscFile, _>(&zsc_deco_path)
+        .ok();
+    zone_info.zone_path = zon_file_path.path().parent().unwrap().into();
 
-    let zon = ZON::from_path(&client_configuration.data_path.join(zon_file_path)).unwrap();
+    let zone_file = vfs_resource
+        .vfs
+        .read_file::<ZonFile, _>(&zon_file_path)
+        .unwrap();
 
-    for path in zon.textures.iter() {
+    for path in zone_file.tile_textures.iter() {
         if path.to_lowercase().ends_with(".dds") {
             zone_info.tile_image_handles.push(asset_server.load(path));
         }
@@ -184,7 +277,7 @@ fn load_zone_tiles(
             .push(asset_server.load(&format!("3DDATA/JUNON/WATER/OCEAN01_{:02}.DDS", i)));
     }
 
-    zone_info.zone = zon;
+    zone_info.zone = zone_file;
 }
 
 fn check_zone_tile_textures(
@@ -215,7 +308,8 @@ impl AssetLoader for ZmsMeshAssetLoader {
         load_context: &'a mut LoadContext,
     ) -> BoxedFuture<'a, Result<(), anyhow::Error>> {
         Box::pin(async move {
-            match ZmsFile::read(FileReader::from(bytes)) {
+            match <ZmsFile as rose_file_readers::RoseFile>::read(bytes.into(), &Default::default())
+            {
                 Ok(mut zms) => {
                     let mut mesh = Mesh::new(PrimitiveTopology::TriangleList);
                     mesh.set_indices(Some(Indices::U16(zms.indices)));
@@ -278,7 +372,7 @@ impl AssetLoader for ZmsMeshAssetLoader {
                     load_context.set_default_asset(LoadedAsset::new(mesh));
                     Ok(())
                 }
-                Err(error) => Err(anyhow::Error::new(error)),
+                Err(error) => Err(error),
             }
         })
     }
@@ -301,7 +395,7 @@ fn setup(
     mut water_mesh_materials: ResMut<Assets<WaterMeshMaterial>>,
     zone_info: ResMut<ZoneInfo>,
     mut textures: ResMut<Assets<Image>>,
-    client_configuration: Res<ClientConfiguration>,
+    vfs_resource: Res<VfsResource>,
 ) {
     // Create camera
     commands
@@ -374,13 +468,14 @@ fn setup(
     });
 
     // Load the zone
-    let zone_base_directory = client_configuration.data_path.join(&zone_info.zone_path);
     for map_y in 0..64u32 {
         for map_x in 0..64u32 {
-            let tilemap =
-                TIL::from_path(&zone_base_directory.join(format!("{}_{}.TIL", map_x, map_y)));
-            let heightmap =
-                HIM::from_path(&zone_base_directory.join(format!("{}_{}.HIM", map_x, map_y)));
+            let tilemap = vfs_resource.vfs.read_file::<TilFile, _>(
+                zone_info.zone_path.join(format!("{}_{}.TIL", map_x, map_y)),
+            );
+            let heightmap = vfs_resource.vfs.read_file::<HimFile, _>(
+                zone_info.zone_path.join(format!("{}_{}.HIM", map_x, map_y)),
+            );
 
             if let (Ok(heightmap), Ok(tilemap)) = (heightmap, tilemap) {
                 let offset_x = 160.0 * map_x as f32;
@@ -411,33 +506,34 @@ fn setup(
                         let base_y = block_y as f32 * 4.0 * 2.5;
 
                         let tile =
-                            &zone_info.zone.tiles[tilemap.tiles[block_y][block_x].tile_id as usize];
+                            &zone_info.zone.tiles[tilemap.get_clamped(block_x, block_y) as usize];
                         let tile_layer1 = tile.layer1 + tile.offset1;
                         let tile_layer2 = tile.layer2 + tile.offset2;
                         let index_base = positions.len() as u16;
                         let tile_rotation = match tile.rotation {
-                            ZoneTileRotation::FlipHorizontal => 2,
-                            ZoneTileRotation::FlipVertical => 3,
-                            ZoneTileRotation::Flip => 4,
-                            ZoneTileRotation::Clockwise90 => 5,
-                            ZoneTileRotation::CounterClockwise90 => 6,
+                            ZonTileRotation::FlipHorizontal => 2,
+                            ZonTileRotation::FlipVertical => 3,
+                            ZonTileRotation::Flip => 4,
+                            ZonTileRotation::Clockwise90 => 5,
+                            ZonTileRotation::CounterClockwise90 => 6,
                             _ => 0,
                         };
 
                         for y in 0..5 {
                             for x in 0..5 {
-                                let heightmap_x = x + block_x * 4;
-                                let heightmap_y = y + block_y * 4;
-                                let height = heightmap.height(heightmap_x, heightmap_y) / 100.0;
+                                let heightmap_x = x + block_x as i32 * 4;
+                                let heightmap_y = y + block_y as i32 * 4;
+                                let height =
+                                    heightmap.get_clamped(heightmap_x, heightmap_y) / 100.0;
 
                                 let height_l =
-                                    heightmap.height(heightmap_x.max(1) - 1, heightmap_y) / 100.0;
+                                    heightmap.get_clamped(heightmap_x - 1, heightmap_y) / 100.0;
                                 let height_r =
-                                    heightmap.height(heightmap_x.min(62) + 1, heightmap_y) / 100.0;
+                                    heightmap.get_clamped(heightmap_x + 1, heightmap_y) / 100.0;
                                 let height_t =
-                                    heightmap.height(heightmap_x, heightmap_y.max(1) - 1) / 100.0;
+                                    heightmap.get_clamped(heightmap_x, heightmap_y - 1) / 100.0;
                                 let height_b =
-                                    heightmap.height(heightmap_x, heightmap_y.min(62) + 1) / 100.0;
+                                    heightmap.get_clamped(heightmap_x, heightmap_y + 1) / 100.0;
                                 let normal = Vec3::new(
                                     (height_r - height_l) / 2.0,
                                     -1.0,
@@ -493,103 +589,114 @@ fn setup(
                 ));
             }
 
-            let ifo = IFO::from_path(&zone_base_directory.join(format!("{}_{}.IFO", map_x, map_y)));
-            let buildings_lit = LIT::from_path(&zone_base_directory.join(format!(
-                "{}_{}/LIGHTMAP/BUILDINGLIGHTMAPDATA.LIT",
-                map_x, map_y
-            )))
-            .ok();
-            let objects_lit = LIT::from_path(&zone_base_directory.join(format!(
-                "{}_{}/LIGHTMAP/OBJECTLIGHTMAPDATA.LIT",
-                map_x, map_y
-            )))
-            .ok();
-            let lit_path = zone_base_directory.join(format!("{}_{}/LIGHTMAP", map_x, map_y));
+            let ifo = vfs_resource.vfs.read_file::<IfoFile, _>(
+                zone_info.zone_path.join(format!("{}_{}.IFO", map_x, map_y)),
+            );
+            let cnst_lit = vfs_resource
+                .vfs
+                .read_file::<LitFile, _>(zone_info.zone_path.join(format!(
+                    "{}_{}/LIGHTMAP/BUILDINGLIGHTMAPDATA.LIT",
+                    map_x, map_y
+                )))
+                .ok();
+            let deco_lit = vfs_resource
+                .vfs
+                .read_file::<LitFile, _>(zone_info.zone_path.join(format!(
+                    "{}_{}/LIGHTMAP/OBJECTLIGHTMAPDATA.LIT",
+                    map_x, map_y
+                )))
+                .ok();
+
+            let lightmap_path = zone_info
+                .zone_path
+                .join(format!("{}_{}/LIGHTMAP/", map_x, map_y));
 
             if let Ok(ifo) = ifo {
-                for ocean in ifo.oceans.iter() {
-                    for patch in ocean.patches.iter() {
-                        let start = Vec3::new(
-                            patch.start.x / 100.0,
-                            patch.start.y / 100.0,
-                            -patch.start.z / 100.0,
+                for (plane_start, plane_end) in ifo.water_planes.iter() {
+                    let start = Vec3::new(
+                        plane_start.x / 100.0,
+                        plane_start.y / 100.0,
+                        -plane_start.z / 100.0,
+                    );
+                    let end = Vec3::new(
+                        plane_end.x / 100.0,
+                        plane_end.y / 100.0,
+                        -plane_end.z / 100.0,
+                    );
+                    let uv_x = (end.x - start.x) / (ifo.water_size / 100.0);
+                    let uv_y = (end.z - start.z) / (ifo.water_size / 100.0);
+
+                    let vertices = [
+                        ([start.x, start.y, end.z], [0.0, 1.0, 0.0], [uv_x, uv_y]),
+                        ([start.x, start.y, start.z], [0.0, 1.0, 0.0], [uv_x, 0.0]),
+                        ([end.x, start.y, start.z], [0.0, 1.0, 0.0], [0.0, 0.0]),
+                        ([end.x, start.y, end.z], [0.0, 1.0, 0.0], [0.0, uv_y]),
+                    ];
+                    let indices = Indices::U32(vec![0, 2, 1, 0, 3, 2]);
+
+                    let mut positions = Vec::new();
+                    let mut normals = Vec::new();
+                    let mut uvs = Vec::new();
+                    for (position, normal, uv) in &vertices {
+                        positions.push(*position);
+                        normals.push(*normal);
+                        uvs.push(*uv);
+                    }
+
+                    let mut mesh = Mesh::new(PrimitiveTopology::TriangleList);
+                    mesh.set_indices(Some(indices));
+                    mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
+                    mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
+                    mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, uvs);
+
+                    commands.spawn().insert_bundle((
+                        meshes.add(mesh),
+                        water_material.clone(),
+                        Transform::from_xyz(5200.0, 0.0, -5200.0),
+                        GlobalTransform::default(),
+                        Visibility::default(),
+                        ComputedVisibility::default(),
+                    ));
+                }
+
+                if let Some(zsc_cnst) = zone_info.zsc_cnst.as_ref() {
+                    for (object_id, object_instance) in ifo.cnst_objects.iter().enumerate() {
+                        let lit_object = cnst_lit.as_ref().and_then(|lit| {
+                            lit.objects
+                                .iter()
+                                .find(|lit_object| lit_object.id as usize == object_id + 1)
+                        });
+
+                        spawn_zsc_object(
+                            &mut commands,
+                            asset_server.as_ref(),
+                            static_mesh_materials.as_mut(),
+                            zsc_cnst,
+                            &lightmap_path,
+                            lit_object,
+                            object_instance,
                         );
-                        let end = Vec3::new(
-                            patch.end.x / 100.0,
-                            patch.end.y / 100.0,
-                            -patch.end.z / 100.0,
-                        );
-                        let uv_x = (end.x - start.x) / (ocean.size / 100.0);
-                        let uv_y = (end.z - start.z) / (ocean.size / 100.0);
-
-                        let vertices = [
-                            ([start.x, start.y, end.z], [0.0, 1.0, 0.0], [uv_x, uv_y]),
-                            ([start.x, start.y, start.z], [0.0, 1.0, 0.0], [uv_x, 0.0]),
-                            ([end.x, start.y, start.z], [0.0, 1.0, 0.0], [0.0, 0.0]),
-                            ([end.x, start.y, end.z], [0.0, 1.0, 0.0], [0.0, uv_y]),
-                        ];
-                        let indices = Indices::U32(vec![0, 2, 1, 0, 3, 2]);
-
-                        let mut positions = Vec::new();
-                        let mut normals = Vec::new();
-                        let mut uvs = Vec::new();
-                        for (position, normal, uv) in &vertices {
-                            positions.push(*position);
-                            normals.push(*normal);
-                            uvs.push(*uv);
-                        }
-
-                        let mut mesh = Mesh::new(PrimitiveTopology::TriangleList);
-                        mesh.set_indices(Some(indices));
-                        mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
-                        mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
-                        mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, uvs);
-
-                        commands.spawn().insert_bundle((
-                            meshes.add(mesh),
-                            water_material.clone(),
-                            Transform::from_xyz(5200.0, 0.0, -5200.0),
-                            GlobalTransform::default(),
-                            Visibility::default(),
-                            ComputedVisibility::default(),
-                        ));
                     }
                 }
 
-                for (object_id, object_instance) in ifo.buildings.iter().enumerate() {
-                    let lit_object = buildings_lit.as_ref().and_then(|lit| {
-                        lit.objects
-                            .iter()
-                            .find(|lit_object| lit_object.id as usize == object_id + 1)
-                    });
+                if let Some(zsc_deco) = zone_info.zsc_deco.as_ref() {
+                    for (object_id, object_instance) in ifo.deco_objects.iter().enumerate() {
+                        let lit_object = deco_lit.as_ref().and_then(|lit| {
+                            lit.objects
+                                .iter()
+                                .find(|lit_object| lit_object.id as usize == object_id + 1)
+                        });
 
-                    spawn_zsc_object(
-                        &mut commands,
-                        asset_server.as_ref(),
-                        static_mesh_materials.as_mut(),
-                        &zone_info.zsc_cnst,
-                        &lit_path,
-                        lit_object,
-                        object_instance,
-                    );
-                }
-
-                for (object_id, object_instance) in ifo.objects.iter().enumerate() {
-                    let lit_object = objects_lit.as_ref().and_then(|lit| {
-                        lit.objects
-                            .iter()
-                            .find(|lit_object| lit_object.id as usize == object_id + 1)
-                    });
-
-                    spawn_zsc_object(
-                        &mut commands,
-                        asset_server.as_ref(),
-                        static_mesh_materials.as_mut(),
-                        &zone_info.zsc_deco,
-                        &lit_path,
-                        lit_object,
-                        object_instance,
-                    );
+                        spawn_zsc_object(
+                            &mut commands,
+                            asset_server.as_ref(),
+                            static_mesh_materials.as_mut(),
+                            zsc_deco,
+                            &lightmap_path,
+                            lit_object,
+                            object_instance,
+                        );
+                    }
                 }
             }
         }
@@ -600,10 +707,10 @@ fn spawn_zsc_object(
     commands: &mut Commands,
     asset_server: &AssetServer,
     static_mesh_materials: &mut Assets<StaticMeshMaterial>,
-    zsc: &ZSC,
-    lit_path: &Path,
-    lit_object: Option<&lit::LightmapObject>,
-    object_instance: &ifo::ObjectData,
+    zsc: &ZscFile,
+    lightmap_path: &Path,
+    lit_object: Option<&LitObject>,
+    object_instance: &IfoObject,
 ) {
     let object = &zsc.objects[object_instance.object_id as usize];
 
@@ -668,21 +775,20 @@ fn spawn_zsc_object(
 
                 let mesh_id = object_part.mesh_id as usize;
                 let mesh = mesh_cache[mesh_id].clone().unwrap_or_else(|| {
-                    let handle = asset_server.load(zsc.meshes[mesh_id].clone());
+                    let handle = asset_server.load(zsc.meshes[mesh_id].path());
                     mesh_cache.insert(mesh_id, Some(handle.clone()));
                     handle
                 });
                 let lit_part = lit_object.and_then(|lit_object| lit_object.parts.get(part_index));
-                let lightmap_texture = lit_part.map(|lit_part| {
-                    asset_server.load(lit_path.join(PathBuf::from_rose_path(&lit_part.filename)))
-                });
+                let lightmap_texture = lit_part
+                    .map(|lit_part| asset_server.load(lightmap_path.join(&lit_part.filename)));
                 let (lightmap_uv_offset, lightmap_uv_scale) = lit_part
                     .map(|lit_part| {
-                        let scale = 1.0 / lit_part.parts_per_width as f32;
+                        let scale = 1.0 / lit_part.parts_per_row as f32;
                         (
                             Vec2::new(
-                                (lit_part.part_position % lit_part.parts_per_width) as f32,
-                                (lit_part.part_position / lit_part.parts_per_width) as f32,
+                                (lit_part.part_index % lit_part.parts_per_row) as f32,
+                                (lit_part.part_index / lit_part.parts_per_row) as f32,
                             ),
                             scale,
                         )
@@ -693,7 +799,7 @@ fn spawn_zsc_object(
                 let material = material_cache[material_id].clone().unwrap_or_else(|| {
                     let zsc_material = &zsc.materials[material_id];
                     let handle = static_mesh_materials.add(StaticMeshMaterial {
-                        base_texture: asset_server.load(zsc_material.path.clone()),
+                        base_texture: asset_server.load(zsc_material.path.path()),
                         lightmap_texture,
                         alpha_value: if zsc_material.alpha != 1.0 {
                             Some(zsc_material.alpha)
@@ -702,8 +808,8 @@ fn spawn_zsc_object(
                         },
                         alpha_mode: if zsc_material.alpha_enabled {
                             AlphaMode::Blend
-                        } else if zsc_material.alpha_test_enabled {
-                            AlphaMode::Mask(zsc_material.alpha_ref as f32 / 256.0)
+                        } else if let Some(alpha_ref) = zsc_material.alpha_test {
+                            AlphaMode::Mask(alpha_ref)
                         } else {
                             AlphaMode::Opaque
                         },
@@ -717,8 +823,7 @@ fn spawn_zsc_object(
                     /*
                     pub blend_mode: SceneBlendMode,
                     pub specular_enabled: bool,
-                    pub glow_type: SceneGlowType,
-                    pub glow_color: Color3,
+                    pub glow: Option<ZscMaterialGlow>,
                     */
                     material_cache.insert(material_id, Some(handle.clone()));
                     handle

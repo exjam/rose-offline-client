@@ -9,11 +9,10 @@ edition = "2021"
 bevy = { version = "0.6", features = ["dds"] }
 clap = "3.1"
 log = "0.4.14"
-roselib = { git = "https://github.com/exjam/rose-tools", branch = "master" }
 bitflags = "1.2"
 lazy_static = "1.4.0"
 anyhow = "1.0.4"
-rose-file-readers = { git = "https://github.com/exjam/rose-offline", branch = "main" }
+rose-file-readers = { git = "https://github.com/exjam/rose-offline", rev = "1aeb0d4c69d595ab4a12cafec4fac1baa47b8d13" }
 
 [patch.crates-io]
 bevy = { git = "https://github.com/bevyengine/bevy", rev = "b6a647cc013861b182be5f4c85b60b2709388210" }
