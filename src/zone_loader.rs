@@ -1,15 +1,15 @@
 use bevy::{
     math::{Quat, Vec2, Vec3},
     prelude::{
-        AssetServer, Assets, BuildChildren, ChildBuilder, ComputedVisibility, GlobalTransform,
-        Handle, Mesh, ResMut, Transform, Visibility,
+        AssetServer, Assets, BuildChildren, ChildBuilder, Component, ComputedVisibility,
+        GlobalTransform, Handle, Mesh, ResMut, Transform, Visibility,
     },
     render::{mesh::Indices, render_resource::PrimitiveTopology},
 };
 use bevy_mod_picking::PickableBundle;
 use rose_file_readers::{
     HimFile, IfoFile, IfoObject, LitFile, LitObject, StbFile, TilFile, VfsPath, ZonFile, ZonTile,
-    ZonTileRotation, ZscFile,
+    ZonTileRotation, ZscFile, ZscMaterial,
 };
 use std::path::Path;
 
@@ -18,8 +18,14 @@ use crate::{
         StaticMeshMaterial, TerrainMaterial, TextureArray, TextureArrayBuilder, WaterMeshMaterial,
         MESH_ATTRIBUTE_UV_1, TERRAIN_MESH_ATTRIBUTE_TILE_INFO,
     },
-    VfsResource, ZscMaterialComponent,
+    VfsResource,
 };
+
+#[derive(Component)]
+pub struct ZoneObject {
+    pub mesh_path: String,
+    pub material: ZscMaterial,
+}
 
 #[allow(clippy::too_many_arguments)]
 pub fn load_zone(
@@ -474,7 +480,10 @@ fn load_block_object(
                         GlobalTransform::default(),
                         Visibility::default(),
                         ComputedVisibility::default(),
-                        ZscMaterialComponent(zsc.materials[material_id].clone()),
+                        ZoneObject {
+                            mesh_path: zsc.meshes[mesh_id].path().to_string_lossy().into(),
+                            material: zsc.materials[material_id].clone(),
+                        },
                     ))
                     .insert_bundle(PickableBundle::default());
             }

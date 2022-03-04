@@ -11,6 +11,7 @@ bitflags = "1.2"
 lazy_static = "1.4.0"
 anyhow = "1.0.4"
 rose-file-readers = { git = "https://github.com/exjam/rose-offline", rev = "f3d0ef438c3f8695b0dc4967b9e87257c1e86c06" }
+bevy_egui = "0.11"
 bevy_mod_picking = "0.5"
 bevy_polyline = "0.1"
 
@@ -19,6 +20,7 @@ bevy = { git = "https://github.com/bevyengine/bevy", rev = "b6a647cc013861b182be
 bevy_mod_picking = { git = "https://github.com/exjam/bevy_mod_picking", branch = "allow_bevy_patch" }
 bevy_mod_raycast = { git = "https://github.com/exjam/bevy_mod_raycast", branch = "allow_bevy_patch" }
 bevy_polyline = { git = "https://github.com/exjam/bevy_polyline", branch = "allow_bevy_patch" }
+bevy_egui = { git = "https://github.com/exjam/bevy_egui", branch = "fix_bevy_main" }
 
 [profile.dev.package."*"]
 opt-level = 3
