@@ -607,9 +607,9 @@ fn setup(
                                 let height_b =
                                     heightmap.get_clamped(heightmap_x, heightmap_y + 1) / 100.0;
                                 let normal = Vec3::new(
-                                    (height_r - height_l) / 2.0,
-                                    -1.0,
-                                    (height_b - height_t) / 2.0,
+                                    (height_l - height_r) / 2.0,
+                                    1.0,
+                                    (height_t - height_b) / 2.0,
                                 )
                                 .normalize();
 
