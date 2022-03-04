@@ -22,15 +22,6 @@ impl AssetLoader for ZmsAssetLoader {
                     let mut mesh = Mesh::new(PrimitiveTopology::TriangleList);
                     mesh.set_indices(Some(Indices::U16(zms.indices)));
 
-                    if !zms.position.is_empty() {
-                        for vert in zms.position.iter_mut() {
-                            let y = vert[1];
-                            vert[1] = vert[2];
-                            vert[2] = -y;
-                        }
-                        mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, zms.position);
-                    }
-
                     if !zms.normal.is_empty() {
                         for vert in zms.normal.iter_mut() {
                             let y = vert[1];
@@ -38,6 +29,20 @@ impl AssetLoader for ZmsAssetLoader {
                             vert[2] = -y;
                         }
                         mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, zms.normal);
+                    } else {
+                        mesh.insert_attribute(
+                            Mesh::ATTRIBUTE_NORMAL,
+                            vec![[0.0, 1.0, 0.0]; zms.position.len()],
+                        );
+                    }
+
+                    if !zms.position.is_empty() {
+                        for vert in zms.position.iter_mut() {
+                            let y = vert[1];
+                            vert[1] = vert[2];
+                            vert[2] = -y;
+                        }
+                        mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, zms.position);
                     }
 
                     if !zms.tangent.is_empty() {
