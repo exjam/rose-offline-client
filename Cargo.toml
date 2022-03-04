@@ -10,7 +10,7 @@ log = "0.4.14"
 bitflags = "1.2"
 lazy_static = "1.4.0"
 anyhow = "1.0.4"
-rose-file-readers = { git = "https://github.com/exjam/rose-offline", rev = "0710107cb18e79a987292b5ee3f6b95f245ced65" }
+rose-file-readers = { git = "https://github.com/exjam/rose-offline", rev = "f3d0ef438c3f8695b0dc4967b9e87257c1e86c06" }
 bevy_mod_picking = "0.5"
 bevy_polyline = "0.1"
 
