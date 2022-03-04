@@ -52,7 +52,7 @@ impl Plugin for StaticMeshMaterialPlugin {
 
         app.add_plugin(MaterialPlugin::<StaticMeshMaterial>::default());
 
-        let render_device = app.world.get_resource::<RenderDevice>().unwrap();
+        let render_device = app.world.resource::<RenderDevice>();
         let linear_sampler = render_device.create_sampler(&SamplerDescriptor {
             mag_filter: FilterMode::Linear,
             min_filter: FilterMode::Linear,

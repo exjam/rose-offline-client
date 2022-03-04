@@ -3,6 +3,7 @@ mod terrain_material;
 mod water_mesh_material;
 
 use std::{
+    ffi::OsStr,
     path::{Path, PathBuf},
     sync::Arc,
     time::Duration,
@@ -13,6 +14,7 @@ use bevy::{
         AssetIo, AssetIoError, AssetLoader, AssetServerSettings, BoxedFuture, LoadContext,
         LoadState, LoadedAsset,
     },
+    ecs::system::{lifetimeless::SRes, SystemParamItem},
     math::{Quat, Vec2, Vec3},
     pbr::MeshRenderPlugin,
     prelude::{
@@ -21,9 +23,20 @@ use bevy::{
         PerspectiveCameraBundle, Plugin, Query, Res, ResMut, State, SystemSet, Transform,
         Visibility, With,
     },
+    reflect::TypeUuid,
     render::{
         mesh::{Indices, VertexAttributeValues},
-        render_resource::{Extent3d, PrimitiveTopology, TextureDimension, TextureFormat},
+        render_asset::{
+            ExtractedAssets, PrepareAssetError, RenderAsset, RenderAssetPlugin, RenderAssets,
+        },
+        render_component::ExtractComponentPlugin,
+        render_resource::{
+            CommandEncoderDescriptor, Extent3d, ImageCopyTexture, Origin3d, PrimitiveTopology,
+            Texture, TextureAspect, TextureDescriptor, TextureDimension, TextureFormat,
+            TextureUsages, TextureView, TextureViewDescriptor,
+        },
+        renderer::{RenderDevice, RenderQueue},
+        texture::{FileTextureError, ImageType},
     },
     window::{WindowDescriptor, Windows},
 };
@@ -156,18 +169,19 @@ fn main() {
         .add_system(control_picking)
         .add_system(picking_events);
 
+    app.add_asset::<TextureArray>()
+        .add_plugin(ExtractComponentPlugin::<Handle<TextureArray>>::default())
+        .add_plugin(RenderAssetPlugin::<TextureArray>::default());
+
     // Initialise rose stuff
     app.insert_resource(ClientConfiguration { zone_id })
-        .init_resource::<ZoneInfo>()
         .init_asset_loader::<ZmsMeshAssetLoader>()
+        .init_asset_loader::<CopySrcImageAssetLoader>()
         .add_plugin(MeshRenderPlugin)
         .add_plugin(TerrainMaterialPlugin)
         .add_plugin(StaticMeshMaterialPlugin)
         .add_plugin(WaterMeshMaterialPlugin)
-        .add_state(AppState::Setup)
-        .add_system_set(SystemSet::on_enter(AppState::Setup).with_system(load_zone_tiles))
-        .add_system_set(SystemSet::on_update(AppState::Setup).with_system(check_zone_tile_textures))
-        .add_system_set(SystemSet::on_enter(AppState::Finished).with_system(setup));
+        .add_startup_system(setup);
 
     app.run();
 }
@@ -237,12 +251,6 @@ fn picking_events(
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-enum AppState {
-    Setup,
-    Finished,
-}
-
 struct VfsAssetIo {
     vfs: Arc<VfsIndex>,
 }
@@ -254,6 +262,7 @@ struct VfsResource {
 impl AssetIo for VfsAssetIo {
     fn load_path<'a>(&'a self, path: &'a Path) -> BoxedFuture<'a, Result<Vec<u8>, AssetIoError>> {
         Box::pin(async move {
+            let path = path.to_str().unwrap().trim_end_matches(".image_copy_src");
             if let Some(file) = self.vfs.open_file(path) {
                 match file {
                     VfsFile::Buffer(buffer) => Ok(buffer),
@@ -285,6 +294,103 @@ impl AssetIo for VfsAssetIo {
     }
 }
 
+#[derive(Debug, Clone, TypeUuid)]
+#[uuid = "6942088b-4202-4569-a420-694208cc0c22"]
+pub struct TextureArray {
+    pub images: Vec<Handle<Image>>,
+}
+
+pub struct GpuTextureArray {
+    pub texture: Texture,
+    pub texture_view: TextureView,
+}
+
+impl RenderAsset for TextureArray {
+    type ExtractedAsset = TextureArray;
+    type PreparedAsset = GpuTextureArray;
+    type Param = (
+        SRes<RenderDevice>,
+        SRes<RenderAssets<Image>>,
+        SRes<RenderQueue>,
+    );
+
+    fn extract_asset(&self) -> Self::ExtractedAsset {
+        self.clone()
+    }
+
+    fn prepare_asset(
+        texture_array: Self::ExtractedAsset,
+        (render_device, gpu_images, render_queue): &mut SystemParamItem<Self::Param>,
+    ) -> Result<Self::PreparedAsset, PrepareAssetError<Self::ExtractedAsset>> {
+        let mut texture_array_gpu_images = Vec::with_capacity(texture_array.images.len());
+
+        for slice in texture_array.images.iter() {
+            let gpu_image = gpu_images.get(slice);
+            if let Some(gpu_image) = gpu_image {
+                texture_array_gpu_images.push(gpu_image);
+            } else {
+                return Err(PrepareAssetError::RetryNextUpdate(texture_array));
+            }
+        }
+
+        let size = texture_array_gpu_images[0].size;
+
+        let array_texture = render_device.create_texture(&TextureDescriptor {
+            label: Some("texture_array"),
+            size: Extent3d {
+                width: size.width as u32,
+                height: size.height as u32,
+                depth_or_array_layers: texture_array_gpu_images.len() as u32,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: TextureDimension::D2,
+            format: TextureFormat::Rgba8UnormSrgb,
+            usage: TextureUsages::COPY_DST | TextureUsages::TEXTURE_BINDING,
+        });
+
+        let mut command_encoder = render_device.create_command_encoder(&CommandEncoderDescriptor {
+            label: Some("create_texture_array"),
+        });
+
+        for (slice, slice_gpu_image) in texture_array_gpu_images.iter().enumerate() {
+            command_encoder.copy_texture_to_texture(
+                ImageCopyTexture {
+                    texture: &slice_gpu_image.texture,
+                    mip_level: 0,
+                    origin: Origin3d { x: 0, y: 0, z: 0 },
+                    aspect: TextureAspect::All,
+                },
+                ImageCopyTexture {
+                    texture: &array_texture,
+                    mip_level: 0,
+                    origin: Origin3d {
+                        x: 0,
+                        y: 0,
+                        z: slice as u32,
+                    },
+                    aspect: TextureAspect::All,
+                },
+                Extent3d {
+                    width: size.width as u32,
+                    height: size.height as u32,
+                    depth_or_array_layers: 1,
+                },
+            );
+        }
+
+        let command_buffer = command_encoder.finish();
+        render_queue.submit(vec![command_buffer]);
+
+        let texture_view = array_texture.create_view(&TextureViewDescriptor::default());
+
+        Ok(GpuTextureArray {
+            texture: array_texture,
+            texture_view,
+        })
+    }
+}
+
 /// A plugin used to execute the override of the asset io
 struct VfsAssetIoPlugin;
 
@@ -300,75 +406,35 @@ impl Plugin for VfsAssetIoPlugin {
 }
 
 #[derive(Default)]
-struct ZoneInfo {
-    zone: ZonFile,
-    zsc_deco: Option<ZscFile>,
-    zsc_cnst: Option<ZscFile>,
-    zone_path: PathBuf,
-    tile_image_handles: Vec<Handle<Image>>,
-    water_image_handles: Vec<Handle<Image>>,
-}
+pub struct CopySrcImageAssetLoader;
 
-fn load_zone_tiles(
-    mut zone_info: ResMut<ZoneInfo>,
-    asset_server: Res<AssetServer>,
-    client_configuration: Res<ClientConfiguration>,
-    vfs_resource: Res<VfsResource>,
-) {
-    let zone_id = client_configuration.zone_id;
-    let list_zone = vfs_resource
-        .vfs
-        .read_file::<StbFile, _>("3DDATA/STB/LIST_ZONE.STB")
-        .unwrap();
-    let zon_file_path = VfsPath::from(list_zone.get(zone_id, 1));
-    let zsc_deco_path = VfsPath::from(list_zone.get(zone_id, 11));
-    let zsc_cnst_path = VfsPath::from(list_zone.get(zone_id, 12));
-
-    zone_info.zsc_cnst = vfs_resource
-        .vfs
-        .read_file::<ZscFile, _>(&zsc_cnst_path)
-        .ok();
-    zone_info.zsc_deco = vfs_resource
-        .vfs
-        .read_file::<ZscFile, _>(&zsc_deco_path)
-        .ok();
-    zone_info.zone_path = zon_file_path.path().parent().unwrap().into();
-
-    let zone_file = vfs_resource
-        .vfs
-        .read_file::<ZonFile, _>(&zon_file_path)
-        .unwrap();
-
-    for path in zone_file.tile_textures.iter() {
-        if path.to_lowercase().ends_with(".dds") {
-            zone_info.tile_image_handles.push(asset_server.load(path));
-        }
+impl AssetLoader for CopySrcImageAssetLoader {
+    fn load<'a>(
+        &'a self,
+        bytes: &'a [u8],
+        load_context: &'a mut LoadContext,
+    ) -> BoxedFuture<'a, Result<(), anyhow::Error>> {
+        Box::pin(async move {
+            let ext = Path::new(load_context.path().file_stem().unwrap())
+                .extension()
+                .unwrap()
+                .to_str()
+                .unwrap();
+            let mut dyn_img =
+                Image::from_buffer(bytes, ImageType::Extension(ext)).map_err(|_| {
+                    anyhow::anyhow!(
+                        "Error in CopySrcImageAssetLoader for path {}",
+                        load_context.path().display()
+                    )
+                })?;
+            dyn_img.texture_descriptor.usage |= TextureUsages::COPY_SRC;
+            load_context.set_default_asset(LoadedAsset::new(dyn_img));
+            Ok(())
+        })
     }
 
-    for i in 1..=25 {
-        zone_info
-            .water_image_handles
-            .push(asset_server.load(&format!("3DDATA/JUNON/WATER/OCEAN01_{:02}.DDS", i)));
-    }
-
-    zone_info.zone = zone_file;
-}
-
-fn check_zone_tile_textures(
-    mut state: ResMut<State<AppState>>,
-    zone_info: ResMut<ZoneInfo>,
-    asset_server: Res<AssetServer>,
-) {
-    if matches!(
-        asset_server
-            .get_group_load_state(zone_info.tile_image_handles.iter().map(|handle| handle.id)),
-        LoadState::Loaded
-    ) && matches!(
-        asset_server
-            .get_group_load_state(zone_info.water_image_handles.iter().map(|handle| handle.id)),
-        LoadState::Loaded
-    ) {
-        state.set(AppState::Finished).unwrap();
+    fn extensions(&self) -> &[&str] {
+        &["image_copy_src"]
     }
 }
 
@@ -459,13 +525,13 @@ impl AssetLoader for ZmsMeshAssetLoader {
 #[allow(clippy::too_many_arguments)]
 fn setup(
     mut commands: Commands,
+    client_configuration: Res<ClientConfiguration>,
     asset_server: Res<AssetServer>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut terrain_materials: ResMut<Assets<TerrainMaterial>>,
     mut static_mesh_materials: ResMut<Assets<StaticMeshMaterial>>,
     mut water_mesh_materials: ResMut<Assets<WaterMeshMaterial>>,
-    zone_info: ResMut<ZoneInfo>,
-    mut textures: ResMut<Assets<Image>>,
+    mut texture_arrays: ResMut<Assets<TextureArray>>,
     vfs_resource: Res<VfsResource>,
 ) {
     // Create camera
@@ -477,92 +543,81 @@ fn setup(
         .insert_bundle(PickingCameraBundle::default())
         .insert(FlyCam);
 
-    // Create tile array texture
-    let tile_texture_size = textures
-        .get(zone_info.tile_image_handles[0].clone())
-        .map(|image| image.size())
+    // Load zone info
+    let zone_id = client_configuration.zone_id;
+    let list_zone = vfs_resource
+        .vfs
+        .read_file::<StbFile, _>("3DDATA/STB/LIST_ZONE.STB")
         .unwrap();
-    let tile_texture_width = tile_texture_size.x as u32;
-    let tile_texture_height = tile_texture_size.y as u32;
-    let mut zone_tile_array = Image::new(
-        Extent3d {
-            width: tile_texture_width,
-            height: tile_texture_height,
-            depth_or_array_layers: zone_info.tile_image_handles.len() as u32,
-        },
-        TextureDimension::D2,
-        vec![
-            0;
-            4 * (tile_texture_width * tile_texture_height) as usize
-                * zone_info.tile_image_handles.len()
-        ],
-        TextureFormat::Rgba8UnormSrgb,
-    );
-    for (i, handle) in zone_info.tile_image_handles.iter().enumerate() {
-        let image = textures.get(handle).unwrap();
-        let begin = 4 * (tile_texture_width * tile_texture_height) as usize * i;
-        let end = 4 * (tile_texture_width * tile_texture_height) as usize * (i + 1);
-        zone_tile_array.data[begin..end].copy_from_slice(&image.data);
-    }
-    let tile_array_texture = textures.add(zone_tile_array);
+    let zon_file_path = VfsPath::from(list_zone.get(zone_id, 1));
+    let zsc_deco_path = VfsPath::from(list_zone.get(zone_id, 11));
+    let zsc_cnst_path = VfsPath::from(list_zone.get(zone_id, 12));
 
-    // Create water array texture
-    let water_texture_size = textures
-        .get(zone_info.water_image_handles[0].clone())
-        .map(|image| image.size())
+    let zsc_cnst = vfs_resource
+        .vfs
+        .read_file::<ZscFile, _>(&zsc_cnst_path)
+        .ok();
+    let zsc_deco = vfs_resource
+        .vfs
+        .read_file::<ZscFile, _>(&zsc_deco_path)
+        .ok();
+    let zone_path = zon_file_path.path().parent().unwrap();
+
+    let zone_file = vfs_resource
+        .vfs
+        .read_file::<ZonFile, _>(&zon_file_path)
         .unwrap();
-    let water_texture_width = water_texture_size.x as u32;
-    let water_texture_height = water_texture_size.y as u32;
-    let mut water_tile_array = Image::new(
-        Extent3d {
-            width: water_texture_width,
-            height: water_texture_height,
-            depth_or_array_layers: zone_info.water_image_handles.len() as u32,
-        },
-        TextureDimension::D2,
-        vec![
-            0;
-            4 * (water_texture_width * water_texture_height) as usize
-                * zone_info.water_image_handles.len()
-        ],
-        TextureFormat::Rgba8UnormSrgb,
-    );
-    for (i, handle) in zone_info.water_image_handles.iter().enumerate() {
-        let image = textures.get(handle).unwrap();
-        let begin = 4 * (water_texture_width * water_texture_height) as usize * i;
-        let end = 4 * (water_texture_width * water_texture_height) as usize * (i + 1);
-        water_tile_array.data[begin..end].copy_from_slice(&image.data);
-    }
-    let water_array_texture = textures.add(water_tile_array);
 
+    // Load zone tile array
+    let mut tile_array_images = Vec::new();
+    for path in zone_file.tile_textures.iter() {
+        if path == "end" {
+            break;
+        }
+
+        tile_array_images.push(asset_server.load(&(path.to_owned() + ".image_copy_src")));
+    }
+    let tile_texture_array = texture_arrays.add(TextureArray {
+        images: tile_array_images,
+    });
+
+    // Load zone water array
+    let mut water_array_images = Vec::new();
+    for i in 1..=25 {
+        water_array_images.push(asset_server.load(&format!(
+            "3DDATA/JUNON/WATER/OCEAN01_{:02}.DDS.image_copy_src",
+            i
+        )));
+    }
+    let water_texture_array = texture_arrays.add(TextureArray {
+        images: water_array_images,
+    });
     let water_material = water_mesh_materials.add(WaterMeshMaterial {
-        water_texture_array: water_array_texture,
+        water_texture_array,
     });
 
     // Load the zone
-    for map_y in 0..64u32 {
-        for map_x in 0..64u32 {
-            let tilemap = vfs_resource.vfs.read_file::<TilFile, _>(
-                zone_info.zone_path.join(format!("{}_{}.TIL", map_x, map_y)),
-            );
-            let heightmap = vfs_resource.vfs.read_file::<HimFile, _>(
-                zone_info.zone_path.join(format!("{}_{}.HIM", map_x, map_y)),
-            );
+    for block_y in 0..64u32 {
+        for block_x in 0..64u32 {
+            let tilemap = vfs_resource
+                .vfs
+                .read_file::<TilFile, _>(zone_path.join(format!("{}_{}.TIL", block_x, block_y)));
+            let heightmap = vfs_resource
+                .vfs
+                .read_file::<HimFile, _>(zone_path.join(format!("{}_{}.HIM", block_x, block_y)));
 
             if let (Ok(heightmap), Ok(tilemap)) = (heightmap, tilemap) {
-                let offset_x = 160.0 * map_x as f32;
-                let offset_y = 160.0 * (65.0 - map_y as f32);
+                let offset_x = 160.0 * block_x as f32;
+                let offset_y = 160.0 * (65.0 - block_y as f32);
 
                 let material = terrain_materials.add(TerrainMaterial {
                     lightmap_texture: asset_server.load(&format!(
-                        "{}/{}_{}/{}_{}_PLANELIGHTINGMAP.DDS",
-                        zone_info.zone_path.to_str().unwrap(),
-                        map_x,
-                        map_y,
-                        map_x,
-                        map_y
+                        "{}/{1:}_{2:}/{1:}_{2:}_PLANELIGHTINGMAP.DDS",
+                        zone_path.to_str().unwrap(),
+                        block_x,
+                        block_y,
                     )),
-                    tile_array_texture: tile_array_texture.clone(),
+                    tile_array_texture: tile_texture_array.clone(),
                 });
 
                 let mut positions = Vec::new();
@@ -572,16 +627,11 @@ fn setup(
                 let mut indices = Vec::new();
                 let mut tile_ids = Vec::new();
 
-                for block_x in 0..16 {
-                    for block_y in 0..16 {
-                        let base_x = block_x as f32 * 4.0 * 2.5;
-                        let base_y = block_y as f32 * 4.0 * 2.5;
-
-                        let tile =
-                            &zone_info.zone.tiles[tilemap.get_clamped(block_x, block_y) as usize];
-                        let tile_layer1 = tile.layer1 + tile.offset1;
-                        let tile_layer2 = tile.layer2 + tile.offset2;
-                        let index_base = positions.len() as u16;
+                for tile_x in 0..16 {
+                    for tile_y in 0..16 {
+                        let tile = &zone_file.tiles[tilemap.get_clamped(tile_x, tile_y) as usize];
+                        let tile_array_index1 = tile.layer1 + tile.offset1;
+                        let tile_array_index2 = tile.layer2 + tile.offset2;
                         let tile_rotation = match tile.rotation {
                             ZonTileRotation::FlipHorizontal => 2,
                             ZonTileRotation::FlipVertical => 3,
@@ -590,14 +640,16 @@ fn setup(
                             ZonTileRotation::CounterClockwise90 => 6,
                             _ => 0,
                         };
+                        let tile_indices_base = positions.len() as u16;
+                        let tile_offset_x = tile_x as f32 * 4.0 * 2.5;
+                        let tile_offset_y = tile_y as f32 * 4.0 * 2.5;
 
                         for y in 0..5 {
                             for x in 0..5 {
-                                let heightmap_x = x + block_x as i32 * 4;
-                                let heightmap_y = y + block_y as i32 * 4;
+                                let heightmap_x = x + tile_x as i32 * 4;
+                                let heightmap_y = y + tile_y as i32 * 4;
                                 let height =
                                     heightmap.get_clamped(heightmap_x, heightmap_y) / 100.0;
-
                                 let height_l =
                                     heightmap.get_clamped(heightmap_x - 1, heightmap_y) / 100.0;
                                 let height_r =
@@ -614,23 +666,27 @@ fn setup(
                                 .normalize();
 
                                 positions.push([
-                                    base_x + x as f32 * 2.5,
+                                    tile_offset_x + x as f32 * 2.5,
                                     height,
-                                    base_y + y as f32 * 2.5,
+                                    tile_offset_y + y as f32 * 2.5,
                                 ]);
                                 normals.push([normal.x, normal.y, normal.z]);
                                 uvs_tile.push([x as f32 / 4.0, y as f32 / 4.0]);
                                 uvs_lightmap.push([
-                                    (block_x as f32 * 4.0 + x as f32) / 64.0,
-                                    (block_y as f32 * 4.0 + y as f32) / 64.0,
+                                    (tile_x as f32 * 4.0 + x as f32) / 64.0,
+                                    (tile_y as f32 * 4.0 + y as f32) / 64.0,
                                 ]);
-                                tile_ids.push([tile_layer1, tile_layer2, tile_rotation]);
+                                tile_ids.push([
+                                    tile_array_index1,
+                                    tile_array_index2,
+                                    tile_rotation,
+                                ]);
                             }
                         }
 
                         for y in 0..(5 - 1) {
                             for x in 0..(5 - 1) {
-                                let start = index_base + y * 5 + x;
+                                let start = tile_indices_base + y * 5 + x;
                                 indices.push(start);
                                 indices.push(start + 5);
                                 indices.push(start + 1);
@@ -664,27 +720,25 @@ fn setup(
                     .insert_bundle(PickableBundle::default());
             }
 
-            let ifo = vfs_resource.vfs.read_file::<IfoFile, _>(
-                zone_info.zone_path.join(format!("{}_{}.IFO", map_x, map_y)),
-            );
+            let ifo = vfs_resource
+                .vfs
+                .read_file::<IfoFile, _>(zone_path.join(format!("{}_{}.IFO", block_x, block_y)));
             let cnst_lit = vfs_resource
                 .vfs
-                .read_file::<LitFile, _>(zone_info.zone_path.join(format!(
+                .read_file::<LitFile, _>(zone_path.join(format!(
                     "{}_{}/LIGHTMAP/BUILDINGLIGHTMAPDATA.LIT",
-                    map_x, map_y
+                    block_x, block_y
                 )))
                 .ok();
             let deco_lit = vfs_resource
                 .vfs
-                .read_file::<LitFile, _>(zone_info.zone_path.join(format!(
+                .read_file::<LitFile, _>(zone_path.join(format!(
                     "{}_{}/LIGHTMAP/OBJECTLIGHTMAPDATA.LIT",
-                    map_x, map_y
+                    block_x, block_y
                 )))
                 .ok();
 
-            let lightmap_path = zone_info
-                .zone_path
-                .join(format!("{}_{}/LIGHTMAP/", map_x, map_y));
+            let lightmap_path = zone_path.join(format!("{}_{}/LIGHTMAP/", block_x, block_y));
 
             if let Ok(ifo) = ifo {
                 for (plane_start, plane_end) in ifo.water_planes.iter() {
@@ -734,7 +788,7 @@ fn setup(
                     ));
                 }
 
-                if let Some(zsc_cnst) = zone_info.zsc_cnst.as_ref() {
+                if let Some(zsc_cnst) = zsc_cnst.as_ref() {
                     for (object_id, object_instance) in ifo.cnst_objects.iter().enumerate() {
                         let lit_object = cnst_lit.as_ref().and_then(|lit| {
                             lit.objects
@@ -754,7 +808,7 @@ fn setup(
                     }
                 }
 
-                if let Some(zsc_deco) = zone_info.zsc_deco.as_ref() {
+                if let Some(zsc_deco) = zsc_deco.as_ref() {
                     for (object_id, object_instance) in ifo.deco_objects.iter().enumerate() {
                         let lit_object = deco_lit.as_ref().and_then(|lit| {
                             lit.objects

@@ -1,4 +1,4 @@
-use crate::load_internal_asset;
+use crate::{load_internal_asset, TextureArray};
 use bevy::{
     asset::{AssetServer, Handle},
     ecs::system::{lifetimeless::SRes, SystemParamItem},
@@ -44,7 +44,7 @@ impl Plugin for TerrainMaterialPlugin {
 
         app.add_plugin(MaterialPlugin::<TerrainMaterial>::default());
 
-        let render_device = app.world.get_resource::<RenderDevice>().unwrap();
+        let render_device = app.world.resource::<RenderDevice>();
         let linear_sampler = render_device.create_sampler(&SamplerDescriptor {
             mag_filter: FilterMode::Linear,
             min_filter: FilterMode::Linear,
@@ -65,7 +65,7 @@ pub struct TerrainMaterialSamplers {
 #[uuid = "6994888b-4202-457b-aacf-517228cc0c22"]
 pub struct TerrainMaterial {
     pub lightmap_texture: Handle<Image>,
-    pub tile_array_texture: Handle<Image>,
+    pub tile_array_texture: Handle<TextureArray>,
 }
 
 /// The GPU representation of a [`TerrainMaterial`].
@@ -73,7 +73,7 @@ pub struct TerrainMaterial {
 pub struct GpuTerrainMaterial {
     pub bind_group: BindGroup,
     pub lightmap_texture: Handle<Image>,
-    pub tile_array_texture: Handle<Image>,
+    pub tile_array_texture: Handle<TextureArray>,
 }
 
 impl RenderAsset for TerrainMaterial {
@@ -84,6 +84,7 @@ impl RenderAsset for TerrainMaterial {
         SRes<RenderDevice>,
         SRes<MaterialPipeline<TerrainMaterial>>,
         SRes<RenderAssets<Image>>,
+        SRes<RenderAssets<TextureArray>>,
         SRes<TerrainMaterialSamplers>,
     );
 
@@ -93,7 +94,7 @@ impl RenderAsset for TerrainMaterial {
 
     fn prepare_asset(
         material: Self::ExtractedAsset,
-        (render_device, material_pipeline, gpu_images, samplers): &mut SystemParamItem<Self::Param>,
+        (render_device, material_pipeline, gpu_images, gpu_texture_arrays, samplers): &mut SystemParamItem<Self::Param>,
     ) -> Result<Self::PreparedAsset, PrepareAssetError<Self::ExtractedAsset>> {
         let lightmap_gpu_image = gpu_images.get(&material.lightmap_texture);
         if lightmap_gpu_image.is_none() {
@@ -102,7 +103,7 @@ impl RenderAsset for TerrainMaterial {
         let lightmap_texture_view = &lightmap_gpu_image.unwrap().texture_view;
         let lightmap_texture_sampler = &samplers.linear_sampler;
 
-        let tile_array_gpu_image = gpu_images.get(&material.tile_array_texture);
+        let tile_array_gpu_image = gpu_texture_arrays.get(&material.tile_array_texture);
         if tile_array_gpu_image.is_none() {
             return Err(PrepareAssetError::RetryNextUpdate(material));
         }

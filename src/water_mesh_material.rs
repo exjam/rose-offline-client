@@ -1,4 +1,4 @@
-use crate::load_internal_asset;
+use crate::{load_internal_asset, TextureArray};
 use bevy::{
     asset::{AssetServer, Handle},
     core::Time,
@@ -32,7 +32,6 @@ use bevy::{
             SpecializedMeshPipelines, TextureSampleType, TextureViewDimension,
         },
         renderer::{RenderDevice, RenderQueue},
-        texture::Image,
         view::{ExtractedView, VisibleEntities},
         RenderApp, RenderStage,
     },
@@ -53,7 +52,7 @@ impl Plugin for WaterMeshMaterialPlugin {
             Shader::from_wgsl
         );
 
-        let render_device = app.world.get_resource::<RenderDevice>().unwrap();
+        let render_device = app.world.resource::<RenderDevice>();
         let buffer = render_device.create_buffer(&BufferDescriptor {
             label: Some("time uniform buffer"),
             size: std::mem::size_of::<i32>() as u64,
@@ -179,8 +178,8 @@ impl SpecializedMeshPipeline for WaterMeshMaterialPipeline {
 
 impl FromWorld for WaterMeshMaterialPipeline {
     fn from_world(world: &mut World) -> Self {
-        let asset_server = world.get_resource::<AssetServer>().unwrap();
-        let render_device = world.get_resource::<RenderDevice>().unwrap();
+        let asset_server = world.resource::<AssetServer>();
+        let render_device = world.resource::<RenderDevice>();
         let material_layout = WaterMeshMaterial::bind_group_layout(render_device);
         let time_uniform_layout =
             render_device.create_bind_group_layout(&BindGroupLayoutDescriptor {
@@ -198,7 +197,7 @@ impl FromWorld for WaterMeshMaterialPipeline {
             });
 
         WaterMeshMaterialPipeline {
-            mesh_pipeline: world.get_resource::<MeshPipeline>().unwrap().clone(),
+            mesh_pipeline: world.resource::<MeshPipeline>().clone(),
             material_layout,
             time_uniform_layout,
             vertex_shader: WaterMeshMaterial::vertex_shader(asset_server),
@@ -222,14 +221,14 @@ pub struct WaterMeshMaterialUniformData {
 #[derive(Debug, Clone, TypeUuid)]
 #[uuid = "6942088b-c082-457b-aacf-694208cc0c22"]
 pub struct WaterMeshMaterial {
-    pub water_texture_array: Handle<Image>,
+    pub water_texture_array: Handle<TextureArray>,
 }
 
 /// The GPU representation of a [`WaterMeshMaterial`].
 #[derive(Debug, Clone)]
 pub struct GpuWaterMeshMaterial {
     pub bind_group: BindGroup,
-    pub water_texture_array: Handle<Image>,
+    pub water_texture_array: Handle<TextureArray>,
 }
 
 impl RenderAsset for WaterMeshMaterial {
@@ -238,7 +237,7 @@ impl RenderAsset for WaterMeshMaterial {
     type Param = (
         SRes<RenderDevice>,
         SRes<WaterMeshMaterialPipeline>,
-        SRes<RenderAssets<Image>>,
+        SRes<RenderAssets<TextureArray>>,
     );
 
     fn extract_asset(&self) -> Self::ExtractedAsset {
@@ -247,9 +246,9 @@ impl RenderAsset for WaterMeshMaterial {
 
     fn prepare_asset(
         material: Self::ExtractedAsset,
-        (render_device, material_pipeline, gpu_images): &mut SystemParamItem<Self::Param>,
+        (render_device, material_pipeline, gpu_texture_arrays): &mut SystemParamItem<Self::Param>,
     ) -> Result<Self::PreparedAsset, PrepareAssetError<Self::ExtractedAsset>> {
-        let water_texture_gpu_image = gpu_images.get(&material.water_texture_array);
+        let water_texture_gpu_image = gpu_texture_arrays.get(&material.water_texture_array);
         if water_texture_gpu_image.is_none() {
             return Err(PrepareAssetError::RetryNextUpdate(material));
         }
