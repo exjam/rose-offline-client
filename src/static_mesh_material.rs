@@ -95,7 +95,8 @@ pub struct StaticMeshMaterialUniformData {
 pub struct StaticMeshMaterial {
     pub base_texture: Handle<Image>,
     pub alpha_value: Option<f32>,
-    pub alpha_mode: AlphaMode,
+    pub alpha_enabled: bool,
+    pub alpha_test: Option<f32>,
     pub two_sided: bool,
     pub z_test_enabled: bool,
     pub z_write_enabled: bool,
@@ -111,7 +112,8 @@ impl Default for StaticMeshMaterial {
         Self {
             base_texture: Default::default(),
             alpha_value: None,
-            alpha_mode: AlphaMode::Opaque,
+            alpha_enabled: false,
+            alpha_test: None,
             two_sided: false,
             z_test_enabled: true,
             z_write_enabled: true,
@@ -132,7 +134,6 @@ pub struct GpuStaticMeshMaterial {
     pub lightmap_texture: Option<Handle<Image>>,
 
     pub flags: StaticMeshMaterialFlags,
-    pub alpha_value: Option<f32>,
     pub alpha_mode: AlphaMode,
     pub two_sided: bool,
     pub z_test_enabled: bool,
@@ -177,16 +178,26 @@ impl RenderAsset for StaticMeshMaterial {
 
         let mut flags = StaticMeshMaterialFlags::NONE;
         let mut alpha_cutoff = 0.5;
-        match material.alpha_mode {
-            AlphaMode::Opaque => flags |= StaticMeshMaterialFlags::ALPHA_MODE_OPAQUE,
-            AlphaMode::Mask(c) => {
-                alpha_cutoff = c;
-                flags |= StaticMeshMaterialFlags::ALPHA_MODE_MASK;
-            }
-            AlphaMode::Blend => flags |= StaticMeshMaterialFlags::ALPHA_MODE_BLEND,
-        };
+        let mut alpha_mode = AlphaMode::Opaque;
+
+        if material.alpha_enabled {
+            flags |= StaticMeshMaterialFlags::ALPHA_MODE_BLEND;
+            alpha_mode = AlphaMode::Blend;
+        }
+
+        if let Some(alpha_ref) = material.alpha_test {
+            flags |= StaticMeshMaterialFlags::ALPHA_MODE_MASK;
+            alpha_cutoff = alpha_ref;
+            alpha_mode = AlphaMode::Mask(alpha_cutoff);
+        }
+
+        if !material.alpha_enabled && material.alpha_test.is_none() {
+            flags |= StaticMeshMaterialFlags::ALPHA_MODE_OPAQUE;
+        }
+
         let alpha_value = if let Some(alpha_value) = material.alpha_value {
             flags |= StaticMeshMaterialFlags::HAS_ALPHA_VALUE;
+            alpha_mode = AlphaMode::Blend;
             alpha_value
         } else {
             1.0
@@ -239,8 +250,7 @@ impl RenderAsset for StaticMeshMaterial {
             base_texture: material.base_texture,
             lightmap_texture: material.lightmap_texture,
             flags,
-            alpha_mode: material.alpha_mode,
-            alpha_value: material.alpha_value,
+            alpha_mode,
             two_sided: material.two_sided,
             z_test_enabled: material.z_test_enabled,
             z_write_enabled: material.z_write_enabled,
@@ -251,7 +261,6 @@ impl RenderAsset for StaticMeshMaterial {
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct StaticMeshMaterialKey {
     has_lightmap: bool,
-    is_alpha_mask: bool,
     two_sided: bool,
     z_test_enabled: bool,
     z_write_enabled: bool,
@@ -263,7 +272,6 @@ impl SpecializedMaterial for StaticMeshMaterial {
     fn key(render_asset: &<Self as RenderAsset>::PreparedAsset) -> Self::Key {
         StaticMeshMaterialKey {
             has_lightmap: render_asset.lightmap_texture.is_some(),
-            is_alpha_mask: matches!(render_asset.alpha_mode, AlphaMode::Mask(_)),
             two_sided: render_asset.two_sided,
             z_test_enabled: render_asset.z_test_enabled,
             z_write_enabled: render_asset.z_write_enabled,

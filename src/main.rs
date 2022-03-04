@@ -833,13 +833,8 @@ fn spawn_zsc_object(
                         } else {
                             None
                         },
-                        alpha_mode: if zsc_material.alpha_enabled {
-                            AlphaMode::Blend
-                        } else if let Some(alpha_ref) = zsc_material.alpha_test {
-                            AlphaMode::Mask(alpha_ref)
-                        } else {
-                            AlphaMode::Opaque
-                        },
+                        alpha_enabled: zsc_material.alpha_enabled,
+                        alpha_test: zsc_material.alpha_test,
                         two_sided: zsc_material.two_sided,
                         z_write_enabled: zsc_material.z_write_enabled,
                         z_test_enabled: zsc_material.z_test_enabled,
