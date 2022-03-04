@@ -16,12 +16,13 @@ use bevy::{
     math::{Quat, Vec2, Vec3},
     pbr::MeshRenderPlugin,
     prelude::{
-        AddAsset, App, AssetServer, Assets, BuildChildren, Commands, Component, ComputedVisibility,
-        EventReader, GlobalTransform, Handle, Image, Mesh, Msaa, PerspectiveCameraBundle, Plugin,
-        Query, Res, ResMut, State, SystemSet, Transform, Visibility,
+        AddAsset, App, AssetServer, Assets, BuildChildren, Color, Commands, Component,
+        ComputedVisibility, Entity, EventReader, GlobalTransform, Handle, Image, Mesh, Msaa,
+        PerspectiveCameraBundle, Plugin, Query, Res, ResMut, State, SystemSet, Transform,
+        Visibility, With,
     },
     render::{
-        mesh::Indices,
+        mesh::{Indices, VertexAttributeValues},
         render_resource::{Extent3d, PrimitiveTopology, TextureDimension, TextureFormat},
     },
     window::{WindowDescriptor, Windows},
@@ -33,6 +34,7 @@ use bevy_mod_picking::{
     PickingEvent, PickingPlugin, PickingPluginsState,
 };
 
+use bevy_polyline::{Polyline, PolylineBundle, PolylineMaterial, PolylinePlugin};
 use rose_file_readers::{
     HimFile, IfoFile, IfoObject, LitFile, LitObject, StbFile, TilFile, VfsFile, VfsIndex, VfsPath,
     ZmsFile, ZonFile, ZonTileRotation, ZscFile, ZscMaterial,
@@ -147,6 +149,7 @@ fn main() {
 
     // Initialise 3rd party bevy plugins
     app.add_plugin(NoCameraPlayerPlugin)
+        .add_plugin(PolylinePlugin)
         .add_plugin(PickingPlugin)
         .add_plugin(InteractablePickingPlugin)
         .add_plugin(DebugCursorPickingPlugin)
@@ -179,11 +182,56 @@ fn control_picking(windows: Res<Windows>, mut picking: ResMut<PickingPluginsStat
     picking.update_debug_cursor = !cursor_locked;
 }
 
-fn picking_events(mut events: EventReader<PickingEvent>, query: Query<&ZscMaterialComponent>) {
+fn picking_events(
+    mut commands: Commands,
+    mut events: EventReader<PickingEvent>,
+    mut polylines: ResMut<Assets<Polyline>>,
+    mut polyline_materials: ResMut<Assets<PolylineMaterial>>,
+    query: Query<(
+        &Handle<Mesh>,
+        &GlobalTransform,
+        Option<&ZscMaterialComponent>,
+    )>,
+    existing_polylines: Query<Entity, With<Handle<Polyline>>>,
+    meshes: Res<Assets<Mesh>>,
+) {
     for event in events.iter() {
         if let &PickingEvent::Clicked(e) = event {
-            if let Ok(zsc_material) = query.get(e) {
-                println!("{:#?}", zsc_material.0);
+            if let Ok((mesh, &global_transform, zsc_material)) = query.get(e) {
+                if let Some(mesh) = meshes.get(mesh) {
+                    if let (
+                        Some(Indices::U16(indices)),
+                        Some(VertexAttributeValues::Float32x3(vertices)),
+                    ) = (mesh.indices(), mesh.attribute(Mesh::ATTRIBUTE_POSITION))
+                    {
+                        let mut polyline_vertices = Vec::new();
+                        for &i in indices.iter() {
+                            let vertex = vertices[i as usize];
+                            polyline_vertices.push(Vec3::new(vertex[0], vertex[1], vertex[2]));
+                        }
+
+                        commands.spawn_bundle(PolylineBundle {
+                            polyline: polylines.add(Polyline {
+                                vertices: polyline_vertices,
+                            }),
+                            material: polyline_materials.add(PolylineMaterial {
+                                width: 4.0,
+                                color: Color::PINK,
+                                perspective: true,
+                            }),
+                            transform: global_transform.into(),
+                            ..Default::default()
+                        });
+
+                        for existing in existing_polylines.iter() {
+                            commands.entity(existing).despawn();
+                        }
+                    }
+                }
+
+                if let Some(zsc_material) = zsc_material {
+                    println!("{:#?}", zsc_material.0);
+                }
             }
         }
     }
