@@ -5,6 +5,7 @@ mod water_mesh_material;
 use std::{
     path::{Path, PathBuf},
     sync::Arc,
+    time::Duration,
 };
 
 use bevy::{
@@ -122,7 +123,10 @@ fn main() {
         })
         .add_plugin(bevy::log::LogPlugin::default())
         .add_plugin(bevy::core::CorePlugin::default())
-        .add_plugin(bevy::diagnostic::LogDiagnosticsPlugin::default())
+        .add_plugin(bevy::diagnostic::LogDiagnosticsPlugin {
+            wait_duration: Duration::from_secs(30),
+            ..Default::default()
+        })
         .add_plugin(bevy::diagnostic::FrameTimeDiagnosticsPlugin::default())
         .add_plugin(bevy::transform::TransformPlugin::default())
         .add_plugin(bevy::diagnostic::DiagnosticsPlugin::default())
