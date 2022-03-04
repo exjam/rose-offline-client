@@ -1,42 +1,20 @@
-mod static_mesh_material;
-mod terrain_material;
-mod water_mesh_material;
+mod render;
+mod vfs_asset_io;
+mod zms_asset_loader;
 
-use std::{
-    ffi::OsStr,
-    path::{Path, PathBuf},
-    sync::Arc,
-    time::Duration,
-};
+use std::{path::Path, sync::Arc, time::Duration};
 
 use bevy::{
-    asset::{
-        AssetIo, AssetIoError, AssetLoader, AssetServerSettings, BoxedFuture, LoadContext,
-        LoadState, LoadedAsset,
-    },
-    ecs::system::{lifetimeless::SRes, SystemParamItem},
+    asset::AssetServerSettings,
     math::{Quat, Vec2, Vec3},
-    pbr::MeshRenderPlugin,
     prelude::{
         AddAsset, App, AssetServer, Assets, BuildChildren, Color, Commands, Component,
-        ComputedVisibility, Entity, EventReader, GlobalTransform, Handle, Image, Mesh, Msaa,
-        PerspectiveCameraBundle, Plugin, Query, Res, ResMut, State, SystemSet, Transform,
-        Visibility, With,
+        ComputedVisibility, Entity, EventReader, GlobalTransform, Handle, Mesh, Msaa,
+        PerspectiveCameraBundle, Query, Res, ResMut, Transform, Visibility, With,
     },
-    reflect::TypeUuid,
     render::{
         mesh::{Indices, VertexAttributeValues},
-        render_asset::{
-            ExtractedAssets, PrepareAssetError, RenderAsset, RenderAssetPlugin, RenderAssets,
-        },
-        render_component::ExtractComponentPlugin,
-        render_resource::{
-            CommandEncoderDescriptor, Extent3d, ImageCopyTexture, Origin3d, PrimitiveTopology,
-            Texture, TextureAspect, TextureDescriptor, TextureDimension, TextureFormat,
-            TextureUsages, TextureView, TextureViewDescriptor,
-        },
-        renderer::{RenderDevice, RenderQueue},
-        texture::{FileTextureError, ImageType},
+        render_resource::PrimitiveTopology,
     },
     window::{WindowDescriptor, Windows},
 };
@@ -48,22 +26,23 @@ use bevy_mod_picking::{
 };
 
 use bevy_polyline::{Polyline, PolylineBundle, PolylineMaterial, PolylinePlugin};
+use render::{
+    RoseRenderPlugin, StaticMeshMaterial, TerrainMaterial, TextureArray, TextureArrayBuilder,
+    WaterMeshMaterial, MESH_ATTRIBUTE_UV_1, TERRAIN_MESH_ATTRIBUTE_TILE_INFO,
+};
 use rose_file_readers::{
-    HimFile, IfoFile, IfoObject, LitFile, LitObject, StbFile, TilFile, VfsFile, VfsIndex, VfsPath,
-    ZmsFile, ZonFile, ZonTileRotation, ZscFile, ZscMaterial,
+    HimFile, IfoFile, IfoObject, LitFile, LitObject, StbFile, TilFile, VfsIndex, VfsPath, ZonFile,
+    ZonTileRotation, ZscFile, ZscMaterial,
 };
-use static_mesh_material::{
-    StaticMeshMaterial, StaticMeshMaterialPlugin, STATIC_MESH_ATTRIBUTE_UV1,
-    STATIC_MESH_ATTRIBUTE_UV2, STATIC_MESH_ATTRIBUTE_UV3, STATIC_MESH_ATTRIBUTE_UV4,
-};
-use terrain_material::{
-    TerrainMaterial, TerrainMaterialPlugin, TERRAIN_MESH_ATTRIBUTE_TILE_INFO,
-    TERRAIN_MESH_ATTRIBUTE_UV1,
-};
-use water_mesh_material::{WaterMeshMaterial, WaterMeshMaterialPlugin};
+use vfs_asset_io::VfsAssetIo;
+use zms_asset_loader::ZmsAssetLoader;
 
 struct ClientConfiguration {
     zone_id: usize,
+}
+
+pub struct VfsResource {
+    vfs: Arc<VfsIndex>,
 }
 
 fn main() {
@@ -114,8 +93,9 @@ fn main() {
         }
     }
 
-    let vfs =
-        VfsIndex::with_paths(data_idx_path, data_extracted_path).expect("Failed to initialise VFS");
+    let vfs = Arc::new(
+        VfsIndex::with_paths(data_idx_path, data_extracted_path).expect("Failed to initialise VFS"),
+    );
 
     let mut app = App::new();
 
@@ -150,11 +130,14 @@ fn main() {
         .add_plugin(bevy::transform::TransformPlugin::default())
         .add_plugin(bevy::diagnostic::DiagnosticsPlugin::default())
         .add_plugin(bevy::input::InputPlugin::default())
-        .add_plugin(bevy::window::WindowPlugin::default())
-        .insert_resource(VfsResource { vfs: Arc::new(vfs) })
-        .add_plugin(VfsAssetIoPlugin)
-        .add_plugin(bevy::asset::AssetPlugin::default())
-        .add_plugin(bevy::scene::ScenePlugin::default())
+        .add_plugin(bevy::window::WindowPlugin::default());
+
+    let task_pool = app.world.resource::<bevy::tasks::IoTaskPool>().0.clone();
+    app.insert_resource(VfsResource { vfs: vfs.clone() })
+        .insert_resource(AssetServer::new(VfsAssetIo::new(vfs), task_pool))
+        .add_plugin(bevy::asset::AssetPlugin::default());
+
+    app.add_plugin(bevy::scene::ScenePlugin::default())
         .add_plugin(bevy::winit::WinitPlugin::default())
         .add_plugin(bevy::render::RenderPlugin::default())
         .add_plugin(bevy::core_pipeline::CorePipelinePlugin::default())
@@ -169,18 +152,10 @@ fn main() {
         .add_system(control_picking)
         .add_system(picking_events);
 
-    app.add_asset::<TextureArray>()
-        .add_plugin(ExtractComponentPlugin::<Handle<TextureArray>>::default())
-        .add_plugin(RenderAssetPlugin::<TextureArray>::default());
-
     // Initialise rose stuff
     app.insert_resource(ClientConfiguration { zone_id })
-        .init_asset_loader::<ZmsMeshAssetLoader>()
-        .init_asset_loader::<CopySrcImageAssetLoader>()
-        .add_plugin(MeshRenderPlugin)
-        .add_plugin(TerrainMaterialPlugin)
-        .add_plugin(StaticMeshMaterialPlugin)
-        .add_plugin(WaterMeshMaterialPlugin)
+        .init_asset_loader::<ZmsAssetLoader>()
+        .add_plugin(RoseRenderPlugin)
         .add_startup_system(setup);
 
     app.run();
@@ -251,277 +226,6 @@ fn picking_events(
     }
 }
 
-struct VfsAssetIo {
-    vfs: Arc<VfsIndex>,
-}
-
-struct VfsResource {
-    vfs: Arc<VfsIndex>,
-}
-
-impl AssetIo for VfsAssetIo {
-    fn load_path<'a>(&'a self, path: &'a Path) -> BoxedFuture<'a, Result<Vec<u8>, AssetIoError>> {
-        Box::pin(async move {
-            let path = path.to_str().unwrap().trim_end_matches(".image_copy_src");
-            if let Some(file) = self.vfs.open_file(path) {
-                match file {
-                    VfsFile::Buffer(buffer) => Ok(buffer),
-                    VfsFile::View(view) => Ok(view.into()),
-                }
-            } else {
-                Err(AssetIoError::NotFound(path.into()))
-            }
-        })
-    }
-
-    fn read_directory(
-        &self,
-        _path: &Path,
-    ) -> Result<Box<dyn Iterator<Item = PathBuf>>, AssetIoError> {
-        Ok(Box::new(std::iter::empty::<PathBuf>()))
-    }
-
-    fn is_directory(&self, _path: &Path) -> bool {
-        false
-    }
-
-    fn watch_path_for_changes(&self, _path: &Path) -> Result<(), AssetIoError> {
-        Ok(())
-    }
-
-    fn watch_for_changes(&self) -> Result<(), AssetIoError> {
-        Ok(())
-    }
-}
-
-#[derive(Debug, Clone, TypeUuid)]
-#[uuid = "6942088b-4202-4569-a420-694208cc0c22"]
-pub struct TextureArray {
-    pub images: Vec<Handle<Image>>,
-}
-
-pub struct GpuTextureArray {
-    pub texture: Texture,
-    pub texture_view: TextureView,
-}
-
-impl RenderAsset for TextureArray {
-    type ExtractedAsset = TextureArray;
-    type PreparedAsset = GpuTextureArray;
-    type Param = (
-        SRes<RenderDevice>,
-        SRes<RenderAssets<Image>>,
-        SRes<RenderQueue>,
-    );
-
-    fn extract_asset(&self) -> Self::ExtractedAsset {
-        self.clone()
-    }
-
-    fn prepare_asset(
-        texture_array: Self::ExtractedAsset,
-        (render_device, gpu_images, render_queue): &mut SystemParamItem<Self::Param>,
-    ) -> Result<Self::PreparedAsset, PrepareAssetError<Self::ExtractedAsset>> {
-        let mut texture_array_gpu_images = Vec::with_capacity(texture_array.images.len());
-
-        for slice in texture_array.images.iter() {
-            let gpu_image = gpu_images.get(slice);
-            if let Some(gpu_image) = gpu_image {
-                texture_array_gpu_images.push(gpu_image);
-            } else {
-                return Err(PrepareAssetError::RetryNextUpdate(texture_array));
-            }
-        }
-
-        let size = texture_array_gpu_images[0].size;
-
-        let array_texture = render_device.create_texture(&TextureDescriptor {
-            label: Some("texture_array"),
-            size: Extent3d {
-                width: size.width as u32,
-                height: size.height as u32,
-                depth_or_array_layers: texture_array_gpu_images.len() as u32,
-            },
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: TextureDimension::D2,
-            format: TextureFormat::Rgba8UnormSrgb,
-            usage: TextureUsages::COPY_DST | TextureUsages::TEXTURE_BINDING,
-        });
-
-        let mut command_encoder = render_device.create_command_encoder(&CommandEncoderDescriptor {
-            label: Some("create_texture_array"),
-        });
-
-        for (slice, slice_gpu_image) in texture_array_gpu_images.iter().enumerate() {
-            command_encoder.copy_texture_to_texture(
-                ImageCopyTexture {
-                    texture: &slice_gpu_image.texture,
-                    mip_level: 0,
-                    origin: Origin3d { x: 0, y: 0, z: 0 },
-                    aspect: TextureAspect::All,
-                },
-                ImageCopyTexture {
-                    texture: &array_texture,
-                    mip_level: 0,
-                    origin: Origin3d {
-                        x: 0,
-                        y: 0,
-                        z: slice as u32,
-                    },
-                    aspect: TextureAspect::All,
-                },
-                Extent3d {
-                    width: size.width as u32,
-                    height: size.height as u32,
-                    depth_or_array_layers: 1,
-                },
-            );
-        }
-
-        let command_buffer = command_encoder.finish();
-        render_queue.submit(vec![command_buffer]);
-
-        let texture_view = array_texture.create_view(&TextureViewDescriptor::default());
-
-        Ok(GpuTextureArray {
-            texture: array_texture,
-            texture_view,
-        })
-    }
-}
-
-/// A plugin used to execute the override of the asset io
-struct VfsAssetIoPlugin;
-
-impl Plugin for VfsAssetIoPlugin {
-    fn build(&self, app: &mut App) {
-        app.insert_resource(AssetServer::new(
-            VfsAssetIo {
-                vfs: app.world.resource::<VfsResource>().vfs.clone(),
-            },
-            app.world.resource::<bevy::tasks::IoTaskPool>().0.clone(),
-        ));
-    }
-}
-
-#[derive(Default)]
-pub struct CopySrcImageAssetLoader;
-
-impl AssetLoader for CopySrcImageAssetLoader {
-    fn load<'a>(
-        &'a self,
-        bytes: &'a [u8],
-        load_context: &'a mut LoadContext,
-    ) -> BoxedFuture<'a, Result<(), anyhow::Error>> {
-        Box::pin(async move {
-            let ext = Path::new(load_context.path().file_stem().unwrap())
-                .extension()
-                .unwrap()
-                .to_str()
-                .unwrap();
-            let mut dyn_img =
-                Image::from_buffer(bytes, ImageType::Extension(ext)).map_err(|_| {
-                    anyhow::anyhow!(
-                        "Error in CopySrcImageAssetLoader for path {}",
-                        load_context.path().display()
-                    )
-                })?;
-            dyn_img.texture_descriptor.usage |= TextureUsages::COPY_SRC;
-            load_context.set_default_asset(LoadedAsset::new(dyn_img));
-            Ok(())
-        })
-    }
-
-    fn extensions(&self) -> &[&str] {
-        &["image_copy_src"]
-    }
-}
-
-#[derive(Default)]
-pub struct ZmsMeshAssetLoader;
-
-impl AssetLoader for ZmsMeshAssetLoader {
-    fn load<'a>(
-        &'a self,
-        bytes: &'a [u8],
-        load_context: &'a mut LoadContext,
-    ) -> BoxedFuture<'a, Result<(), anyhow::Error>> {
-        Box::pin(async move {
-            match <ZmsFile as rose_file_readers::RoseFile>::read(bytes.into(), &Default::default())
-            {
-                Ok(mut zms) => {
-                    let mut mesh = Mesh::new(PrimitiveTopology::TriangleList);
-                    mesh.set_indices(Some(Indices::U16(zms.indices)));
-
-                    if !zms.position.is_empty() {
-                        for vert in zms.position.iter_mut() {
-                            let y = vert[1];
-                            vert[1] = vert[2];
-                            vert[2] = -y;
-                        }
-                        mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, zms.position);
-                    }
-
-                    if !zms.normal.is_empty() {
-                        for vert in zms.normal.iter_mut() {
-                            let y = vert[1];
-                            vert[1] = vert[2];
-                            vert[2] = -y;
-                        }
-                        mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, zms.normal);
-                    }
-
-                    if !zms.tangent.is_empty() {
-                        for vert in zms.tangent.iter_mut() {
-                            let y = vert[1];
-                            vert[1] = vert[2];
-                            vert[2] = -y;
-                        }
-                        mesh.insert_attribute(Mesh::ATTRIBUTE_TANGENT, zms.tangent);
-                    }
-
-                    if !zms.color.is_empty() {
-                        mesh.insert_attribute(Mesh::ATTRIBUTE_COLOR, zms.color);
-                    }
-
-                    if !zms.bone_weights.is_empty() {
-                        mesh.insert_attribute(Mesh::ATTRIBUTE_JOINT_WEIGHT, zms.bone_weights);
-                    }
-
-                    if !zms.bone_indices.is_empty() {
-                        mesh.insert_attribute(Mesh::ATTRIBUTE_JOINT_INDEX, zms.bone_indices);
-                    }
-
-                    if !zms.uv1.is_empty() {
-                        mesh.insert_attribute(STATIC_MESH_ATTRIBUTE_UV1, zms.uv1);
-                    }
-
-                    if !zms.uv2.is_empty() {
-                        mesh.insert_attribute(STATIC_MESH_ATTRIBUTE_UV2, zms.uv2);
-                    }
-
-                    if !zms.uv3.is_empty() {
-                        mesh.insert_attribute(STATIC_MESH_ATTRIBUTE_UV3, zms.uv3);
-                    }
-
-                    if !zms.uv4.is_empty() {
-                        mesh.insert_attribute(STATIC_MESH_ATTRIBUTE_UV4, zms.uv4);
-                    }
-
-                    load_context.set_default_asset(LoadedAsset::new(mesh));
-                    Ok(())
-                }
-                Err(error) => Err(error),
-            }
-        })
-    }
-
-    fn extensions(&self) -> &[&str] {
-        &["zms"]
-    }
-}
-
 #[allow(clippy::too_many_arguments)]
 fn setup(
     mut commands: Commands,
@@ -569,31 +273,23 @@ fn setup(
         .unwrap();
 
     // Load zone tile array
-    let mut tile_array_images = Vec::new();
+    let mut tile_texture_array_builder = TextureArrayBuilder::new();
     for path in zone_file.tile_textures.iter() {
         if path == "end" {
             break;
         }
 
-        tile_array_images.push(asset_server.load(&(path.to_owned() + ".image_copy_src")));
+        tile_texture_array_builder.add(path.clone());
     }
-    let tile_texture_array = texture_arrays.add(TextureArray {
-        images: tile_array_images,
-    });
+    let tile_texture_array = texture_arrays.add(tile_texture_array_builder.build(&asset_server));
 
     // Load zone water array
-    let mut water_array_images = Vec::new();
+    let mut water_texture_array_builder = TextureArrayBuilder::new();
     for i in 1..=25 {
-        water_array_images.push(asset_server.load(&format!(
-            "3DDATA/JUNON/WATER/OCEAN01_{:02}.DDS.image_copy_src",
-            i
-        )));
+        water_texture_array_builder.add(format!("3DDATA/JUNON/WATER/OCEAN01_{:02}.DDS", i));
     }
-    let water_texture_array = texture_arrays.add(TextureArray {
-        images: water_array_images,
-    });
     let water_material = water_mesh_materials.add(WaterMeshMaterial {
-        water_texture_array,
+        water_texture_array: texture_arrays.add(water_texture_array_builder.build(&asset_server)),
     });
 
     // Load the zone
@@ -704,7 +400,7 @@ fn setup(
                 mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
                 mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
                 mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, uvs_lightmap);
-                mesh.insert_attribute(TERRAIN_MESH_ATTRIBUTE_UV1, uvs_tile);
+                mesh.insert_attribute(MESH_ATTRIBUTE_UV_1, uvs_tile);
                 mesh.insert_attribute(TERRAIN_MESH_ATTRIBUTE_TILE_INFO, tile_ids);
 
                 commands
@@ -966,15 +662,4 @@ fn spawn_zsc_object(
                     .insert_bundle(PickableBundle::default());
             }
         });
-}
-
-#[macro_export]
-macro_rules! load_internal_asset {
-    ($app: ident, $handle: ident, $path_str: expr, $loader: expr) => {{
-        let mut assets = $app
-            .world
-            .get_resource_mut::<bevy::asset::Assets<_>>()
-            .unwrap();
-        assets.set_untracked($handle, ($loader)(include_str!($path_str)));
-    }};
 }

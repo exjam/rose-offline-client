@@ -1,9 +1,8 @@
-use crate::{load_internal_asset, TextureArray};
 use bevy::{
     asset::{AssetServer, Handle},
     ecs::system::{lifetimeless::SRes, SystemParamItem},
     pbr::{MaterialPipeline, MaterialPlugin, SpecializedMaterial},
-    prelude::{App, HandleUntyped, Mesh, Plugin},
+    prelude::{App, Assets, HandleUntyped, Mesh, Plugin},
     reflect::TypeUuid,
     render::{
         mesh::{MeshVertexAttribute, MeshVertexBufferLayout},
@@ -21,25 +20,23 @@ use bevy::{
     },
 };
 
-pub const TERRAIN_MATERIAL_SHADER_HANDLE: HandleUntyped =
-    HandleUntyped::weak_from_u64(Shader::TYPE_UUID, 4206939651767701046);
+use crate::render::{TextureArray, MESH_ATTRIBUTE_UV_1};
 
-pub const TERRAIN_MESH_ATTRIBUTE_UV1: MeshVertexAttribute =
-    MeshVertexAttribute::new("Vertex_Uv1", 42069421, VertexFormat::Float32x2);
+pub const TERRAIN_MATERIAL_SHADER_HANDLE: HandleUntyped =
+    HandleUntyped::weak_from_u64(Shader::TYPE_UUID, 0x3d7939250aff89cb);
 
 pub const TERRAIN_MESH_ATTRIBUTE_TILE_INFO: MeshVertexAttribute =
-    MeshVertexAttribute::new("Vertex_TileInfo", 42069422, VertexFormat::Sint32x3);
+    MeshVertexAttribute::new("Vertex_TileInfo", 3855645392, VertexFormat::Sint32x3);
 
 #[derive(Default)]
 pub struct TerrainMaterialPlugin;
 
 impl Plugin for TerrainMaterialPlugin {
     fn build(&self, app: &mut App) {
-        load_internal_asset!(
-            app,
+        let mut shader_assets = app.world.resource_mut::<Assets<Shader>>();
+        shader_assets.set_untracked(
             TERRAIN_MATERIAL_SHADER_HANDLE,
-            "shaders/terrain_material.wgsl",
-            Shader::from_wgsl
+            Shader::from_wgsl(include_str!("shaders/terrain_material.wgsl")),
         );
 
         app.add_plugin(MaterialPlugin::<TerrainMaterial>::default());
@@ -62,7 +59,7 @@ pub struct TerrainMaterialSamplers {
 }
 
 #[derive(Debug, Clone, TypeUuid)]
-#[uuid = "6994888b-4202-457b-aacf-517228cc0c22"]
+#[uuid = "403e3628-46d2-4d2a-b74c-ce84be2b1ba2"]
 pub struct TerrainMaterial {
     pub lightmap_texture: Handle<Image>,
     pub tile_array_texture: Handle<TextureArray>,
@@ -159,7 +156,7 @@ impl SpecializedMaterial for TerrainMaterial {
         let vertex_layout = layout.get_layout(&[
             Mesh::ATTRIBUTE_POSITION.at_shader_location(0),
             Mesh::ATTRIBUTE_UV_0.at_shader_location(1),
-            TERRAIN_MESH_ATTRIBUTE_UV1.at_shader_location(2),
+            MESH_ATTRIBUTE_UV_1.at_shader_location(2),
             TERRAIN_MESH_ATTRIBUTE_TILE_INFO.at_shader_location(3),
         ])?;
         descriptor.vertex.buffers = vec![vertex_layout];

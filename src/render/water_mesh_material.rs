@@ -1,4 +1,3 @@
-use crate::{load_internal_asset, TextureArray};
 use bevy::{
     asset::{AssetServer, Handle},
     core::Time,
@@ -9,8 +8,8 @@ use bevy::{
         SetMeshBindGroup, SetMeshViewBindGroup,
     },
     prelude::{
-        error, AddAsset, App, Commands, Entity, FromWorld, HandleUntyped, Mesh, Msaa, Plugin,
-        Query, Res, ResMut, World,
+        error, AddAsset, App, Assets, Commands, Entity, FromWorld, HandleUntyped, Mesh, Msaa,
+        Plugin, Query, Res, ResMut, World,
     },
     reflect::TypeUuid,
     render::{
@@ -37,19 +36,20 @@ use bevy::{
     },
 };
 
+use crate::render::TextureArray;
+
 pub const WATER_MESH_MATERIAL_SHADER_HANDLE: HandleUntyped =
-    HandleUntyped::weak_from_u64(Shader::TYPE_UUID, 6942042051767701046);
+    HandleUntyped::weak_from_u64(Shader::TYPE_UUID, 0x333959e64b35d5d9);
 
 #[derive(Default)]
 pub struct WaterMeshMaterialPlugin;
 
 impl Plugin for WaterMeshMaterialPlugin {
     fn build(&self, app: &mut App) {
-        load_internal_asset!(
-            app,
+        let mut shader_assets = app.world.resource_mut::<Assets<Shader>>();
+        shader_assets.set_untracked(
             WATER_MESH_MATERIAL_SHADER_HANDLE,
-            "shaders/water_mesh_material.wgsl",
-            Shader::from_wgsl
+            Shader::from_wgsl(include_str!("shaders/water_mesh_material.wgsl")),
         );
 
         let render_device = app.world.resource::<RenderDevice>();
@@ -219,7 +219,7 @@ pub struct WaterMeshMaterialUniformData {
 }
 
 #[derive(Debug, Clone, TypeUuid)]
-#[uuid = "6942088b-c082-457b-aacf-694208cc0c22"]
+#[uuid = "e9e46dcc-94db-4b31-819f-d5ecffc732f0"]
 pub struct WaterMeshMaterial {
     pub water_texture_array: Handle<TextureArray>,
 }
