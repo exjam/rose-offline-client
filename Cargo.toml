@@ -3,8 +3,6 @@ name = "bevy_rose"
 version = "0.1.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
 bevy = { version = "0.6", features = ["dds"] }
 clap = "3.1"
@@ -12,10 +10,13 @@ log = "0.4.14"
 bitflags = "1.2"
 lazy_static = "1.4.0"
 anyhow = "1.0.4"
-rose-file-readers = { git = "https://github.com/exjam/rose-offline", rev = "0a0387672f149c29337a8e6ee8a06b16ce4f1976" }
+rose-file-readers = { git = "https://github.com/exjam/rose-offline", rev = "0710107cb18e79a987292b5ee3f6b95f245ced65" }
+bevy_mod_picking = "0.5"
 
 [patch.crates-io]
 bevy = { git = "https://github.com/bevyengine/bevy", rev = "b6a647cc013861b182be5f4c85b60b2709388210" }
+bevy_mod_picking = { git = "https://github.com/exjam/bevy_mod_picking", branch = "allow_bevy_patch" }
+bevy_mod_raycast = { git = "https://github.com/exjam/bevy_mod_raycast", branch = "allow_bevy_patch" }
 
 [profile.dev.package."*"]
 opt-level = 3

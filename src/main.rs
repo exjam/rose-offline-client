@@ -14,24 +14,28 @@ use bevy::{
         LoadState, LoadedAsset,
     },
     math::{Quat, Vec2, Vec3},
-    pbr::{AlphaMode, MeshRenderPlugin},
+    pbr::MeshRenderPlugin,
     prelude::{
-        AddAsset, App, AssetServer, Assets, BuildChildren, Commands, ComputedVisibility,
-        GlobalTransform, Handle, Image, Mesh, Msaa, PerspectiveCameraBundle, Plugin, Res, ResMut,
-        State, SystemSet, Transform, Visibility,
+        AddAsset, App, AssetServer, Assets, BuildChildren, Commands, Component, ComputedVisibility,
+        EventReader, GlobalTransform, Handle, Image, Mesh, Msaa, PerspectiveCameraBundle, Plugin,
+        Query, Res, ResMut, State, SystemSet, Transform, Visibility,
     },
     render::{
         mesh::Indices,
         render_resource::{Extent3d, PrimitiveTopology, TextureDimension, TextureFormat},
     },
-    window::WindowDescriptor,
+    window::{WindowDescriptor, Windows},
 };
 mod bevy_flycam;
 use bevy_flycam::{FlyCam, MovementSettings, NoCameraPlayerPlugin};
+use bevy_mod_picking::{
+    DebugCursorPickingPlugin, InteractablePickingPlugin, PickableBundle, PickingCameraBundle,
+    PickingEvent, PickingPlugin, PickingPluginsState,
+};
 
 use rose_file_readers::{
     HimFile, IfoFile, IfoObject, LitFile, LitObject, StbFile, TilFile, VfsFile, VfsIndex, VfsPath,
-    ZmsFile, ZonFile, ZonTileRotation, ZscFile,
+    ZmsFile, ZonFile, ZonTileRotation, ZscFile, ZscMaterial,
 };
 use static_mesh_material::{
     StaticMeshMaterial, StaticMeshMaterialPlugin, STATIC_MESH_ATTRIBUTE_UV1,
@@ -142,7 +146,12 @@ fn main() {
         .add_plugin(bevy::pbr::PbrPlugin::default());
 
     // Initialise 3rd party bevy plugins
-    app.add_plugin(NoCameraPlayerPlugin);
+    app.add_plugin(NoCameraPlayerPlugin)
+        .add_plugin(PickingPlugin)
+        .add_plugin(InteractablePickingPlugin)
+        .add_plugin(DebugCursorPickingPlugin)
+        .add_system(control_picking)
+        .add_system(picking_events);
 
     // Initialise rose stuff
     app.insert_resource(ClientConfiguration { zone_id })
@@ -158,6 +167,26 @@ fn main() {
         .add_system_set(SystemSet::on_enter(AppState::Finished).with_system(setup));
 
     app.run();
+}
+
+#[derive(Component)]
+pub struct ZscMaterialComponent(ZscMaterial);
+
+fn control_picking(windows: Res<Windows>, mut picking: ResMut<PickingPluginsState>) {
+    let window = windows.get_primary().unwrap();
+    let cursor_locked = window.cursor_locked();
+    picking.enable_picking = !cursor_locked;
+    picking.update_debug_cursor = !cursor_locked;
+}
+
+fn picking_events(mut events: EventReader<PickingEvent>, query: Query<&ZscMaterialComponent>) {
+    for event in events.iter() {
+        if let &PickingEvent::Clicked(e) = event {
+            if let Ok(zsc_material) = query.get(e) {
+                println!("{:#?}", zsc_material.0);
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -397,6 +426,7 @@ fn setup(
             transform: Transform::from_xyz(5200.0, 0.0, -5200.0).looking_at(Vec3::ZERO, Vec3::Y),
             ..Default::default()
         })
+        .insert_bundle(PickingCameraBundle::default())
         .insert(FlyCam);
 
     // Create tile array texture
@@ -573,14 +603,17 @@ fn setup(
                 mesh.insert_attribute(TERRAIN_MESH_ATTRIBUTE_UV1, uvs_tile);
                 mesh.insert_attribute(TERRAIN_MESH_ATTRIBUTE_TILE_INFO, tile_ids);
 
-                commands.spawn().insert_bundle((
-                    meshes.add(mesh),
-                    material.clone(),
-                    Transform::from_xyz(offset_x, 0.0, -offset_y),
-                    GlobalTransform::default(),
-                    Visibility::default(),
-                    ComputedVisibility::default(),
-                ));
+                commands
+                    .spawn()
+                    .insert_bundle((
+                        meshes.add(mesh),
+                        material.clone(),
+                        Transform::from_xyz(offset_x, 0.0, -offset_y),
+                        GlobalTransform::default(),
+                        Visibility::default(),
+                        ComputedVisibility::default(),
+                    ))
+                    .insert_bundle(PickableBundle::default());
             }
 
             let ifo = vfs_resource.vfs.read_file::<IfoFile, _>(
@@ -823,14 +856,17 @@ fn spawn_zsc_object(
                     handle
                 });
 
-                parent.spawn_bundle((
-                    mesh,
-                    material,
-                    part_transform,
-                    GlobalTransform::default(),
-                    Visibility::default(),
-                    ComputedVisibility::default(),
-                ));
+                parent
+                    .spawn_bundle((
+                        mesh,
+                        material,
+                        part_transform,
+                        GlobalTransform::default(),
+                        Visibility::default(),
+                        ComputedVisibility::default(),
+                        ZscMaterialComponent(zsc.materials[material_id].clone()),
+                    ))
+                    .insert_bundle(PickableBundle::default());
             }
         });
 }
