@@ -496,7 +496,7 @@ fn setup(
             4 * (tile_texture_width * tile_texture_height) as usize
                 * zone_info.tile_image_handles.len()
         ],
-        TextureFormat::Rgba8Unorm,
+        TextureFormat::Rgba8UnormSrgb,
     );
     for (i, handle) in zone_info.tile_image_handles.iter().enumerate() {
         let image = textures.get(handle).unwrap();
@@ -525,7 +525,7 @@ fn setup(
             4 * (water_texture_width * water_texture_height) as usize
                 * zone_info.water_image_handles.len()
         ],
-        TextureFormat::Rgba8Unorm,
+        TextureFormat::Rgba8UnormSrgb,
     );
     for (i, handle) in zone_info.water_image_handles.iter().enumerate() {
         let image = textures.get(handle).unwrap();
