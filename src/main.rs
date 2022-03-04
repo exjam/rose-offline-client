@@ -17,7 +17,7 @@ use bevy_mod_picking::{
     PickingPlugin, PickingPluginsState,
 };
 use bevy_polyline::{Polyline, PolylineBundle, PolylineMaterial, PolylinePlugin};
-use rose_file_readers::{StbFile, StlFile, VfsIndex, ZscMaterial};
+use rose_file_readers::{StbFile, StlFile, VfsIndex};
 
 mod bevy_flycam;
 mod render;
@@ -243,6 +243,7 @@ fn picking_events(
 #[derive(Component)]
 pub struct LoadedZone;
 
+#[allow(dead_code)]
 pub struct ZoneListItem {
     id: usize,
     name: String,
