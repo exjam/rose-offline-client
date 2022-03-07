@@ -2,6 +2,7 @@ use std::{path::Path, sync::Arc, time::Duration};
 
 use bevy::{
     asset::AssetServerSettings,
+    core_pipeline::ClearColor,
     math::Vec3,
     prelude::{
         AddAsset, App, AssetServer, Assets, BuildChildren, Color, Commands, Component,
@@ -124,6 +125,7 @@ fn main() {
             height: 1080.0,
             ..Default::default()
         })
+        .insert_resource(ClearColor(Color::rgb(0.70, 0.90, 1.0)))
         .add_plugin(bevy::log::LogPlugin::default())
         .add_plugin(bevy::core::CorePlugin::default())
         .add_plugin(bevy::diagnostic::LogDiagnosticsPlugin {
