@@ -7,9 +7,10 @@ use bevy::{
     render::{mesh::Indices, render_resource::PrimitiveTopology},
 };
 use bevy_mod_picking::PickableBundle;
+use rose_data::ZoneListEntry;
 use rose_file_readers::{
-    HimFile, IfoFile, IfoObject, LitFile, LitObject, StbFile, TilFile, VfsPath, ZonFile, ZonTile,
-    ZonTileRotation, ZscFile, ZscMaterial,
+    HimFile, IfoFile, IfoObject, LitFile, LitObject, TilFile, ZonFile, ZonTile, ZonTileRotation,
+    ZscFile, ZscMaterial,
 };
 use std::path::Path;
 
@@ -37,29 +38,21 @@ pub fn load_zone(
     static_mesh_materials: &mut ResMut<Assets<StaticMeshMaterial>>,
     water_mesh_materials: &mut ResMut<Assets<WaterMeshMaterial>>,
     texture_arrays: &mut ResMut<Assets<TextureArray>>,
-    zone_id: usize,
+    zone_list_entry: &ZoneListEntry,
 ) {
-    let list_zone = vfs_resource
-        .vfs
-        .read_file::<StbFile, _>("3DDATA/STB/LIST_ZONE.STB")
-        .unwrap();
-    let zon_file_path = VfsPath::from(list_zone.get(zone_id, 1));
-    let zsc_deco_path = VfsPath::from(list_zone.get(zone_id, 11));
-    let zsc_cnst_path = VfsPath::from(list_zone.get(zone_id, 12));
-
     let zsc_cnst = vfs_resource
         .vfs
-        .read_file::<ZscFile, _>(&zsc_cnst_path)
+        .read_file::<ZscFile, _>(&zone_list_entry.zsc_cnst_path)
         .ok();
     let zsc_deco = vfs_resource
         .vfs
-        .read_file::<ZscFile, _>(&zsc_deco_path)
+        .read_file::<ZscFile, _>(&zone_list_entry.zsc_deco_path)
         .ok();
-    let zone_path = zon_file_path.path().parent().unwrap();
+    let zone_path = zone_list_entry.zon_file_path.path().parent().unwrap();
 
     let zone_file = vfs_resource
         .vfs
-        .read_file::<ZonFile, _>(&zon_file_path)
+        .read_file::<ZonFile, _>(&zone_list_entry.zon_file_path)
         .unwrap();
 
     // Load zone tile array

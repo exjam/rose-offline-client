@@ -1,15 +1,18 @@
-use std::{path::Path, sync::Arc, time::Duration};
-
 use bevy::{
     asset::AssetServerSettings,
     core_pipeline::ClearColor,
     math::Vec3,
+    pbr::{AlphaMode, StandardMaterial},
     prelude::{
-        AddAsset, App, AssetServer, Assets, BuildChildren, Color, Commands, Component,
-        DespawnRecursiveExt, Entity, EventReader, GlobalTransform, Handle, Mesh, Msaa,
+        shape, AddAsset, App, AssetServer, Assets, BuildChildren, Changed, Color, Commands,
+        Component, DespawnRecursiveExt, Entity, EventReader, GlobalTransform, Handle, Mesh, Msaa,
         PerspectiveCameraBundle, Query, Res, ResMut, State, SystemSet, Transform, With,
     },
-    render::mesh::{Indices, VertexAttributeValues},
+    render::{
+        mesh::{Indices, VertexAttributeValues},
+        render_resource::WgpuFeatures,
+        settings::WgpuSettings,
+    },
     window::{WindowDescriptor, Windows},
 };
 use bevy_egui::{egui, EguiContext, EguiPlugin};
@@ -18,15 +21,24 @@ use bevy_mod_picking::{
     PickingPlugin, PickingPluginsState,
 };
 use bevy_polyline::{Polyline, PolylineBundle, PolylineMaterial, PolylinePlugin};
-use rose_file_readers::{StbFile, StlFile, VfsIndex};
+use std::{path::Path, sync::Arc, time::Duration};
+
+use nalgebra::Point3;
+use rose_data::{
+    EquipmentIndex, EquipmentItem, ItemDatabase, ItemReference, ItemType, ZoneId, ZoneList,
+};
+use rose_file_readers::VfsIndex;
+use rose_game_common::components::{CharacterGender, CharacterInfo, Equipment};
 
 mod bevy_flycam;
+mod character_model;
 mod render;
 mod vfs_asset_io;
 mod zms_asset_loader;
 mod zone_loader;
 
 use bevy_flycam::{FlyCam, MovementSettings, NoCameraPlayerPlugin};
+use character_model::{spawn_character_model, CharacterModel, CharacterModelList};
 use render::{
     RoseRenderPlugin, StaticMeshMaterial, TerrainMaterial, TextureArray, WaterMeshMaterial,
 };
@@ -34,8 +46,10 @@ use vfs_asset_io::VfsAssetIo;
 use zms_asset_loader::ZmsAssetLoader;
 use zone_loader::ZoneObject;
 
+use crate::character_model::update_character_equipment;
+
 struct LoadZoneId {
-    zone_id: usize,
+    zone_id: ZoneId,
 }
 
 pub struct VfsResource {
@@ -81,8 +95,9 @@ fn main() {
 
     let zone_id = matches
         .value_of("zone")
-        .and_then(|str| str.parse::<usize>().ok())
-        .unwrap_or(2);
+        .and_then(|str| str.parse::<u16>().ok())
+        .and_then(ZoneId::new)
+        .unwrap_or_else(|| ZoneId::new(2).unwrap());
     let disable_vsync = matches.is_present("disable-vsync");
 
     let mut data_idx_path = matches.value_of("data-idx").map(Path::new);
@@ -126,6 +141,10 @@ fn main() {
             ..Default::default()
         })
         .insert_resource(ClearColor(Color::rgb(0.70, 0.90, 1.0)))
+        .insert_resource(WgpuSettings {
+            features: WgpuFeatures::TEXTURE_COMPRESSION_BC,
+            ..Default::default()
+        })
         .add_plugin(bevy::log::LogPlugin::default())
         .add_plugin(bevy::core::CorePlugin::default())
         .add_plugin(bevy::diagnostic::LogDiagnosticsPlugin {
@@ -140,7 +159,7 @@ fn main() {
 
     let task_pool = app.world.resource::<bevy::tasks::IoTaskPool>().0.clone();
     app.insert_resource(VfsResource { vfs: vfs.clone() })
-        .insert_resource(AssetServer::new(VfsAssetIo::new(vfs), task_pool))
+        .insert_resource(AssetServer::new(VfsAssetIo::new(vfs.clone()), task_pool))
         .add_plugin(bevy::asset::AssetPlugin::default());
 
     app.add_plugin(bevy::scene::ScenePlugin::default())
@@ -159,7 +178,10 @@ fn main() {
     // Initialise rose stuff
     app.insert_resource(LoadZoneId { zone_id })
         .init_asset_loader::<ZmsAssetLoader>()
-        .add_plugin(RoseRenderPlugin);
+        .add_plugin(RoseRenderPlugin)
+        .insert_resource(
+            CharacterModelList::new(&vfs).expect("Failed to load character model list"),
+        );
 
     app.add_plugin(EguiPlugin).add_system(draw_debug_ui);
 
@@ -172,6 +194,7 @@ fn main() {
         .add_system_set(
             SystemSet::on_update(AppState::InGame)
                 .with_system(control_picking)
+                .with_system(update_character_model)
                 .with_system(picking_events),
         )
         .add_startup_system(setup);
@@ -245,20 +268,15 @@ fn picking_events(
 #[derive(Component)]
 pub struct LoadedZone;
 
-#[allow(dead_code)]
-pub struct ZoneListItem {
-    id: usize,
-    name: String,
-    zon_file: String,
-    deco_file: String,
-    cnst_file: String,
-}
-
-pub struct ZoneList {
-    zones: Vec<ZoneListItem>,
-}
-
-fn setup(mut commands: Commands, vfs_resource: Res<VfsResource>) {
+fn setup(
+    mut commands: Commands,
+    vfs_resource: Res<VfsResource>,
+    asset_server: Res<AssetServer>,
+    character_model_list: Res<CharacterModelList>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    mut static_mesh_materials: ResMut<Assets<StaticMeshMaterial>>,
+) {
     // Create camera
     commands
         .spawn_bundle(PerspectiveCameraBundle {
@@ -269,44 +287,97 @@ fn setup(mut commands: Commands, vfs_resource: Res<VfsResource>) {
         .insert(FlyCam);
 
     // Load list of zones
-    let list_zone_stb = vfs_resource
-        .vfs
-        .read_file::<StbFile, _>("3DDATA/STB/LIST_ZONE.STB")
-        .unwrap();
-    let list_zone_stl = vfs_resource
-        .vfs
-        .read_file::<StlFile, _>("3DDATA/STB/LIST_ZONE_S.STL")
-        .unwrap();
-    let mut zones = Vec::new();
-
-    for i in 1..list_zone_stb.rows() {
-        let zon_file = list_zone_stb.get(i, 1).to_string();
-        if zon_file.is_empty() {
-            continue;
-        }
-
-        let name = list_zone_stl
-            .get_text_string(1, list_zone_stb.get(i, 26))
-            .unwrap_or("")
-            .to_string();
-
-        let deco_file = list_zone_stb.get(i, 11).to_string();
-        let cnst_file = list_zone_stb.get(i, 12).to_string();
-
-        zones.push(ZoneListItem {
-            id: i,
-            zon_file,
-            name,
-            deco_file,
-            cnst_file,
-        });
-    }
-    commands.insert_resource(ZoneList { zones });
+    commands.insert_resource(
+        rose_data_irose::get_zone_list(&vfs_resource.vfs).expect("Failed to load zone list"),
+    );
 
     commands.insert_resource(DebugUiState {
         zone_list_open: true,
         inspecting_entity: None,
+        item_list_open: true,
     });
+    commands.insert_resource(DebugUiItemListState {
+        item_list_type: ItemType::Face,
+    });
+
+    commands.insert_resource(
+        rose_data_irose::get_item_database(&vfs_resource.vfs)
+            .expect("Failed to load item database"),
+    );
+
+    // Create a character
+    let bone_mesh = meshes.add(Mesh::from(shape::Cube { size: 0.1 }));
+    let bone_material = materials.add(StandardMaterial {
+        base_color: Color::rgba(1.0, 0.08, 0.58, 0.75),
+        alpha_mode: AlphaMode::Blend,
+        ..Default::default()
+    });
+
+    let character_info = CharacterInfo {
+        name: "Bot 1".into(),
+        gender: CharacterGender::Male,
+        race: 0,
+        face: 8,
+        hair: 10,
+        birth_stone: 0,
+        job: 0,
+        rank: 0,
+        fame: 0,
+        fame_b: 0,
+        fame_g: 0,
+        revive_zone_id: ZoneId::new(22).unwrap(),
+        revive_position: Point3::new(5200.0, 0.0, -5200.0),
+        unique_id: 0,
+    };
+    let mut equipment = Equipment::default();
+    equipment
+        .equip_item(EquipmentItem::new(&ItemReference::new(ItemType::Weapon, 1)).unwrap())
+        .ok();
+    equipment
+        .equip_item(EquipmentItem::new(&ItemReference::new(ItemType::SubWeapon, 1)).unwrap())
+        .ok();
+
+    let character_model = spawn_character_model(
+        &mut commands,
+        &asset_server,
+        &mut static_mesh_materials,
+        &character_model_list,
+        &character_info,
+        &equipment,
+        Some((bone_mesh, bone_material)),
+    );
+    let root_bone = character_model.skeleton.bones[0];
+    commands
+        .spawn_bundle((
+            character_info,
+            equipment,
+            character_model,
+            GlobalTransform::default(),
+            Transform::from_translation(Vec3::new(5200.0, 20.0, -5200.0))
+                .with_scale(Vec3::new(10.0, 10.0, 10.0)),
+        ))
+        .add_child(root_bone);
+}
+
+fn update_character_model(
+    mut commands: Commands,
+    mut query: Query<(&CharacterInfo, &mut CharacterModel, &Equipment), Changed<Equipment>>,
+    asset_server: Res<AssetServer>,
+    character_model_list: Res<CharacterModelList>,
+    mut static_mesh_materials: ResMut<Assets<StaticMeshMaterial>>,
+) {
+    for (character_info, mut character_model, equipment) in query.iter_mut() {
+        println!("Equipment changed");
+        update_character_equipment(
+            &mut commands,
+            &asset_server,
+            &mut static_mesh_materials,
+            &character_model_list,
+            &mut character_model,
+            character_info,
+            equipment,
+        );
+    }
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -315,6 +386,7 @@ fn state_enter_load_zone(
     load_zone_id: Res<LoadZoneId>,
     asset_server: Res<AssetServer>,
     vfs_resource: Res<VfsResource>,
+    zone_list: Res<ZoneList>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut terrain_materials: ResMut<Assets<TerrainMaterial>>,
     mut static_mesh_materials: ResMut<Assets<StaticMeshMaterial>>,
@@ -329,17 +401,19 @@ fn state_enter_load_zone(
             Transform::default(),
         ))
         .with_children(|child_builder| {
-            zone_loader::load_zone(
-                child_builder,
-                &asset_server,
-                &vfs_resource,
-                &mut meshes,
-                &mut terrain_materials,
-                &mut static_mesh_materials,
-                &mut water_mesh_materials,
-                &mut texture_arrays,
-                load_zone_id.zone_id,
-            );
+            if let Some(zone_list_entry) = zone_list.get_zone(load_zone_id.zone_id) {
+                zone_loader::load_zone(
+                    child_builder,
+                    &asset_server,
+                    &vfs_resource,
+                    &mut meshes,
+                    &mut terrain_materials,
+                    &mut static_mesh_materials,
+                    &mut water_mesh_materials,
+                    &mut texture_arrays,
+                    zone_list_entry,
+                );
+            }
         });
 
     state.set(AppState::InGame).unwrap();
@@ -354,15 +428,24 @@ fn state_leave_in_game(mut commands: Commands, loaded_zone_query: Query<Entity, 
 pub struct DebugUiState {
     zone_list_open: bool,
     inspecting_entity: Option<Entity>,
+    item_list_open: bool,
 }
 
+pub struct DebugUiItemListState {
+    item_list_type: ItemType,
+}
+
+#[allow(clippy::too_many_arguments)]
 fn draw_debug_ui(
     mut egui_context: ResMut<EguiContext>,
     mut state: ResMut<State<AppState>>,
     zone_list: Res<ZoneList>,
+    item_database: Res<ItemDatabase>,
     mut debug_ui_state: ResMut<DebugUiState>,
+    mut debug_item_list_state: ResMut<DebugUiItemListState>,
     mut load_zone_id: ResMut<LoadZoneId>,
     query_zone_object: Query<&ZoneObject>,
+    mut query_character: Query<(&mut Equipment,)>,
 ) {
     egui::Window::new("Zone List")
         .vscroll(true)
@@ -375,8 +458,8 @@ fn draw_debug_ui(
                 ui.label("name");
                 ui.end_row();
 
-                for zone in zone_list.zones.iter() {
-                    ui.label(format!("{}", zone.id));
+                for zone in zone_list.iter() {
+                    ui.label(format!("{}", zone.id.get()));
                     ui.label(&zone.name);
                     if ui.button("Load").clicked() {
                         load_zone_id.zone_id = zone.id;
@@ -447,4 +530,145 @@ fn draw_debug_ui(
                 });
             });
     }
+
+    egui::Window::new("Item List")
+        .vscroll(true)
+        .resizable(true)
+        .default_height(300.0)
+        .open(&mut debug_ui_state.item_list_open)
+        .show(egui_context.ctx_mut(), |ui| {
+            ui.horizontal(|ui| {
+                ui.selectable_value(
+                    &mut debug_item_list_state.item_list_type,
+                    ItemType::Face,
+                    "Face",
+                );
+                ui.selectable_value(
+                    &mut debug_item_list_state.item_list_type,
+                    ItemType::Head,
+                    "Head",
+                );
+                ui.selectable_value(
+                    &mut debug_item_list_state.item_list_type,
+                    ItemType::Body,
+                    "Body",
+                );
+                ui.selectable_value(
+                    &mut debug_item_list_state.item_list_type,
+                    ItemType::Hands,
+                    "Hands",
+                );
+                ui.selectable_value(
+                    &mut debug_item_list_state.item_list_type,
+                    ItemType::Feet,
+                    "Feet",
+                );
+                ui.selectable_value(
+                    &mut debug_item_list_state.item_list_type,
+                    ItemType::Back,
+                    "Back",
+                );
+                ui.selectable_value(
+                    &mut debug_item_list_state.item_list_type,
+                    ItemType::Weapon,
+                    "Weapon",
+                );
+                ui.selectable_value(
+                    &mut debug_item_list_state.item_list_type,
+                    ItemType::SubWeapon,
+                    "SubWeapon",
+                );
+            });
+            ui.horizontal(|ui| {
+                ui.selectable_value(
+                    &mut debug_item_list_state.item_list_type,
+                    ItemType::Jewellery,
+                    "Jewellery",
+                );
+                ui.selectable_value(
+                    &mut debug_item_list_state.item_list_type,
+                    ItemType::Consumable,
+                    "Consumable",
+                );
+                ui.selectable_value(
+                    &mut debug_item_list_state.item_list_type,
+                    ItemType::Gem,
+                    "Gem",
+                );
+                ui.selectable_value(
+                    &mut debug_item_list_state.item_list_type,
+                    ItemType::Material,
+                    "Material",
+                );
+                ui.selectable_value(
+                    &mut debug_item_list_state.item_list_type,
+                    ItemType::Quest,
+                    "Quest",
+                );
+                ui.selectable_value(
+                    &mut debug_item_list_state.item_list_type,
+                    ItemType::Vehicle,
+                    "Vehicle",
+                );
+            });
+
+            egui::Grid::new("item_list_grid").show(ui, |ui| {
+                ui.label("id");
+                ui.label("name");
+                ui.end_row();
+
+                for item_reference in item_database.iter_items(debug_item_list_state.item_list_type)
+                {
+                    if let Some(item_data) = item_database.get_base_item(item_reference) {
+                        if !item_data.name.is_empty() {
+                            ui.label(format!("{}", item_reference.item_number));
+                            ui.label(&item_data.name);
+
+                            if item_reference.item_type.is_equipment_item()
+                                && ui.button("Equip").clicked()
+                            {
+                                for (mut equipment,) in query_character.iter_mut() {
+                                    match item_reference.item_type {
+                                        ItemType::Face => {
+                                            equipment.equipped_items[EquipmentIndex::Face] =
+                                                Some(EquipmentItem::new(&item_reference).unwrap())
+                                        }
+                                        ItemType::Head => {
+                                            equipment.equipped_items[EquipmentIndex::Head] =
+                                                Some(EquipmentItem::new(&item_reference).unwrap())
+                                        }
+                                        ItemType::Body => {
+                                            equipment.equipped_items[EquipmentIndex::Body] =
+                                                Some(EquipmentItem::new(&item_reference).unwrap())
+                                        }
+                                        ItemType::Hands => {
+                                            equipment.equipped_items[EquipmentIndex::Hands] =
+                                                Some(EquipmentItem::new(&item_reference).unwrap())
+                                        }
+                                        ItemType::Feet => {
+                                            equipment.equipped_items[EquipmentIndex::Feet] =
+                                                Some(EquipmentItem::new(&item_reference).unwrap())
+                                        }
+                                        ItemType::Back => {
+                                            equipment.equipped_items[EquipmentIndex::Back] =
+                                                Some(EquipmentItem::new(&item_reference).unwrap())
+                                        }
+                                        ItemType::Weapon => {
+                                            equipment.equipped_items[EquipmentIndex::WeaponRight] =
+                                                Some(EquipmentItem::new(&item_reference).unwrap())
+                                        }
+                                        ItemType::SubWeapon => {
+                                            equipment.equipped_items[EquipmentIndex::WeaponLeft] =
+                                                Some(EquipmentItem::new(&item_reference).unwrap())
+                                        }
+                                        _ => {}
+                                    }
+                                }
+                            }
+                            ui.end_row();
+                        }
+                    }
+                }
+            });
+        });
 }

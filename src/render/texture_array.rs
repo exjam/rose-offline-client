@@ -1,5 +1,3 @@
-use std::path::Path;
-
 use bevy::{
     asset::{AssetLoader, BoxedFuture, LoadContext, LoadedAsset},
     ecs::system::{lifetimeless::SRes, SystemParamItem},
@@ -14,9 +12,10 @@ use bevy::{
             TextureViewDescriptor,
         },
         renderer::{RenderDevice, RenderQueue},
-        texture::ImageType,
+        texture::{TextureError, TextureFormatPixelInfo},
     },
 };
+use image::DynamicImage;
 
 #[derive(Debug, Clone, TypeUuid)]
 #[uuid = "f1963cac-7435-4adf-a3cf-676c62f5453f"]
@@ -143,6 +142,127 @@ impl RenderAsset for TextureArray {
 #[derive(Default)]
 pub struct CopySrcImageAssetLoader;
 
+fn image_to_texture(dyn_img: DynamicImage) -> Image {
+    use bevy::core::cast_slice;
+    let width;
+    let height;
+
+    let data: Vec<u8>;
+    let format: TextureFormat;
+
+    match dyn_img {
+        DynamicImage::ImageLuma8(i) => {
+            let i = DynamicImage::ImageLuma8(i).into_rgba8();
+            width = i.width();
+            height = i.height();
+            format = TextureFormat::Rgba8UnormSrgb;
+
+            data = i.into_raw();
+        }
+        DynamicImage::ImageLumaA8(i) => {
+            let i = DynamicImage::ImageLumaA8(i).into_rgba8();
+            width = i.width();
+            height = i.height();
+            format = TextureFormat::Rgba8UnormSrgb;
+
+            data = i.into_raw();
+        }
+        DynamicImage::ImageRgb8(i) => {
+            let i = DynamicImage::ImageRgb8(i).into_rgba8();
+            width = i.width();
+            height = i.height();
+            format = TextureFormat::Rgba8UnormSrgb;
+
+            data = i.into_raw();
+        }
+        DynamicImage::ImageRgba8(i) => {
+            width = i.width();
+            height = i.height();
+            format = TextureFormat::Rgba8UnormSrgb;
+
+            data = i.into_raw();
+        }
+        DynamicImage::ImageBgr8(i) => {
+            let i = DynamicImage::ImageBgr8(i).into_bgra8();
+
+            width = i.width();
+            height = i.height();
+            format = TextureFormat::Bgra8UnormSrgb;
+
+            data = i.into_raw();
+        }
+        DynamicImage::ImageBgra8(i) => {
+            width = i.width();
+            height = i.height();
+            format = TextureFormat::Bgra8UnormSrgb;
+
+            data = i.into_raw();
+        }
+        DynamicImage::ImageLuma16(i) => {
+            width = i.width();
+            height = i.height();
+            format = TextureFormat::R16Uint;
+
+            let raw_data = i.into_raw();
+
+            data = cast_slice(&raw_data).to_owned();
+        }
+        DynamicImage::ImageLumaA16(i) => {
+            width = i.width();
+            height = i.height();
+            format = TextureFormat::Rg16Uint;
+
+            let raw_data = i.into_raw();
+
+            data = cast_slice(&raw_data).to_owned();
+        }
+        DynamicImage::ImageRgb16(image) => {
+            width = image.width();
+            height = image.height();
+            format = TextureFormat::Rgba16Uint;
+
+            let mut local_data =
+                Vec::with_capacity(width as usize * height as usize * format.pixel_size());
+
+            for pixel in image.into_raw().chunks_exact(3) {
+                // TODO: use the array_chunks method once stabilised
+                // https://github.com/rust-lang/rust/issues/74985
+                let r = pixel[0];
+                let g = pixel[1];
+                let b = pixel[2];
+                let a = u16::max_value();
+
+                local_data.extend_from_slice(&r.to_ne_bytes());
+                local_data.extend_from_slice(&g.to_ne_bytes());
+                local_data.extend_from_slice(&b.to_ne_bytes());
+                local_data.extend_from_slice(&a.to_ne_bytes());
+            }
+
+            data = local_data;
+        }
+        DynamicImage::ImageRgba16(i) => {
+            width = i.width();
+            height = i.height();
+            format = TextureFormat::Rgba16Uint;
+
+            let raw_data = i.into_raw();
+
+            data = cast_slice(&raw_data).to_owned();
+        }
+    }
+
+    Image::new(
+        Extent3d {
+            width,
+            height,
+            depth_or_array_layers: 1,
+        },
+        TextureDimension::D2,
+        data,
+        format,
+    )
+}
+
 impl AssetLoader for CopySrcImageAssetLoader {
     fn load<'a>(
         &'a self,
@@ -150,18 +270,10 @@ impl AssetLoader for CopySrcImageAssetLoader {
         load_context: &'a mut LoadContext,
     ) -> BoxedFuture<'a, Result<(), anyhow::Error>> {
         Box::pin(async move {
-            let ext = Path::new(load_context.path().file_stem().unwrap())
-                .extension()
-                .unwrap()
-                .to_str()
-                .unwrap();
-            let mut dyn_img =
-                Image::from_buffer(bytes, ImageType::Extension(ext)).map_err(|_| {
-                    anyhow::anyhow!(
-                        "Error in CopySrcImageAssetLoader for path {}",
-                        load_context.path().display()
-                    )
-                })?;
+            let mut dyn_img = image_to_texture(
+                image::load_from_memory_with_format(bytes, image::ImageFormat::Dds)
+                    .map_err(TextureError::ImageError)?,
+            );
             dyn_img.texture_descriptor.usage |= TextureUsages::COPY_SRC;
             load_context.set_default_asset(LoadedAsset::new(dyn_img));
             Ok(())

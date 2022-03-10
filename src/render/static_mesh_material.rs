@@ -1,9 +1,12 @@
 use bevy::{
     asset::{AssetServer, Handle},
     ecs::system::{lifetimeless::SRes, SystemParamItem},
-    math::Vec2,
+    math::{Mat4, Vec2},
     pbr::{AlphaMode, MaterialPipeline, MaterialPlugin, SpecializedMaterial},
-    prelude::{App, Assets, HandleUntyped, Mesh, Plugin},
+    prelude::{
+        App, Assets, Commands, Component, Entity, GlobalTransform, HandleUntyped, Mesh, Plugin,
+        Query,
+    },
     reflect::TypeUuid,
     render::{
         mesh::MeshVertexBufferLayout,
@@ -19,7 +22,7 @@ use bevy::{
         },
         renderer::RenderDevice,
         texture::Image,
-        RenderApp,
+        RenderApp, RenderStage,
     },
 };
 
@@ -30,6 +33,16 @@ pub const STATIC_MESH_MATERIAL_SHADER_HANDLE: HandleUntyped =
 
 #[derive(Default)]
 pub struct StaticMeshMaterialPlugin;
+
+#[derive(Component)]
+pub struct RoseSkeleton {
+    pub bones: Vec<Entity>,
+}
+
+#[derive(Component)]
+pub struct ExtractedSkeleton {
+    pub bones: Vec<Mat4>,
+}
 
 impl Plugin for StaticMeshMaterialPlugin {
     fn build(&self, app: &mut App) {
@@ -49,8 +62,27 @@ impl Plugin for StaticMeshMaterialPlugin {
         });
 
         if let Ok(render_app) = app.get_sub_app_mut(RenderApp) {
-            render_app.insert_resource(StaticMeshMaterialSamplers { linear_sampler });
+            render_app
+                .insert_resource(StaticMeshMaterialSamplers { linear_sampler })
+                .add_system_to_stage(RenderStage::Extract, extract_skeletons);
         }
+    }
+}
+
+fn extract_skeletons(
+    mut commands: Commands,
+    query_skeletons: Query<(Entity, &RoseSkeleton, &GlobalTransform)>,
+    query_bones: Query<&GlobalTransform>,
+) {
+    for (entity, skeleton, global_transform) in query_skeletons.iter() {
+        let inverse_root = global_transform.compute_matrix().inverse();
+        let mut bones_matrix = Vec::new();
+        for &bone in skeleton.bones.iter() {
+            bones_matrix.push(inverse_root * query_bones.get(bone).unwrap().compute_matrix());
+        }
+        commands.get_or_spawn(entity).insert(ExtractedSkeleton {
+            bones: bones_matrix,
+        });
     }
 }
 
