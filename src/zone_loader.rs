@@ -447,7 +447,7 @@ fn load_block_object(
                 let material = material_cache[material_id].clone().unwrap_or_else(|| {
                     let zsc_material = &zsc.materials[material_id];
                     let handle = static_mesh_materials.add(StaticMeshMaterial {
-                        base_texture: asset_server.load(zsc_material.path.path()),
+                        base_texture: Some(asset_server.load(zsc_material.path.path())),
                         lightmap_texture,
                         alpha_value: if zsc_material.alpha != 1.0 {
                             Some(zsc_material.alpha)

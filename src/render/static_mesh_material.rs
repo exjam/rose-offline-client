@@ -82,7 +82,7 @@ pub struct StaticMeshMaterialUniformData {
 #[derive(Debug, Clone, TypeUuid)]
 #[uuid = "62a496fa-33e8-41a8-9a44-237d70214227"]
 pub struct StaticMeshMaterial {
-    pub base_texture: Handle<Image>,
+    pub base_texture: Option<Handle<Image>>,
     pub alpha_value: Option<f32>,
     pub alpha_enabled: bool,
     pub alpha_test: Option<f32>,
@@ -99,7 +99,7 @@ pub struct StaticMeshMaterial {
 impl Default for StaticMeshMaterial {
     fn default() -> Self {
         Self {
-            base_texture: Default::default(),
+            base_texture: None,
             alpha_value: None,
             alpha_enabled: false,
             alpha_test: None,
@@ -119,7 +119,7 @@ pub struct GpuStaticMeshMaterial {
     pub bind_group: BindGroup,
 
     pub uniform_buffer: Buffer,
-    pub base_texture: Handle<Image>,
+    pub base_texture: Option<Handle<Image>>,
     pub lightmap_texture: Option<Handle<Image>>,
 
     pub flags: StaticMeshMaterialFlags,
@@ -148,11 +148,14 @@ impl RenderAsset for StaticMeshMaterial {
         material: Self::ExtractedAsset,
         (render_device, material_pipeline, gpu_images, samplers): &mut SystemParamItem<Self::Param>,
     ) -> Result<Self::PreparedAsset, PrepareAssetError<Self::ExtractedAsset>> {
-        let base_gpu_image = gpu_images.get(&material.base_texture);
-        if base_gpu_image.is_none() {
+        let (base_texture_view, _) = if let Some(result) = material_pipeline
+            .mesh_pipeline
+            .get_image_texture(gpu_images, &material.base_texture)
+        {
+            result
+        } else {
             return Err(PrepareAssetError::RetryNextUpdate(material));
-        }
-        let base_texture_view = &base_gpu_image.unwrap().texture_view;
+        };
         let base_texture_sampler = &samplers.linear_sampler;
 
         let (lightmap_texture_view, _) = if let Some(result) = material_pipeline
