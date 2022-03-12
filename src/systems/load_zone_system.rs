@@ -1,24 +1,26 @@
 use bevy::{
     math::{Quat, Vec2, Vec3},
     prelude::{
-        AssetServer, Assets, BuildChildren, ChildBuilder, Component, ComputedVisibility,
-        GlobalTransform, Handle, Mesh, ResMut, Transform, Visibility,
+        AssetServer, Assets, BuildChildren, ChildBuilder, Commands, Component, ComputedVisibility,
+        DespawnRecursiveExt, GlobalTransform, Handle, Mesh, Res, ResMut, Transform, Visibility,
     },
     render::{mesh::Indices, render_resource::PrimitiveTopology},
 };
 use bevy_mod_picking::PickableBundle;
-use rose_data::ZoneListEntry;
+use std::path::Path;
+
+use rose_data::{ZoneList, ZoneListEntry};
 use rose_file_readers::{
     HimFile, IfoFile, IfoObject, LitFile, LitObject, TilFile, ZonFile, ZonTile, ZonTileRotation,
     ZscFile, ZscMaterial,
 };
-use std::path::Path;
 
 use crate::{
     render::{
         StaticMeshMaterial, TerrainMaterial, TextureArray, TextureArrayBuilder, WaterMeshMaterial,
         MESH_ATTRIBUTE_UV_1, TERRAIN_MESH_ATTRIBUTE_TILE_INFO,
     },
+    resources::LoadedZone,
     VfsResource,
 };
 
@@ -29,7 +31,65 @@ pub struct ZoneObject {
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn load_zone(
+pub fn load_zone_system(
+    mut commands: Commands,
+    mut loaded_zone: ResMut<LoadedZone>,
+    asset_server: Res<AssetServer>,
+    vfs_resource: Res<VfsResource>,
+    zone_list: Res<ZoneList>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut terrain_materials: ResMut<Assets<TerrainMaterial>>,
+    mut static_mesh_materials: ResMut<Assets<StaticMeshMaterial>>,
+    mut water_mesh_materials: ResMut<Assets<WaterMeshMaterial>>,
+    mut texture_arrays: ResMut<Assets<TextureArray>>,
+) {
+    let next_zone_id = loaded_zone.next_zone_id.take();
+    if next_zone_id.is_none() {
+        return;
+    }
+    let next_zone_id = next_zone_id.unwrap();
+
+    // Nothing to do if moving to same zone
+    if let Some((current_zone_id, _)) = loaded_zone.zone {
+        if current_zone_id == next_zone_id {
+            return;
+        }
+    }
+
+    // Despawn old zone
+    if let Some((current_zone_id, current_zone_entity)) = loaded_zone.zone.take() {
+        if current_zone_id == next_zone_id {
+            return;
+        }
+
+        commands.entity(current_zone_entity).despawn_recursive();
+    }
+
+    // Spawn new zone
+    let zone_entity = commands
+        .spawn_bundle((GlobalTransform::default(), Transform::default()))
+        .with_children(|child_builder| {
+            if let Some(zone_list_entry) = zone_list.get_zone(next_zone_id) {
+                load_zone(
+                    child_builder,
+                    &asset_server,
+                    &vfs_resource,
+                    &mut meshes,
+                    &mut terrain_materials,
+                    &mut static_mesh_materials,
+                    &mut water_mesh_materials,
+                    &mut texture_arrays,
+                    zone_list_entry,
+                )
+                .ok();
+            }
+        })
+        .id();
+    loaded_zone.zone = Some((next_zone_id, zone_entity));
+}
+
+#[allow(clippy::too_many_arguments)]
+fn load_zone(
     commands: &mut ChildBuilder,
     asset_server: &AssetServer,
     vfs_resource: &VfsResource,
@@ -39,7 +99,10 @@ pub fn load_zone(
     water_mesh_materials: &mut ResMut<Assets<WaterMeshMaterial>>,
     texture_arrays: &mut ResMut<Assets<TextureArray>>,
     zone_list_entry: &ZoneListEntry,
-) {
+) -> Result<(), anyhow::Error> {
+    let zone_file = vfs_resource
+        .vfs
+        .read_file::<ZonFile, _>(&zone_list_entry.zon_file_path)?;
     let zsc_cnst = vfs_resource
         .vfs
         .read_file::<ZscFile, _>(&zone_list_entry.zsc_cnst_path)
@@ -48,12 +111,6 @@ pub fn load_zone(
         .vfs
         .read_file::<ZscFile, _>(&zone_list_entry.zsc_deco_path)
         .ok();
-    let zone_path = zone_list_entry.zon_file_path.path().parent().unwrap();
-
-    let zone_file = vfs_resource
-        .vfs
-        .read_file::<ZonFile, _>(&zone_list_entry.zon_file_path)
-        .unwrap();
 
     // Load zone tile array
     let mut tile_texture_array_builder = TextureArrayBuilder::new();
@@ -76,6 +133,12 @@ pub fn load_zone(
     });
 
     // Load the zone
+    let zone_path = zone_list_entry
+        .zon_file_path
+        .path()
+        .parent()
+        .unwrap_or_else(|| Path::new(""));
+
     for block_y in 0..64u32 {
         for block_x in 0..64u32 {
             let tilemap = vfs_resource
@@ -179,6 +242,8 @@ pub fn load_zone(
             }
         }
     }
+
+    Ok(())
 }
 
 #[allow(clippy::too_many_arguments)]

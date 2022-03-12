@@ -2,31 +2,20 @@ use bevy::{
     math::{Quat, Vec3},
     pbr::{PbrBundle, StandardMaterial},
     prelude::{
-        AssetServer, Assets, BuildChildren, Commands, Component, ComputedVisibility, Entity,
-        GlobalTransform, Handle, Mesh, Transform, Visibility,
+        AssetServer, Assets, BuildChildren, Commands, ComputedVisibility, Entity, GlobalTransform,
+        Handle, Mesh, Transform, Visibility,
     },
 };
-use enum_map::{Enum, EnumMap};
+use enum_map::EnumMap;
 
 use rose_data::{EquipmentIndex, ItemType};
 use rose_file_readers::{VfsIndex, ZmdFile, ZscFile};
 use rose_game_common::components::{CharacterGender, CharacterInfo, Equipment};
 
-use crate::render::StaticMeshMaterial;
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Enum)]
-pub enum CharacterModelPart {
-    CharacterFace,
-    CharacterHair,
-    Head,
-    FaceItem,
-    Body,
-    Hands,
-    Feet,
-    Back,
-    Weapon,
-    SubWeapon,
-}
+use crate::{
+    components::{CharacterModel, CharacterModelPart, CharacterModelSkeleton},
+    render::StaticMeshMaterial,
+};
 
 impl CharacterModelPart {
     fn default_bone_id(&self, dummy_bone_offset: usize) -> Option<usize> {
@@ -150,192 +139,6 @@ impl CharacterModelList {
     }
 }
 
-pub struct LoadedSkeleton {
-    pub bones: Vec<Entity>,
-    pub dummy_bone_offset: usize,
-}
-
-fn spawn_skeleton(
-    commands: &mut Commands,
-    skeleton: &ZmdFile,
-    bone_visualisation: Option<(Handle<Mesh>, Handle<StandardMaterial>)>,
-) -> LoadedSkeleton {
-    let mut bone_entities = Vec::with_capacity(skeleton.bones.len());
-    let dummy_bone_offset = skeleton.bones.len();
-
-    for bone in skeleton.bones.iter().chain(skeleton.dummy_bones.iter()) {
-        let position = Vec3::new(bone.position.x, bone.position.z, -bone.position.y) / 100.0;
-
-        let rotation = Quat::from_xyzw(
-            bone.rotation.x,
-            bone.rotation.z,
-            -bone.rotation.y,
-            bone.rotation.w,
-        );
-
-        let transform = Transform::default()
-            .with_translation(position)
-            .with_rotation(rotation);
-
-        if let Some((bone_mesh, bone_material)) = &bone_visualisation {
-            bone_entities.push(
-                commands
-                    .spawn_bundle(PbrBundle {
-                        mesh: bone_mesh.clone(),
-                        material: bone_material.clone(),
-                        transform,
-                        ..Default::default()
-                    })
-                    .id(),
-            );
-        } else {
-            bone_entities.push(
-                commands
-                    .spawn_bundle((transform, GlobalTransform::default()))
-                    .id(),
-            );
-        }
-    }
-
-    for (i, bone) in skeleton
-        .bones
-        .iter()
-        .chain(skeleton.dummy_bones.iter())
-        .enumerate()
-    {
-        if bone.parent as usize == i {
-            continue;
-        }
-
-        if let Some(&bone_entity) = bone_entities.get(i) {
-            if let Some(&parent_entity) = bone_entities.get(bone.parent as usize) {
-                commands.entity(parent_entity).add_child(bone_entity);
-            }
-        }
-    }
-
-    LoadedSkeleton {
-        bones: bone_entities,
-        dummy_bone_offset,
-    }
-}
-
-fn spawn_model(
-    commands: &mut Commands,
-    asset_server: &AssetServer,
-    static_mesh_materials: &mut Assets<StaticMeshMaterial>,
-    model_list: &ZscFile,
-    model_id: usize,
-    skeleton: &LoadedSkeleton,
-    default_bone_id: usize,
-) -> (usize, Vec<Entity>) {
-    let mut parts = Vec::new();
-    let object = if let Some(object) = model_list.objects.get(model_id) {
-        object
-    } else {
-        return (model_id, parts);
-    };
-
-    for object_part in object.parts.iter() {
-        let mesh_id = object_part.mesh_id as usize;
-        let mesh = asset_server.load::<Mesh, _>(model_list.meshes[mesh_id].path());
-        let material_id = object_part.material_id as usize;
-        let zsc_material = &model_list.materials[material_id];
-        let material = static_mesh_materials.add(StaticMeshMaterial {
-            base_texture: Some(asset_server.load(zsc_material.path.path())),
-            lightmap_texture: None,
-            alpha_value: if zsc_material.alpha != 1.0 {
-                Some(zsc_material.alpha)
-            } else {
-                None
-            },
-            alpha_enabled: zsc_material.alpha_enabled,
-            alpha_test: zsc_material.alpha_test,
-            two_sided: zsc_material.two_sided,
-            z_write_enabled: zsc_material.z_write_enabled,
-            z_test_enabled: zsc_material.z_test_enabled,
-            ..Default::default()
-        });
-
-        let entity = commands
-            .spawn_bundle((
-                mesh,
-                material,
-                Transform::default(),
-                GlobalTransform::default(),
-                Visibility::default(),
-                ComputedVisibility::default(),
-            ))
-            .id();
-
-        let link_bone_id = object_part.bone_index.unwrap_or_else(|| {
-            object_part
-                .dummy_index
-                .map(|x| x + skeleton.dummy_bone_offset as u16)
-                .unwrap_or(default_bone_id as u16)
-        }) as usize;
-
-        if let Some(&parent_entity) = skeleton.bones.get(link_bone_id as usize) {
-            commands.entity(parent_entity).add_child(entity);
-        }
-
-        parts.push(entity);
-    }
-
-    (model_id, parts)
-}
-
-#[derive(Component)]
-pub struct CharacterModel {
-    pub gender: CharacterGender,
-    pub skeleton: LoadedSkeleton,
-    pub model_parts: EnumMap<CharacterModelPart, (usize, Vec<Entity>)>,
-}
-
-fn get_model_part_index(
-    character_info: &CharacterInfo,
-    equipment: &Equipment,
-    model_part: CharacterModelPart,
-) -> Option<usize> {
-    match model_part {
-        CharacterModelPart::CharacterFace => Some(character_info.face as usize),
-        CharacterModelPart::CharacterHair => Some(character_info.hair as usize),
-        CharacterModelPart::Head => equipment.equipped_items[EquipmentIndex::Head]
-            .as_ref()
-            .map(|equipment_item| equipment_item.item.item_number),
-        CharacterModelPart::FaceItem => equipment.equipped_items[EquipmentIndex::Face]
-            .as_ref()
-            .map(|equipment_item| equipment_item.item.item_number),
-        CharacterModelPart::Body => Some(
-            equipment.equipped_items[EquipmentIndex::Body]
-                .as_ref()
-                .map(|equipment_item| equipment_item.item.item_number)
-                .unwrap_or(1),
-        ),
-        CharacterModelPart::Hands => Some(
-            equipment.equipped_items[EquipmentIndex::Hands]
-                .as_ref()
-                .map(|equipment_item| equipment_item.item.item_number)
-                .unwrap_or(1),
-        ),
-        CharacterModelPart::Feet => Some(
-            equipment.equipped_items[EquipmentIndex::Feet]
-                .as_ref()
-                .map(|equipment_item| equipment_item.item.item_number)
-                .unwrap_or(1),
-        ),
-        CharacterModelPart::Back => equipment.equipped_items[EquipmentIndex::Back]
-            .as_ref()
-            .map(|equipment_item| equipment_item.item.item_number),
-        CharacterModelPart::Weapon => equipment.equipped_items[EquipmentIndex::WeaponRight]
-            .as_ref()
-            .map(|equipment_item| equipment_item.item.item_number),
-        CharacterModelPart::SubWeapon => equipment.equipped_items[EquipmentIndex::WeaponLeft]
-            .as_ref()
-            .map(|equipment_item| equipment_item.item.item_number),
-    }
-}
-
 pub fn spawn_character_model(
     commands: &mut Commands,
     asset_server: &AssetServer,
@@ -430,5 +233,179 @@ pub fn update_character_equipment(
                 );
             }
         }
+    }
+}
+
+fn spawn_skeleton(
+    commands: &mut Commands,
+    skeleton: &ZmdFile,
+    bone_visualisation: Option<(Handle<Mesh>, Handle<StandardMaterial>)>,
+) -> CharacterModelSkeleton {
+    let mut bone_entities = Vec::with_capacity(skeleton.bones.len());
+    let dummy_bone_offset = skeleton.bones.len();
+
+    for bone in skeleton.bones.iter().chain(skeleton.dummy_bones.iter()) {
+        let position = Vec3::new(bone.position.x, bone.position.z, -bone.position.y) / 100.0;
+
+        let rotation = Quat::from_xyzw(
+            bone.rotation.x,
+            bone.rotation.z,
+            -bone.rotation.y,
+            bone.rotation.w,
+        );
+
+        let transform = Transform::default()
+            .with_translation(position)
+            .with_rotation(rotation);
+
+        if let Some((bone_mesh, bone_material)) = &bone_visualisation {
+            bone_entities.push(
+                commands
+                    .spawn_bundle(PbrBundle {
+                        mesh: bone_mesh.clone(),
+                        material: bone_material.clone(),
+                        transform,
+                        ..Default::default()
+                    })
+                    .id(),
+            );
+        } else {
+            bone_entities.push(
+                commands
+                    .spawn_bundle((transform, GlobalTransform::default()))
+                    .id(),
+            );
+        }
+    }
+
+    for (i, bone) in skeleton
+        .bones
+        .iter()
+        .chain(skeleton.dummy_bones.iter())
+        .enumerate()
+    {
+        if bone.parent as usize == i {
+            continue;
+        }
+
+        if let Some(&bone_entity) = bone_entities.get(i) {
+            if let Some(&parent_entity) = bone_entities.get(bone.parent as usize) {
+                commands.entity(parent_entity).add_child(bone_entity);
+            }
+        }
+    }
+
+    CharacterModelSkeleton {
+        bones: bone_entities,
+        dummy_bone_offset,
+    }
+}
+
+fn spawn_model(
+    commands: &mut Commands,
+    asset_server: &AssetServer,
+    static_mesh_materials: &mut Assets<StaticMeshMaterial>,
+    model_list: &ZscFile,
+    model_id: usize,
+    skeleton: &CharacterModelSkeleton,
+    default_bone_id: usize,
+) -> (usize, Vec<Entity>) {
+    let mut parts = Vec::new();
+    let object = if let Some(object) = model_list.objects.get(model_id) {
+        object
+    } else {
+        return (model_id, parts);
+    };
+
+    for object_part in object.parts.iter() {
+        let mesh_id = object_part.mesh_id as usize;
+        let mesh = asset_server.load::<Mesh, _>(model_list.meshes[mesh_id].path());
+        let material_id = object_part.material_id as usize;
+        let zsc_material = &model_list.materials[material_id];
+        let material = static_mesh_materials.add(StaticMeshMaterial {
+            base_texture: Some(asset_server.load(zsc_material.path.path())),
+            lightmap_texture: None,
+            alpha_value: if zsc_material.alpha != 1.0 {
+                Some(zsc_material.alpha)
+            } else {
+                None
+            },
+            alpha_enabled: zsc_material.alpha_enabled,
+            alpha_test: zsc_material.alpha_test,
+            two_sided: zsc_material.two_sided,
+            z_write_enabled: zsc_material.z_write_enabled,
+            z_test_enabled: zsc_material.z_test_enabled,
+            ..Default::default()
+        });
+
+        let entity = commands
+            .spawn_bundle((
+                mesh,
+                material,
+                Transform::default(),
+                GlobalTransform::default(),
+                Visibility::default(),
+                ComputedVisibility::default(),
+            ))
+            .id();
+
+        let link_bone_id = object_part.bone_index.unwrap_or_else(|| {
+            object_part
+                .dummy_index
+                .map(|x| x + skeleton.dummy_bone_offset as u16)
+                .unwrap_or(default_bone_id as u16)
+        }) as usize;
+
+        if let Some(&parent_entity) = skeleton.bones.get(link_bone_id as usize) {
+            commands.entity(parent_entity).add_child(entity);
+        }
+
+        parts.push(entity);
+    }
+
+    (model_id, parts)
+}
+
+fn get_model_part_index(
+    character_info: &CharacterInfo,
+    equipment: &Equipment,
+    model_part: CharacterModelPart,
+) -> Option<usize> {
+    match model_part {
+        CharacterModelPart::CharacterFace => Some(character_info.face as usize),
+        CharacterModelPart::CharacterHair => Some(character_info.hair as usize),
+        CharacterModelPart::Head => equipment.equipped_items[EquipmentIndex::Head]
+            .as_ref()
+            .map(|equipment_item| equipment_item.item.item_number),
+        CharacterModelPart::FaceItem => equipment.equipped_items[EquipmentIndex::Face]
+            .as_ref()
+            .map(|equipment_item| equipment_item.item.item_number),
+        CharacterModelPart::Body => Some(
+            equipment.equipped_items[EquipmentIndex::Body]
+                .as_ref()
+                .map(|equipment_item| equipment_item.item.item_number)
+                .unwrap_or(1),
+        ),
+        CharacterModelPart::Hands => Some(
+            equipment.equipped_items[EquipmentIndex::Hands]
+                .as_ref()
+                .map(|equipment_item| equipment_item.item.item_number)
+                .unwrap_or(1),
+        ),
+        CharacterModelPart::Feet => Some(
+            equipment.equipped_items[EquipmentIndex::Feet]
+                .as_ref()
+                .map(|equipment_item| equipment_item.item.item_number)
+                .unwrap_or(1),
+        ),
+        CharacterModelPart::Back => equipment.equipped_items[EquipmentIndex::Back]
+            .as_ref()
+            .map(|equipment_item| equipment_item.item.item_number),
+        CharacterModelPart::Weapon => equipment.equipped_items[EquipmentIndex::WeaponRight]
+            .as_ref()
+            .map(|equipment_item| equipment_item.item.item_number),
+        CharacterModelPart::SubWeapon => equipment.equipped_items[EquipmentIndex::WeaponLeft]
+            .as_ref()
+            .map(|equipment_item| equipment_item.item.item_number),
     }
 }

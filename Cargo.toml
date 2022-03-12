@@ -11,16 +11,22 @@ bevy_mod_picking = "0.5"
 bevy_polyline = "0.1"
 bitflags = "1.2"
 clap = "3.1"
+crossbeam-channel = "0.5"
 enum-map = { version = "2.0", features = ["serde"] }
 image = { version = "0.23", default-features = false, features = ["dds"] }
 lazy_static = "1.4.0"
 log = "0.4.14"
 nalgebra = { version = "0.25", features = ["serde-serialize"] }
-rose-data = { git = "https://github.com/exjam/rose-offline", rev = "901ea4786dd98a54fb8797c5c534f1e38cb59d80" }
-rose-data-irose = { git = "https://github.com/exjam/rose-offline", rev = "901ea4786dd98a54fb8797c5c534f1e38cb59d80" }
-rose-file-readers = { git = "https://github.com/exjam/rose-offline", rev = "901ea4786dd98a54fb8797c5c534f1e38cb59d80" }
-rose-game-common = { git = "https://github.com/exjam/rose-offline", rev = "901ea4786dd98a54fb8797c5c534f1e38cb59d80" }
-rose-game-irose = { git = "https://github.com/exjam/rose-offline", rev = "901ea4786dd98a54fb8797c5c534f1e38cb59d80" }
+num-traits = "0.2"
+thiserror = "1.0"
+tokio = { version = "1.17", features = ["rt", "net", "sync", "macros", "io-util"] }
+rose-data = { git = "https://github.com/exjam/rose-offline", rev = "960c143742fe062082e1250ea809c797b6319d0f" }
+rose-data-irose = { git = "https://github.com/exjam/rose-offline", rev = "960c143742fe062082e1250ea809c797b6319d0f" }
+rose-file-readers = { git = "https://github.com/exjam/rose-offline", rev = "960c143742fe062082e1250ea809c797b6319d0f" }
+rose-game-common = { git = "https://github.com/exjam/rose-offline", rev = "960c143742fe062082e1250ea809c797b6319d0f" }
+rose-game-irose = { git = "https://github.com/exjam/rose-offline", rev = "960c143742fe062082e1250ea809c797b6319d0f" }
+rose-network-common = { git = "https://github.com/exjam/rose-offline", rev = "960c143742fe062082e1250ea809c797b6319d0f" }
+rose-network-irose = { git = "https://github.com/exjam/rose-offline", rev = "960c143742fe062082e1250ea809c797b6319d0f" }
 
 [patch.crates-io]
 bevy = { git = "https://github.com/exjam/bevy", rev = "8fa350f95cbc5c075fbff57facadfd88928bcc0a", features = ["dds"] }
