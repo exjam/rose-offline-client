@@ -1,0 +1,235 @@
+use bevy::{
+    math::Vec3,
+    prelude::{
+        Commands, Local, PerspectiveCameraBundle, Res, ResMut, Transform,
+    },
+    window::Windows,
+};
+use bevy_egui::{egui, EguiContext};
+
+use rose_data::ZoneId;
+use rose_game_common::messages::client::{ClientMessage, JoinServer};
+
+use crate::resources::{
+    Account, LoadedZone, LoginConnection, NetworkThread, ServerList, WorldConnection,
+};
+
+enum LoginState {
+    Input,
+    WaitServerList,
+    ServerSelect,
+    JoiningServer,
+}
+
+impl Default for LoginState {
+    fn default() -> Self {
+        Self::Input
+    }
+}
+
+#[derive(Default)]
+pub struct LoginUiState {
+    state: LoginState,
+    initial_focus_set: bool,
+    username: String,
+    password: String,
+    selected_world_server_id: usize,
+    selected_game_server_id: usize,
+}
+
+pub fn login_state_enter_system(
+    mut commands: Commands,
+    mut loaded_zone: ResMut<LoadedZone>,
+    mut windows: ResMut<Windows>,
+) {
+    if let Some(window) = windows.get_primary_mut() {
+        window.set_cursor_lock_mode(false);
+        window.set_cursor_visibility(true);
+    }
+
+    commands.spawn_bundle(PerspectiveCameraBundle {
+        transform: Transform::from_xyz(5240.0, 10.0, -5400.0)
+            .looking_at(Vec3::new(5200.0, 35.0, -5300.0), Vec3::Y),
+        ..Default::default()
+    });
+
+    loaded_zone.next_zone_id = Some(ZoneId::new(4).unwrap());
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn login_ui_system(
+    mut commands: Commands,
+    mut ui_state: Local<LoginUiState>,
+    mut egui_context: ResMut<EguiContext>,
+    login_connection: Option<Res<LoginConnection>>,
+    world_connection: Option<Res<WorldConnection>>,
+    server_list: Option<Res<ServerList>>,
+    network_thread: Res<NetworkThread>,
+) {
+    if login_connection.is_none() && world_connection.is_none() {
+        // If we have no connection, return to input state
+        ui_state.state = LoginState::Input;
+    }
+
+    if server_list.is_some() {
+        match ui_state.state {
+            LoginState::Input => {
+                // We must have disconnected, remove the old server list
+                commands.remove_resource::<ServerList>();
+            }
+            LoginState::WaitServerList => {
+                // We have server list, transition to select
+                ui_state.state = LoginState::ServerSelect;
+            }
+            _ => {}
+        }
+    }
+
+    match ui_state.state {
+        LoginState::Input => {
+            egui::Window::new("Login")
+                .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
+                .collapsible(false)
+                .show(egui_context.ctx_mut(), |ui| {
+                    let (text_username, text_password) = egui::Grid::new("login_dialog_grid")
+                        .num_columns(2)
+                        .show(ui, |ui| {
+                            ui.label("Username");
+                            let text_username = ui.text_edit_singleline(&mut ui_state.username);
+                            ui.end_row();
+
+                            ui.label("Password");
+                            let text_password = ui.add(
+                                egui::TextEdit::singleline(&mut ui_state.password).password(true),
+                            );
+                            ui.end_row();
+
+                            if !ui_state.initial_focus_set {
+                                text_username.request_focus();
+                                ui_state.initial_focus_set = true;
+                            }
+
+                            (text_username, text_password)
+                        })
+                        .inner;
+
+                    ui.separator();
+
+                    let mut try_start_login = ui.input().key_pressed(egui::Key::Enter);
+                    ui.horizontal(|ui| {
+                        if ui.button("Login").clicked() {
+                            try_start_login = true;
+                        }
+
+                        if ui.button("Exit").clicked() {
+                            // take some action here
+                        }
+                    });
+
+                    if try_start_login {
+                        if ui_state.username.is_empty() {
+                            text_username.request_focus();
+                        } else if ui_state.password.is_empty() {
+                            text_password.request_focus();
+                        } else {
+                            ui_state.state = LoginState::WaitServerList;
+                            commands.insert_resource(Account {
+                                username: ui_state.username.clone(),
+                                password_md5: format!("{:x}", md5::compute(&ui_state.password)),
+                            });
+                            commands.insert_resource(
+                                network_thread.connect_login("192.168.50.246", 29000),
+                            );
+                        }
+                    }
+                });
+        }
+        LoginState::WaitServerList => {
+            egui::Window::new("Connecting...")
+                .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
+                .collapsible(false)
+                .show(egui_context.ctx_mut(), |ui| {
+                    ui.label("Logging in");
+                });
+        }
+        LoginState::ServerSelect => {
+            egui::Window::new("Select Server")
+                .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
+                .collapsible(false)
+                .show(egui_context.ctx_mut(), |ui| {
+                    let mut try_select_server = ui.input().key_pressed(egui::Key::Enter);
+                    let server_list = server_list.as_ref().unwrap();
+
+                    ui.horizontal(|ui| {
+                        let mut selected_world_server_id = ui_state.selected_world_server_id;
+                        let mut selected_game_server_id = ui_state.selected_game_server_id;
+
+                        ui.vertical(|ui| {
+                            ui.label("World Server");
+                            for world_server in server_list.world_servers.iter() {
+                                ui.selectable_value(
+                                    &mut selected_world_server_id,
+                                    world_server.id,
+                                    &world_server.name,
+                                );
+                            }
+                        });
+
+                        ui.vertical(|ui| {
+                            ui.label("Game Server");
+                            for world_server in server_list.world_servers.iter() {
+                                if world_server.id == selected_world_server_id {
+                                    for game_server in world_server.game_servers.iter() {
+                                        let response = ui.selectable_value(
+                                            &mut selected_game_server_id,
+                                            game_server.id,
+                                            &game_server.name,
+                                        );
+
+                                        if response.double_clicked() {
+                                            try_select_server = true;
+                                        }
+                                    }
+                                }
+                            }
+                        });
+
+                        ui_state.selected_world_server_id = selected_world_server_id;
+                        ui_state.selected_world_server_id = selected_world_server_id;
+                    });
+
+                    ui.horizontal(|ui| {
+                        if ui.button("Play").clicked() {
+                            try_select_server = true;
+                        }
+
+                        if ui.button("Logout").clicked() {
+                            commands.remove_resource::<LoginConnection>();
+                            try_select_server = false;
+                        }
+                    });
+
+                    if try_select_server {
+                        if let Some(connection) = login_connection.as_ref() {
+                            connection
+                                .client_message_tx
+                                .send(ClientMessage::JoinServer(JoinServer {
+                                    server_id: ui_state.selected_world_server_id,
+                                    channel_id: ui_state.selected_game_server_id,
+                                }))
+                                .ok();
+                            ui_state.state = LoginState::JoiningServer;
+                        }
+                    }
+                });
+        }
+        LoginState::JoiningServer => {
+            egui::Window::new("Connecting...")
+                .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
+                .collapsible(false)
+                .show(egui_context.ctx_mut(), |ui| {
+                    ui.label("Connecting to channel");
+                });
+        }
+    }
+}

@@ -30,21 +30,24 @@ pub enum LoginClientError {
 }
 
 pub struct LoginClient {
-    packet_codec: Box<dyn PacketCodec + Send + Sync>,
+    server_address: SocketAddr,
     client_message_rx: tokio::sync::mpsc::UnboundedReceiver<ClientMessage>,
     server_message_tx: crossbeam_channel::Sender<ServerMessage>,
+    packet_codec: Box<dyn PacketCodec + Send + Sync>,
 }
 
 impl LoginClient {
     // TODO: Pass irose into this
     pub fn new(
+        server_address: SocketAddr,
         client_message_rx: tokio::sync::mpsc::UnboundedReceiver<ClientMessage>,
         server_message_tx: crossbeam_channel::Sender<ServerMessage>,
     ) -> Self {
         Self {
-            packet_codec: Box::new(ClientPacketCodec::default(&IROSE_112_TABLE)),
+            server_address,
             client_message_rx,
             server_message_tx,
+            packet_codec: Box::new(ClientPacketCodec::default(&IROSE_112_TABLE)),
         }
     }
 
@@ -165,8 +168,8 @@ impl LoginClient {
         Ok(())
     }
 
-    pub async fn run_connection(&mut self, address: SocketAddr) -> Result<(), anyhow::Error> {
-        let socket = TcpStream::connect(&address).await?;
+    pub async fn run_connection(&mut self) -> Result<(), anyhow::Error> {
+        let socket = TcpStream::connect(&self.server_address).await?;
         let mut connection = Connection::new(socket, self.packet_codec.as_ref());
 
         loop {

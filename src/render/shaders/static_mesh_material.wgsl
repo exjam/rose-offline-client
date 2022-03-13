@@ -74,9 +74,9 @@ struct FragmentInput {
 
 [[stage(fragment)]]
 fn fragment(in: FragmentInput) -> [[location(0)]] vec4<f32> {
-    var output_color: vec4<f32> = textureSample(base_texture, base_sampler, in.uv);
+    var output_color: vec4<f32> = textureSample(base_texture, base_sampler, in.uv) * 2.0;
 #ifdef HAS_STATIC_MESH_LIGHTMAP
-    output_color = output_color * textureSample(lightmap_texture, lightmap_sampler, (in.lightmap_uv + material.lightmap_uv_offset) * material.lightmap_uv_scale) * 2.0;
+    output_color = output_color * textureSample(lightmap_texture, lightmap_sampler, (in.lightmap_uv + material.lightmap_uv_offset) * material.lightmap_uv_scale);
 #endif
 
     if ((material.flags & STATIC_MESH_MATERIAL_FLAGS_HAS_ALPHA_VALUE) != 0u) {

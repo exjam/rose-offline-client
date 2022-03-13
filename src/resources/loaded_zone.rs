@@ -1,6 +1,7 @@
 use bevy::prelude::Entity;
 use rose_data::ZoneId;
 
+#[derive(Default)]
 pub struct LoadedZone {
     pub zone: Option<(ZoneId, Entity)>,
     pub next_zone_id: Option<ZoneId>,

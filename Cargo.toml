@@ -16,6 +16,7 @@ enum-map = { version = "2.0", features = ["serde"] }
 image = { version = "0.23", default-features = false, features = ["dds"] }
 lazy_static = "1.4.0"
 log = "0.4.14"
+md5 = "0.7.0"
 nalgebra = { version = "0.25", features = ["serde-serialize"] }
 num-traits = "0.2"
 thiserror = "1.0"
@@ -29,13 +30,13 @@ rose-network-common = { git = "https://github.com/exjam/rose-offline", rev = "96
 rose-network-irose = { git = "https://github.com/exjam/rose-offline", rev = "960c143742fe062082e1250ea809c797b6319d0f" }
 
 [patch.crates-io]
-bevy = { git = "https://github.com/exjam/bevy", rev = "8fa350f95cbc5c075fbff57facadfd88928bcc0a", features = ["dds"] }
-bevy_ecs = { git = "https://github.com/exjam/bevy", rev = "8fa350f95cbc5c075fbff57facadfd88928bcc0a", features = ["dds"] }
+bevy = { git = "https://github.com/exjam/bevy", rev = "8fa350f95cbc5c075fbff57facadfd88928bcc0a" }
+bevy_ecs = { git = "https://github.com/exjam/bevy", rev = "8fa350f95cbc5c075fbff57facadfd88928bcc0a" }
 bevy_mod_picking = { git = "https://github.com/exjam/bevy_mod_picking", branch = "allow_bevy_patch" }
 bevy_mod_raycast = { git = "https://github.com/exjam/bevy_mod_raycast", branch = "allow_bevy_patch" }
 bevy_polyline = { git = "https://github.com/exjam/bevy_polyline", branch = "allow_bevy_patch" }
 bevy_egui = { git = "https://github.com/exjam/bevy_egui", branch = "fix_bevy_main" }
-image = { git = "https://github.com/image-rs/image", branch = "version-0.23", default-features = false, features = ["dds"] }
+image = { git = "https://github.com/image-rs/image", branch = "version-0.23" }
 
 [profile.dev.package."*"]
 opt-level = 3

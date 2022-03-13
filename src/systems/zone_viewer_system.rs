@@ -2,8 +2,8 @@ use bevy::{
     ecs::query::QueryEntityError,
     math::Vec3,
     prelude::{
-        Assets, Color, Commands, Entity, EventReader, GlobalTransform, Handle, Local, Mesh,
-        PerspectiveCameraBundle, Query, Res, ResMut, Transform,
+        Assets, Camera, Color, Commands, Entity, EventReader, GlobalTransform, Handle, Local, Mesh,
+        PerspectiveCameraBundle, Query, Res, ResMut, Transform, With,
     },
     render::mesh::{Indices, VertexAttributeValues},
     window::Windows,
@@ -62,6 +62,7 @@ pub fn zone_viewer_system(
     meshes: Res<Assets<Mesh>>,
     mut polylines: ResMut<Assets<Polyline>>,
     mut polyline_materials: ResMut<Assets<PolylineMaterial>>,
+    camera_query: Query<&Transform, With<Camera>>,
 ) {
     // Disable picking when controlling camera
     let window = windows.get_primary().unwrap();
@@ -114,6 +115,12 @@ pub fn zone_viewer_system(
     }
 
     // Draw ui
+    egui::Window::new("Camera").show(egui_context.ctx_mut(), |ui| {
+        let transform = camera_query.single();
+        ui.label(format!("Translation: {}", transform.translation));
+        ui.label(format!("Forward: {}", transform.forward()));
+    });
+
     egui::Window::new("Zone List")
         .vscroll(true)
         .resizable(true)

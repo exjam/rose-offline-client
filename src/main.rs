@@ -26,9 +26,11 @@ use rose_file_readers::VfsIndex;
 
 use character_model::CharacterModelList;
 use render::RoseRenderPlugin;
-use resources::{AppState, LoadedZone};
+use resources::{run_network_thread, AppState, LoadedZone, NetworkThread, NetworkThreadMessage};
 use systems::{
-    character_model_system, load_zone_system, model_viewer_system, zone_viewer_setup_system,
+    character_model_system, character_select_enter_system, character_select_system,
+    game_connection_system, load_zone_system, login_connection_system, login_state_enter_system,
+    login_ui_system, model_viewer_system, world_connection_system, zone_viewer_setup_system,
     zone_viewer_system,
 };
 use vfs_asset_io::VfsAssetIo;
@@ -55,9 +57,15 @@ fn main() {
         .arg(
             clap::Arg::new("zone")
                 .long("zone")
-                .help("Which zone to load")
+                .help("Runs as zone viewer, loading the specified zone")
                 .takes_value(true),
         )
+        .arg(
+            clap::Arg::new("model-viewer")
+                .long("model-viewer")
+                .help("Run model viewer"),
+        )
+        .arg(clap::Arg::new("game").long("game").help("Run game"))
         .arg(
             clap::Arg::new("disable-vsync")
                 .long("disable-vsync")
@@ -69,12 +77,18 @@ fn main() {
     );
     let matches = command.get_matches();
 
-    let zone_id = matches
+    let disable_vsync = matches.is_present("disable-vsync");
+    let mut app_state = AppState::ZoneViewer;
+    let view_zone_id = matches
         .value_of("zone")
         .and_then(|str| str.parse::<u16>().ok())
         .and_then(ZoneId::new)
         .unwrap_or_else(|| ZoneId::new(2).unwrap());
-    let disable_vsync = matches.is_present("disable-vsync");
+    if matches.is_present("game") {
+        app_state = AppState::GameLogin;
+    } else if matches.is_present("model-viewer") {
+        app_state = AppState::ModelViewer;
+    }
 
     let mut data_idx_path = matches.value_of("data-idx").map(Path::new);
     let data_extracted_path = matches.value_of("data-path").map(Path::new);
@@ -160,12 +174,16 @@ fn main() {
     app.init_asset_loader::<ZmsAssetLoader>()
         .add_plugin(RoseRenderPlugin);
 
-    // Setup state
-    app.insert_resource(LoadedZone::with_next_zone(zone_id))
-        .add_system(load_zone_system)
+    app.add_system(load_zone_system)
         .add_system(character_model_system);
 
-    app.add_state(AppState::ZoneViewer);
+    // Setup state
+    app.add_state(app_state);
+    if matches!(app_state, AppState::ZoneViewer) {
+        app.insert_resource(LoadedZone::with_next_zone(view_zone_id));
+    } else {
+        app.insert_resource(LoadedZone::default());
+    }
 
     app.add_system_set(
         SystemSet::on_enter(AppState::ZoneViewer).with_system(zone_viewer_setup_system),
@@ -176,9 +194,33 @@ fn main() {
         SystemSet::on_update(AppState::ModelViewer).with_system(model_viewer_system),
     );
 
-    app.add_startup_system(load_resources);
+    app.add_system_set(
+        SystemSet::on_enter(AppState::GameLogin).with_system(login_state_enter_system),
+    )
+    .add_system_set(SystemSet::on_update(AppState::GameLogin).with_system(login_ui_system));
 
+    app.add_system_set(
+        SystemSet::on_enter(AppState::GameCharacterSelect)
+            .with_system(character_select_enter_system),
+    )
+    .add_system_set(
+        SystemSet::on_update(AppState::GameCharacterSelect).with_system(character_select_system),
+    );
+
+    // Setup network
+    let (network_thread_tx, network_thread_rx) =
+        tokio::sync::mpsc::unbounded_channel::<NetworkThreadMessage>();
+    let network_thread = std::thread::spawn(move || run_network_thread(network_thread_rx));
+    app.insert_resource(NetworkThread::new(network_thread_tx.clone()))
+        .add_system(login_connection_system)
+        .add_system(world_connection_system)
+        .add_system(game_connection_system);
+
+    app.add_startup_system(load_resources);
     app.run();
+
+    network_thread_tx.send(NetworkThreadMessage::Exit).ok();
+    network_thread.join().ok();
 }
 
 fn load_resources(mut commands: Commands, vfs_resource: Res<VfsResource>) {
