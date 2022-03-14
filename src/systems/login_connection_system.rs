@@ -103,8 +103,6 @@ pub fn login_connection_system(
                             login_token,
                             account.password_md5.clone(),
                         ));
-                        commands.remove_resource::<LoginConnection>();
-                        break Ok(());
                     } else {
                         break Err(ConnectionError::ConnectionLost.into());
                     }

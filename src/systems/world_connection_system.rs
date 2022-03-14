@@ -2,11 +2,13 @@ use bevy::prelude::{Commands, Res, ResMut, State};
 use rose_game_common::messages::{client::ClientMessage, server::ServerMessage};
 use rose_network_common::ConnectionError;
 
-use crate::resources::{AppState, CharacterList, WorldConnection};
+use crate::resources::{Account, AppState, CharacterList, NetworkThread, WorldConnection};
 
 pub fn world_connection_system(
     mut commands: Commands,
     world_connection: Option<Res<WorldConnection>>,
+    account: Option<Res<Account>>,
+    network_thread: Res<NetworkThread>,
     mut app_state: ResMut<State<AppState>>,
 ) {
     if world_connection.is_none() {
@@ -34,10 +36,24 @@ pub fn world_connection_system(
 
                 commands.insert_resource(CharacterList { characters });
             }
+            Ok(ServerMessage::SelectCharacter(response)) => match response {
+                Ok(server_info) => {
+                    commands.insert_resource(network_thread.connect_game(
+                        &server_info.ip,
+                        server_info.port,
+                        server_info.packet_codec_seed,
+                        server_info.login_token,
+                        account.as_ref().unwrap().password_md5.clone(),
+                    ));
+                }
+                Err(_) => {
+                    break Err(ConnectionError::ConnectionLost.into());
+                }
+            },
             // TODO:
             // ServerMessage::CreateCharacter
             // ServerMessage::DeleteCharacter
-            // ServerMessage::SelectCharacter
+            //
             // ServerMessage::ReturnToCharacterSelect
             Ok(message) => {
                 log::warn!("Received unexpected world server message: {:#?}", message);

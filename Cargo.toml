@@ -21,13 +21,13 @@ nalgebra = { version = "0.25", features = ["serde-serialize"] }
 num-traits = "0.2"
 thiserror = "1.0"
 tokio = { version = "1.17", features = ["rt", "net", "sync", "macros", "io-util"] }
-rose-data = { git = "https://github.com/exjam/rose-offline", rev = "960c143742fe062082e1250ea809c797b6319d0f" }
-rose-data-irose = { git = "https://github.com/exjam/rose-offline", rev = "960c143742fe062082e1250ea809c797b6319d0f" }
-rose-file-readers = { git = "https://github.com/exjam/rose-offline", rev = "960c143742fe062082e1250ea809c797b6319d0f" }
-rose-game-common = { git = "https://github.com/exjam/rose-offline", rev = "960c143742fe062082e1250ea809c797b6319d0f" }
-rose-game-irose = { git = "https://github.com/exjam/rose-offline", rev = "960c143742fe062082e1250ea809c797b6319d0f" }
-rose-network-common = { git = "https://github.com/exjam/rose-offline", rev = "960c143742fe062082e1250ea809c797b6319d0f" }
-rose-network-irose = { git = "https://github.com/exjam/rose-offline", rev = "960c143742fe062082e1250ea809c797b6319d0f" }
+rose-data = { git = "https://github.com/exjam/rose-offline", rev = "32fc811d5bbbe461a218256c43216f4581bee636" }
+rose-data-irose = { git = "https://github.com/exjam/rose-offline", rev = "32fc811d5bbbe461a218256c43216f4581bee636" }
+rose-file-readers = { git = "https://github.com/exjam/rose-offline", rev = "32fc811d5bbbe461a218256c43216f4581bee636" }
+rose-game-common = { git = "https://github.com/exjam/rose-offline", rev = "32fc811d5bbbe461a218256c43216f4581bee636" }
+rose-game-irose = { git = "https://github.com/exjam/rose-offline", rev = "32fc811d5bbbe461a218256c43216f4581bee636" }
+rose-network-common = { git = "https://github.com/exjam/rose-offline", rev = "32fc811d5bbbe461a218256c43216f4581bee636" }
+rose-network-irose = { git = "https://github.com/exjam/rose-offline", rev = "32fc811d5bbbe461a218256c43216f4581bee636" }
 
 [patch.crates-io]
 bevy = { git = "https://github.com/exjam/bevy", rev = "8fa350f95cbc5c075fbff57facadfd88928bcc0a" }

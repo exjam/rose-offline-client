@@ -35,7 +35,15 @@ pub struct ObjectInspectorState {
     outline_entity: Option<Entity>,
 }
 
-pub fn zone_viewer_setup_system(mut commands: Commands) {
+pub fn zone_viewer_setup_system(
+    mut commands: Commands,
+    query_cameras: Query<Entity, With<Camera>>,
+) {
+    // Remove any other cameras
+    for entity in query_cameras.iter() {
+        commands.entity(entity).despawn();
+    }
+
     commands
         .spawn_bundle(PerspectiveCameraBundle {
             transform: Transform::from_xyz(5120.0, 50.0, -5120.0)

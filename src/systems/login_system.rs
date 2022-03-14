@@ -1,7 +1,7 @@
 use bevy::{
     math::Vec3,
     prelude::{
-        Commands, Local, PerspectiveCameraBundle, Res, ResMut, Transform,
+        Camera, Commands, Entity, PerspectiveCameraBundle, Query, Res, ResMut, Transform, With,
     },
     window::Windows,
 };
@@ -10,9 +10,7 @@ use bevy_egui::{egui, EguiContext};
 use rose_data::ZoneId;
 use rose_game_common::messages::client::{ClientMessage, JoinServer};
 
-use crate::resources::{
-    Account, LoadedZone, LoginConnection, NetworkThread, ServerList, WorldConnection,
-};
+use crate::resources::{Account, LoadedZone, LoginConnection, NetworkThread, ServerList};
 
 enum LoginState {
     Input,
@@ -28,7 +26,7 @@ impl Default for LoginState {
 }
 
 #[derive(Default)]
-pub struct LoginUiState {
+pub struct Login {
     state: LoginState,
     initial_focus_set: bool,
     username: String,
@@ -41,12 +39,21 @@ pub fn login_state_enter_system(
     mut commands: Commands,
     mut loaded_zone: ResMut<LoadedZone>,
     mut windows: ResMut<Windows>,
+    query_cameras: Query<Entity, With<Camera>>,
 ) {
+    // Ensure cursor is not locked
     if let Some(window) = windows.get_primary_mut() {
         window.set_cursor_lock_mode(false);
         window.set_cursor_visibility(true);
     }
 
+    // Remove any other cameras
+    for entity in query_cameras.iter() {
+        commands.entity(entity).despawn();
+    }
+
+    commands.remove_resource::<Account>();
+    commands.insert_resource(Login::default());
     commands.spawn_bundle(PerspectiveCameraBundle {
         transform: Transform::from_xyz(5240.0, 10.0, -5400.0)
             .looking_at(Vec3::new(5200.0, 35.0, -5300.0), Vec3::Y),
@@ -56,17 +63,21 @@ pub fn login_state_enter_system(
     loaded_zone.next_zone_id = Some(ZoneId::new(4).unwrap());
 }
 
+pub fn login_state_exit_system(mut commands: Commands) {
+    commands.remove_resource::<LoginConnection>();
+    commands.remove_resource::<Login>();
+}
+
 #[allow(clippy::too_many_arguments)]
-pub fn login_ui_system(
+pub fn login_system(
     mut commands: Commands,
-    mut ui_state: Local<LoginUiState>,
+    mut ui_state: ResMut<Login>,
     mut egui_context: ResMut<EguiContext>,
     login_connection: Option<Res<LoginConnection>>,
-    world_connection: Option<Res<WorldConnection>>,
     server_list: Option<Res<ServerList>>,
     network_thread: Res<NetworkThread>,
 ) {
-    if login_connection.is_none() && world_connection.is_none() {
+    if login_connection.is_none() {
         // If we have no connection, return to input state
         ui_state.state = LoginState::Input;
     }

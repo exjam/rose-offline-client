@@ -5,12 +5,17 @@ use tokio::net::TcpStream;
 
 use rose_game_common::messages::{
     client::{ClientMessage, ConnectionRequest},
-    server::{ConnectionRequestError, ConnectionResponse, ServerMessage},
+    server::{ConnectionRequestError, ConnectionResponse, JoinServerResponse, ServerMessage},
 };
 use rose_network_common::{Connection, Packet, PacketCodec};
 use rose_network_irose::{
-    world_client_packets::{PacketClientCharacterList, PacketClientConnectRequest},
-    world_server_packets::{ConnectResult, PacketConnectionReply, ServerPackets, PacketServerCharacterList},
+    world_client_packets::{
+        PacketClientCharacterList, PacketClientConnectRequest, PacketClientSelectCharacter,
+    },
+    world_server_packets::{
+        ConnectResult, PacketConnectionReply, PacketServerCharacterList, PacketServerMoveServer,
+        ServerPackets,
+    },
     ClientPacketCodec, IROSE_112_TABLE,
 };
 
@@ -60,12 +65,24 @@ impl WorldClient {
             }
             Some(ServerPackets::CharacterListReply) => {
                 self.server_message_tx
-                    .send(ServerMessage::CharacterList(PacketServerCharacterList::try_from(&packet)?.characters))
+                    .send(ServerMessage::CharacterList(
+                        PacketServerCharacterList::try_from(&packet)?.characters,
+                    ))
+                    .ok();
+            }
+            Some(ServerPackets::MoveServer) => {
+                let response = PacketServerMoveServer::try_from(&packet)?;
+                self.server_message_tx
+                    .send(ServerMessage::SelectCharacter(Ok(JoinServerResponse {
+                        login_token: response.login_token,
+                        packet_codec_seed: response.packet_codec_seed,
+                        ip: response.ip.to_string(),
+                        port: response.port,
+                    })))
                     .ok();
             }
             // ServerPackets::CreateCharacterReply -> ServerMessage::CreateCharacter
             // ServerPackets::DeleteCharacterReply -> ServerMessage::DeleteCharacter
-            // ServerPackets::MoveServer -> ServerMessage::SelectCharacter
             // ServerPackets::ReturnToCharacterSelect -> ServerMessage::ReturnToCharacterSelect
             _ => println!("Unhandled world packet {:x}", packet.command),
         }
@@ -95,9 +112,16 @@ impl WorldClient {
                     .write_packet(Packet::from(&PacketClientCharacterList {}))
                     .await?
             }
+            ClientMessage::SelectCharacter(message) => {
+                connection
+                    .write_packet(Packet::from(&PacketClientSelectCharacter {
+                        slot: message.slot,
+                        name: &message.name,
+                    }))
+                    .await?
+            }
             // ClientMessage::CreateCharacter -> ClientPackets::CreateCharacter
             // ClientMessage::DeleteCharacter -> ClientPackets::DeleteCharacter
-            // ClientMessage::SelectCharacter -> ClientPackets::SelectCharacter
             unimplemented => {
                 println!(
                     "Unimplemented WorldClient ClientMessage {:?}",

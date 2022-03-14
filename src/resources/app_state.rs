@@ -2,6 +2,7 @@
 pub enum AppState {
     GameLogin,
     GameCharacterSelect,
+    Game,
     ModelViewer,
     ZoneViewer,
 }

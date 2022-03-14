@@ -28,10 +28,10 @@ use character_model::CharacterModelList;
 use render::RoseRenderPlugin;
 use resources::{run_network_thread, AppState, LoadedZone, NetworkThread, NetworkThreadMessage};
 use systems::{
-    character_model_system, character_select_enter_system, character_select_system,
-    game_connection_system, load_zone_system, login_connection_system, login_state_enter_system,
-    login_ui_system, model_viewer_system, world_connection_system, zone_viewer_setup_system,
-    zone_viewer_system,
+    character_model_system, character_select_enter_system, character_select_exit_system,
+    character_select_system, game_connection_system, game_state_enter_system, load_zone_system,
+    login_connection_system, login_state_enter_system, login_state_exit_system, login_system,
+    model_viewer_system, world_connection_system, zone_viewer_setup_system, zone_viewer_system,
 };
 use vfs_asset_io::VfsAssetIo;
 use zms_asset_loader::ZmsAssetLoader;
@@ -115,10 +115,6 @@ fn main() {
                 .unwrap_or_else(|| "data".to_string()),
             watch_for_changes: false,
         })
-        .insert_resource(MovementSettings {
-            sensitivity: 0.00012,
-            speed: 200.,
-        })
         .insert_resource(WindowDescriptor {
             title: "Definitely not a ROSE client".to_string(),
             present_mode: if disable_vsync {
@@ -164,6 +160,10 @@ fn main() {
 
     // Initialise 3rd party bevy plugins
     app.add_plugin(NoCameraPlayerPlugin)
+        .insert_resource(MovementSettings {
+            sensitivity: 0.00012,
+            speed: 200.,
+        })
         .add_plugin(PolylinePlugin)
         .add_plugin(PickingPlugin)
         .add_plugin(InteractablePickingPlugin)
@@ -197,15 +197,21 @@ fn main() {
     app.add_system_set(
         SystemSet::on_enter(AppState::GameLogin).with_system(login_state_enter_system),
     )
-    .add_system_set(SystemSet::on_update(AppState::GameLogin).with_system(login_ui_system));
+    .add_system_set(SystemSet::on_exit(AppState::GameLogin).with_system(login_state_exit_system))
+    .add_system_set(SystemSet::on_update(AppState::GameLogin).with_system(login_system));
 
     app.add_system_set(
         SystemSet::on_enter(AppState::GameCharacterSelect)
             .with_system(character_select_enter_system),
     )
     .add_system_set(
+        SystemSet::on_exit(AppState::GameCharacterSelect).with_system(character_select_exit_system),
+    )
+    .add_system_set(
         SystemSet::on_update(AppState::GameCharacterSelect).with_system(character_select_system),
     );
+
+    app.add_system_set(SystemSet::on_enter(AppState::Game).with_system(game_state_enter_system));
 
     // Setup network
     let (network_thread_tx, network_thread_rx) =
