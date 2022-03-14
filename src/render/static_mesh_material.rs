@@ -121,6 +121,7 @@ pub struct StaticMeshMaterial {
     pub two_sided: bool,
     pub z_test_enabled: bool,
     pub z_write_enabled: bool,
+    pub specular_enabled: bool,
 
     // lightmap texture, uv offset, uv scale
     pub lightmap_texture: Option<Handle<Image>>,
@@ -138,6 +139,7 @@ impl Default for StaticMeshMaterial {
             two_sided: false,
             z_test_enabled: true,
             z_write_enabled: true,
+            specular_enabled: false,
             lightmap_texture: None,
             lightmap_uv_offset: Vec2::new(0.0, 0.0),
             lightmap_uv_scale: 1.0,
@@ -217,6 +219,12 @@ impl RenderAsset for StaticMeshMaterial {
 
         if !material.alpha_enabled && material.alpha_test.is_none() {
             flags |= StaticMeshMaterialFlags::ALPHA_MODE_OPAQUE;
+        }
+
+        if material.specular_enabled {
+            // Alpha is used for specular, so this is actually opaque
+            flags |= StaticMeshMaterialFlags::ALPHA_MODE_OPAQUE;
+            alpha_mode = AlphaMode::Opaque;
         }
 
         let alpha_value = if let Some(alpha_value) = material.alpha_value {

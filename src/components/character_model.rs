@@ -1,6 +1,7 @@
 use bevy::prelude::{Component, Entity};
 use enum_map::{Enum, EnumMap};
 
+use rose_data::NpcId;
 use rose_game_common::components::CharacterGender;
 
 #[derive(Component)]
@@ -11,8 +12,15 @@ pub struct CharacterModel {
 }
 
 pub struct CharacterModelSkeleton {
+    pub root: Entity,
     pub bones: Vec<Entity>,
     pub dummy_bone_offset: usize,
+}
+
+#[derive(Component)]
+pub struct NpcModel {
+    pub npc_id: NpcId,
+    pub skeleton: CharacterModelSkeleton,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Enum)]

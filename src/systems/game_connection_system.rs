@@ -1,20 +1,58 @@
 use bevy::{
     math::Vec3,
     prelude::{
-        AssetServer, Assets, BuildChildren, Commands, ComputedVisibility, GlobalTransform, Res,
-        ResMut, State, Transform, Visibility,
+        AssetServer, Assets, BuildChildren, Commands, ComputedVisibility, DespawnRecursiveExt,
+        Entity, GlobalTransform, Local, Query, Res, ResMut, State, Transform, Visibility, With,
     },
 };
-use rose_game_common::messages::server::ServerMessage;
+use nalgebra::Point3;
+use rose_data::ZoneId;
+use rose_game_common::{
+    components::{ClientEntity, ClientEntityId, ClientEntityType, Destination, Target},
+    messages::{client::ClientMessage, server::ServerMessage},
+};
 use rose_network_common::ConnectionError;
 
 use crate::{
     character_model::{spawn_character_model, CharacterModelList},
-    components::PlayerCharacter,
+    components::{CollisionRayCastSource, PlayerCharacter},
+    npc_model::{spawn_npc_model, NpcModelList},
     render::StaticMeshMaterial,
     resources::{AppState, GameConnection, LoadedZone},
+    VfsResource,
 };
 
+pub struct ClientEntityList {
+    pub client_entities: Vec<Option<Entity>>,
+}
+
+impl Default for ClientEntityList {
+    fn default() -> Self {
+        Self {
+            client_entities: vec![None; 4096],
+        }
+    }
+}
+
+impl ClientEntityList {
+    pub fn add(&mut self, id: ClientEntityId, entity: Entity) {
+        self.client_entities[id.0 as usize] = Some(entity);
+    }
+
+    pub fn remove(&mut self, id: ClientEntityId) {
+        self.client_entities[id.0 as usize] = None;
+    }
+
+    pub fn clear(&mut self) {
+        self.client_entities.fill(None);
+    }
+
+    pub fn get(&self, id: ClientEntityId) -> Option<Entity> {
+        self.client_entities[id.0 as usize]
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
 pub fn game_connection_system(
     mut commands: Commands,
     game_connection: Option<Res<GameConnection>>,
@@ -22,7 +60,11 @@ pub fn game_connection_system(
     mut app_state: ResMut<State<AppState>>,
     asset_server: Res<AssetServer>,
     character_model_list: Res<CharacterModelList>,
+    npc_model_list: Res<NpcModelList>,
     mut static_mesh_materials: ResMut<Assets<StaticMeshMaterial>>,
+    query_player: Query<Entity, With<PlayerCharacter>>,
+    mut client_entity_list: Local<ClientEntityList>,
+    vfs_resource: Res<VfsResource>,
 ) {
     if game_connection.is_none() {
         return;
@@ -51,7 +93,7 @@ pub fn game_connection_system(
                     &character_data.equipment,
                     None,
                 );
-                let root_bone = character_model.skeleton.bones[0];
+                let root_bone = character_model.skeleton.root;
 
                 commands
                     .spawn_bundle((
@@ -68,13 +110,14 @@ pub fn game_connection_system(
                         character_data.skill_points,
                         character_data.union_membership,
                         character_data.stamina,
+                        character_data.position.clone(),
                     ))
                     .insert_bundle((
                         PlayerCharacter {},
                         character_model,
                         Transform::from_xyz(
                             character_data.position.position.x / 100.0,
-                            10.0,
+                            20.0,
                             -character_data.position.position.y / 100.0,
                         ),
                         GlobalTransform::default(),
@@ -85,6 +128,184 @@ pub fn game_connection_system(
 
                 // Transition to in game state
                 app_state.set(AppState::Game).ok();
+
+                // Tell server we are ready to join the zone
+                game_connection
+                    .client_message_tx
+                    .send(ClientMessage::JoinZoneRequest)
+                    .ok();
+            }
+            Ok(ServerMessage::JoinZone(message)) => {
+                let entity = query_player.single();
+                commands
+                    .entity(entity)
+                    .insert_bundle((
+                        ClientEntity::new(
+                            ClientEntityType::Character,
+                            message.entity_id,
+                            ZoneId::new(1).unwrap(), // TODO: Is ZoneId important in ClientEntity for client?
+                        ),
+                        message.experience_points,
+                        message.team,
+                        message.health_points,
+                        message.mana_points,
+                    ))
+                    .with_children(|child_builder| {
+                        child_builder.spawn_bundle((
+                            CollisionRayCastSource {},
+                            Transform::default()
+                                .with_translation(Vec3::new(0.0, 1.35, 0.0))
+                                .looking_at(-Vec3::Y, Vec3::X),
+                            GlobalTransform::default(),
+                        ));
+                    });
+                client_entity_list.clear();
+                client_entity_list.add(message.entity_id, entity);
+                // TODO: Do something with message.world_ticks
+            }
+            Ok(ServerMessage::SpawnEntityNpc(message)) => {
+                if let Some(npc_model) = spawn_npc_model(
+                    &mut commands,
+                    &npc_model_list,
+                    &asset_server,
+                    &mut static_mesh_materials,
+                    message.npc.id,
+                    &vfs_resource.vfs,
+                ) {
+                    let root_bone = npc_model.skeleton.root;
+
+                    // pub direction: f32,
+                    let entity = commands
+                        .spawn_bundle((
+                            message.npc,
+                            message.team,
+                            message.health,
+                            message.command,
+                            // TOOD: message.status_effects,
+                            message.move_mode,
+                            message.position.clone(),
+                        ))
+                        .insert_bundle((
+                            ClientEntity::new(
+                                ClientEntityType::Npc,
+                                message.entity_id,
+                                ZoneId::new(1).unwrap(), // TODO: Is ZoneId important in ClientEntity for client?
+                            ),
+                            npc_model,
+                            Transform::from_xyz(
+                                message.position.position.x / 100.0,
+                                100000.0,
+                                -message.position.position.y / 100.0,
+                            ),
+                            GlobalTransform::default(),
+                            Visibility::default(),
+                            ComputedVisibility::default(),
+                        ))
+                        .add_child(root_bone)
+                        .with_children(|child_builder| {
+                            child_builder.spawn_bundle((
+                                CollisionRayCastSource {},
+                                Transform::default()
+                                    .with_translation(Vec3::new(0.0, 1.35, 0.0))
+                                    .looking_at(-Vec3::Y, Vec3::X),
+                                GlobalTransform::default(),
+                            ));
+                        })
+                        .id();
+
+                    if let Some(destination) = message.destination.as_ref() {
+                        commands.entity(entity).insert(destination.clone());
+                    }
+                    if let Some(target_entity) = message
+                        .target_entity_id
+                        .and_then(|id| client_entity_list.get(id))
+                    {
+                        commands.entity(entity).insert(Target::new(target_entity));
+                    }
+
+                    client_entity_list.add(message.entity_id, entity);
+                }
+            }
+            Ok(ServerMessage::SpawnEntityMonster(message)) => {
+                if let Some(npc_model) = spawn_npc_model(
+                    &mut commands,
+                    &npc_model_list,
+                    &asset_server,
+                    &mut static_mesh_materials,
+                    message.npc.id,
+                    &vfs_resource.vfs,
+                ) {
+                    let root_bone = npc_model.skeleton.root;
+
+                    // pub direction: f32,
+                    let entity = commands
+                        .spawn_bundle((
+                            message.npc,
+                            message.team,
+                            message.health,
+                            message.command,
+                            // TOOD: message.status_effects,
+                            message.move_mode,
+                            message.position.clone(),
+                        ))
+                        .insert_bundle((
+                            ClientEntity::new(
+                                ClientEntityType::Monster,
+                                message.entity_id,
+                                ZoneId::new(1).unwrap(), // TODO: Is ZoneId important in ClientEntity for client?
+                            ),
+                            npc_model,
+                            Transform::from_xyz(
+                                message.position.position.x / 100.0,
+                                100000.0,
+                                -message.position.position.y / 100.0,
+                            ),
+                            GlobalTransform::default(),
+                            Visibility::default(),
+                            ComputedVisibility::default(),
+                        ))
+                        .add_child(root_bone)
+                        .with_children(|child_builder| {
+                            child_builder.spawn_bundle((
+                                CollisionRayCastSource {},
+                                Transform::default()
+                                    .with_translation(Vec3::new(0.0, 1.35, 0.0))
+                                    .looking_at(-Vec3::Y, Vec3::X),
+                                GlobalTransform::default(),
+                            ));
+                        })
+                        .id();
+
+                    if let Some(destination) = message.destination.as_ref() {
+                        commands.entity(entity).insert(destination.clone());
+                    }
+
+                    if let Some(target_entity) = message
+                        .target_entity_id
+                        .and_then(|id| client_entity_list.get(id))
+                    {
+                        commands.entity(entity).insert(Target::new(target_entity));
+                    }
+
+                    client_entity_list.add(message.entity_id, entity);
+                }
+            }
+            Ok(ServerMessage::MoveEntity(message)) => {
+                if let Some(entity) = client_entity_list.get(message.entity_id) {
+                    commands.entity(entity).insert(Destination::new(Point3::new(
+                        message.x,
+                        message.y,
+                        message.z as f32,
+                    )));
+                }
+            }
+            Ok(ServerMessage::RemoveEntities(message)) => {
+                for entity_id in message.entity_ids {
+                    if let Some(entity) = client_entity_list.get(entity_id) {
+                        client_entity_list.remove(entity_id);
+                        commands.entity(entity).despawn_recursive();
+                    }
+                }
             }
             Ok(message) => {
                 log::warn!("Received unexpected game server message: {:#?}", message);

@@ -7,15 +7,18 @@ use rose_game_common::messages::{
     client::{ClientMessage, ConnectionRequest},
     server::{
         CharacterData, CharacterDataItems, CharacterDataQuest, ConnectionRequestError,
-        ConnectionResponse, ServerMessage,
+        ConnectionResponse, JoinZoneResponse, MoveEntity, RemoveEntities, ServerMessage,
+        SpawnEntityMonster, SpawnEntityNpc,
     },
 };
 use rose_network_common::{Connection, Packet, PacketCodec};
 use rose_network_irose::{
-    game_client_packets::PacketClientConnectRequest,
+    game_client_packets::{PacketClientConnectRequest, PacketClientJoinZone, PacketClientMove},
     game_server_packets::{
         ConnectResult, PacketConnectionReply, PacketServerCharacterInventory,
-        PacketServerCharacterQuestData, PacketServerSelectCharacter, ServerPackets,
+        PacketServerCharacterQuestData, PacketServerJoinZone, PacketServerMoveEntity,
+        PacketServerRemoveEntities, PacketServerSelectCharacter, PacketServerSpawnEntityMonster,
+        PacketServerSpawnEntityNpc, ServerPackets,
     },
     ClientPacketCodec, IROSE_112_TABLE,
 };
@@ -106,6 +109,76 @@ impl GameClient {
                     )))
                     .ok();
             }
+            Some(ServerPackets::JoinZone) => {
+                let response = PacketServerJoinZone::try_from(&packet)?;
+                self.server_message_tx
+                    .send(ServerMessage::JoinZone(JoinZoneResponse {
+                        entity_id: response.entity_id,
+                        experience_points: response.experience_points,
+                        team: response.team,
+                        health_points: response.health_points,
+                        mana_points: response.mana_points,
+                        world_ticks: response.world_ticks,
+                    }))
+                    .ok();
+            }
+            Some(ServerPackets::MoveEntity) | Some(ServerPackets::MoveEntityWithMoveMode) => {
+                let response = PacketServerMoveEntity::try_from(&packet)?;
+                self.server_message_tx
+                    .send(ServerMessage::MoveEntity(MoveEntity {
+                        entity_id: response.entity_id,
+                        target_entity_id: response.target_entity_id,
+                        distance: response.distance,
+                        x: response.x,
+                        y: response.y,
+                        z: response.z,
+                        move_mode: response.move_mode,
+                    }))
+                    .ok();
+            }
+            Some(ServerPackets::SpawnEntityNpc) => {
+                let message = PacketServerSpawnEntityNpc::try_from(&packet)?;
+                self.server_message_tx
+                    .send(ServerMessage::SpawnEntityNpc(SpawnEntityNpc {
+                        entity_id: message.entity_id,
+                        npc: message.npc,
+                        direction: message.direction,
+                        position: message.position,
+                        team: message.team,
+                        health: message.health,
+                        destination: message.destination,
+                        command: message.command,
+                        target_entity_id: message.target_entity_id,
+                        move_mode: message.move_mode,
+                        status_effects: message.status_effects,
+                    }))
+                    .ok();
+            }
+            Some(ServerPackets::SpawnEntityMonster) => {
+                let message = PacketServerSpawnEntityMonster::try_from(&packet)?;
+                self.server_message_tx
+                    .send(ServerMessage::SpawnEntityMonster(SpawnEntityMonster {
+                        entity_id: message.entity_id,
+                        npc: message.npc,
+                        position: message.position,
+                        team: message.team,
+                        health: message.health,
+                        destination: message.destination,
+                        command: message.command,
+                        target_entity_id: message.target_entity_id,
+                        move_mode: message.move_mode,
+                        status_effects: message.status_effects,
+                    }))
+                    .ok();
+            }
+            Some(ServerPackets::RemoveEntities) => {
+                let message = PacketServerRemoveEntities::try_from(&packet)?;
+                self.server_message_tx
+                    .send(ServerMessage::RemoveEntities(RemoveEntities {
+                        entity_ids: message.entity_ids,
+                    }))
+                    .ok();
+            }
             _ => println!("Unhandled game packet {:x}", packet.command),
         }
 
@@ -126,6 +199,24 @@ impl GameClient {
                     .write_packet(Packet::from(&PacketClientConnectRequest {
                         login_token,
                         password_md5,
+                    }))
+                    .await?
+            }
+            ClientMessage::JoinZoneRequest => {
+                connection
+                    .write_packet(Packet::from(&PacketClientJoinZone {
+                        weight_rate: 0,
+                        z: 0,
+                    }))
+                    .await?
+            }
+            ClientMessage::Move(message) => {
+                connection
+                    .write_packet(Packet::from(&PacketClientMove {
+                        target_entity_id: message.target_entity_id,
+                        x: message.x,
+                        y: message.y,
+                        z: message.z,
                     }))
                     .await?
             }

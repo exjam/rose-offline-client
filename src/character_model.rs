@@ -175,9 +175,7 @@ pub fn spawn_character_model(
                 character_model_list.get_model_list(character_info.gender, model_part),
                 model_id,
                 &skeleton,
-                model_part
-                    .default_bone_id(skeleton.dummy_bone_offset)
-                    .unwrap_or(0),
+                model_part.default_bone_id(skeleton.dummy_bone_offset),
             );
         }
     }
@@ -227,22 +225,23 @@ pub fn update_character_equipment(
                     character_model_list.get_model_list(character_info.gender, model_part),
                     model_id,
                     &character_model.skeleton,
-                    model_part
-                        .default_bone_id(character_model.skeleton.dummy_bone_offset)
-                        .unwrap_or(0),
+                    model_part.default_bone_id(character_model.skeleton.dummy_bone_offset),
                 );
             }
         }
     }
 }
 
-fn spawn_skeleton(
+pub fn spawn_skeleton(
     commands: &mut Commands,
     skeleton: &ZmdFile,
     bone_visualisation: Option<(Handle<Mesh>, Handle<StandardMaterial>)>,
 ) -> CharacterModelSkeleton {
     let mut bone_entities = Vec::with_capacity(skeleton.bones.len());
     let dummy_bone_offset = skeleton.bones.len();
+    let root = commands
+        .spawn_bundle((Transform::default(), GlobalTransform::default()))
+        .id();
 
     for bone in skeleton.bones.iter().chain(skeleton.dummy_bones.iter()) {
         let position = Vec3::new(bone.position.x, bone.position.z, -bone.position.y) / 100.0;
@@ -284,31 +283,30 @@ fn spawn_skeleton(
         .chain(skeleton.dummy_bones.iter())
         .enumerate()
     {
-        if bone.parent as usize == i {
-            continue;
-        }
-
         if let Some(&bone_entity) = bone_entities.get(i) {
-            if let Some(&parent_entity) = bone_entities.get(bone.parent as usize) {
+            if bone.parent as usize == i {
+                commands.entity(root).add_child(bone_entity);
+            } else if let Some(&parent_entity) = bone_entities.get(bone.parent as usize) {
                 commands.entity(parent_entity).add_child(bone_entity);
             }
         }
     }
 
     CharacterModelSkeleton {
+        root,
         bones: bone_entities,
         dummy_bone_offset,
     }
 }
 
-fn spawn_model(
+pub fn spawn_model(
     commands: &mut Commands,
     asset_server: &AssetServer,
     static_mesh_materials: &mut Assets<StaticMeshMaterial>,
     model_list: &ZscFile,
     model_id: usize,
     skeleton: &CharacterModelSkeleton,
-    default_bone_id: usize,
+    default_bone_index: Option<usize>,
 ) -> (usize, Vec<Entity>) {
     let mut parts = Vec::new();
     let object = if let Some(object) = model_list.objects.get(model_id) {
@@ -335,6 +333,7 @@ fn spawn_model(
             two_sided: zsc_material.two_sided,
             z_write_enabled: zsc_material.z_write_enabled,
             z_test_enabled: zsc_material.z_test_enabled,
+            specular_enabled: zsc_material.specular_enabled,
             ..Default::default()
         });
 
@@ -349,16 +348,21 @@ fn spawn_model(
             ))
             .id();
 
-        let link_bone_id = object_part.bone_index.unwrap_or_else(|| {
-            object_part
-                .dummy_index
-                .map(|x| x + skeleton.dummy_bone_offset as u16)
-                .unwrap_or(default_bone_id as u16)
-        }) as usize;
-
-        if let Some(&parent_entity) = skeleton.bones.get(link_bone_id as usize) {
-            commands.entity(parent_entity).add_child(entity);
-        }
+        let link_bone_entity = if let Some(bone_index) = object_part.bone_index {
+            skeleton.bones.get(bone_index as usize).cloned()
+        } else if let Some(dummy_index) = object_part.dummy_index {
+            skeleton
+                .bones
+                .get(dummy_index as usize + skeleton.dummy_bone_offset)
+                .cloned()
+        } else if let Some(default_bone_index) = default_bone_index {
+            skeleton.bones.get(default_bone_index as usize).cloned()
+        } else {
+            None
+        };
+        commands
+            .entity(link_bone_entity.unwrap_or(skeleton.root))
+            .add_child(entity);
 
         parts.push(entity);
     }

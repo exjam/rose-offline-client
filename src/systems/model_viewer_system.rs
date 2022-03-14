@@ -2,8 +2,9 @@ use bevy::{
     math::Vec3,
     pbr::{AlphaMode, StandardMaterial},
     prelude::{
-        shape, AssetServer, Assets, BuildChildren, Color, Commands, GlobalTransform, Local, Mesh,
-        Query, Res, ResMut, Transform,
+        shape, AssetServer, Assets, BuildChildren, Camera, Color, Commands, Entity,
+        GlobalTransform, Local, Mesh, PerspectiveCameraBundle, PerspectiveProjection, Query, Res,
+        ResMut, Transform, With,
     },
 };
 use bevy_egui::{egui, EguiContext};
@@ -14,6 +15,7 @@ use rose_game_common::components::{CharacterGender, CharacterInfo, Equipment};
 
 use crate::{
     character_model::{spawn_character_model, CharacterModelList},
+    follow_camera::{FollowCameraBundle, FollowCameraController},
     render::StaticMeshMaterial,
 };
 
@@ -39,6 +41,23 @@ impl Default for ModelViewerUiItemListState {
             item_list_type: ItemType::Face,
         }
     }
+}
+
+pub fn model_viewer_enter_system(
+    mut commands: Commands,
+    query_cameras: Query<Entity, (With<Camera>, With<PerspectiveProjection>)>,
+) {
+    // Remove any other cameras
+    for entity in query_cameras.iter() {
+        commands.entity(entity).despawn();
+    }
+
+    commands.spawn_bundle(FollowCameraBundle::new(
+        FollowCameraController::default(),
+        PerspectiveCameraBundle::default(),
+        Vec3::new(10.0, 10.0, 10.0),
+        Vec3::new(0.0, 0.0, 0.0),
+    ));
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -97,15 +116,14 @@ pub fn model_viewer_system(
             &equipment,
             Some((bone_mesh, bone_material)),
         );
-        let root_bone = character_model.skeleton.bones[0];
+        let root_bone = character_model.skeleton.root;
         commands
             .spawn_bundle((
                 character_info,
                 equipment,
                 character_model,
                 GlobalTransform::default(),
-                Transform::from_translation(Vec3::new(5200.0, 20.0, -5200.0))
-                    .with_scale(Vec3::new(10.0, 10.0, 10.0)),
+                Transform::default(),
             ))
             .add_child(root_bone);
     } else {

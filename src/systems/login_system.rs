@@ -1,7 +1,8 @@
 use bevy::{
     math::Vec3,
     prelude::{
-        Camera, Commands, Entity, PerspectiveCameraBundle, Query, Res, ResMut, Transform, With,
+        Camera, Commands, Entity, FromWorld, PerspectiveCameraBundle, PerspectiveProjection, Query,
+        Res, ResMut, Transform, With, World,
     },
     window::Windows,
 };
@@ -10,7 +11,9 @@ use bevy_egui::{egui, EguiContext};
 use rose_data::ZoneId;
 use rose_game_common::messages::client::{ClientMessage, JoinServer};
 
-use crate::resources::{Account, LoadedZone, LoginConnection, NetworkThread, ServerList};
+use crate::resources::{
+    Account, LoadedZone, LoginConnection, NetworkThread, ServerConfiguration, ServerList,
+};
 
 enum LoginState {
     Input,
@@ -25,21 +28,41 @@ impl Default for LoginState {
     }
 }
 
-#[derive(Default)]
 pub struct Login {
     state: LoginState,
     initial_focus_set: bool,
+    ip: String,
+    port: String,
     username: String,
     password: String,
     selected_world_server_id: usize,
     selected_game_server_id: usize,
+    auto_login: bool,
+}
+
+impl FromWorld for Login {
+    fn from_world(world: &mut World) -> Self {
+        let config = world.get_resource::<ServerConfiguration>().unwrap();
+
+        Self {
+            state: LoginState::default(),
+            initial_focus_set: false,
+            ip: config.ip.clone(),
+            port: config.port.clone(),
+            username: config.preset_username.as_ref().cloned().unwrap_or_default(),
+            password: config.preset_password.as_ref().cloned().unwrap_or_default(),
+            selected_world_server_id: config.preset_server_id.unwrap_or(0),
+            selected_game_server_id: config.preset_channel_id.unwrap_or(0),
+            auto_login: config.auto_login,
+        }
+    }
 }
 
 pub fn login_state_enter_system(
     mut commands: Commands,
     mut loaded_zone: ResMut<LoadedZone>,
     mut windows: ResMut<Windows>,
-    query_cameras: Query<Entity, With<Camera>>,
+    query_cameras: Query<Entity, (With<Camera>, With<PerspectiveProjection>)>,
 ) {
     // Ensure cursor is not locked
     if let Some(window) = windows.get_primary_mut() {
@@ -53,7 +76,7 @@ pub fn login_state_enter_system(
     }
 
     commands.remove_resource::<Account>();
-    commands.insert_resource(Login::default());
+    commands.init_resource::<Login>();
     commands.spawn_bundle(PerspectiveCameraBundle {
         transform: Transform::from_xyz(5240.0, 10.0, -5400.0)
             .looking_at(Vec3::new(5200.0, 35.0, -5300.0), Vec3::Y),
@@ -126,7 +149,8 @@ pub fn login_system(
 
                     ui.separator();
 
-                    let mut try_start_login = ui.input().key_pressed(egui::Key::Enter);
+                    let mut try_start_login =
+                        ui.input().key_pressed(egui::Key::Enter) || ui_state.auto_login;
                     ui.horizontal(|ui| {
                         if ui.button("Login").clicked() {
                             try_start_login = true;
@@ -148,9 +172,10 @@ pub fn login_system(
                                 username: ui_state.username.clone(),
                                 password_md5: format!("{:x}", md5::compute(&ui_state.password)),
                             });
-                            commands.insert_resource(
-                                network_thread.connect_login("192.168.50.246", 29000),
-                            );
+                            commands.insert_resource(network_thread.connect_login(
+                                &ui_state.ip,
+                                ui_state.port.parse::<u16>().unwrap_or(29000),
+                            ));
                         }
                     }
                 });
@@ -168,7 +193,8 @@ pub fn login_system(
                 .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
                 .collapsible(false)
                 .show(egui_context.ctx_mut(), |ui| {
-                    let mut try_select_server = ui.input().key_pressed(egui::Key::Enter);
+                    let mut try_select_server =
+                        ui.input().key_pressed(egui::Key::Enter) || ui_state.auto_login;
                     let server_list = server_list.as_ref().unwrap();
 
                     ui.horizontal(|ui| {

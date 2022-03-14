@@ -6,7 +6,13 @@ use bevy::{
     },
     render::{mesh::Indices, render_resource::PrimitiveTopology},
 };
-use bevy_mod_picking::PickableBundle;
+use bevy_rapier3d::{
+    physics::ColliderBundle,
+    prelude::{
+        ColliderFlags, ColliderFlagsComponent, ColliderShape, ColliderShapeComponent,
+        InteractionGroups,
+    },
+};
 use std::path::Path;
 
 use rose_data::{ZoneList, ZoneListEntry};
@@ -16,6 +22,10 @@ use rose_file_readers::{
 };
 
 use crate::{
+    components::{
+        CollisionTriMesh, COLLISION_GROUP_PLAYER_MOVEABLE, COLLISION_GROUP_ZONE_OBJECT,
+        COLLISION_GROUP_ZONE_TERRAIN,
+    },
     render::{
         StaticMeshMaterial, TerrainMaterial, TextureArray, TextureArrayBuilder, WaterMeshMaterial,
         MESH_ATTRIBUTE_UV_1, TERRAIN_MESH_ATTRIBUTE_TILE_INFO,
@@ -162,8 +172,8 @@ fn load_zone(
                 load_block_heightmap(
                     commands,
                     meshes.as_mut(),
-                    &heightmap,
-                    &tilemap,
+                    heightmap,
+                    tilemap,
                     &zone_file.tiles,
                     block_terrain_material,
                     block_x,
@@ -250,8 +260,8 @@ fn load_zone(
 fn load_block_heightmap(
     commands: &mut ChildBuilder,
     meshes: &mut Assets<Mesh>,
-    heightmap: &HimFile,
-    tilemap: &TilFile,
+    heightmap: HimFile,
+    tilemap: TilFile,
     tile_info: &[ZonTile],
     material: Handle<TerrainMaterial>,
     block_x: u32,
@@ -338,6 +348,34 @@ fn load_block_heightmap(
     mesh.insert_attribute(MESH_ATTRIBUTE_UV_1, uvs_tile);
     mesh.insert_attribute(TERRAIN_MESH_ATTRIBUTE_TILE_INFO, tile_ids);
 
+    let mut collider_verts = Vec::new();
+    let mut collider_indices = Vec::new();
+
+    for y in 0..heightmap.height as i32 {
+        for x in 0..heightmap.width as i32 {
+            collider_verts.push(
+                [
+                    offset_x + x as f32 * 2.5,
+                    heightmap.get_clamped(x, y) / 100.0,
+                    -offset_y + y as f32 * 2.5,
+                ]
+                .into(),
+            );
+        }
+    }
+
+    for y in 0..(heightmap.height - 1) {
+        for x in 0..(heightmap.width - 1) {
+            let start = y * heightmap.width + x;
+            collider_indices.push([start, start + heightmap.width, start + 1]);
+            collider_indices.push([
+                start + 1,
+                start + heightmap.width,
+                start + 1 + heightmap.width,
+            ]);
+        }
+    }
+
     commands
         .spawn()
         .insert_bundle((
@@ -348,7 +386,16 @@ fn load_block_heightmap(
             Visibility::default(),
             ComputedVisibility::default(),
         ))
-        .insert_bundle(PickableBundle::default());
+        .insert_bundle(ColliderBundle {
+            shape: ColliderShapeComponent(ColliderShape::trimesh(collider_verts, collider_indices)),
+            flags: ColliderFlagsComponent(ColliderFlags {
+                collision_groups: InteractionGroups::all().with_memberships(
+                    COLLISION_GROUP_ZONE_TERRAIN | COLLISION_GROUP_PLAYER_MOVEABLE,
+                ),
+                ..Default::default()
+            }),
+            ..Default::default()
+        });
 }
 
 fn load_block_waterplanes(
@@ -517,33 +564,40 @@ fn load_block_object(
                         two_sided: zsc_material.two_sided,
                         z_write_enabled: zsc_material.z_write_enabled,
                         z_test_enabled: zsc_material.z_test_enabled,
+                        specular_enabled: zsc_material.specular_enabled,
                         lightmap_uv_offset,
                         lightmap_uv_scale,
                     });
 
                     /*
                     pub blend_mode: SceneBlendMode,
-                    pub specular_enabled: bool,
                     pub glow: Option<ZscMaterialGlow>,
                     */
                     material_cache.insert(material_id, Some(handle.clone()));
                     handle
                 });
 
-                parent
-                    .spawn_bundle((
-                        mesh,
-                        material,
-                        part_transform,
-                        GlobalTransform::default(),
-                        Visibility::default(),
-                        ComputedVisibility::default(),
-                        ZoneObject {
-                            mesh_path: zsc.meshes[mesh_id].path().to_string_lossy().into(),
-                            material: zsc.materials[material_id].clone(),
-                        },
-                    ))
-                    .insert_bundle(PickableBundle::default());
+                let collision_group = if object_part.collision_shape.is_none() {
+                    COLLISION_GROUP_ZONE_OBJECT
+                } else {
+                    COLLISION_GROUP_ZONE_OBJECT | COLLISION_GROUP_PLAYER_MOVEABLE
+                };
+
+                parent.spawn_bundle((
+                    mesh,
+                    material,
+                    part_transform,
+                    GlobalTransform::default(),
+                    Visibility::default(),
+                    ComputedVisibility::default(),
+                    ZoneObject {
+                        mesh_path: zsc.meshes[mesh_id].path().to_string_lossy().into(),
+                        material: zsc.materials[material_id].clone(),
+                    },
+                    CollisionTriMesh {
+                        group: collision_group,
+                    },
+                ));
             }
         });
 }

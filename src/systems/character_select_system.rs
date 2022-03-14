@@ -2,7 +2,8 @@ use bevy::{
     math::{Quat, Vec3},
     prelude::{
         AssetServer, Assets, BuildChildren, Camera, Commands, DespawnRecursiveExt, Entity,
-        GlobalTransform, Query, Res, ResMut, State, Transform, With,
+        GlobalTransform, PerspectiveCameraBundle, PerspectiveProjection, Query, Res, ResMut, State,
+        Transform, With,
     },
     window::Windows,
 };
@@ -12,7 +13,7 @@ use rose_game_common::messages::client::{ClientMessage, SelectCharacter};
 use crate::{
     character_model::{spawn_character_model, CharacterModelList},
     render::StaticMeshMaterial,
-    resources::{AppState, CharacterList, WorldConnection},
+    resources::{AppState, CharacterList, ServerConfiguration, WorldConnection},
 };
 
 enum CharacterSelectState {
@@ -37,15 +38,24 @@ pub struct CharacterSelect {
 pub fn character_select_enter_system(
     mut commands: Commands,
     mut windows: ResMut<Windows>,
-    mut query_camera: Query<&mut Transform, With<Camera>>,
+    query_cameras: Query<Entity, (With<Camera>, With<PerspectiveProjection>)>,
 ) {
     if let Some(window) = windows.get_primary_mut() {
         window.set_cursor_lock_mode(false);
         window.set_cursor_visibility(true);
     }
 
-    *query_camera.single_mut() = Transform::from_xyz(5200.0, 3.4, -5220.0)
-        .looking_at(Vec3::new(5200.0, 3.4, -5200.0), Vec3::Y);
+    // Remove any other cameras
+    for entity in query_cameras.iter() {
+        commands.entity(entity).despawn();
+    }
+
+    commands.spawn_bundle(PerspectiveCameraBundle {
+        transform: Transform::from_xyz(5200.0, 3.4, -5220.0)
+            .looking_at(Vec3::new(5200.0, 3.4, -5200.0), Vec3::Y),
+        ..Default::default()
+    });
+
     commands.insert_resource(CharacterSelect::default());
 }
 
@@ -78,6 +88,7 @@ pub fn character_select_system(
     character_model_list: Res<CharacterModelList>,
     mut static_mesh_materials: ResMut<Assets<StaticMeshMaterial>>,
     mut app_state: ResMut<State<AppState>>,
+    server_configuration: Res<ServerConfiguration>,
 ) {
     if world_connection.is_none() {
         // Disconnected, return to login
@@ -101,7 +112,7 @@ pub fn character_select_system(
                     &character.equipment,
                     None,
                 );
-                let root_bone = character_model.skeleton.bones[0];
+                let root_bone = character_model.skeleton.root;
                 let index = ui_state.models.len();
                 let character_entity = commands
                     .spawn_bundle((
@@ -122,42 +133,80 @@ pub fn character_select_system(
         }
     }
 
-    egui::Window::new("Character Select")
-        .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
-        .collapsible(false)
-        .title_bar(false)
-        .show(egui_context.ctx_mut(), |ui| {
-            if let Some(character_list) = character_list.as_ref() {
-                for (i, character) in character_list.characters.iter().enumerate() {
-                    ui.selectable_value(
-                        &mut ui_state.selected_character_index,
-                        i,
-                        &character.info.name,
-                    );
-                }
-            }
+    match ui_state.state {
+        CharacterSelectState::CharacterSelect => {
+            egui::Window::new("Character Select")
+                .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
+                .collapsible(false)
+                .title_bar(false)
+                .show(egui_context.ctx_mut(), |ui| {
+                    let mut try_play_character = false;
 
-            if ui.button("Play").clicked() {
-                if let Some(connection) = world_connection.as_ref() {
                     if let Some(character_list) = character_list.as_ref() {
-                        connection
-                            .client_message_tx
-                            .send(ClientMessage::SelectCharacter(SelectCharacter {
-                                slot: ui_state.selected_character_index as u8,
-                                name: character_list.characters[ui_state.selected_character_index]
-                                    .info
-                                    .name
-                                    .clone(),
-                            }))
-                            .ok();
-
-                        ui_state.state = CharacterSelectState::JoinGameServer;
+                        for (i, character) in character_list.characters.iter().enumerate() {
+                            ui.selectable_value(
+                                &mut ui_state.selected_character_index,
+                                i,
+                                &character.info.name,
+                            );
+                        }
                     }
-                }
-            }
 
-            if ui.button("Logout").clicked() {
-                commands.remove_resource::<WorldConnection>();
-            }
-        });
+                    if ui.button("Play").clicked() {
+                        try_play_character = true;
+                    }
+
+                    if let Some(preset_character_name) =
+                        server_configuration.preset_character_name.as_ref()
+                    {
+                        let mut selected_character_index = None;
+
+                        if let Some(character_list) = character_list.as_ref() {
+                            for (i, character) in character_list.characters.iter().enumerate() {
+                                if &character.info.name == preset_character_name {
+                                    selected_character_index = Some(i);
+                                }
+                            }
+                        }
+
+                        if let Some(selected_character_index) = selected_character_index {
+                            ui_state.selected_character_index = selected_character_index;
+                            try_play_character = true;
+                        }
+                    }
+
+                    if try_play_character {
+                        if let Some(connection) = world_connection.as_ref() {
+                            if let Some(character_list) = character_list.as_ref() {
+                                connection
+                                    .client_message_tx
+                                    .send(ClientMessage::SelectCharacter(SelectCharacter {
+                                        slot: ui_state.selected_character_index as u8,
+                                        name: character_list.characters
+                                            [ui_state.selected_character_index]
+                                            .info
+                                            .name
+                                            .clone(),
+                                    }))
+                                    .ok();
+
+                                ui_state.state = CharacterSelectState::JoinGameServer;
+                            }
+                        }
+                    }
+
+                    if ui.button("Logout").clicked() {
+                        commands.remove_resource::<WorldConnection>();
+                    }
+                });
+        }
+        CharacterSelectState::JoinGameServer => {
+            egui::Window::new("Connecting...")
+                .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
+                .collapsible(false)
+                .show(egui_context.ctx_mut(), |ui| {
+                    ui.label("Connecting to game");
+                });
+        }
+    }
 }

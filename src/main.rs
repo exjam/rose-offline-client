@@ -1,19 +1,19 @@
 use bevy::{
     asset::AssetServerSettings,
     core_pipeline::ClearColor,
+    ecs::event::Events,
     prelude::{AddAsset, App, AssetServer, Color, Commands, Msaa, Res, SystemSet},
     render::{render_resource::WgpuFeatures, settings::WgpuSettings},
     window::WindowDescriptor,
 };
-use bevy_egui::EguiPlugin;
-use bevy_flycam::{MovementSettings, NoCameraPlayerPlugin};
-use bevy_mod_picking::{DebugCursorPickingPlugin, InteractablePickingPlugin, PickingPlugin};
-use bevy_polyline::PolylinePlugin;
+use bevy_rapier3d::physics::{NoUserData, RapierConfiguration, RapierPhysicsPlugin};
 use std::{path::Path, sync::Arc, time::Duration};
 
-mod bevy_flycam;
 mod character_model;
 mod components;
+mod events;
+mod follow_camera;
+mod npc_model;
 mod protocol;
 mod render;
 mod resources;
@@ -25,13 +25,22 @@ use rose_data::ZoneId;
 use rose_file_readers::VfsIndex;
 
 use character_model::CharacterModelList;
+use events::PickingEvent;
+use follow_camera::FollowCameraPlugin;
+use npc_model::NpcModelList;
 use render::RoseRenderPlugin;
-use resources::{run_network_thread, AppState, LoadedZone, NetworkThread, NetworkThreadMessage};
+use resources::{
+    run_network_thread, AppState, LoadedZone, NetworkThread, NetworkThreadMessage,
+    ServerConfiguration,
+};
 use systems::{
     character_model_system, character_select_enter_system, character_select_exit_system,
-    character_select_system, game_connection_system, game_state_enter_system, load_zone_system,
-    login_connection_system, login_state_enter_system, login_state_exit_system, login_system,
-    model_viewer_system, world_connection_system, zone_viewer_setup_system, zone_viewer_system,
+    character_select_system, collision_add_colliders_system, collision_picking_system,
+    collision_system, game_connection_system, game_player_move_system, game_state_enter_system,
+    load_zone_system, login_connection_system, login_state_enter_system, login_state_exit_system,
+    login_system, model_viewer_enter_system, model_viewer_system, update_position_system,
+    world_connection_system, zone_viewer_picking_system, zone_viewer_setup_system,
+    zone_viewer_system,
 };
 use vfs_asset_io::VfsAssetIo;
 use zms_asset_loader::ZmsAssetLoader;
@@ -70,12 +79,79 @@ fn main() {
             clap::Arg::new("disable-vsync")
                 .long("disable-vsync")
                 .help("Disable v-sync to see accurate frame times"),
+        )
+        .arg(
+            clap::Arg::new("ip")
+                .long("ip")
+                .help("Server IP for game login")
+                .takes_value(true),
+        )
+        .arg(
+            clap::Arg::new("port")
+                .long("port")
+                .help("Server port for game login")
+                .takes_value(true)
+                .default_value("29000"),
+        )
+        .arg(
+            clap::Arg::new("username")
+                .long("username")
+                .help("Username for game login")
+                .takes_value(true),
+        )
+        .arg(
+            clap::Arg::new("password")
+                .long("password")
+                .help("Password for game login")
+                .takes_value(true),
+        )
+        .arg(
+            clap::Arg::new("server-id")
+                .long("server-id")
+                .help("Server id to use for auto-login")
+                .takes_value(true),
+        )
+        .arg(
+            clap::Arg::new("channel-id")
+                .long("channel-id")
+                .help("Channel id to use for auto-login")
+                .takes_value(true),
+        )
+        .arg(
+            clap::Arg::new("character-name")
+                .long("character-name")
+                .help("If --auto-login is set, this will also auto login to the given character")
+                .takes_value(true),
+        )
+        .arg(
+            clap::Arg::new("auto-login")
+                .long("auto-login")
+                .help("Automatically login to server"),
         );
     let data_path_error = command.error(
         clap::ErrorKind::ArgumentNotFound,
         "Must specify at least one of --data-idx or --data-path",
     );
     let matches = command.get_matches();
+
+    let ip = matches
+        .value_of("ip")
+        .map(|x| x.to_string())
+        .unwrap_or_else(|| "127.0.0.1".to_string());
+    let port = matches
+        .value_of("ip")
+        .map(|x| x.to_string())
+        .unwrap_or_else(|| "29000".to_string());
+    let preset_username = matches.value_of("username").map(|x| x.to_string());
+    let preset_password = matches.value_of("password").map(|x| x.to_string());
+    let preset_server_id = matches
+        .value_of("server-id")
+        .and_then(|x| x.parse::<usize>().ok());
+    let preset_channel_id = matches
+        .value_of("channel-id")
+        .and_then(|x| x.parse::<usize>().ok());
+    let preset_character_name = matches.value_of("character-name").map(|x| x.to_string());
+    let auto_login = matches.is_present("auto-login");
 
     let disable_vsync = matches.is_present("disable-vsync");
     let mut app_state = AppState::ZoneViewer;
@@ -159,20 +235,31 @@ fn main() {
         .add_plugin(bevy::pbr::PbrPlugin::default());
 
     // Initialise 3rd party bevy plugins
-    app.add_plugin(NoCameraPlayerPlugin)
-        .insert_resource(MovementSettings {
-            sensitivity: 0.00012,
-            speed: 200.,
-        })
-        .add_plugin(PolylinePlugin)
-        .add_plugin(PickingPlugin)
-        .add_plugin(InteractablePickingPlugin)
-        .add_plugin(DebugCursorPickingPlugin)
-        .add_plugin(EguiPlugin);
+    app.add_plugin(bevy_polyline::PolylinePlugin)
+        .add_plugin(bevy_egui::EguiPlugin)
+        .add_plugin(smooth_bevy_cameras::LookTransformPlugin)
+        .add_plugin(smooth_bevy_cameras::controllers::unreal::UnrealCameraPlugin::default())
+        .add_plugin(FollowCameraPlugin::default())
+        .add_plugin(RapierPhysicsPlugin::<NoUserData>::default())
+        .insert_resource(RapierConfiguration {
+            physics_pipeline_active: false,
+            query_pipeline_active: true,
+            ..Default::default()
+        });
 
     // Initialise rose stuff
     app.init_asset_loader::<ZmsAssetLoader>()
-        .add_plugin(RoseRenderPlugin);
+        .add_plugin(RoseRenderPlugin)
+        .insert_resource(ServerConfiguration {
+            ip,
+            port,
+            preset_username,
+            preset_password,
+            preset_server_id,
+            preset_channel_id,
+            preset_character_name,
+            auto_login,
+        });
 
     app.add_system(load_zone_system)
         .add_system(character_model_system);
@@ -188,11 +275,16 @@ fn main() {
     app.add_system_set(
         SystemSet::on_enter(AppState::ZoneViewer).with_system(zone_viewer_setup_system),
     )
-    .add_system_set(SystemSet::on_update(AppState::ZoneViewer).with_system(zone_viewer_system));
+    .add_system_set(
+        SystemSet::on_update(AppState::ZoneViewer)
+            .with_system(zone_viewer_system)
+            .with_system(zone_viewer_picking_system),
+    );
 
     app.add_system_set(
-        SystemSet::on_update(AppState::ModelViewer).with_system(model_viewer_system),
-    );
+        SystemSet::on_enter(AppState::ModelViewer).with_system(model_viewer_enter_system),
+    )
+    .add_system_set(SystemSet::on_update(AppState::ModelViewer).with_system(model_viewer_system));
 
     app.add_system_set(
         SystemSet::on_enter(AppState::GameLogin).with_system(login_state_enter_system),
@@ -211,7 +303,18 @@ fn main() {
         SystemSet::on_update(AppState::GameCharacterSelect).with_system(character_select_system),
     );
 
-    app.add_system_set(SystemSet::on_enter(AppState::Game).with_system(game_state_enter_system));
+    app.add_system_set(SystemSet::on_enter(AppState::Game).with_system(game_state_enter_system))
+        .add_system_set(
+            SystemSet::on_update(AppState::Game)
+                .with_system(collision_system)
+                .with_system(update_position_system)
+                .with_system(game_player_move_system),
+        );
+
+    app.insert_resource(Events::<PickingEvent>::default());
+    app.add_system(collision_system)
+        .add_system(collision_picking_system)
+        .add_system(collision_add_colliders_system);
 
     // Setup network
     let (network_thread_tx, network_thread_rx) =
@@ -241,5 +344,9 @@ fn load_resources(mut commands: Commands, vfs_resource: Res<VfsResource>) {
 
     commands.insert_resource(
         CharacterModelList::new(&vfs_resource.vfs).expect("Failed to load character model list"),
+    );
+
+    commands.insert_resource(
+        NpcModelList::new(&vfs_resource.vfs).expect("Failed to load NPC model list"),
     );
 }
