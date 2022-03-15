@@ -1,24 +1,22 @@
 use bevy::{
     math::Vec3,
     prelude::{
-        AssetServer, Assets, BuildChildren, Commands, ComputedVisibility, DespawnRecursiveExt,
-        Entity, GlobalTransform, Local, Query, Res, ResMut, State, Transform, Visibility, With,
+        BuildChildren, Commands, ComputedVisibility, DespawnRecursiveExt, Entity, GlobalTransform,
+        Local, Query, Res, ResMut, State, Transform, Visibility, With,
     },
 };
 use rose_data::ZoneId;
 use rose_game_common::{
-    components::{ClientEntity, ClientEntityId, ClientEntityType, Destination, Target},
+    components::{
+        ClientEntity, ClientEntityId, ClientEntityType, Destination, StatusEffects, Target,
+    },
     messages::{client::ClientMessage, server::ServerMessage},
 };
 use rose_network_common::ConnectionError;
 
 use crate::{
-    character_model::{spawn_character_model, CharacterModelList},
     components::{CollisionRayCastSource, PlayerCharacter},
-    npc_model::{spawn_npc_model, NpcModelList},
-    render::StaticMeshMaterial,
     resources::{AppState, GameConnection, LoadedZone},
-    VfsResource,
 };
 
 pub struct ClientEntityList {
@@ -57,13 +55,8 @@ pub fn game_connection_system(
     game_connection: Option<Res<GameConnection>>,
     mut loaded_zone: ResMut<LoadedZone>,
     mut app_state: ResMut<State<AppState>>,
-    asset_server: Res<AssetServer>,
-    character_model_list: Res<CharacterModelList>,
-    npc_model_list: Res<NpcModelList>,
-    mut static_mesh_materials: ResMut<Assets<StaticMeshMaterial>>,
     query_player: Query<Entity, With<PlayerCharacter>>,
     mut client_entity_list: Local<ClientEntityList>,
-    vfs_resource: Res<VfsResource>,
 ) {
     if game_connection.is_none() {
         return;
@@ -83,17 +76,6 @@ pub fn game_connection_system(
                 loaded_zone.next_zone_id = Some(character_data.position.zone_id);
 
                 // Spawn character
-                let character_model = spawn_character_model(
-                    &mut commands,
-                    &asset_server,
-                    &mut static_mesh_materials,
-                    &character_model_list,
-                    &character_data.character_info,
-                    &character_data.equipment,
-                    None,
-                );
-                let root_bone = character_model.skeleton.root;
-
                 commands
                     .spawn_bundle((
                         character_data.character_info,
@@ -110,10 +92,10 @@ pub fn game_connection_system(
                         character_data.union_membership,
                         character_data.stamina,
                         character_data.position.clone(),
+                        StatusEffects::default(),
                     ))
                     .insert_bundle((
                         PlayerCharacter {},
-                        character_model,
                         Transform::from_xyz(
                             character_data.position.position.x / 100.0,
                             20.0,
@@ -122,8 +104,7 @@ pub fn game_connection_system(
                         GlobalTransform::default(),
                         Visibility::default(),
                         ComputedVisibility::default(),
-                    ))
-                    .add_child(root_bone);
+                    ));
 
                 // Transition to in game state
                 app_state.set(AppState::Game).ok();
@@ -163,131 +144,110 @@ pub fn game_connection_system(
                 // TODO: Do something with message.world_ticks
             }
             Ok(ServerMessage::SpawnEntityNpc(message)) => {
-                if let Some(npc_model) = spawn_npc_model(
-                    &mut commands,
-                    &npc_model_list,
-                    &asset_server,
-                    &mut static_mesh_materials,
-                    message.npc.id,
-                    &vfs_resource.vfs,
-                ) {
-                    let root_bone = npc_model.skeleton.root;
-
-                    // pub direction: f32,
-                    let entity = commands
-                        .spawn_bundle((
-                            message.npc,
-                            message.team,
-                            message.health,
-                            message.command,
-                            // TOOD: message.status_effects,
-                            message.move_mode,
-                            message.position.clone(),
-                        ))
-                        .insert_bundle((
-                            ClientEntity::new(
-                                ClientEntityType::Npc,
-                                message.entity_id,
-                                ZoneId::new(1).unwrap(), // TODO: Is ZoneId important in ClientEntity for client?
-                            ),
-                            npc_model,
-                            Transform::from_xyz(
-                                message.position.position.x / 100.0,
-                                100000.0,
-                                -message.position.position.y / 100.0,
-                            ),
+                // TODO: Rotate using message.direction
+                let entity = commands
+                    .spawn_bundle((
+                        message.npc,
+                        message.team,
+                        message.health,
+                        message.command,
+                        message.move_mode,
+                        message.position.clone(),
+                        StatusEffects {
+                            active: message.status_effects,
+                            ..Default::default()
+                        },
+                    ))
+                    .insert_bundle((
+                        ClientEntity::new(
+                            ClientEntityType::Npc,
+                            message.entity_id,
+                            ZoneId::new(1).unwrap(), // TODO: Is ZoneId important in ClientEntity for client?
+                        ),
+                        Transform::from_xyz(
+                            message.position.position.x / 100.0,
+                            100000.0,
+                            -message.position.position.y / 100.0,
+                        ),
+                        GlobalTransform::default(),
+                        Visibility::default(),
+                        ComputedVisibility::default(),
+                    ))
+                    .with_children(|child_builder| {
+                        child_builder.spawn_bundle((
+                            CollisionRayCastSource {},
+                            Transform::default()
+                                .with_translation(Vec3::new(0.0, 1.35, 0.0))
+                                .looking_at(-Vec3::Y, Vec3::X),
                             GlobalTransform::default(),
-                            Visibility::default(),
-                            ComputedVisibility::default(),
-                        ))
-                        .add_child(root_bone)
-                        .with_children(|child_builder| {
-                            child_builder.spawn_bundle((
-                                CollisionRayCastSource {},
-                                Transform::default()
-                                    .with_translation(Vec3::new(0.0, 1.35, 0.0))
-                                    .looking_at(-Vec3::Y, Vec3::X),
-                                GlobalTransform::default(),
-                            ));
-                        })
-                        .id();
+                        ));
+                    })
+                    .id();
 
-                    if let Some(destination) = message.destination.as_ref() {
-                        commands.entity(entity).insert(destination.clone());
-                    }
-                    if let Some(target_entity) = message
-                        .target_entity_id
-                        .and_then(|id| client_entity_list.get(id))
-                    {
-                        commands.entity(entity).insert(Target::new(target_entity));
-                    }
-
-                    client_entity_list.add(message.entity_id, entity);
+                if let Some(destination) = message.destination.as_ref() {
+                    commands.entity(entity).insert(destination.clone());
                 }
+                if let Some(target_entity) = message
+                    .target_entity_id
+                    .and_then(|id| client_entity_list.get(id))
+                {
+                    commands.entity(entity).insert(Target::new(target_entity));
+                }
+
+                client_entity_list.add(message.entity_id, entity);
             }
             Ok(ServerMessage::SpawnEntityMonster(message)) => {
-                if let Some(npc_model) = spawn_npc_model(
-                    &mut commands,
-                    &npc_model_list,
-                    &asset_server,
-                    &mut static_mesh_materials,
-                    message.npc.id,
-                    &vfs_resource.vfs,
-                ) {
-                    let root_bone = npc_model.skeleton.root;
-
-                    // pub direction: f32,
-                    let entity = commands
-                        .spawn_bundle((
-                            message.npc,
-                            message.team,
-                            message.health,
-                            message.command,
-                            // TOOD: message.status_effects,
-                            message.move_mode,
-                            message.position.clone(),
-                        ))
-                        .insert_bundle((
-                            ClientEntity::new(
-                                ClientEntityType::Monster,
-                                message.entity_id,
-                                ZoneId::new(1).unwrap(), // TODO: Is ZoneId important in ClientEntity for client?
-                            ),
-                            npc_model,
-                            Transform::from_xyz(
-                                message.position.position.x / 100.0,
-                                100000.0,
-                                -message.position.position.y / 100.0,
-                            ),
+                let entity = commands
+                    .spawn_bundle((
+                        message.npc,
+                        message.team,
+                        message.health,
+                        message.command,
+                        message.move_mode,
+                        message.position.clone(),
+                        StatusEffects {
+                            active: message.status_effects,
+                            ..Default::default()
+                        },
+                    ))
+                    .insert_bundle((
+                        ClientEntity::new(
+                            ClientEntityType::Monster,
+                            message.entity_id,
+                            ZoneId::new(1).unwrap(), // TODO: Is ZoneId important in ClientEntity for client?
+                        ),
+                        Transform::from_xyz(
+                            message.position.position.x / 100.0,
+                            100000.0,
+                            -message.position.position.y / 100.0,
+                        ),
+                        GlobalTransform::default(),
+                        Visibility::default(),
+                        ComputedVisibility::default(),
+                    ))
+                    .with_children(|child_builder| {
+                        child_builder.spawn_bundle((
+                            CollisionRayCastSource {},
+                            Transform::default()
+                                .with_translation(Vec3::new(0.0, 1.35, 0.0))
+                                .looking_at(-Vec3::Y, Vec3::X),
                             GlobalTransform::default(),
-                            Visibility::default(),
-                            ComputedVisibility::default(),
-                        ))
-                        .add_child(root_bone)
-                        .with_children(|child_builder| {
-                            child_builder.spawn_bundle((
-                                CollisionRayCastSource {},
-                                Transform::default()
-                                    .with_translation(Vec3::new(0.0, 1.35, 0.0))
-                                    .looking_at(-Vec3::Y, Vec3::X),
-                                GlobalTransform::default(),
-                            ));
-                        })
-                        .id();
+                        ));
+                    })
+                    .id();
 
-                    if let Some(destination) = message.destination.as_ref() {
-                        commands.entity(entity).insert(destination.clone());
-                    }
-
-                    if let Some(target_entity) = message
-                        .target_entity_id
-                        .and_then(|id| client_entity_list.get(id))
-                    {
-                        commands.entity(entity).insert(Target::new(target_entity));
-                    }
-
-                    client_entity_list.add(message.entity_id, entity);
+                if let Some(destination) = message.destination.as_ref() {
+                    commands.entity(entity).insert(destination.clone());
                 }
+
+                if let Some(target_entity) = message
+                    .target_entity_id
+                    .and_then(|id| client_entity_list.get(id))
+                {
+                    commands.entity(entity).insert(Target::new(target_entity));
+                }
+
+                client_entity_list.add(message.entity_id, entity);
             }
             Ok(ServerMessage::MoveEntity(message)) => {
                 if let Some(entity) = client_entity_list.get(message.entity_id) {

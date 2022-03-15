@@ -1,20 +1,15 @@
 use bevy::{
     math::{Quat, Vec3},
     prelude::{
-        AssetServer, Assets, BuildChildren, Camera, Commands, DespawnRecursiveExt, Entity,
-        GlobalTransform, PerspectiveCameraBundle, PerspectiveProjection, Query, Res, ResMut, State,
-        Transform, With,
+        Camera, Commands, DespawnRecursiveExt, Entity, GlobalTransform, PerspectiveCameraBundle,
+        PerspectiveProjection, Query, Res, ResMut, State, Transform, With,
     },
     window::Windows,
 };
 use bevy_egui::{egui, EguiContext};
 use rose_game_common::messages::client::{ClientMessage, SelectCharacter};
 
-use crate::{
-    character_model::{spawn_character_model, CharacterModelList},
-    render::StaticMeshMaterial,
-    resources::{AppState, CharacterList, ServerConfiguration, WorldConnection},
-};
+use crate::resources::{AppState, CharacterList, ServerConfiguration, WorldConnection};
 
 enum CharacterSelectState {
     CharacterSelect,
@@ -84,9 +79,6 @@ pub fn character_select_system(
     mut egui_context: ResMut<EguiContext>,
     world_connection: Option<Res<WorldConnection>>,
     character_list: Option<Res<CharacterList>>,
-    asset_server: Res<AssetServer>,
-    character_model_list: Res<CharacterModelList>,
-    mut static_mesh_materials: ResMut<Assets<StaticMeshMaterial>>,
     mut app_state: ResMut<State<AppState>>,
     server_configuration: Res<ServerConfiguration>,
 ) {
@@ -103,28 +95,16 @@ pub fn character_select_system(
                 .iter()
                 .any(|(name, _)| name == &character.info.name)
             {
-                let character_model = spawn_character_model(
-                    &mut commands,
-                    &asset_server,
-                    &mut static_mesh_materials,
-                    &character_model_list,
-                    &character.info,
-                    &character.equipment,
-                    None,
-                );
-                let root_bone = character_model.skeleton.root;
                 let index = ui_state.models.len();
                 let character_entity = commands
                     .spawn_bundle((
                         character.info.clone(),
                         character.equipment.clone(),
-                        character_model,
                         GlobalTransform::default(),
                         Transform::from_translation(CHARACTER_POSITIONS[index].into())
                             .with_rotation(Quat::from_rotation_y(std::f32::consts::PI))
                             .with_scale(Vec3::new(1.5, 1.5, 1.5)),
                     ))
-                    .add_child(root_bone)
                     .id();
                 ui_state
                     .models
