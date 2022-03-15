@@ -9,10 +9,12 @@ use bevy::{
 use bevy_egui::{egui, EguiContext};
 use bevy_polyline::{Polyline, PolylineBundle, PolylineMaterial};
 use bevy_rapier3d::prelude::{ColliderShapeComponent, AABB};
-use rose_data::ZoneList;
 use smooth_bevy_cameras::controllers::unreal::{UnrealCameraBundle, UnrealCameraController};
 
-use crate::{events::PickingEvent, resources::LoadedZone};
+use crate::{
+    events::PickingEvent,
+    resources::{GameData, LoadedZone},
+};
 
 use super::load_zone_system::ZoneObject;
 
@@ -102,7 +104,7 @@ pub fn zone_viewer_system(
     mut ui_state: Local<ZoneViewerUiState>,
     inspect_object: Option<Res<ZoneViewerInspectObject>>,
     query_zone_object: Query<&ZoneObject>,
-    zone_list: Res<ZoneList>,
+    game_data: Res<GameData>,
     mut loaded_zone: ResMut<LoadedZone>,
     mut egui_context: ResMut<EguiContext>,
     camera_query: Query<&Transform, With<Camera>>,
@@ -125,7 +127,7 @@ pub fn zone_viewer_system(
                 ui.label("name");
                 ui.end_row();
 
-                for zone in zone_list.iter() {
+                for zone in game_data.zone_list.iter() {
                     ui.label(format!("{}", zone.id.get()));
                     ui.label(&zone.name);
                     if ui.button("Load").clicked() {

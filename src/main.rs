@@ -21,7 +21,7 @@ mod systems;
 mod vfs_asset_io;
 mod zms_asset_loader;
 
-use rose_data::ZoneId;
+use rose_data::{NpcDatabaseOptions, ZoneId};
 use rose_file_readers::VfsIndex;
 
 use character_model::CharacterModelList;
@@ -30,7 +30,7 @@ use follow_camera::FollowCameraPlugin;
 use npc_model::NpcModelList;
 use render::RoseRenderPlugin;
 use resources::{
-    run_network_thread, AppState, LoadedZone, NetworkThread, NetworkThreadMessage,
+    run_network_thread, AppState, GameData, LoadedZone, NetworkThread, NetworkThreadMessage,
     ServerConfiguration,
 };
 use systems::{
@@ -325,22 +325,54 @@ fn main() {
         .add_system(world_connection_system)
         .add_system(game_connection_system);
 
-    app.add_startup_system(load_resources);
+    app.add_startup_system(load_game_data);
     app.run();
 
     network_thread_tx.send(NetworkThreadMessage::Exit).ok();
     network_thread.join().ok();
 }
 
-fn load_resources(mut commands: Commands, vfs_resource: Res<VfsResource>) {
-    commands.insert_resource(
-        rose_data_irose::get_zone_list(&vfs_resource.vfs).expect("Failed to load zone list"),
-    );
-
-    commands.insert_resource(
+fn load_game_data(mut commands: Commands, vfs_resource: Res<VfsResource>) {
+    let item_database = Arc::new(
         rose_data_irose::get_item_database(&vfs_resource.vfs)
             .expect("Failed to load item database"),
     );
+    let npc_database = Arc::new(
+        rose_data_irose::get_npc_database(
+            &vfs_resource.vfs,
+            &NpcDatabaseOptions {
+                load_motion_file_data: false,
+            },
+        )
+        .expect("Failed to load npc database"),
+    );
+    let skill_database = Arc::new(
+        rose_data_irose::get_skill_database(&vfs_resource.vfs)
+            .expect("Failed to load skill database"),
+    );
+
+    commands.insert_resource(GameData {
+        ability_value_calculator: rose_game_irose::data::get_ability_value_calculator(
+            item_database.clone(),
+            skill_database.clone(),
+            npc_database.clone(),
+        ),
+        data_decoder: rose_data_irose::get_data_decoder(),
+        items: item_database,
+        npcs: npc_database,
+        quests: Arc::new(
+            rose_data_irose::get_quest_database(&vfs_resource.vfs)
+                .expect("Failed to load quest database"),
+        ),
+        skills: skill_database,
+        status_effects: Arc::new(
+            rose_data_irose::get_status_effect_database(&vfs_resource.vfs)
+                .expect("Failed to load status effect database"),
+        ),
+        zone_list: Arc::new(
+            rose_data_irose::get_zone_list(&vfs_resource.vfs).expect("Failed to load zone list"),
+        ),
+    });
 
     commands.insert_resource(
         CharacterModelList::new(&vfs_resource.vfs).expect("Failed to load character model list"),

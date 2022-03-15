@@ -15,7 +15,7 @@ use bevy_rapier3d::{
 };
 use std::path::Path;
 
-use rose_data::{ZoneList, ZoneListEntry};
+use rose_data::ZoneListEntry;
 use rose_file_readers::{
     HimFile, IfoFile, IfoObject, LitFile, LitObject, TilFile, ZonFile, ZonTile, ZonTileRotation,
     ZscFile, ZscMaterial,
@@ -30,7 +30,7 @@ use crate::{
         StaticMeshMaterial, TerrainMaterial, TextureArray, TextureArrayBuilder, WaterMeshMaterial,
         MESH_ATTRIBUTE_UV_1, TERRAIN_MESH_ATTRIBUTE_TILE_INFO,
     },
-    resources::LoadedZone,
+    resources::{GameData, LoadedZone},
     VfsResource,
 };
 
@@ -46,7 +46,7 @@ pub fn load_zone_system(
     mut loaded_zone: ResMut<LoadedZone>,
     asset_server: Res<AssetServer>,
     vfs_resource: Res<VfsResource>,
-    zone_list: Res<ZoneList>,
+    game_data: Res<GameData>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut terrain_materials: ResMut<Assets<TerrainMaterial>>,
     mut static_mesh_materials: ResMut<Assets<StaticMeshMaterial>>,
@@ -79,7 +79,7 @@ pub fn load_zone_system(
     let zone_entity = commands
         .spawn_bundle((GlobalTransform::default(), Transform::default()))
         .with_children(|child_builder| {
-            if let Some(zone_list_entry) = zone_list.get_zone(next_zone_id) {
+            if let Some(zone_list_entry) = game_data.zone_list.get_zone(next_zone_id) {
                 load_zone(
                     child_builder,
                     &asset_server,
