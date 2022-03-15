@@ -1,5 +1,5 @@
 use bevy::{
-    math::{Quat, Vec3},
+    math::{Quat, Vec3, Vec3Swizzles},
     prelude::{Commands, Entity, Query, Transform},
 };
 use rose_game_common::components::{Destination, Position};
@@ -10,7 +10,7 @@ pub fn update_position_system(
 ) {
     for (entity, mut position, destination, mut transform) in query.iter_mut() {
         let direction = destination.position.xy() - position.position.xy();
-        let distance_squared = direction.magnitude_squared();
+        let distance_squared = direction.length_squared();
 
         if distance_squared == 0.0 {
             position.position = destination.position;
@@ -24,7 +24,7 @@ pub fn update_position_system(
 
             // Move to position
             let move_vector = direction.normalize() * 300.0 * (1.0 / 60.0);
-            if move_vector.magnitude_squared() >= distance_squared {
+            if move_vector.length_squared() >= distance_squared {
                 position.position = destination.position;
                 commands.entity(entity).remove::<Destination>();
             } else {

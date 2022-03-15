@@ -5,7 +5,6 @@ use bevy::{
         Entity, GlobalTransform, Local, Query, Res, ResMut, State, Transform, Visibility, With,
     },
 };
-use nalgebra::Point3;
 use rose_data::ZoneId;
 use rose_game_common::{
     components::{ClientEntity, ClientEntityId, ClientEntityType, Destination, Target},
@@ -292,7 +291,7 @@ pub fn game_connection_system(
             }
             Ok(ServerMessage::MoveEntity(message)) => {
                 if let Some(entity) = client_entity_list.get(message.entity_id) {
-                    commands.entity(entity).insert(Destination::new(Point3::new(
+                    commands.entity(entity).insert(Destination::new(Vec3::new(
                         message.x,
                         message.y,
                         message.z as f32,

@@ -8,7 +8,6 @@ use bevy::{
     },
 };
 use bevy_egui::{egui, EguiContext};
-use nalgebra::Point3;
 
 use rose_data::{EquipmentIndex, EquipmentItem, ItemDatabase, ItemReference, ItemType, ZoneId};
 use rose_game_common::components::{CharacterGender, CharacterInfo, Equipment};
@@ -96,7 +95,7 @@ pub fn model_viewer_system(
             fame_b: 0,
             fame_g: 0,
             revive_zone_id: ZoneId::new(22).unwrap(),
-            revive_position: Point3::new(5200.0, 0.0, -5200.0),
+            revive_position: Vec3::new(5200.0, 0.0, -5200.0),
             unique_id: 0,
         };
         let mut equipment = Equipment::default();

@@ -17,18 +17,17 @@ image = { version = "0.23", default-features = false, features = ["dds"] }
 lazy_static = "1.4.0"
 log = "0.4.14"
 md5 = "0.7.0"
-nalgebra = { version = "0.25", features = ["serde-serialize"] }
 num-traits = "0.2"
 smooth-bevy-cameras = "0.2.0"
 thiserror = "1.0"
 tokio = { version = "1.17", features = ["rt", "net", "sync", "macros", "io-util"] }
-rose-data = { git = "https://github.com/exjam/rose-offline", rev = "0f7fb1e31739324c9b384044ec27e0d3d122f6db" }
-rose-data-irose = { git = "https://github.com/exjam/rose-offline", rev = "0f7fb1e31739324c9b384044ec27e0d3d122f6db" }
-rose-file-readers = { git = "https://github.com/exjam/rose-offline", rev = "0f7fb1e31739324c9b384044ec27e0d3d122f6db" }
-rose-game-common = { git = "https://github.com/exjam/rose-offline", rev = "0f7fb1e31739324c9b384044ec27e0d3d122f6db" }
-rose-game-irose = { git = "https://github.com/exjam/rose-offline", rev = "0f7fb1e31739324c9b384044ec27e0d3d122f6db" }
-rose-network-common = { git = "https://github.com/exjam/rose-offline", rev = "0f7fb1e31739324c9b384044ec27e0d3d122f6db" }
-rose-network-irose = { git = "https://github.com/exjam/rose-offline", rev = "0f7fb1e31739324c9b384044ec27e0d3d122f6db" }
+rose-data = { git = "https://github.com/exjam/rose-offline", rev = "6a7fe09eedb3cd598ddcbf04dc12fe474e4942df" }
+rose-data-irose = { git = "https://github.com/exjam/rose-offline", rev = "6a7fe09eedb3cd598ddcbf04dc12fe474e4942df" }
+rose-file-readers = { git = "https://github.com/exjam/rose-offline", rev = "6a7fe09eedb3cd598ddcbf04dc12fe474e4942df" }
+rose-game-common = { git = "https://github.com/exjam/rose-offline", rev = "6a7fe09eedb3cd598ddcbf04dc12fe474e4942df" }
+rose-game-irose = { git = "https://github.com/exjam/rose-offline", rev = "6a7fe09eedb3cd598ddcbf04dc12fe474e4942df" }
+rose-network-common = { git = "https://github.com/exjam/rose-offline", rev = "6a7fe09eedb3cd598ddcbf04dc12fe474e4942df" }
+rose-network-irose = { git = "https://github.com/exjam/rose-offline", rev = "6a7fe09eedb3cd598ddcbf04dc12fe474e4942df" }
 
 [patch.crates-io]
 bevy = { git = "https://github.com/exjam/bevy", rev = "8fa350f95cbc5c075fbff57facadfd88928bcc0a" }
