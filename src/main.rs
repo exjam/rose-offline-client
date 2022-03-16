@@ -39,11 +39,11 @@ use resources::{
 use systems::{
     character_model_system, character_select_enter_system, character_select_exit_system,
     character_select_system, collision_add_colliders_system, collision_picking_system,
-    collision_system, debug_model_skeleton_system, game_connection_system, game_player_move_system,
-    game_state_enter_system, load_zone_system, login_connection_system, login_state_enter_system,
-    login_state_exit_system, login_system, model_viewer_enter_system, model_viewer_system,
-    npc_model_system, update_position_system, world_connection_system, zone_viewer_picking_system,
-    zone_viewer_setup_system, zone_viewer_system,
+    collision_system, debug_model_skeleton_system, game_connection_system, game_debug_ui_system,
+    game_player_move_system, game_state_enter_system, load_zone_system, login_connection_system,
+    login_state_enter_system, login_state_exit_system, login_system, model_viewer_enter_system,
+    model_viewer_system, npc_model_system, update_position_system, world_connection_system,
+    zone_viewer_picking_system, zone_viewer_setup_system, zone_viewer_system,
 };
 use vfs_asset_io::VfsAssetIo;
 use zms_asset_loader::ZmsAssetLoader;
@@ -316,7 +316,8 @@ fn main() {
             SystemSet::on_update(AppState::Game)
                 .with_system(collision_system)
                 .with_system(update_position_system)
-                .with_system(game_player_move_system),
+                .with_system(game_player_move_system)
+                .with_system(game_debug_ui_system),
         );
 
     app.insert_resource(Events::<PickingEvent>::default());
