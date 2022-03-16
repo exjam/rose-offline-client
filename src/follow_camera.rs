@@ -1,3 +1,4 @@
+use bevy_egui::EguiContext;
 use smooth_bevy_cameras::{LookAngles, LookTransform, LookTransformBundle, Smoother};
 
 use bevy::{
@@ -8,7 +9,7 @@ use bevy::{
         prelude::*,
     },
     math::prelude::*,
-    render::prelude::*,
+    render::{camera::Camera3d, prelude::*},
     transform::components::Transform,
 };
 
@@ -29,13 +30,13 @@ pub struct FollowCameraBundle {
     #[bundle]
     look_transform: LookTransformBundle,
     #[bundle]
-    perspective: PerspectiveCameraBundle,
+    perspective: PerspectiveCameraBundle<Camera3d>,
 }
 
 impl FollowCameraBundle {
     pub fn new(
         controller: FollowCameraController,
-        mut perspective: PerspectiveCameraBundle,
+        mut perspective: PerspectiveCameraBundle<Camera3d>,
         eye: Vec3,
         target: Vec3,
     ) -> Self {
@@ -93,7 +94,12 @@ pub fn default_input_map(
     mut mouse_motion_events: EventReader<MouseMotion>,
     mouse_buttons: Res<Input<MouseButton>>,
     controllers: Query<&FollowCameraController>,
+    mut egui_ctx: ResMut<EguiContext>,
 ) {
+    if egui_ctx.ctx_mut().wants_pointer_input() || egui_ctx.ctx_mut().wants_keyboard_input() {
+        return;
+    }
+
     // Can only control one camera at a time.
     let controller = if let Some(controller) = controllers.iter().next() {
         controller

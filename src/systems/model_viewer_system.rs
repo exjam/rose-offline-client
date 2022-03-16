@@ -11,6 +11,7 @@ use rose_data::{EquipmentIndex, EquipmentItem, ItemReference, ItemType, NpcId, Z
 use rose_game_common::components::{CharacterGender, CharacterInfo, Equipment, Npc};
 
 use crate::{
+    fly_camera::FlyCameraController,
     follow_camera::{FollowCameraBundle, FollowCameraController},
     resources::GameData,
 };
@@ -46,18 +47,18 @@ pub fn model_viewer_enter_system(
     mut commands: Commands,
     query_cameras: Query<Entity, (With<Camera>, With<PerspectiveProjection>)>,
 ) {
-    // Remove any other cameras
+    // Reset camera
     for entity in query_cameras.iter() {
-        commands.entity(entity).despawn();
+        commands
+            .entity(entity)
+            .remove::<FlyCameraController>()
+            .insert_bundle(FollowCameraBundle::new(
+                FollowCameraController::default(),
+                PerspectiveCameraBundle::default(),
+                Vec3::new(10.0, 10.0, 10.0),
+                Vec3::new(0.0, 0.0, 0.0),
+            ));
     }
-
-    // Spawn our camera
-    commands.spawn_bundle(FollowCameraBundle::new(
-        FollowCameraController::default(),
-        PerspectiveCameraBundle::default(),
-        Vec3::new(10.0, 10.0, 10.0),
-        Vec3::new(0.0, 0.0, 0.0),
-    ));
 
     // Spawn our character model
     let character_info = CharacterInfo {

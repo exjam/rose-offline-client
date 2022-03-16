@@ -1,15 +1,20 @@
 use bevy::{
     math::{Quat, Vec3},
     prelude::{
-        Camera, Commands, DespawnRecursiveExt, Entity, GlobalTransform, PerspectiveCameraBundle,
-        PerspectiveProjection, Query, Res, ResMut, State, Transform, With,
+        Commands, DespawnRecursiveExt, Entity, GlobalTransform, Query, Res, ResMut, State,
+        Transform, With,
     },
+    render::camera::Camera3d,
     window::Windows,
 };
 use bevy_egui::{egui, EguiContext};
 use rose_game_common::messages::client::{ClientMessage, SelectCharacter};
 
-use crate::resources::{AppState, CharacterList, ServerConfiguration, WorldConnection};
+use crate::{
+    fly_camera::FlyCameraController,
+    follow_camera::FollowCameraController,
+    resources::{AppState, CharacterList, ServerConfiguration, WorldConnection},
+};
 
 enum CharacterSelectState {
     CharacterSelect,
@@ -33,23 +38,24 @@ pub struct CharacterSelect {
 pub fn character_select_enter_system(
     mut commands: Commands,
     mut windows: ResMut<Windows>,
-    query_cameras: Query<Entity, (With<Camera>, With<PerspectiveProjection>)>,
+    query_cameras: Query<Entity, With<Camera3d>>,
 ) {
     if let Some(window) = windows.get_primary_mut() {
         window.set_cursor_lock_mode(false);
         window.set_cursor_visibility(true);
     }
 
-    // Remove any other cameras
+    // Reset camera
     for entity in query_cameras.iter() {
-        commands.entity(entity).despawn();
+        commands
+            .entity(entity)
+            .insert(
+                Transform::from_xyz(5200.0, 3.4, -5220.0)
+                    .looking_at(Vec3::new(5200.0, 3.4, -5200.0), Vec3::Y),
+            )
+            .remove::<FlyCameraController>()
+            .remove::<FollowCameraController>();
     }
-
-    commands.spawn_bundle(PerspectiveCameraBundle {
-        transform: Transform::from_xyz(5200.0, 3.4, -5220.0)
-            .looking_at(Vec3::new(5200.0, 3.4, -5200.0), Vec3::Y),
-        ..Default::default()
-    });
 
     commands.insert_resource(CharacterSelect::default());
 }

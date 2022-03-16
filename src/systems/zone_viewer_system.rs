@@ -9,10 +9,11 @@ use bevy::{
 use bevy_egui::{egui, EguiContext};
 use bevy_polyline::{Polyline, PolylineBundle, PolylineMaterial};
 use bevy_rapier3d::prelude::{ColliderShapeComponent, AABB};
-use smooth_bevy_cameras::controllers::unreal::{UnrealCameraBundle, UnrealCameraController};
 
 use crate::{
     events::PickingEvent,
+    fly_camera::{FlyCameraBundle, FlyCameraController},
+    follow_camera::{FollowCameraController},
     resources::{GameData, LoadedZone},
 };
 
@@ -39,17 +40,18 @@ pub fn zone_viewer_setup_system(
     mut commands: Commands,
     query_cameras: Query<Entity, (With<Camera>, With<PerspectiveProjection>)>,
 ) {
-    // Remove any other cameras
+    // Reset camera
     for entity in query_cameras.iter() {
-        commands.entity(entity).despawn();
+        commands
+            .entity(entity)
+            .remove::<FollowCameraController>()
+            .insert_bundle(FlyCameraBundle::new(
+                FlyCameraController::default(),
+                PerspectiveCameraBundle::default(),
+                Vec3::new(5120.0, 50.0, -5120.0),
+                Vec3::new(5200.0, 0.0, -5200.0),
+            ));
     }
-
-    commands.spawn_bundle(UnrealCameraBundle::new(
-        UnrealCameraController::default(),
-        PerspectiveCameraBundle::default(),
-        Vec3::new(5120.0, 50.0, -5120.0),
-        Vec3::new(5200.0, 0.0, -5200.0),
-    ));
 }
 
 pub fn zone_viewer_picking_system(

@@ -1,7 +1,7 @@
 use bevy::{
     math::Vec3,
     prelude::{
-        Camera, Commands, Entity, FromWorld, PerspectiveCameraBundle, PerspectiveProjection, Query,
+        Camera, Commands, Entity, FromWorld, PerspectiveProjection, Query,
         Res, ResMut, Transform, With, World,
     },
     window::Windows,
@@ -11,8 +11,12 @@ use bevy_egui::{egui, EguiContext};
 use rose_data::ZoneId;
 use rose_game_common::messages::client::{ClientMessage, JoinServer};
 
-use crate::resources::{
-    Account, LoadedZone, LoginConnection, NetworkThread, ServerConfiguration, ServerList,
+use crate::{
+    fly_camera::FlyCameraController,
+    follow_camera::FollowCameraController,
+    resources::{
+        Account, LoadedZone, LoginConnection, NetworkThread, ServerConfiguration, ServerList,
+    },
 };
 
 enum LoginState {
@@ -70,18 +74,20 @@ pub fn login_state_enter_system(
         window.set_cursor_visibility(true);
     }
 
-    // Remove any other cameras
+    // Reset camera
     for entity in query_cameras.iter() {
-        commands.entity(entity).despawn();
+        commands
+            .entity(entity)
+            .insert(
+                Transform::from_xyz(5240.0, 10.0, -5400.0)
+                    .looking_at(Vec3::new(5200.0, 35.0, -5300.0), Vec3::Y),
+            )
+            .remove::<FlyCameraController>()
+            .remove::<FollowCameraController>();
     }
 
     commands.remove_resource::<Account>();
     commands.init_resource::<Login>();
-    commands.spawn_bundle(PerspectiveCameraBundle {
-        transform: Transform::from_xyz(5240.0, 10.0, -5400.0)
-            .looking_at(Vec3::new(5200.0, 35.0, -5300.0), Vec3::Y),
-        ..Default::default()
-    });
 
     loaded_zone.next_zone_id = Some(ZoneId::new(4).unwrap());
 }

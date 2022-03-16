@@ -2,7 +2,9 @@ use bevy::{
     asset::AssetServerSettings,
     core_pipeline::ClearColor,
     ecs::event::Events,
-    prelude::{AddAsset, App, AssetServer, Color, Commands, Msaa, Res, SystemSet},
+    prelude::{
+        AddAsset, App, AssetServer, Color, Commands, Msaa, PerspectiveCameraBundle, Res, SystemSet,
+    },
     render::{render_resource::WgpuFeatures, settings::WgpuSettings},
     window::WindowDescriptor,
 };
@@ -12,6 +14,7 @@ use std::{path::Path, sync::Arc, time::Duration};
 mod character_model;
 mod components;
 mod events;
+mod fly_camera;
 mod follow_camera;
 mod npc_model;
 mod protocol;
@@ -26,6 +29,7 @@ use rose_file_readers::VfsIndex;
 
 use character_model::CharacterModelList;
 use events::PickingEvent;
+use fly_camera::FlyCameraPlugin;
 use follow_camera::FollowCameraPlugin;
 use npc_model::NpcModelList;
 use render::RoseRenderPlugin;
@@ -219,6 +223,7 @@ fn main() {
         })
         .add_plugin(bevy::diagnostic::FrameTimeDiagnosticsPlugin::default())
         .add_plugin(bevy::transform::TransformPlugin::default())
+        .add_plugin(bevy::hierarchy::HierarchyPlugin::default())
         .add_plugin(bevy::diagnostic::DiagnosticsPlugin::default())
         .add_plugin(bevy::input::InputPlugin::default())
         .add_plugin(bevy::window::WindowPlugin::default());
@@ -238,7 +243,7 @@ fn main() {
     app.add_plugin(bevy_polyline::PolylinePlugin)
         .add_plugin(bevy_egui::EguiPlugin)
         .add_plugin(smooth_bevy_cameras::LookTransformPlugin)
-        .add_plugin(smooth_bevy_cameras::controllers::unreal::UnrealCameraPlugin::default())
+        .add_plugin(FlyCameraPlugin::default())
         .add_plugin(FollowCameraPlugin::default())
         .add_plugin(RapierPhysicsPlugin::<NoUserData>::default())
         .insert_resource(RapierConfiguration {
@@ -384,4 +389,6 @@ fn load_game_data(mut commands: Commands, vfs_resource: Res<VfsResource>) {
     commands.insert_resource(
         NpcModelList::new(&vfs_resource.vfs).expect("Failed to load NPC model list"),
     );
+
+    commands.spawn_bundle(PerspectiveCameraBundle::default());
 }
