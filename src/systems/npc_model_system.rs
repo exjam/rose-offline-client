@@ -1,42 +1,48 @@
-use bevy::prelude::{
-    AssetServer, Assets, BuildChildren, Changed, Commands, DespawnRecursiveExt, Entity, Query, Res,
-    ResMut,
-};
+use bevy::prelude::{AssetServer, Assets, Changed, Commands, Entity, Query, Res, ResMut};
 
 use rose_game_common::components::Npc;
 
 use crate::{
-    components::NpcModel,
+    components::{ModelSkeleton, NpcModel},
     npc_model::{spawn_npc_model, NpcModelList},
     render::StaticMeshMaterial,
     resources::DebugBoneVisualisation,
     VfsResource,
 };
 
+#[allow(clippy::type_complexity)]
 pub fn npc_model_system(
     mut commands: Commands,
-    mut query: Query<(Entity, &Npc, Option<&mut NpcModel>), Changed<Npc>>,
+    mut query: Query<(Entity, &Npc, Option<&mut NpcModel>, Option<&ModelSkeleton>), Changed<Npc>>,
     asset_server: Res<AssetServer>,
     npc_model_list: Res<NpcModelList>,
     vfs_resource: Res<VfsResource>,
     mut static_mesh_materials: ResMut<Assets<StaticMeshMaterial>>,
     debug_bone_visualisation: Option<Res<DebugBoneVisualisation>>,
 ) {
-    for (entity, npc, mut current_npc_model) in query.iter_mut() {
+    for (entity, npc, mut current_npc_model, current_skeleton) in query.iter_mut() {
         if let Some(current_npc_model) = current_npc_model.as_mut() {
             if current_npc_model.npc_id == npc.id {
                 // Does not need new model, ignore
                 continue;
             }
 
-            // Remove old model, replace with new one below
-            commands
-                .entity(current_npc_model.skeleton.root)
-                .despawn_recursive();
+            // Despawn model parts
+            for part_entity in current_npc_model.model_parts.iter() {
+                commands.entity(*part_entity).despawn();
+            }
+
+            // Despawn model skeleton
+            if let Some(current_skeleton) = current_skeleton {
+                for bone_entity in current_skeleton.bones.iter() {
+                    commands.entity(*bone_entity).despawn();
+                }
+            }
         }
 
-        if let Some(npc_model) = spawn_npc_model(
+        if let Some((npc_model, model_skeleton)) = spawn_npc_model(
             &mut commands,
+            entity,
             &npc_model_list,
             &asset_server,
             &mut static_mesh_materials,
@@ -46,13 +52,17 @@ pub fn npc_model_system(
                 .as_ref()
                 .map(|x| (x.mesh.clone(), x.material.clone())),
         ) {
-            let root_bone = npc_model.skeleton.root;
             commands
                 .entity(entity)
-                .insert(npc_model)
-                .add_child(root_bone);
-        } else if current_npc_model.is_some() {
-            commands.entity(entity).remove::<NpcModel>();
+                .insert_bundle((npc_model, model_skeleton));
+        } else {
+            if current_npc_model.is_some() {
+                commands.entity(entity).remove::<NpcModel>();
+            }
+
+            if current_skeleton.is_some() {
+                commands.entity(entity).remove::<ModelSkeleton>();
+            }
         }
     }
 }

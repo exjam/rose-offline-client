@@ -33,8 +33,8 @@ use follow_camera::FollowCameraPlugin;
 use npc_model::NpcModelList;
 use render::RoseRenderPlugin;
 use resources::{
-    run_network_thread, AppState, DebugBoneVisualisation, GameData, LoadedZone, NetworkThread,
-    NetworkThreadMessage, ServerConfiguration,
+    run_network_thread, AppState, GameData, LoadedZone, NetworkThread, NetworkThreadMessage,
+    ServerConfiguration,
 };
 use systems::{
     character_model_system, character_select_enter_system, character_select_exit_system,

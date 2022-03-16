@@ -13,7 +13,7 @@ use rose_file_readers::{VfsIndex, ZmdFile, ZscFile};
 use rose_game_common::components::{CharacterGender, CharacterInfo, Equipment};
 
 use crate::{
-    components::{CharacterModel, CharacterModelPart, CharacterModelSkeleton},
+    components::{CharacterModel, CharacterModelPart, ModelSkeleton},
     render::StaticMeshMaterial,
 };
 
@@ -139,17 +139,20 @@ impl CharacterModelList {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn spawn_character_model(
     commands: &mut Commands,
+    model_entity: Entity,
     asset_server: &AssetServer,
     static_mesh_materials: &mut Assets<StaticMeshMaterial>,
     character_model_list: &CharacterModelList,
     character_info: &CharacterInfo,
     equipment: &Equipment,
     bone_visualisation: Option<(Handle<Mesh>, Handle<StandardMaterial>)>,
-) -> CharacterModel {
+) -> (CharacterModel, ModelSkeleton) {
     let skeleton = spawn_skeleton(
         commands,
+        model_entity,
         character_model_list.get_skeleton(character_info.gender),
         bone_visualisation,
     );
@@ -170,6 +173,7 @@ pub fn spawn_character_model(
         if let Some(model_id) = get_model_part_index(character_info, equipment, model_part) {
             model_parts[model_part] = spawn_model(
                 commands,
+                model_entity,
                 asset_server,
                 static_mesh_materials,
                 character_model_list.get_model_list(character_info.gender, model_part),
@@ -180,19 +184,24 @@ pub fn spawn_character_model(
         }
     }
 
-    CharacterModel {
-        gender: character_info.gender,
+    (
+        CharacterModel {
+            gender: character_info.gender,
+            model_parts,
+        },
         skeleton,
-        model_parts,
-    }
+    )
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn update_character_equipment(
     commands: &mut Commands,
+    model_entity: Entity,
     asset_server: &AssetServer,
     static_mesh_materials: &mut Assets<StaticMeshMaterial>,
     character_model_list: &CharacterModelList,
     character_model: &mut CharacterModel,
+    model_skeleton: &ModelSkeleton,
     character_info: &CharacterInfo,
     equipment: &Equipment,
 ) {
@@ -220,12 +229,13 @@ pub fn update_character_equipment(
             if model_id != 0 {
                 character_model.model_parts[model_part] = spawn_model(
                     commands,
+                    model_entity,
                     asset_server,
                     static_mesh_materials,
                     character_model_list.get_model_list(character_info.gender, model_part),
                     model_id,
-                    &character_model.skeleton,
-                    model_part.default_bone_id(character_model.skeleton.dummy_bone_offset),
+                    model_skeleton,
+                    model_part.default_bone_id(model_skeleton.dummy_bone_offset),
                 );
             }
         }
@@ -234,14 +244,12 @@ pub fn update_character_equipment(
 
 pub fn spawn_skeleton(
     commands: &mut Commands,
+    model_entity: Entity,
     skeleton: &ZmdFile,
     bone_visualisation: Option<(Handle<Mesh>, Handle<StandardMaterial>)>,
-) -> CharacterModelSkeleton {
+) -> ModelSkeleton {
     let mut bone_entities = Vec::with_capacity(skeleton.bones.len());
     let dummy_bone_offset = skeleton.bones.len();
-    let root = commands
-        .spawn_bundle((Transform::default(), GlobalTransform::default()))
-        .id();
 
     for bone in skeleton.bones.iter().chain(skeleton.dummy_bones.iter()) {
         let position = Vec3::new(bone.position.x, bone.position.z, -bone.position.y) / 100.0;
@@ -285,27 +293,28 @@ pub fn spawn_skeleton(
     {
         if let Some(&bone_entity) = bone_entities.get(i) {
             if bone.parent as usize == i {
-                commands.entity(root).add_child(bone_entity);
+                commands.entity(model_entity).add_child(bone_entity);
             } else if let Some(&parent_entity) = bone_entities.get(bone.parent as usize) {
                 commands.entity(parent_entity).add_child(bone_entity);
             }
         }
     }
 
-    CharacterModelSkeleton {
-        root,
+    ModelSkeleton {
         bones: bone_entities,
         dummy_bone_offset,
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn spawn_model(
     commands: &mut Commands,
+    model_entity: Entity,
     asset_server: &AssetServer,
     static_mesh_materials: &mut Assets<StaticMeshMaterial>,
     model_list: &ZscFile,
     model_id: usize,
-    skeleton: &CharacterModelSkeleton,
+    model_skeleton: &ModelSkeleton,
     default_bone_index: Option<usize>,
 ) -> (usize, Vec<Entity>) {
     let mut parts = Vec::new();
@@ -349,19 +358,22 @@ pub fn spawn_model(
             .id();
 
         let link_bone_entity = if let Some(bone_index) = object_part.bone_index {
-            skeleton.bones.get(bone_index as usize).cloned()
+            model_skeleton.bones.get(bone_index as usize).cloned()
         } else if let Some(dummy_index) = object_part.dummy_index {
-            skeleton
+            model_skeleton
                 .bones
-                .get(dummy_index as usize + skeleton.dummy_bone_offset)
+                .get(dummy_index as usize + model_skeleton.dummy_bone_offset)
                 .cloned()
         } else if let Some(default_bone_index) = default_bone_index {
-            skeleton.bones.get(default_bone_index as usize).cloned()
+            model_skeleton
+                .bones
+                .get(default_bone_index as usize)
+                .cloned()
         } else {
             None
         };
         commands
-            .entity(link_bone_entity.unwrap_or(skeleton.root))
+            .entity(link_bone_entity.unwrap_or(model_entity))
             .add_child(entity);
 
         parts.push(entity);

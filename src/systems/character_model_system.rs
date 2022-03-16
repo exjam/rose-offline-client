@@ -1,12 +1,10 @@
-use bevy::prelude::{
-    AssetServer, Assets, BuildChildren, Changed, Commands, Entity, Or, Query, Res, ResMut,
-};
+use bevy::prelude::{AssetServer, Assets, Changed, Commands, Entity, Or, Query, Res, ResMut};
 
 use rose_game_common::components::{CharacterInfo, Equipment};
 
 use crate::{
     character_model::{spawn_character_model, update_character_equipment, CharacterModelList},
-    components::CharacterModel,
+    components::{CharacterModel, ModelSkeleton},
     render::StaticMeshMaterial,
     resources::DebugBoneVisualisation,
 };
@@ -20,6 +18,7 @@ pub fn character_model_system(
             &CharacterInfo,
             &Equipment,
             Option<&mut CharacterModel>,
+            Option<&ModelSkeleton>,
         ),
         Or<(Changed<CharacterInfo>, Changed<Equipment>)>,
     >,
@@ -28,20 +27,24 @@ pub fn character_model_system(
     mut static_mesh_materials: ResMut<Assets<StaticMeshMaterial>>,
     debug_bone_visualisation: Option<Res<DebugBoneVisualisation>>,
 ) {
-    for (entity, character_info, equipment, mut character_model) in query.iter_mut() {
+    for (entity, character_info, equipment, mut character_model, model_skeleton) in query.iter_mut()
+    {
         if let Some(character_model) = character_model.as_mut() {
             update_character_equipment(
                 &mut commands,
+                entity,
                 &asset_server,
                 &mut static_mesh_materials,
                 &character_model_list,
                 character_model,
+                model_skeleton.as_ref().unwrap(),
                 character_info,
                 equipment,
             );
         } else {
-            let character_model = spawn_character_model(
+            let (character_model, model_skeleton) = spawn_character_model(
                 &mut commands,
+                entity,
                 &asset_server,
                 &mut static_mesh_materials,
                 &character_model_list,
@@ -51,11 +54,9 @@ pub fn character_model_system(
                     .as_ref()
                     .map(|x| (x.mesh.clone(), x.material.clone())),
             );
-            let root_bone = character_model.skeleton.root;
             commands
                 .entity(entity)
-                .insert(character_model)
-                .add_child(root_bone);
+                .insert_bundle((character_model, model_skeleton));
         }
     }
 }

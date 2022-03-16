@@ -7,20 +7,19 @@ use rose_game_common::components::CharacterGender;
 #[derive(Component)]
 pub struct CharacterModel {
     pub gender: CharacterGender,
-    pub skeleton: CharacterModelSkeleton,
     pub model_parts: EnumMap<CharacterModelPart, (usize, Vec<Entity>)>,
-}
-
-pub struct CharacterModelSkeleton {
-    pub root: Entity,
-    pub bones: Vec<Entity>,
-    pub dummy_bone_offset: usize,
 }
 
 #[derive(Component)]
 pub struct NpcModel {
     pub npc_id: NpcId,
-    pub skeleton: CharacterModelSkeleton,
+    pub model_parts: Vec<Entity>,
+}
+
+#[derive(Component)]
+pub struct ModelSkeleton {
+    pub bones: Vec<Entity>,
+    pub dummy_bone_offset: usize,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Enum)]

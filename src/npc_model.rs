@@ -1,6 +1,6 @@
 use bevy::{
     pbr::StandardMaterial,
-    prelude::{AssetServer, Assets, Commands, GlobalTransform, Handle, Mesh, Transform},
+    prelude::{AssetServer, Assets, Commands, Entity, Handle, Mesh},
 };
 
 use rose_data::NpcId;
@@ -8,7 +8,7 @@ use rose_file_readers::{ChrFile, VfsIndex, ZmdFile, ZscFile};
 
 use crate::{
     character_model::{spawn_model, spawn_skeleton},
-    components::{CharacterModelSkeleton, NpcModel},
+    components::{ModelSkeleton, NpcModel},
     render::StaticMeshMaterial,
 };
 
@@ -26,44 +26,52 @@ impl NpcModelList {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn spawn_npc_model(
     commands: &mut Commands,
+    model_entity: Entity,
     npc_model_list: &NpcModelList,
     asset_server: &AssetServer,
     static_mesh_materials: &mut Assets<StaticMeshMaterial>,
     npc_id: NpcId,
     vfs: &VfsIndex,
     bone_visualisation: Option<(Handle<Mesh>, Handle<StandardMaterial>)>,
-) -> Option<NpcModel> {
+) -> Option<(NpcModel, ModelSkeleton)> {
     let npc_model_data = npc_model_list.chr_npc.npcs.get(&npc_id.get())?;
-    let skeleton = if let Some(skeleton) = npc_model_list
+    let model_skeleton = if let Some(skeleton) = npc_model_list
         .chr_npc
         .skeleton_files
         .get(npc_model_data.skeleton_index as usize)
         .and_then(|p| vfs.read_file::<ZmdFile, _>(p).ok())
     {
-        spawn_skeleton(commands, &skeleton, bone_visualisation)
+        spawn_skeleton(commands, model_entity, &skeleton, bone_visualisation)
     } else {
-        CharacterModelSkeleton {
-            root: commands
-                .spawn_bundle((Transform::default(), GlobalTransform::default()))
-                .id(),
+        ModelSkeleton {
             bones: Vec::new(),
             dummy_bone_offset: 0,
         }
     };
 
+    let mut model_parts = Vec::with_capacity(16);
     for model_id in npc_model_data.model_ids.iter() {
-        spawn_model(
+        let (_model_id, mut parts) = spawn_model(
             commands,
+            model_entity,
             asset_server,
             static_mesh_materials,
             &npc_model_list.zsc_npc,
             *model_id as usize,
-            &skeleton,
+            &model_skeleton,
             None,
         );
+        model_parts.append(&mut parts);
     }
 
-    Some(NpcModel { npc_id, skeleton })
+    Some((
+        NpcModel {
+            npc_id,
+            model_parts,
+        },
+        model_skeleton,
+    ))
 }
