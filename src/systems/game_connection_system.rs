@@ -115,6 +115,16 @@ pub fn game_connection_system(
                 // We return immediately so future packets will be able to use query_player
                 return;
             }
+            Ok(ServerMessage::CharacterDataItems(message)) => {
+                commands
+                    .entity(query_player.single())
+                    .insert_bundle((message.inventory, message.equipment));
+            }
+            Ok(ServerMessage::CharacterDataQuest(message)) => {
+                commands
+                    .entity(query_player.single())
+                    .insert(message.quest_state);
+            }
             Ok(ServerMessage::JoinZone(message)) => {
                 let entity = query_player.single();
                 commands
