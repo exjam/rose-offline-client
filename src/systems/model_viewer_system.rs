@@ -11,9 +11,10 @@ use rose_data::{EquipmentIndex, EquipmentItem, ItemReference, ItemType, NpcId, Z
 use rose_game_common::components::{CharacterGender, CharacterInfo, Equipment, Npc};
 
 use crate::{
+    components::DebugModelSkeleton,
     fly_camera::FlyCameraController,
     follow_camera::{FollowCameraBundle, FollowCameraController},
-    resources::{DebugBoneVisualisation, GameData},
+    resources::GameData,
 };
 
 pub struct ModelViewerUiState {
@@ -60,9 +61,6 @@ pub fn model_viewer_enter_system(
             ));
     }
 
-    // Use debug bone visualisation
-    commands.init_resource::<DebugBoneVisualisation>();
-
     // Spawn our character model
     let character_info = CharacterInfo {
         name: "Bot 1".into(),
@@ -93,6 +91,7 @@ pub fn model_viewer_enter_system(
         equipment,
         GlobalTransform::default(),
         Transform::default().with_translation(Vec3::new(2.0, 0.0, 0.0)),
+        DebugModelSkeleton::default(),
     ));
 
     // Spawn our NPC model
@@ -100,6 +99,7 @@ pub fn model_viewer_enter_system(
         Npc::new(NpcId::new(1).unwrap(), 0),
         GlobalTransform::default(),
         Transform::default().with_translation(Vec3::new(-2.0, 0.0, 0.0)),
+        DebugModelSkeleton::default(),
     ));
 }
 

@@ -1,9 +1,8 @@
 use bevy::{
     math::{Quat, Vec3},
-    pbr::{PbrBundle, StandardMaterial},
     prelude::{
         AssetServer, Assets, BuildChildren, Commands, ComputedVisibility, Entity, GlobalTransform,
-        Handle, Mesh, Transform, Visibility,
+        Mesh, Transform, Visibility,
     },
 };
 use enum_map::EnumMap;
@@ -148,13 +147,11 @@ pub fn spawn_character_model(
     character_model_list: &CharacterModelList,
     character_info: &CharacterInfo,
     equipment: &Equipment,
-    bone_visualisation: Option<(Handle<Mesh>, Handle<StandardMaterial>)>,
 ) -> (CharacterModel, ModelSkeleton) {
     let skeleton = spawn_skeleton(
         commands,
         model_entity,
         character_model_list.get_skeleton(character_info.gender),
-        bone_visualisation,
     );
     let mut model_parts = EnumMap::default();
 
@@ -246,7 +243,6 @@ pub fn spawn_skeleton(
     commands: &mut Commands,
     model_entity: Entity,
     skeleton: &ZmdFile,
-    bone_visualisation: Option<(Handle<Mesh>, Handle<StandardMaterial>)>,
 ) -> ModelSkeleton {
     let mut bone_entities = Vec::with_capacity(skeleton.bones.len());
     let dummy_bone_offset = skeleton.bones.len();
@@ -265,24 +261,11 @@ pub fn spawn_skeleton(
             .with_translation(position)
             .with_rotation(rotation);
 
-        if let Some((bone_mesh, bone_material)) = &bone_visualisation {
-            bone_entities.push(
-                commands
-                    .spawn_bundle(PbrBundle {
-                        mesh: bone_mesh.clone(),
-                        material: bone_material.clone(),
-                        transform,
-                        ..Default::default()
-                    })
-                    .id(),
-            );
-        } else {
-            bone_entities.push(
-                commands
-                    .spawn_bundle((transform, GlobalTransform::default()))
-                    .id(),
-            );
-        }
+        bone_entities.push(
+            commands
+                .spawn_bundle((transform, GlobalTransform::default()))
+                .id(),
+        );
     }
 
     for (i, bone) in skeleton

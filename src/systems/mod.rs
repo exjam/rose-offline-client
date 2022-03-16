@@ -1,6 +1,7 @@
 mod character_model_system;
 mod character_select_system;
 mod collision_system;
+mod debug_model_skeleton_system;
 mod game_connection_system;
 mod game_system;
 mod load_zone_system;
@@ -19,6 +20,7 @@ pub use character_select_system::{
 pub use collision_system::{
     collision_add_colliders_system, collision_picking_system, collision_system,
 };
+pub use debug_model_skeleton_system::debug_model_skeleton_system;
 pub use game_connection_system::game_connection_system;
 pub use game_system::{game_player_move_system, game_state_enter_system};
 pub use load_zone_system::load_zone_system;

@@ -22,6 +22,9 @@ pub struct ModelSkeleton {
     pub dummy_bone_offset: usize,
 }
 
+#[derive(Component, Default)]
+pub struct DebugModelSkeleton;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Enum)]
 pub enum CharacterModelPart {
     CharacterFace,

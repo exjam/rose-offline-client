@@ -1,7 +1,6 @@
 mod account;
 mod app_state;
 mod character_list;
-mod debug_bone_visualisation;
 mod game_connection;
 mod game_data;
 mod loaded_zone;
@@ -14,7 +13,6 @@ mod world_connection;
 pub use account::Account;
 pub use app_state::AppState;
 pub use character_list::CharacterList;
-pub use debug_bone_visualisation::DebugBoneVisualisation;
 pub use game_connection::GameConnection;
 pub use game_data::GameData;
 pub use loaded_zone::LoadedZone;

@@ -86,6 +86,7 @@ pub fn zone_viewer_picking_system(
                             width: 4.0,
                             color: Color::PINK,
                             perspective: false,
+                            depth_test: true,
                         }),
                         ..Default::default()
                     })
