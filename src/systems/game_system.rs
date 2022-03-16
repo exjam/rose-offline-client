@@ -2,9 +2,10 @@ use bevy::{
     math::Vec3,
     prelude::{
         Camera, Commands, Entity, EventReader, PerspectiveCameraBundle, PerspectiveProjection,
-        Query, Res, Transform, With,
+        Query, Res, ResMut, Transform, With,
     },
 };
+use bevy_egui::EguiContext;
 use rose_game_common::messages::client::{ClientMessage, Move};
 
 use crate::{
@@ -42,8 +43,13 @@ pub fn game_state_enter_system(
 pub fn game_player_move_system(
     mut picking_events: EventReader<PickingEvent>,
     game_connection: Option<Res<GameConnection>>,
+    mut egui_ctx: ResMut<EguiContext>,
 ) {
     if let Some(event) = picking_events.iter().last() {
+        if egui_ctx.ctx_mut().wants_pointer_input() || egui_ctx.ctx_mut().wants_keyboard_input() {
+            return;
+        }
+
         if let Some(game_connection) = game_connection.as_ref() {
             game_connection
                 .client_message_tx
