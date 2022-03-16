@@ -111,6 +111,9 @@ pub fn game_connection_system(
                     .client_message_tx
                     .send(ClientMessage::JoinZoneRequest)
                     .ok();
+
+                // We return immediately so future packets will be able to use query_player
+                return;
             }
             Ok(ServerMessage::JoinZone(message)) => {
                 let entity = query_player.single();
