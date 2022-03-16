@@ -13,7 +13,7 @@ use bevy_rapier3d::prelude::{ColliderShapeComponent, AABB};
 use crate::{
     events::PickingEvent,
     fly_camera::{FlyCameraBundle, FlyCameraController},
-    follow_camera::{FollowCameraController},
+    follow_camera::FollowCameraController,
     resources::{GameData, LoadedZone},
 };
 

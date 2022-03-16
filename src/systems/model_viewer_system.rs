@@ -13,7 +13,7 @@ use rose_game_common::components::{CharacterGender, CharacterInfo, Equipment, Np
 use crate::{
     fly_camera::FlyCameraController,
     follow_camera::{FollowCameraBundle, FollowCameraController},
-    resources::GameData,
+    resources::{DebugBoneVisualisation, GameData},
 };
 
 pub struct ModelViewerUiState {
@@ -59,6 +59,9 @@ pub fn model_viewer_enter_system(
                 Vec3::new(0.0, 0.0, 0.0),
             ));
     }
+
+    // Use debug bone visualisation
+    commands.init_resource::<DebugBoneVisualisation>();
 
     // Spawn our character model
     let character_info = CharacterInfo {

@@ -1,8 +1,8 @@
 use bevy::{
     math::Vec3,
     prelude::{
-        Camera, Commands, Entity, FromWorld, PerspectiveProjection, Query,
-        Res, ResMut, Transform, With, World,
+        Camera, Commands, Entity, FromWorld, PerspectiveProjection, Query, Res, ResMut, Transform,
+        With, World,
     },
     window::Windows,
 };

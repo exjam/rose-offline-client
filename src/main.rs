@@ -8,7 +8,6 @@ use bevy::{
     render::{render_resource::WgpuFeatures, settings::WgpuSettings},
     window::WindowDescriptor,
 };
-use bevy_rapier3d::physics::{NoUserData, RapierConfiguration, RapierPhysicsPlugin};
 use std::{path::Path, sync::Arc, time::Duration};
 
 mod character_model;
@@ -243,10 +242,10 @@ fn main() {
     app.add_plugin(bevy_polyline::PolylinePlugin)
         .add_plugin(bevy_egui::EguiPlugin)
         .add_plugin(smooth_bevy_cameras::LookTransformPlugin)
-        .add_plugin(FlyCameraPlugin::default())
-        .add_plugin(FollowCameraPlugin::default())
-        .add_plugin(RapierPhysicsPlugin::<NoUserData>::default())
-        .insert_resource(RapierConfiguration {
+        .add_plugin(bevy_rapier3d::physics::RapierPhysicsPlugin::<
+            bevy_rapier3d::physics::NoUserData,
+        >::default())
+        .insert_resource(bevy_rapier3d::physics::RapierConfiguration {
             physics_pipeline_active: false,
             query_pipeline_active: true,
             ..Default::default()
@@ -254,6 +253,8 @@ fn main() {
 
     // Initialise rose stuff
     app.init_asset_loader::<ZmsAssetLoader>()
+        .add_plugin(FlyCameraPlugin::default())
+        .add_plugin(FollowCameraPlugin::default())
         .add_plugin(RoseRenderPlugin)
         .insert_resource(ServerConfiguration {
             ip,
@@ -321,8 +322,6 @@ fn main() {
     app.add_system(collision_system)
         .add_system(collision_picking_system)
         .add_system(collision_add_colliders_system);
-
-    app.init_resource::<DebugBoneVisualisation>();
 
     // Setup network
     let (network_thread_tx, network_thread_rx) =
