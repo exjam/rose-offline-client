@@ -10,6 +10,7 @@ use crate::{
     render::StaticMeshMaterial,
 };
 
+#[allow(clippy::type_complexity)]
 pub fn character_model_system(
     mut commands: Commands,
     mut query: Query<
