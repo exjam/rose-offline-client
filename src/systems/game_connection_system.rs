@@ -106,9 +106,6 @@ pub fn game_connection_system(
                         ComputedVisibility::default(),
                     ));
 
-                // Transition to in game state
-                app_state.set(AppState::Game).ok();
-
                 // Tell server we are ready to join the zone
                 game_connection
                     .client_message_tx
@@ -142,6 +139,11 @@ pub fn game_connection_system(
                 client_entity_list.clear();
                 client_entity_list.add(message.entity_id, entity);
                 // TODO: Do something with message.world_ticks
+
+                // Transition to in game state if we are not already
+                if !matches!(app_state.current(), AppState::Game) {
+                    app_state.set(AppState::Game).ok();
+                }
             }
             Ok(ServerMessage::SpawnEntityNpc(message)) => {
                 // TODO: Rotate using message.direction
