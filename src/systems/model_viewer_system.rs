@@ -1,9 +1,10 @@
 use bevy::{
     math::Vec3,
     prelude::{
-        Camera, Commands, Entity, GlobalTransform, Local, PerspectiveCameraBundle,
-        PerspectiveProjection, Query, Res, ResMut, Transform, With,
+        Commands, Entity, GlobalTransform, Local, PerspectiveCameraBundle, Query, Res, ResMut,
+        Transform, With,
     },
+    render::camera::Camera3d,
 };
 use bevy_egui::{egui, EguiContext};
 
@@ -46,7 +47,7 @@ impl Default for ModelViewerUiItemListState {
 #[allow(clippy::too_many_arguments)]
 pub fn model_viewer_enter_system(
     mut commands: Commands,
-    query_cameras: Query<Entity, (With<Camera>, With<PerspectiveProjection>)>,
+    query_cameras: Query<Entity, With<Camera3d>>,
 ) {
     // Reset camera
     for entity in query_cameras.iter() {

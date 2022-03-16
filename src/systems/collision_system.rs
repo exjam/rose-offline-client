@@ -6,7 +6,7 @@ use bevy::{
         Mesh, MouseButton, Parent, Query, Res, Transform, With, Without,
     },
     render::{
-        camera::RenderTarget,
+        camera::{Camera3d, RenderTarget},
         mesh::{Indices, VertexAttributeValues},
     },
     window::{CursorMoved, Window, Windows},
@@ -108,7 +108,7 @@ pub fn collision_picking_system(
     mut cursor_moved_events: EventReader<CursorMoved>,
     mut cursor_position: Local<MousePosition>,
     windows: Res<Windows>,
-    query_camera: Query<(&Camera, &GlobalTransform)>,
+    query_camera: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
     query_pipeline: Res<QueryPipeline>,
     colliders: QueryPipelineColliderComponentsQuery,
     mut picking_events: EventWriter<PickingEvent>,

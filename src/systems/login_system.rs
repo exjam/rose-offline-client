@@ -1,9 +1,7 @@
 use bevy::{
     math::Vec3,
-    prelude::{
-        Camera, Commands, Entity, FromWorld, PerspectiveProjection, Query, Res, ResMut, Transform,
-        With, World,
-    },
+    prelude::{Commands, Entity, FromWorld, Query, Res, ResMut, Transform, With, World},
+    render::camera::Camera3d,
     window::Windows,
 };
 use bevy_egui::{egui, EguiContext};
@@ -66,7 +64,7 @@ pub fn login_state_enter_system(
     mut commands: Commands,
     mut loaded_zone: ResMut<LoadedZone>,
     mut windows: ResMut<Windows>,
-    query_cameras: Query<Entity, (With<Camera>, With<PerspectiveProjection>)>,
+    query_cameras: Query<Entity, With<Camera3d>>,
 ) {
     // Ensure cursor is not locked
     if let Some(window) = windows.get_primary_mut() {

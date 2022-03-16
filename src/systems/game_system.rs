@@ -1,9 +1,9 @@
 use bevy::{
     math::Vec3,
     prelude::{
-        Camera, Commands, Entity, EventReader, PerspectiveCameraBundle, PerspectiveProjection,
-        Query, Res, ResMut, Transform, With,
+        Commands, Entity, EventReader, PerspectiveCameraBundle, Query, Res, ResMut, Transform, With,
     },
+    render::camera::Camera3d,
 };
 use bevy_egui::EguiContext;
 use rose_game_common::messages::client::{ClientMessage, Move};
@@ -18,7 +18,7 @@ use crate::{
 
 pub fn game_state_enter_system(
     mut commands: Commands,
-    query_cameras: Query<Entity, (With<Camera>, With<PerspectiveProjection>)>,
+    query_cameras: Query<Entity, With<Camera3d>>,
     query_player: Query<(Entity, &Transform), With<PlayerCharacter>>,
 ) {
     // Reset camera

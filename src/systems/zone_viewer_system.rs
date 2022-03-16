@@ -3,8 +3,9 @@ use bevy::{
     math::Vec3,
     prelude::{
         Assets, Camera, Color, Commands, Entity, EventReader, Local, PerspectiveCameraBundle,
-        PerspectiveProjection, Query, Res, ResMut, Transform, With,
+        Query, Res, ResMut, Transform, With,
     },
+    render::camera::Camera3d,
 };
 use bevy_egui::{egui, EguiContext};
 use bevy_polyline::{Polyline, PolylineBundle, PolylineMaterial};
@@ -38,7 +39,7 @@ pub struct ZoneViewerInspectObject {
 
 pub fn zone_viewer_setup_system(
     mut commands: Commands,
-    query_cameras: Query<Entity, (With<Camera>, With<PerspectiveProjection>)>,
+    query_cameras: Query<Entity, With<Camera3d>>,
 ) {
     // Reset camera
     for entity in query_cameras.iter() {
