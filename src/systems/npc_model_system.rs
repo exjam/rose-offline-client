@@ -9,6 +9,7 @@ use crate::{
     components::NpcModel,
     npc_model::{spawn_npc_model, NpcModelList},
     render::StaticMeshMaterial,
+    resources::DebugBoneVisualisation,
     VfsResource,
 };
 
@@ -19,6 +20,7 @@ pub fn npc_model_system(
     npc_model_list: Res<NpcModelList>,
     vfs_resource: Res<VfsResource>,
     mut static_mesh_materials: ResMut<Assets<StaticMeshMaterial>>,
+    debug_bone_visualisation: Option<Res<DebugBoneVisualisation>>,
 ) {
     for (entity, npc, mut current_npc_model) in query.iter_mut() {
         if let Some(current_npc_model) = current_npc_model.as_mut() {
@@ -40,7 +42,9 @@ pub fn npc_model_system(
             &mut static_mesh_materials,
             npc.id,
             &vfs_resource.vfs,
-            None, // Some((bone_mesh, bone_material)),
+            debug_bone_visualisation
+                .as_ref()
+                .map(|x| (x.mesh.clone(), x.material.clone())),
         ) {
             let root_bone = npc_model.skeleton.root;
             commands

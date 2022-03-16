@@ -59,19 +59,6 @@ pub fn model_viewer_enter_system(
         Vec3::new(0.0, 0.0, 0.0),
     ));
 
-    /*
-    TODO: Add this as a resource for model system to optionally pick up?
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
-
-    let bone_mesh = meshes.add(Mesh::from(shape::Cube { size: 0.1 }));
-    let bone_material = materials.add(StandardMaterial {
-        base_color: Color::rgba(1.0, 0.08, 0.58, 0.75),
-        alpha_mode: AlphaMode::Blend,
-        ..Default::default()
-    });
-    */
-
     // Spawn our character model
     let character_info = CharacterInfo {
         name: "Bot 1".into(),

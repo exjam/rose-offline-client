@@ -8,6 +8,7 @@ use crate::{
     character_model::{spawn_character_model, update_character_equipment, CharacterModelList},
     components::CharacterModel,
     render::StaticMeshMaterial,
+    resources::DebugBoneVisualisation,
 };
 
 #[allow(clippy::type_complexity)]
@@ -25,6 +26,7 @@ pub fn character_model_system(
     asset_server: Res<AssetServer>,
     character_model_list: Res<CharacterModelList>,
     mut static_mesh_materials: ResMut<Assets<StaticMeshMaterial>>,
+    debug_bone_visualisation: Option<Res<DebugBoneVisualisation>>,
 ) {
     for (entity, character_info, equipment, mut character_model) in query.iter_mut() {
         if let Some(character_model) = character_model.as_mut() {
@@ -45,7 +47,9 @@ pub fn character_model_system(
                 &character_model_list,
                 character_info,
                 equipment,
-                None, // Some((bone_mesh.clone(), bone_material.clone())),
+                debug_bone_visualisation
+                    .as_ref()
+                    .map(|x| (x.mesh.clone(), x.material.clone())),
             );
             let root_bone = character_model.skeleton.root;
             commands

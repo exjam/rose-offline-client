@@ -30,8 +30,8 @@ use follow_camera::FollowCameraPlugin;
 use npc_model::NpcModelList;
 use render::RoseRenderPlugin;
 use resources::{
-    run_network_thread, AppState, GameData, LoadedZone, NetworkThread, NetworkThreadMessage,
-    ServerConfiguration,
+    run_network_thread, AppState, DebugBoneVisualisation, GameData, LoadedZone, NetworkThread,
+    NetworkThreadMessage, ServerConfiguration,
 };
 use systems::{
     character_model_system, character_select_enter_system, character_select_exit_system,
@@ -316,6 +316,8 @@ fn main() {
     app.add_system(collision_system)
         .add_system(collision_picking_system)
         .add_system(collision_add_colliders_system);
+
+    app.init_resource::<DebugBoneVisualisation>();
 
     // Setup network
     let (network_thread_tx, network_thread_rx) =
