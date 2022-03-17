@@ -235,6 +235,11 @@ impl GameClient {
                     }))
                     .await?
             }
+            ClientMessage::Chat(ref text) => {
+                connection
+                    .write_packet(Packet::from(&PacketClientChat { text }))
+                    .await?
+            }
             unimplemented => {
                 println!("Unimplemented GameClient ClientMessage {:?}", unimplemented);
             }
