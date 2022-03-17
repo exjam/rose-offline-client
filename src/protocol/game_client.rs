@@ -8,17 +8,19 @@ use rose_game_common::messages::{
     server::{
         CharacterData, CharacterDataItems, CharacterDataQuest, ConnectionRequestError,
         ConnectionResponse, JoinZoneResponse, MoveEntity, RemoveEntities, ServerMessage,
-        SpawnEntityMonster, SpawnEntityNpc,
+        SpawnEntityMonster, SpawnEntityNpc, Teleport,
     },
 };
 use rose_network_common::{Connection, Packet, PacketCodec};
 use rose_network_irose::{
-    game_client_packets::{PacketClientConnectRequest, PacketClientJoinZone, PacketClientMove},
+    game_client_packets::{
+        PacketClientChat, PacketClientConnectRequest, PacketClientJoinZone, PacketClientMove,
+    },
     game_server_packets::{
         ConnectResult, PacketConnectionReply, PacketServerCharacterInventory,
         PacketServerCharacterQuestData, PacketServerJoinZone, PacketServerMoveEntity,
         PacketServerRemoveEntities, PacketServerSelectCharacter, PacketServerSpawnEntityMonster,
-        PacketServerSpawnEntityNpc, ServerPackets,
+        PacketServerSpawnEntityNpc, PacketServerTeleport, ServerPackets,
     },
     ClientPacketCodec, IROSE_112_TABLE,
 };
@@ -176,6 +178,19 @@ impl GameClient {
                 self.server_message_tx
                     .send(ServerMessage::RemoveEntities(RemoveEntities {
                         entity_ids: message.entity_ids,
+                    }))
+                    .ok();
+            }
+            Some(ServerPackets::Teleport) => {
+                let message = PacketServerTeleport::try_from(&packet)?;
+                self.server_message_tx
+                    .send(ServerMessage::Teleport(Teleport {
+                        entity_id: message.entity_id,
+                        zone_id: message.zone_id,
+                        x: message.x,
+                        y: message.y,
+                        run_mode: message.run_mode,
+                        ride_mode: message.ride_mode,
                     }))
                     .ok();
             }

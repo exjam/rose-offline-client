@@ -2,13 +2,14 @@ use bevy::{
     math::{Quat, Vec3},
     prelude::{
         BuildChildren, Commands, ComputedVisibility, DespawnRecursiveExt, Entity, GlobalTransform,
-        Local, Query, Res, ResMut, State, Transform, Visibility, With,
+        Local, Res, ResMut, State, Transform, Visibility,
     },
 };
 use rose_data::ZoneId;
 use rose_game_common::{
     components::{
-        ClientEntity, ClientEntityId, ClientEntityType, Destination, StatusEffects, Target,
+        ClientEntity, ClientEntityId, ClientEntityType, Destination, Position, StatusEffects,
+        Target,
     },
     messages::{client::ClientMessage, server::ServerMessage},
 };
@@ -291,6 +292,42 @@ pub fn game_connection_system(
                         client_entity_list.remove(entity_id);
                         commands.entity(entity).despawn_recursive();
                     }
+                }
+            }
+            Ok(ServerMessage::Teleport(message)) => {
+                if let Some(player_entity) = client_entity_list.player_entity {
+                    // Load next zone
+                    loaded_zone.next_zone_id = Some(message.zone_id);
+
+                    // Update player position
+                    commands
+                        .entity(player_entity)
+                        .insert_bundle((
+                            Position::new(Vec3::new(message.x, message.y, 0.0), message.zone_id),
+                            Transform::from_xyz(message.x / 100.0, 20.0, -message.y / 100.0),
+                        ))
+                        .remove::<ClientEntity>();
+
+                    // Despawn all non-player entities
+                    for (client_entity_id, client_entity) in
+                        client_entity_list.client_entities.iter().enumerate()
+                    {
+                        if let Some(client_entity) = client_entity {
+                            if client_entity_list
+                                .player_entity_id
+                                .map_or(true, |id| id.0 != client_entity_id)
+                            {
+                                commands.entity(*client_entity).despawn_recursive();
+                            }
+                        }
+                    }
+                    client_entity_list.clear();
+
+                    // TODO: Do this after zone loading completes ?
+                    game_connection
+                        .client_message_tx
+                        .send(ClientMessage::JoinZoneRequest)
+                        .ok();
                 }
             }
             Ok(message) => {
