@@ -1,5 +1,5 @@
 use bevy::{
-    math::Vec3,
+    math::{Quat, Vec3},
     prelude::{
         BuildChildren, Commands, ComputedVisibility, DespawnRecursiveExt, Entity, GlobalTransform,
         Local, Query, Res, ResMut, State, Transform, Visibility, With,
@@ -159,7 +159,6 @@ pub fn game_connection_system(
                 }
             }
             Ok(ServerMessage::SpawnEntityNpc(message)) => {
-                // TODO: Rotate using message.direction
                 let entity = commands
                     .spawn_bundle((
                         message.npc,
@@ -183,7 +182,11 @@ pub fn game_connection_system(
                             message.position.position.x / 100.0,
                             100000.0,
                             -message.position.position.y / 100.0,
-                        ),
+                        )
+                        .with_rotation(Quat::from_axis_angle(
+                            Vec3::Y,
+                            message.direction.to_radians(),
+                        )),
                         GlobalTransform::default(),
                         Visibility::default(),
                         ComputedVisibility::default(),
