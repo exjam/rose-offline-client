@@ -5,10 +5,13 @@ use bevy::{
     render::camera::Camera3d,
 };
 use bevy_egui::{egui, EguiContext};
+use rose_game_common::messages::client::ClientMessage;
 
 use crate::{
-    components::PlayerCharacter, fly_camera::FlyCameraController,
+    components::PlayerCharacter,
+    fly_camera::FlyCameraController,
     follow_camera::FollowCameraController,
+    resources::{GameConnection, GameData},
 };
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -19,6 +22,7 @@ pub enum DebugCameraType {
 
 pub struct GameDebugUiState {
     show_debug_ui: bool,
+    show_zone_list: bool,
     selected_camera_type: DebugCameraType,
 }
 
@@ -26,6 +30,7 @@ impl Default for GameDebugUiState {
     fn default() -> Self {
         Self {
             show_debug_ui: true,
+            show_zone_list: false,
             selected_camera_type: DebugCameraType::Follow,
         }
     }
@@ -38,6 +43,8 @@ pub fn game_debug_ui_system(
     mut ui_state: Local<GameDebugUiState>,
     query_cameras: Query<Entity, With<Camera3d>>,
     query_player: Query<Entity, With<PlayerCharacter>>,
+    game_connection: Option<Res<GameConnection>>,
+    game_data: Res<GameData>,
     keyboard: Res<Input<KeyCode>>,
 ) {
     if keyboard.pressed(KeyCode::LControl) && keyboard.just_pressed(KeyCode::D) {
@@ -88,7 +95,40 @@ pub fn game_debug_ui_system(
                         }
                     }
                 }
-            })
+            });
+
+            ui.menu_button("View", |ui| {
+                ui.selectable_value(&mut ui_state.show_zone_list, true, "Zone List");
+            });
         });
     });
+
+    let show_zone_list = &mut (*ui_state).show_zone_list;
+
+    egui::Window::new("Zone List")
+        .vscroll(true)
+        .resizable(true)
+        .default_height(300.0)
+        .open(show_zone_list)
+        .show(ctx, |ui| {
+            egui::Grid::new("zone_list_grid").show(ui, |ui| {
+                ui.label("id");
+                ui.label("name");
+                ui.end_row();
+
+                for zone in game_data.zone_list.iter() {
+                    ui.label(format!("{}", zone.id.get()));
+                    ui.label(&zone.name);
+                    if ui.button("Teleport").clicked() {
+                        if let Some(game_connection) = game_connection.as_ref() {
+                            game_connection
+                                .client_message_tx
+                                .send(ClientMessage::Chat(format!("/mm {}", zone.id.get())))
+                                .ok();
+                        }
+                    }
+                    ui.end_row();
+                }
+            });
+        });
 }
