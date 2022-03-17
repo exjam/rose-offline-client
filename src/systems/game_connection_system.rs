@@ -8,8 +8,8 @@ use bevy::{
 use rose_data::ZoneId;
 use rose_game_common::{
     components::{
-        CharacterInfo, ClientEntity, ClientEntityId, ClientEntityType, Destination, Npc, Position,
-        StatusEffects, Target,
+        CharacterInfo, ClientEntity, ClientEntityId, ClientEntityType, Destination, MoveMode,
+        MoveSpeed, Npc, Position, StatusEffects, Target,
     },
     messages::{client::ClientMessage, server::ServerMessage},
 };
@@ -55,7 +55,7 @@ impl ClientEntityList {
     }
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments, clippy::type_complexity)]
 pub fn game_connection_system(
     mut commands: Commands,
     game_connection: Option<Res<GameConnection>>,
@@ -86,6 +86,18 @@ pub fn game_connection_system(
                 // Load next zone
                 loaded_zone.next_zone_id = Some(character_data.position.zone_id);
 
+                let status_effects = StatusEffects::default();
+                let ability_values = game_data.ability_value_calculator.calculate(
+                    &character_data.character_info,
+                    &character_data.level,
+                    &character_data.equipment,
+                    &character_data.basic_stats,
+                    &character_data.skill_list,
+                    &status_effects,
+                );
+                let move_mode = MoveMode::Run;
+                let move_speed = MoveSpeed::new(ability_values.get_run_speed());
+
                 // Spawn character
                 client_entity_list.player_entity = Some(
                     commands
@@ -104,9 +116,12 @@ pub fn game_connection_system(
                             character_data.union_membership,
                             character_data.stamina,
                             character_data.position.clone(),
-                            StatusEffects::default(),
                         ))
                         .insert_bundle((
+                            ability_values,
+                            status_effects,
+                            move_mode,
+                            move_speed,
                             PlayerCharacter {},
                             Transform::from_xyz(
                                 character_data.position.position.x / 100.0,
@@ -176,6 +191,20 @@ pub fn game_connection_system(
                 }
             }
             Ok(ServerMessage::SpawnEntityNpc(message)) => {
+                let status_effects = StatusEffects {
+                    active: message.status_effects,
+                    ..Default::default()
+                };
+                let ability_values = game_data
+                    .ability_value_calculator
+                    .calculate_npc(message.npc.id, &status_effects, None, None)
+                    .unwrap();
+                let move_speed = match message.move_mode {
+                    MoveMode::Walk => MoveSpeed::new(ability_values.get_walk_speed()),
+                    MoveMode::Run => MoveSpeed::new(ability_values.get_run_speed()),
+                    MoveMode::Drive => MoveSpeed::new(ability_values.get_drive_speed()),
+                };
+
                 let entity = commands
                     .spawn_bundle((
                         message.npc,
@@ -184,10 +213,9 @@ pub fn game_connection_system(
                         message.command,
                         message.move_mode,
                         message.position.clone(),
-                        StatusEffects {
-                            active: message.status_effects,
-                            ..Default::default()
-                        },
+                        ability_values,
+                        move_speed,
+                        status_effects,
                     ))
                     .insert_bundle((
                         ClientEntity::new(
@@ -232,6 +260,20 @@ pub fn game_connection_system(
                 client_entity_list.add(message.entity_id, entity);
             }
             Ok(ServerMessage::SpawnEntityMonster(message)) => {
+                let status_effects = StatusEffects {
+                    active: message.status_effects,
+                    ..Default::default()
+                };
+                let ability_values = game_data
+                    .ability_value_calculator
+                    .calculate_npc(message.npc.id, &status_effects, None, None)
+                    .unwrap();
+                let move_speed = match message.move_mode {
+                    MoveMode::Walk => MoveSpeed::new(ability_values.get_walk_speed()),
+                    MoveMode::Run => MoveSpeed::new(ability_values.get_run_speed()),
+                    MoveMode::Drive => MoveSpeed::new(ability_values.get_drive_speed()),
+                };
+
                 let entity = commands
                     .spawn_bundle((
                         message.npc,
@@ -240,10 +282,9 @@ pub fn game_connection_system(
                         message.command,
                         message.move_mode,
                         message.position.clone(),
-                        StatusEffects {
-                            active: message.status_effects,
-                            ..Default::default()
-                        },
+                        ability_values,
+                        move_speed,
+                        status_effects,
                     ))
                     .insert_bundle((
                         ClientEntity::new(

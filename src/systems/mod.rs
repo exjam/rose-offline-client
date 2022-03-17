@@ -1,3 +1,4 @@
+mod ability_values_system;
 mod character_model_system;
 mod character_select_system;
 mod collision_system;
@@ -15,6 +16,7 @@ mod update_position_system;
 mod world_connection_system;
 mod zone_viewer_system;
 
+pub use ability_values_system::ability_values_system;
 pub use character_model_system::character_model_system;
 pub use character_select_system::{
     character_select_enter_system, character_select_exit_system, character_select_system,
