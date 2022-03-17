@@ -1,15 +1,15 @@
 use bevy::{
     math::{Quat, Vec3},
     prelude::{
-        BuildChildren, Commands, ComputedVisibility, DespawnRecursiveExt, Entity, GlobalTransform,
-        Local, Res, ResMut, State, Transform, Visibility,
+        BuildChildren, Commands, ComputedVisibility, DespawnRecursiveExt, Entity, EventWriter,
+        GlobalTransform, Local, Or, Query, Res, ResMut, State, Transform, Visibility, With,
     },
 };
 use rose_data::ZoneId;
 use rose_game_common::{
     components::{
-        ClientEntity, ClientEntityId, ClientEntityType, Destination, Position, StatusEffects,
-        Target,
+        CharacterInfo, ClientEntity, ClientEntityId, ClientEntityType, Destination, Npc, Position,
+        StatusEffects, Target,
     },
     messages::{client::ClientMessage, server::ServerMessage},
 };
@@ -17,7 +17,8 @@ use rose_network_common::ConnectionError;
 
 use crate::{
     components::{CollisionRayCastSource, PlayerCharacter},
-    resources::{AppState, GameConnection, LoadedZone},
+    events::ChatboxEvent,
+    resources::{AppState, GameConnection, GameData, LoadedZone},
 };
 
 pub struct ClientEntityList {
@@ -58,9 +59,15 @@ impl ClientEntityList {
 pub fn game_connection_system(
     mut commands: Commands,
     game_connection: Option<Res<GameConnection>>,
+    game_data: Res<GameData>,
     mut loaded_zone: ResMut<LoadedZone>,
     mut app_state: ResMut<State<AppState>>,
+    mut chatbox_events: EventWriter<ChatboxEvent>,
     mut client_entity_list: Local<ClientEntityList>,
+    query_entity_name: Query<
+        (Option<&CharacterInfo>, Option<&Npc>),
+        Or<(With<CharacterInfo>, With<Npc>)>,
+    >,
 ) {
     if game_connection.is_none() {
         return;
@@ -329,6 +336,36 @@ pub fn game_connection_system(
                         .send(ClientMessage::JoinZoneRequest)
                         .ok();
                 }
+            }
+            Ok(ServerMessage::LocalChat(message)) => {
+                if let Some(entity) = client_entity_list.get(message.entity_id) {
+                    match query_entity_name.get(entity) {
+                        Ok((Some(character_info), None)) => {
+                            chatbox_events
+                                .send(ChatboxEvent::Say(character_info.name.clone(), message.text));
+                        }
+                        Ok((None, Some(npc))) => {
+                            if let Some(npc_data) = game_data.npcs.get_npc(npc.id) {
+                                if !npc_data.name.is_empty() {
+                                    chatbox_events.send(ChatboxEvent::Say(
+                                        npc_data.name.clone(),
+                                        message.text,
+                                    ));
+                                }
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            Ok(ServerMessage::ShoutChat(message)) => {
+                chatbox_events.send(ChatboxEvent::Shout(message.name, message.text));
+            }
+            Ok(ServerMessage::Whisper(message)) => {
+                chatbox_events.send(ChatboxEvent::Whisper(message.from, message.text));
+            }
+            Ok(ServerMessage::AnnounceChat(message)) => {
+                chatbox_events.send(ChatboxEvent::Announce(message.name, message.text));
             }
             Ok(message) => {
                 log::warn!("Received unexpected game server message: {:#?}", message);

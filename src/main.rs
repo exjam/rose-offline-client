@@ -27,7 +27,7 @@ use rose_data::{NpcDatabaseOptions, ZoneId};
 use rose_file_readers::VfsIndex;
 
 use character_model::CharacterModelList;
-use events::PickingEvent;
+use events::{ChatboxEvent, PickingEvent};
 use fly_camera::FlyCameraPlugin;
 use follow_camera::FollowCameraPlugin;
 use npc_model::NpcModelList;
@@ -322,7 +322,9 @@ fn main() {
                 .with_system(game_debug_ui_system),
         );
 
-    app.insert_resource(Events::<PickingEvent>::default());
+    app.insert_resource(Events::<PickingEvent>::default())
+        .insert_resource(Events::<ChatboxEvent>::default());
+
     app.add_system(collision_system)
         .add_system(collision_picking_system)
         .add_system(collision_add_colliders_system);

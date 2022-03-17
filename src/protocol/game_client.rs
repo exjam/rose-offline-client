@@ -6,9 +6,10 @@ use tokio::net::TcpStream;
 use rose_game_common::messages::{
     client::{ClientMessage, ConnectionRequest},
     server::{
-        CharacterData, CharacterDataItems, CharacterDataQuest, ConnectionRequestError,
-        ConnectionResponse, JoinZoneResponse, MoveEntity, RemoveEntities, ServerMessage,
-        SpawnEntityMonster, SpawnEntityNpc, Teleport,
+        AnnounceChat, CharacterData, CharacterDataItems, CharacterDataQuest,
+        ConnectionRequestError, ConnectionResponse, JoinZoneResponse, LocalChat, MoveEntity,
+        RemoveEntities, ServerMessage, ShoutChat, SpawnEntityMonster, SpawnEntityNpc, Teleport,
+        Whisper,
     },
 };
 use rose_network_common::{Connection, Packet, PacketCodec};
@@ -17,10 +18,11 @@ use rose_network_irose::{
         PacketClientChat, PacketClientConnectRequest, PacketClientJoinZone, PacketClientMove,
     },
     game_server_packets::{
-        ConnectResult, PacketConnectionReply, PacketServerCharacterInventory,
-        PacketServerCharacterQuestData, PacketServerJoinZone, PacketServerMoveEntity,
-        PacketServerRemoveEntities, PacketServerSelectCharacter, PacketServerSpawnEntityMonster,
-        PacketServerSpawnEntityNpc, PacketServerTeleport, ServerPackets,
+        ConnectResult, PacketConnectionReply, PacketServerAnnounceChat,
+        PacketServerCharacterInventory, PacketServerCharacterQuestData, PacketServerJoinZone,
+        PacketServerLocalChat, PacketServerMoveEntity, PacketServerRemoveEntities,
+        PacketServerSelectCharacter, PacketServerShoutChat, PacketServerSpawnEntityMonster,
+        PacketServerSpawnEntityNpc, PacketServerTeleport, PacketServerWhisper, ServerPackets,
     },
     ClientPacketCodec, IROSE_112_TABLE,
 };
@@ -191,6 +193,42 @@ impl GameClient {
                         y: message.y,
                         run_mode: message.run_mode,
                         ride_mode: message.ride_mode,
+                    }))
+                    .ok();
+            }
+            Some(ServerPackets::LocalChat) => {
+                let message = PacketServerLocalChat::try_from(&packet)?;
+                self.server_message_tx
+                    .send(ServerMessage::LocalChat(LocalChat {
+                        entity_id: message.entity_id,
+                        text: message.text.to_string(),
+                    }))
+                    .ok();
+            }
+            Some(ServerPackets::ShoutChat) => {
+                let message = PacketServerShoutChat::try_from(&packet)?;
+                self.server_message_tx
+                    .send(ServerMessage::ShoutChat(ShoutChat {
+                        name: message.name.to_string(),
+                        text: message.text.to_string(),
+                    }))
+                    .ok();
+            }
+            Some(ServerPackets::AnnounceChat) => {
+                let message = PacketServerAnnounceChat::try_from(&packet)?;
+                self.server_message_tx
+                    .send(ServerMessage::AnnounceChat(AnnounceChat {
+                        name: message.name.map(|x| x.to_string()),
+                        text: message.text.to_string(),
+                    }))
+                    .ok();
+            }
+            Some(ServerPackets::Whisper) => {
+                let message = PacketServerWhisper::try_from(&packet)?;
+                self.server_message_tx
+                    .send(ServerMessage::Whisper(Whisper {
+                        from: message.from.to_string(),
+                        text: message.text.to_string(),
                     }))
                     .ok();
             }

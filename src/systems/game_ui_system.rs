@@ -1,13 +1,13 @@
-use bevy::prelude::{Local, Res, ResMut};
+use bevy::prelude::{EventReader, Local, Res, ResMut};
 use bevy_egui::{egui, EguiContext};
 use rose_game_common::messages::client::ClientMessage;
 
-use crate::resources::GameConnection;
+use crate::{events::ChatboxEvent, resources::GameConnection};
 
 #[derive(Default)]
 pub struct GameUiState {
     textbox_text: String,
-    textbox_history: Vec<String>,
+    textbox_history: Vec<(egui::Color32, String)>,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -15,6 +15,7 @@ pub fn game_ui_system(
     mut egui_context: ResMut<EguiContext>,
     mut ui_state: Local<GameUiState>,
     game_connection: Option<Res<GameConnection>>,
+    mut chatbox_events: EventReader<ChatboxEvent>,
 ) {
     let mut chatbox_style = (*egui_context.ctx_mut().style()).clone();
     chatbox_style.visuals.widgets.noninteractive.bg_fill = egui::Color32::from_rgba_unmultiplied(
@@ -23,6 +24,36 @@ pub fn game_ui_system(
         chatbox_style.visuals.widgets.noninteractive.bg_fill.b(),
         128,
     );
+
+    for event in chatbox_events.iter() {
+        match event {
+            ChatboxEvent::Say(name, text) => {
+                ui_state
+                    .textbox_history
+                    .push((egui::Color32::LIGHT_GRAY, format!("{}> {}", name, text)));
+            }
+            ChatboxEvent::Shout(name, text) => {
+                ui_state
+                    .textbox_history
+                    .push((egui::Color32::LIGHT_BLUE, format!("{}> {}", name, text)));
+            }
+            ChatboxEvent::Whisper(name, text) => {
+                ui_state
+                    .textbox_history
+                    .push((egui::Color32::LIGHT_GREEN, format!("{}> {}", name, text)));
+            }
+            ChatboxEvent::Announce(Some(name), text) => {
+                ui_state
+                    .textbox_history
+                    .push((egui::Color32::LIGHT_RED, format!("{}> {}", name, text)));
+            }
+            ChatboxEvent::Announce(None, text) => {
+                ui_state
+                    .textbox_history
+                    .push((egui::Color32::LIGHT_RED, text.clone()));
+            }
+        }
+    }
 
     egui::Window::new("Chat Box")
         .anchor(egui::Align2::LEFT_BOTTOM, [5.0, -5.0])
@@ -35,8 +66,8 @@ pub fn game_ui_system(
                     .max_height(250.0)
                     .auto_shrink([false; 2])
                     .show(ui, |ui| {
-                        for line in ui_state.textbox_history.iter() {
-                            ui.label(line);
+                        for (colour, text) in ui_state.textbox_history.iter() {
+                            ui.colored_label(*colour, text);
                         }
                     });
 
