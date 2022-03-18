@@ -25,6 +25,7 @@ use bevy::{
         RenderApp, RenderStage,
     },
 };
+use bevy_inspector_egui::Inspectable;
 
 use crate::render::MESH_ATTRIBUTE_UV_1;
 
@@ -111,7 +112,7 @@ pub struct StaticMeshMaterialUniformData {
     pub lightmap_uv_scale: f32,
 }
 
-#[derive(Debug, Clone, TypeUuid)]
+#[derive(Debug, Clone, TypeUuid, Inspectable)]
 #[uuid = "62a496fa-33e8-41a8-9a44-237d70214227"]
 pub struct StaticMeshMaterial {
     pub base_texture: Option<Handle<Image>>,

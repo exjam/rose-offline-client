@@ -1,7 +1,7 @@
 use bevy::{
     input::Input,
     math::Vec3,
-    prelude::{Commands, Entity, KeyCode, Local, Query, Res, ResMut, With},
+    prelude::{Commands, Entity, EventWriter, KeyCode, Local, Query, Res, ResMut, With},
     render::camera::Camera3d,
 };
 use bevy_egui::{egui, EguiContext};
@@ -9,6 +9,7 @@ use rose_game_common::messages::client::ClientMessage;
 
 use crate::{
     components::PlayerCharacter,
+    events::DebugInspectorEvent,
     fly_camera::FlyCameraController,
     follow_camera::FollowCameraController,
     resources::{GameConnection, GameData},
@@ -23,6 +24,7 @@ pub enum DebugCameraType {
 pub struct GameDebugUiState {
     show_debug_ui: bool,
     show_zone_list: bool,
+    show_object_inspector: bool,
     selected_camera_type: DebugCameraType,
 }
 
@@ -31,6 +33,7 @@ impl Default for GameDebugUiState {
         Self {
             show_debug_ui: true,
             show_zone_list: false,
+            show_object_inspector: false,
             selected_camera_type: DebugCameraType::Follow,
         }
     }
@@ -46,6 +49,7 @@ pub fn game_debug_ui_system(
     game_connection: Option<Res<GameConnection>>,
     game_data: Res<GameData>,
     keyboard: Res<Input<KeyCode>>,
+    mut debug_inspector_events: EventWriter<DebugInspectorEvent>,
 ) {
     if keyboard.pressed(KeyCode::LControl) && keyboard.just_pressed(KeyCode::D) {
         ui_state.show_debug_ui = !ui_state.show_debug_ui;
@@ -110,6 +114,19 @@ pub fn game_debug_ui_system(
 
             ui.menu_button("View", |ui| {
                 ui.selectable_value(&mut ui_state.show_zone_list, true, "Zone List");
+                if ui
+                    .selectable_label(ui_state.show_object_inspector, "Object Inspector")
+                    .clicked()
+                {
+                    ui_state.show_object_inspector = !ui_state.show_object_inspector;
+                    if ui_state.show_object_inspector {
+                        debug_inspector_events.send(DebugInspectorEvent::Show);
+                        debug_inspector_events
+                            .send(DebugInspectorEvent::InspectEntity(query_player.single()));
+                    } else {
+                        debug_inspector_events.send(DebugInspectorEvent::Hide);
+                    }
+                }
             });
         });
     });

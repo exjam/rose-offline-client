@@ -1,20 +1,18 @@
 use bevy::{
-    input::Input,
     math::{Mat4, Vec2, Vec3},
     prelude::{
-        Assets, Camera, Commands, Entity, EventReader, EventWriter, GlobalTransform, Handle, Local,
-        Mesh, MouseButton, Parent, Query, Res, Transform, With, Without,
+        Assets, Camera, Commands, Entity, GlobalTransform, Handle, Mesh, Parent, Query, Res,
+        Transform, With, Without,
     },
     render::{
-        camera::{Camera3d, RenderTarget},
+        camera::RenderTarget,
         mesh::{Indices, VertexAttributeValues},
     },
-    window::{CursorMoved, Window, Windows},
+    window::{Window, Windows},
 };
 use bevy_rapier3d::{
     physics::{
-        ColliderBundle, IntoEntity, QueryPipelineColliderComponentsQuery,
-        QueryPipelineColliderComponentsSet,
+        ColliderBundle, QueryPipelineColliderComponentsQuery, QueryPipelineColliderComponentsSet,
     },
     prelude::{
         ColliderFlags, ColliderFlagsComponent, ColliderShape, ColliderShapeComponent,
@@ -22,15 +20,7 @@ use bevy_rapier3d::{
     },
 };
 
-use crate::{
-    components::{CollisionRayCastSource, CollisionTriMesh, COLLISION_GROUP_PLAYER_MOVEABLE},
-    events::PickingEvent,
-};
-
-#[derive(Default)]
-pub struct MousePosition {
-    position: Vec2,
-}
+use crate::components::{CollisionRayCastSource, CollisionTriMesh, COLLISION_FILTER_COLLIDABLE};
 
 fn get_window_for_camera<'a>(windows: &'a Windows, camera: &Camera) -> Option<&'a Window> {
     match camera.target {
@@ -42,12 +32,12 @@ fn get_window_for_camera<'a>(windows: &'a Windows, camera: &Camera) -> Option<&'
     }
 }
 
-fn from_screenspace(
+pub fn ray_from_screenspace(
     cursor_pos_screen: Vec2,
     windows: &Res<Windows>,
     camera: &Camera,
     camera_transform: &GlobalTransform,
-) -> Option<(Vec3, Vec3)> {
+) -> Option<Ray> {
     let view = camera_transform.compute_matrix();
     let window = get_window_for_camera(windows, camera)?;
     let screen_size = Vec2::from([window.width() as f32, window.height() as f32]);
@@ -69,7 +59,7 @@ fn from_screenspace(
         false => cursor_pos_near - camera_transform.translation, // Direction from camera to cursor
     };
 
-    Some((cursor_pos_near, ray_direction))
+    Some(Ray::new(cursor_pos_near.into(), ray_direction.into()))
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -89,7 +79,7 @@ pub fn collision_system(
             &ray,
             10000000.0,
             false,
-            InteractionGroups::all().with_filter(COLLISION_GROUP_PLAYER_MOVEABLE),
+            InteractionGroups::all().with_memberships(COLLISION_FILTER_COLLIDABLE),
             None,
         );
 
@@ -102,59 +92,16 @@ pub fn collision_system(
     }
 }
 
-#[allow(clippy::too_many_arguments)]
-pub fn collision_picking_system(
-    mouse_button_input: Res<Input<MouseButton>>,
-    mut cursor_moved_events: EventReader<CursorMoved>,
-    mut cursor_position: Local<MousePosition>,
-    windows: Res<Windows>,
-    query_camera: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
-    query_pipeline: Res<QueryPipeline>,
-    colliders: QueryPipelineColliderComponentsQuery,
-    mut picking_events: EventWriter<PickingEvent>,
-) {
-    let colliders = QueryPipelineColliderComponentsSet(&colliders);
-
-    if let Some(event) = cursor_moved_events.iter().last() {
-        cursor_position.position = event.position;
-    }
-
-    if mouse_button_input.just_pressed(MouseButton::Left) {
-        for (camera, camera_transform) in query_camera.iter() {
-            if let Some((origin, direction)) =
-                from_screenspace(cursor_position.position, &windows, camera, camera_transform)
-            {
-                let ray = Ray::new(origin.into(), direction.into());
-                let hit = query_pipeline.cast_ray(
-                    &colliders,
-                    &ray,
-                    10000000.0,
-                    true,
-                    InteractionGroups::default(),
-                    None,
-                );
-
-                if let Some((hit_object, distance)) = hit {
-                    picking_events.send(PickingEvent {
-                        entity: hit_object.0.entity(),
-                        position: ray.point_at(distance).into(),
-                    });
-                }
-            }
-        }
-    }
-}
-
 #[allow(clippy::type_complexity)]
 pub fn collision_add_colliders_system(
     mut commands: Commands,
     meshes: Res<Assets<Mesh>>,
     query_add_trimesh: Query<
-        (Entity, &GlobalTransform, &Handle<Mesh>),
-        (With<CollisionTriMesh>, Without<ColliderShapeComponent>),
+        (Entity, &CollisionTriMesh, &GlobalTransform, &Handle<Mesh>),
+        Without<ColliderShapeComponent>,
     >,
 ) {
-    for (entity, global_transform, mesh_handle) in query_add_trimesh.iter() {
+    for (entity, collision_trimesh, global_transform, mesh_handle) in query_add_trimesh.iter() {
         let global_transform_mat = global_transform.compute_matrix();
         if let Some(mesh) = meshes.get(mesh_handle) {
             if let Some(VertexAttributeValues::Float32x3(vertices)) =
@@ -179,7 +126,10 @@ pub fn collision_add_colliders_system(
                             rapier_indices,
                         )),
                         flags: ColliderFlagsComponent(ColliderFlags {
-                            collision_groups: InteractionGroups::default(),
+                            collision_groups: InteractionGroups::new(
+                                collision_trimesh.group,
+                                collision_trimesh.filter,
+                            ),
                             ..Default::default()
                         }),
                         ..Default::default()

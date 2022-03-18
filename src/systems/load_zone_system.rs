@@ -8,6 +8,7 @@ use bevy::{
     },
     render::{mesh::Indices, render_resource::PrimitiveTopology},
 };
+use bevy_inspector_egui::Inspectable;
 use bevy_rapier3d::{
     physics::ColliderBundle,
     prelude::{
@@ -20,13 +21,14 @@ use std::path::Path;
 use rose_data::{ZoneId, ZoneListEntry};
 use rose_file_readers::{
     HimFile, IfoFile, IfoObject, LitFile, LitObject, TilFile, ZonFile, ZonTile, ZonTileRotation,
-    ZscFile, ZscMaterial,
+    ZscCollisionFlags, ZscCollisionShape, ZscFile,
 };
 
 use crate::{
     components::{
-        CollisionTriMesh, COLLISION_GROUP_PLAYER_MOVEABLE, COLLISION_GROUP_ZONE_OBJECT,
-        COLLISION_GROUP_ZONE_TERRAIN,
+        CollisionTriMesh, COLLISION_FILTER_CLICKABLE, COLLISION_FILTER_COLLIDABLE,
+        COLLISION_FILTER_INSPECTABLE, COLLISION_GROUP_ZONE_OBJECT, COLLISION_GROUP_ZONE_TERRAIN,
+        COLLISION_GROUP_ZONE_WATER,
     },
     events::{LoadZoneEvent, ZoneEvent},
     render::{
@@ -37,14 +39,52 @@ use crate::{
     VfsResource,
 };
 
-pub struct ZoneObjectStaticObjectPart {
-    pub mesh_path: String,
-    pub material: ZscMaterial,
+#[derive(Inspectable)]
+pub enum ZoneObjectStaticObjectPartCollisionShape {
+    None,
+    Sphere,
+    AxisAlignedBoundingBox,
+    ObjectOrientedBoundingBox,
+    Polygon,
 }
 
-#[derive(Component)]
+impl Default for ZoneObjectStaticObjectPartCollisionShape {
+    fn default() -> Self {
+        Self::AxisAlignedBoundingBox
+    }
+}
+
+impl From<&Option<ZscCollisionShape>> for ZoneObjectStaticObjectPartCollisionShape {
+    fn from(value: &Option<ZscCollisionShape>) -> Self {
+        match value {
+            Some(ZscCollisionShape::Sphere) => Self::Sphere,
+            Some(ZscCollisionShape::AxisAlignedBoundingBox) => Self::AxisAlignedBoundingBox,
+            Some(ZscCollisionShape::ObjectOrientedBoundingBox) => Self::ObjectOrientedBoundingBox,
+            Some(ZscCollisionShape::Polygon) => Self::Polygon,
+            None => Self::None,
+        }
+    }
+}
+
+#[derive(Inspectable, Default)]
+pub struct ZoneObjectStaticObjectPart {
+    pub mesh_path: String,
+    pub collision_shape: ZoneObjectStaticObjectPartCollisionShape,
+    pub collision_not_moveable: bool,
+    pub collision_not_pickable: bool,
+    pub collision_height_only: bool,
+    pub collision_no_camera: bool,
+}
+
+#[derive(Inspectable, Default)]
+pub struct ZoneObjectTerrain {
+    pub block_x: u32,
+    pub block_y: u32,
+}
+
+#[derive(Component, Inspectable)]
 pub enum ZoneObject {
-    Terrain,
+    Terrain(ZoneObjectTerrain),
     Water,
     StaticObjectPart(ZoneObjectStaticObjectPart),
 }
@@ -423,7 +463,7 @@ fn load_block_heightmap(
 
     commands
         .spawn_bundle((
-            ZoneObject::Terrain,
+            ZoneObject::Terrain(ZoneObjectTerrain { block_x, block_y }),
             meshes.add(mesh),
             material,
             Transform::from_xyz(offset_x, 0.0, -offset_y),
@@ -434,8 +474,11 @@ fn load_block_heightmap(
         .insert_bundle(ColliderBundle {
             shape: ColliderShapeComponent(ColliderShape::trimesh(collider_verts, collider_indices)),
             flags: ColliderFlagsComponent(ColliderFlags {
-                collision_groups: InteractionGroups::all().with_memberships(
-                    COLLISION_GROUP_ZONE_TERRAIN | COLLISION_GROUP_PLAYER_MOVEABLE,
+                collision_groups: InteractionGroups::new(
+                    COLLISION_GROUP_ZONE_TERRAIN,
+                    COLLISION_FILTER_INSPECTABLE
+                        | COLLISION_FILTER_COLLIDABLE
+                        | COLLISION_FILTER_CLICKABLE,
                 ),
                 ..Default::default()
             }),
@@ -455,14 +498,14 @@ fn load_block_waterplanes(
 ) {
     for (plane_start, plane_end) in water_planes {
         let start = Vec3::new(
-            plane_start.x / 100.0,
+            5200.0 + plane_start.x / 100.0,
             plane_start.y / 100.0,
-            -plane_start.z / 100.0,
+            -(5200.0 + plane_start.z / 100.0),
         );
         let end = Vec3::new(
-            plane_end.x / 100.0,
+            5200.0 + plane_end.x / 100.0,
             plane_end.y / 100.0,
-            -plane_end.z / 100.0,
+            -(5200.0 + plane_end.z / 100.0),
         );
         let uv_x = (end.x - start.x) / (water_size / 100.0);
         let uv_y = (end.z - start.z) / (water_size / 100.0);
@@ -474,11 +517,14 @@ fn load_block_waterplanes(
             ([end.x, start.y, end.z], [0.0, 1.0, 0.0], [0.0, uv_y]),
         ];
         let indices = Indices::U32(vec![0, 2, 1, 0, 3, 2]);
+        let collider_indices = vec![[0, 2, 1], [0, 3, 2]];
 
+        let mut collider_verts = Vec::new();
         let mut positions = Vec::new();
         let mut normals = Vec::new();
         let mut uvs = Vec::new();
         for (position, normal, uv) in &vertices {
+            collider_verts.push((*position).into());
             positions.push(*position);
             normals.push(*normal);
             uvs.push(*uv);
@@ -490,15 +536,31 @@ fn load_block_waterplanes(
         mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
         mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, uvs);
 
-        commands.spawn().insert_bundle((
-            ZoneObject::Water,
-            meshes.add(mesh),
-            water_material.clone(),
-            Transform::from_xyz(5200.0, 0.0, -5200.0),
-            GlobalTransform::default(),
-            Visibility::default(),
-            ComputedVisibility::default(),
-        ));
+        commands
+            .spawn()
+            .insert_bundle((
+                ZoneObject::Water,
+                meshes.add(mesh),
+                water_material.clone(),
+                Transform::default(),
+                GlobalTransform::default(),
+                Visibility::default(),
+                ComputedVisibility::default(),
+            ))
+            .insert_bundle(ColliderBundle {
+                shape: ColliderShapeComponent(ColliderShape::trimesh(
+                    collider_verts,
+                    collider_indices,
+                )),
+                flags: ColliderFlagsComponent(ColliderFlags {
+                    collision_groups: InteractionGroups::new(
+                        COLLISION_GROUP_ZONE_WATER,
+                        COLLISION_FILTER_INSPECTABLE,
+                    ),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            });
     }
 }
 
@@ -610,16 +672,28 @@ fn load_block_object(
             handle
         });
 
-        let collision_group = if object_part.collision_shape.is_none() {
-            COLLISION_GROUP_ZONE_OBJECT
+        let collision_filter = if object_part.collision_shape.is_none() {
+            COLLISION_FILTER_INSPECTABLE
         } else {
-            COLLISION_GROUP_ZONE_OBJECT | COLLISION_GROUP_PLAYER_MOVEABLE
+            COLLISION_FILTER_INSPECTABLE | COLLISION_FILTER_COLLIDABLE | COLLISION_FILTER_CLICKABLE
         };
 
         commands.spawn_bundle((
             ZoneObject::StaticObjectPart(ZoneObjectStaticObjectPart {
                 mesh_path: zsc.meshes[mesh_id].path().to_string_lossy().into(),
-                material: zsc.materials[material_id].clone(),
+                collision_shape: (&object_part.collision_shape).into(),
+                collision_not_moveable: object_part
+                    .collision_flags
+                    .contains(ZscCollisionFlags::NOT_MOVEABLE),
+                collision_not_pickable: object_part
+                    .collision_flags
+                    .contains(ZscCollisionFlags::NOT_PICKABLE),
+                collision_height_only: object_part
+                    .collision_flags
+                    .contains(ZscCollisionFlags::HEIGHT_ONLY),
+                collision_no_camera: object_part
+                    .collision_flags
+                    .contains(ZscCollisionFlags::NOT_CAMERA_COLLISION),
             }),
             mesh,
             material,
@@ -628,7 +702,8 @@ fn load_block_object(
             Visibility::default(),
             ComputedVisibility::default(),
             CollisionTriMesh {
-                group: collision_group,
+                group: COLLISION_GROUP_ZONE_OBJECT,
+                filter: collision_filter,
             },
         ));
     }

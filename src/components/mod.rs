@@ -9,8 +9,10 @@ pub use character_model::{
 };
 pub use client_entity::{ClientEntity, ClientEntityId};
 pub use collision::{
-    CollisionRayCastSource, CollisionTriMesh, COLLISION_GROUP_CHARACTER, COLLISION_GROUP_NPC,
-    COLLISION_GROUP_PLAYER_MOVEABLE, COLLISION_GROUP_ZONE_OBJECT, COLLISION_GROUP_ZONE_TERRAIN,
+    CollisionRayCastSource, CollisionTriMesh, COLLISION_FILTER_CLICKABLE,
+    COLLISION_FILTER_COLLIDABLE, COLLISION_FILTER_INSPECTABLE, COLLISION_GROUP_CHARACTER,
+    COLLISION_GROUP_NPC, COLLISION_GROUP_ZONE_OBJECT, COLLISION_GROUP_ZONE_TERRAIN,
+    COLLISION_GROUP_ZONE_WATER,
 };
 pub use player_character::PlayerCharacter;
 pub use position::Position;
