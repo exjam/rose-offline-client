@@ -5,18 +5,15 @@ use bevy::{
         GlobalTransform, Local, Or, Query, Res, ResMut, State, Transform, Visibility, With,
     },
 };
-use rose_data::ZoneId;
+
 use rose_game_common::{
-    components::{
-        CharacterInfo, ClientEntity, ClientEntityId, ClientEntityType, Destination, MoveMode,
-        MoveSpeed, Npc, StatusEffects, Target,
-    },
+    components::{CharacterInfo, Destination, MoveMode, MoveSpeed, Npc, StatusEffects, Target},
     messages::{client::ClientMessage, server::ServerMessage},
 };
 use rose_network_common::ConnectionError;
 
 use crate::{
-    components::{CollisionRayCastSource, PlayerCharacter, Position},
+    components::{ClientEntity, ClientEntityId, CollisionRayCastSource, PlayerCharacter, Position},
     events::ChatboxEvent,
     resources::{AppState, GameConnection, GameData, LoadedZone},
 };
@@ -159,11 +156,7 @@ pub fn game_connection_system(
                     commands
                         .entity(player_entity)
                         .insert_bundle((
-                            ClientEntity::new(
-                                ClientEntityType::Character,
-                                message.entity_id,
-                                ZoneId::new(1).unwrap(), // TODO: Is ZoneId important in ClientEntity for client?
-                            ),
+                            ClientEntity::new(message.entity_id),
                             message.experience_points,
                             message.team,
                             message.health_points,
@@ -218,11 +211,7 @@ pub fn game_connection_system(
                         status_effects,
                     ))
                     .insert_bundle((
-                        ClientEntity::new(
-                            ClientEntityType::Npc,
-                            message.entity_id,
-                            ZoneId::new(1).unwrap(), // TODO: Is ZoneId important in ClientEntity for client?
-                        ),
+                        ClientEntity::new(message.entity_id),
                         Transform::from_xyz(
                             message.position.x / 100.0,
                             message.position.z / 100.0 + 10000.0,
@@ -287,11 +276,7 @@ pub fn game_connection_system(
                         status_effects,
                     ))
                     .insert_bundle((
-                        ClientEntity::new(
-                            ClientEntityType::Monster,
-                            message.entity_id,
-                            ZoneId::new(1).unwrap(), // TODO: Is ZoneId important in ClientEntity for client?
-                        ),
+                        ClientEntity::new(message.entity_id),
                         Transform::from_xyz(
                             message.position.x / 100.0,
                             message.position.z / 100.0 + 10000.0,
