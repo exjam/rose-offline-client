@@ -1,8 +1,10 @@
 use bevy::{
+    asset::LoadState,
     math::{Quat, Vec2, Vec3},
     prelude::{
-        AssetServer, Assets, BuildChildren, ChildBuilder, Commands, Component, ComputedVisibility,
-        DespawnRecursiveExt, GlobalTransform, Handle, Mesh, Res, ResMut, Transform, Visibility,
+        AssetServer, Assets, Commands, Component, ComputedVisibility, DespawnRecursiveExt, Entity,
+        EventReader, EventWriter, GlobalTransform, Handle, Local, Mesh, Query, Res, ResMut,
+        Transform, Visibility, With,
     },
     render::{mesh::Indices, render_resource::PrimitiveTopology},
 };
@@ -15,7 +17,7 @@ use bevy_rapier3d::{
 };
 use std::path::Path;
 
-use rose_data::ZoneListEntry;
+use rose_data::{ZoneId, ZoneListEntry};
 use rose_file_readers::{
     HimFile, IfoFile, IfoObject, LitFile, LitObject, TilFile, ZonFile, ZonTile, ZonTileRotation,
     ZscFile, ZscMaterial,
@@ -26,24 +28,42 @@ use crate::{
         CollisionTriMesh, COLLISION_GROUP_PLAYER_MOVEABLE, COLLISION_GROUP_ZONE_OBJECT,
         COLLISION_GROUP_ZONE_TERRAIN,
     },
+    events::{LoadZoneEvent, ZoneEvent},
     render::{
         StaticMeshMaterial, TerrainMaterial, TextureArray, TextureArrayBuilder, WaterMeshMaterial,
         MESH_ATTRIBUTE_UV_1, TERRAIN_MESH_ATTRIBUTE_TILE_INFO,
     },
-    resources::{GameData, LoadedZone},
+    resources::GameData,
     VfsResource,
 };
 
-#[derive(Component)]
-pub struct ZoneObject {
+pub struct ZoneObjectStaticObjectPart {
     pub mesh_path: String,
     pub material: ZscMaterial,
+}
+
+#[derive(Component)]
+pub enum ZoneObject {
+    Terrain,
+    Water,
+    StaticObjectPart(ZoneObjectStaticObjectPart),
+}
+
+pub enum LoadZoneState {
+    None,
+    Loading(ZoneId),
+    Loaded(ZoneId),
+}
+
+impl Default for LoadZoneState {
+    fn default() -> Self {
+        Self::None
+    }
 }
 
 #[allow(clippy::too_many_arguments)]
 pub fn load_zone_system(
     mut commands: Commands,
-    mut loaded_zone: ResMut<LoadedZone>,
     asset_server: Res<AssetServer>,
     vfs_resource: Res<VfsResource>,
     game_data: Res<GameData>,
@@ -52,55 +72,80 @@ pub fn load_zone_system(
     mut static_mesh_materials: ResMut<Assets<StaticMeshMaterial>>,
     mut water_mesh_materials: ResMut<Assets<WaterMeshMaterial>>,
     mut texture_arrays: ResMut<Assets<TextureArray>>,
+
+    mut load_zone_state: Local<LoadZoneState>,
+    mut load_zone_event: EventReader<LoadZoneEvent>,
+    mut zone_events: EventWriter<ZoneEvent>,
+    query_zone_objects: Query<(Entity, Option<&Handle<Mesh>>), With<ZoneObject>>,
 ) {
-    let next_zone_id = loaded_zone.next_zone_id.take();
-    if next_zone_id.is_none() {
+    let current_zone_id = match *load_zone_state {
+        LoadZoneState::None => None,
+        LoadZoneState::Loading(zone_id) => Some(zone_id),
+        LoadZoneState::Loaded(zone_id) => Some(zone_id),
+    };
+
+    // Check if we need to load a new zone
+    if let Some(load_zone_event) = load_zone_event.iter().last() {
+        *load_zone_state = LoadZoneState::Loading(load_zone_event.id);
+    }
+
+    let load_zone_id = match *load_zone_state {
+        LoadZoneState::None => None,
+        LoadZoneState::Loading(zone_id) => Some(zone_id),
+        LoadZoneState::Loaded(zone_id) => Some(zone_id),
+    };
+
+    if current_zone_id == load_zone_id {
+        if let LoadZoneState::Loading(zone_id) = *load_zone_state {
+            let mut loaded = true;
+
+            // Check if zone has finished loading
+            for (_, mesh) in query_zone_objects.iter() {
+                if let Some(handle) = mesh {
+                    if matches!(asset_server.get_load_state(handle), LoadState::Loading) {
+                        loaded = false;
+                        break;
+                    }
+                }
+            }
+
+            if loaded {
+                *load_zone_state = LoadZoneState::Loaded(zone_id);
+                zone_events.send(ZoneEvent::Loaded(zone_id));
+            }
+        }
+
+        // Nothing to do
         return;
     }
-    let next_zone_id = next_zone_id.unwrap();
-
-    // Nothing to do if moving to same zone
-    if let Some((current_zone_id, _)) = loaded_zone.zone {
-        if current_zone_id == next_zone_id {
-            return;
-        }
-    }
+    let next_zone_id = load_zone_id.unwrap();
+    *load_zone_state = LoadZoneState::Loading(next_zone_id);
 
     // Despawn old zone
-    if let Some((current_zone_id, current_zone_entity)) = loaded_zone.zone.take() {
-        if current_zone_id == next_zone_id {
-            return;
-        }
-
-        commands.entity(current_zone_entity).despawn_recursive();
+    for (entity, _) in query_zone_objects.iter() {
+        commands.entity(entity).despawn_recursive();
     }
 
     // Spawn new zone
-    let zone_entity = commands
-        .spawn_bundle((GlobalTransform::default(), Transform::default()))
-        .with_children(|child_builder| {
-            if let Some(zone_list_entry) = game_data.zone_list.get_zone(next_zone_id) {
-                load_zone(
-                    child_builder,
-                    &asset_server,
-                    &vfs_resource,
-                    &mut meshes,
-                    &mut terrain_materials,
-                    &mut static_mesh_materials,
-                    &mut water_mesh_materials,
-                    &mut texture_arrays,
-                    zone_list_entry,
-                )
-                .ok();
-            }
-        })
-        .id();
-    loaded_zone.zone = Some((next_zone_id, zone_entity));
+    if let Some(zone_list_entry) = game_data.zone_list.get_zone(next_zone_id) {
+        load_zone(
+            &mut commands,
+            &asset_server,
+            &vfs_resource,
+            &mut meshes,
+            &mut terrain_materials,
+            &mut static_mesh_materials,
+            &mut water_mesh_materials,
+            &mut texture_arrays,
+            zone_list_entry,
+        )
+        .ok();
+    }
 }
 
 #[allow(clippy::too_many_arguments)]
 fn load_zone(
-    commands: &mut ChildBuilder,
+    commands: &mut Commands,
     asset_server: &AssetServer,
     vfs_resource: &VfsResource,
     meshes: &mut ResMut<Assets<Mesh>>,
@@ -258,7 +303,7 @@ fn load_zone(
 
 #[allow(clippy::too_many_arguments)]
 fn load_block_heightmap(
-    commands: &mut ChildBuilder,
+    commands: &mut Commands,
     meshes: &mut Assets<Mesh>,
     heightmap: HimFile,
     tilemap: TilFile,
@@ -377,8 +422,8 @@ fn load_block_heightmap(
     }
 
     commands
-        .spawn()
-        .insert_bundle((
+        .spawn_bundle((
+            ZoneObject::Terrain,
             meshes.add(mesh),
             material,
             Transform::from_xyz(offset_x, 0.0, -offset_y),
@@ -399,7 +444,7 @@ fn load_block_heightmap(
 }
 
 fn load_block_waterplanes(
-    commands: &mut ChildBuilder,
+    commands: &mut Commands,
     meshes: &mut Assets<Mesh>,
     water_size: f32,
     water_planes: &[(
@@ -446,6 +491,7 @@ fn load_block_waterplanes(
         mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, uvs);
 
         commands.spawn().insert_bundle((
+            ZoneObject::Water,
             meshes.add(mesh),
             water_material.clone(),
             Transform::from_xyz(5200.0, 0.0, -5200.0),
@@ -457,7 +503,7 @@ fn load_block_waterplanes(
 }
 
 fn load_block_object(
-    commands: &mut ChildBuilder,
+    commands: &mut Commands,
     asset_server: &AssetServer,
     static_mesh_materials: &mut Assets<StaticMeshMaterial>,
     zsc: &ZscFile,
@@ -466,138 +512,124 @@ fn load_block_object(
     object_instance: &IfoObject,
 ) {
     let object = &zsc.objects[object_instance.object_id as usize];
-
-    let position = Vec3::new(
-        object_instance.position.x,
-        object_instance.position.z,
-        -object_instance.position.y,
-    ) / 100.0
-        + Vec3::new(5200.0, 0.0, -5200.0);
-
-    let scale = Vec3::new(
-        object_instance.scale.x,
-        object_instance.scale.z,
-        object_instance.scale.y,
-    );
-
-    let rotation = Quat::from_xyzw(
-        object_instance.rotation.x,
-        object_instance.rotation.z,
-        -object_instance.rotation.y,
-        object_instance.rotation.w,
-    );
-
-    let transform = Transform::default()
-        .with_translation(position)
-        .with_rotation(rotation)
-        .with_scale(scale);
+    let object_transform = Transform::default()
+        .with_translation(
+            Vec3::new(
+                object_instance.position.x,
+                object_instance.position.z,
+                -object_instance.position.y,
+            ) / 100.0
+                + Vec3::new(5200.0, 0.0, -5200.0),
+        )
+        .with_rotation(Quat::from_xyzw(
+            object_instance.rotation.x,
+            object_instance.rotation.z,
+            -object_instance.rotation.y,
+            object_instance.rotation.w,
+        ))
+        .with_scale(Vec3::new(
+            object_instance.scale.x,
+            object_instance.scale.z,
+            object_instance.scale.y,
+        ));
 
     let mut material_cache: Vec<Option<Handle<StaticMeshMaterial>>> =
         vec![None; zsc.materials.len()];
     let mut mesh_cache: Vec<Option<Handle<Mesh>>> = vec![None; zsc.meshes.len()];
 
-    commands
-        .spawn_bundle((
-            transform,
-            GlobalTransform::default(),
-            Visibility::default(),
-            ComputedVisibility::default(),
-        ))
-        .with_children(|parent| {
-            for (part_index, object_part) in object.parts.iter().enumerate() {
-                let part_position = Vec3::new(
-                    object_part.position.x,
-                    object_part.position.z,
-                    -object_part.position.y,
-                ) / 100.0;
-                let part_scale = Vec3::new(
-                    object_part.scale.x,
-                    object_part.scale.z,
-                    object_part.scale.y,
-                );
-                let part_rotation = Quat::from_xyzw(
+    for (part_index, object_part) in object.parts.iter().enumerate() {
+        let part_transform = object_transform
+            * Transform::default()
+                .with_translation(
+                    Vec3::new(
+                        object_part.position.x,
+                        object_part.position.z,
+                        -object_part.position.y,
+                    ) / 100.0,
+                )
+                .with_rotation(Quat::from_xyzw(
                     object_part.rotation.x,
                     object_part.rotation.z,
                     -object_part.rotation.y,
                     object_part.rotation.w,
-                );
-                let part_transform = Transform::default()
-                    .with_translation(part_position)
-                    .with_rotation(part_rotation)
-                    .with_scale(part_scale);
-
-                let mesh_id = object_part.mesh_id as usize;
-                let mesh = mesh_cache[mesh_id].clone().unwrap_or_else(|| {
-                    let handle = asset_server.load(zsc.meshes[mesh_id].path());
-                    mesh_cache.insert(mesh_id, Some(handle.clone()));
-                    handle
-                });
-                let lit_part = lit_object.and_then(|lit_object| lit_object.parts.get(part_index));
-                let lightmap_texture = lit_part
-                    .map(|lit_part| asset_server.load(lightmap_path.join(&lit_part.filename)));
-                let (lightmap_uv_offset, lightmap_uv_scale) = lit_part
-                    .map(|lit_part| {
-                        let scale = 1.0 / lit_part.parts_per_row as f32;
-                        (
-                            Vec2::new(
-                                (lit_part.part_index % lit_part.parts_per_row) as f32,
-                                (lit_part.part_index / lit_part.parts_per_row) as f32,
-                            ),
-                            scale,
-                        )
-                    })
-                    .unwrap_or((Vec2::new(0.0, 0.0), 1.0));
-
-                let material_id = object_part.material_id as usize;
-                let material = material_cache[material_id].clone().unwrap_or_else(|| {
-                    let zsc_material = &zsc.materials[material_id];
-                    let handle = static_mesh_materials.add(StaticMeshMaterial {
-                        base_texture: Some(asset_server.load(zsc_material.path.path())),
-                        lightmap_texture,
-                        alpha_value: if zsc_material.alpha != 1.0 {
-                            Some(zsc_material.alpha)
-                        } else {
-                            None
-                        },
-                        alpha_enabled: zsc_material.alpha_enabled,
-                        alpha_test: zsc_material.alpha_test,
-                        two_sided: zsc_material.two_sided,
-                        z_write_enabled: zsc_material.z_write_enabled,
-                        z_test_enabled: zsc_material.z_test_enabled,
-                        specular_enabled: zsc_material.specular_enabled,
-                        lightmap_uv_offset,
-                        lightmap_uv_scale,
-                    });
-
-                    /*
-                    pub blend_mode: SceneBlendMode,
-                    pub glow: Option<ZscMaterialGlow>,
-                    */
-                    material_cache.insert(material_id, Some(handle.clone()));
-                    handle
-                });
-
-                let collision_group = if object_part.collision_shape.is_none() {
-                    COLLISION_GROUP_ZONE_OBJECT
-                } else {
-                    COLLISION_GROUP_ZONE_OBJECT | COLLISION_GROUP_PLAYER_MOVEABLE
-                };
-
-                parent.spawn_bundle((
-                    mesh,
-                    material,
-                    part_transform,
-                    GlobalTransform::default(),
-                    Visibility::default(),
-                    ComputedVisibility::default(),
-                    ZoneObject {
-                        mesh_path: zsc.meshes[mesh_id].path().to_string_lossy().into(),
-                        material: zsc.materials[material_id].clone(),
-                    },
-                    CollisionTriMesh {
-                        group: collision_group,
-                    },
+                ))
+                .with_scale(Vec3::new(
+                    object_part.scale.x,
+                    object_part.scale.z,
+                    object_part.scale.y,
                 ));
-            }
+
+        let mesh_id = object_part.mesh_id as usize;
+        let mesh = mesh_cache[mesh_id].clone().unwrap_or_else(|| {
+            let handle = asset_server.load(zsc.meshes[mesh_id].path());
+            mesh_cache.insert(mesh_id, Some(handle.clone()));
+            handle
         });
+        let lit_part = lit_object.and_then(|lit_object| lit_object.parts.get(part_index));
+        let lightmap_texture =
+            lit_part.map(|lit_part| asset_server.load(lightmap_path.join(&lit_part.filename)));
+        let (lightmap_uv_offset, lightmap_uv_scale) = lit_part
+            .map(|lit_part| {
+                let scale = 1.0 / lit_part.parts_per_row as f32;
+                (
+                    Vec2::new(
+                        (lit_part.part_index % lit_part.parts_per_row) as f32,
+                        (lit_part.part_index / lit_part.parts_per_row) as f32,
+                    ),
+                    scale,
+                )
+            })
+            .unwrap_or((Vec2::new(0.0, 0.0), 1.0));
+
+        let material_id = object_part.material_id as usize;
+        let material = material_cache[material_id].clone().unwrap_or_else(|| {
+            let zsc_material = &zsc.materials[material_id];
+            let handle = static_mesh_materials.add(StaticMeshMaterial {
+                base_texture: Some(asset_server.load(zsc_material.path.path())),
+                lightmap_texture,
+                alpha_value: if zsc_material.alpha != 1.0 {
+                    Some(zsc_material.alpha)
+                } else {
+                    None
+                },
+                alpha_enabled: zsc_material.alpha_enabled,
+                alpha_test: zsc_material.alpha_test,
+                two_sided: zsc_material.two_sided,
+                z_write_enabled: zsc_material.z_write_enabled,
+                z_test_enabled: zsc_material.z_test_enabled,
+                specular_enabled: zsc_material.specular_enabled,
+                lightmap_uv_offset,
+                lightmap_uv_scale,
+            });
+
+            /*
+            pub blend_mode: SceneBlendMode,
+            pub glow: Option<ZscMaterialGlow>,
+            */
+            material_cache.insert(material_id, Some(handle.clone()));
+            handle
+        });
+
+        let collision_group = if object_part.collision_shape.is_none() {
+            COLLISION_GROUP_ZONE_OBJECT
+        } else {
+            COLLISION_GROUP_ZONE_OBJECT | COLLISION_GROUP_PLAYER_MOVEABLE
+        };
+
+        commands.spawn_bundle((
+            ZoneObject::StaticObjectPart(ZoneObjectStaticObjectPart {
+                mesh_path: zsc.meshes[mesh_id].path().to_string_lossy().into(),
+                material: zsc.materials[material_id].clone(),
+            }),
+            mesh,
+            material,
+            part_transform,
+            GlobalTransform::default(),
+            Visibility::default(),
+            ComputedVisibility::default(),
+            CollisionTriMesh {
+                group: collision_group,
+            },
+        ));
+    }
 }

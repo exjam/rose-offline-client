@@ -2,8 +2,8 @@ use bevy::{
     ecs::query::QueryEntityError,
     math::Vec3,
     prelude::{
-        Assets, Camera, Color, Commands, Entity, EventReader, Local, PerspectiveCameraBundle,
-        Query, Res, ResMut, Transform, With,
+        Assets, Camera, Color, Commands, Entity, EventReader, EventWriter, Local,
+        PerspectiveCameraBundle, Query, Res, ResMut, Transform, With,
     },
     render::camera::Camera3d,
 };
@@ -12,10 +12,10 @@ use bevy_polyline::{Polyline, PolylineBundle, PolylineMaterial};
 use bevy_rapier3d::prelude::{ColliderShapeComponent, AABB};
 
 use crate::{
-    events::PickingEvent,
+    events::{LoadZoneEvent, PickingEvent},
     fly_camera::{FlyCameraBundle, FlyCameraController},
     follow_camera::FollowCameraController,
-    resources::{GameData, LoadedZone},
+    resources::GameData,
 };
 
 use super::load_zone_system::ZoneObject;
@@ -109,7 +109,7 @@ pub fn zone_viewer_system(
     inspect_object: Option<Res<ZoneViewerInspectObject>>,
     query_zone_object: Query<&ZoneObject>,
     game_data: Res<GameData>,
-    mut loaded_zone: ResMut<LoadedZone>,
+    mut load_zone_events: EventWriter<LoadZoneEvent>,
     mut egui_context: ResMut<EguiContext>,
     camera_query: Query<&Transform, With<Camera>>,
 ) {
@@ -135,7 +135,7 @@ pub fn zone_viewer_system(
                     ui.label(format!("{}", zone.id.get()));
                     ui.label(&zone.name);
                     if ui.button("Load").clicked() {
-                        loaded_zone.next_zone_id = Some(zone.id);
+                        load_zone_events.send(LoadZoneEvent::new(zone.id));
                     }
                     ui.end_row();
                 }
@@ -150,55 +150,67 @@ pub fn zone_viewer_system(
                     .resizable(true)
                     .default_height(300.0)
                     .show(egui_context.ctx_mut(), |ui| {
-                        egui::Grid::new("zone_list_grid").show(ui, |ui| {
-                            ui.label("mesh");
-                            ui.label(&zone_object.mesh_path);
-                            ui.end_row();
+                        match zone_object {
+                            ZoneObject::Terrain => { ui.label("terrain"); }
+                            ZoneObject::Water => { ui.label("water"); }
+                            ZoneObject::StaticObjectPart(object_part) => {
+                                egui::Grid::new("zone_list_grid").show(ui, |ui| {
+                                    // TODO: Replace with bevy-inspector-egui?
+                                    ui.label("mesh");
+                                    ui.label(&object_part.mesh_path);
+                                    ui.end_row();
 
-                            ui.label("texture");
-                            ui.label(zone_object.material.path.path().to_str().unwrap_or(""));
-                            ui.end_row();
+                                    ui.label("texture");
+                                    ui.label(
+                                        object_part.material.path.path().to_str().unwrap_or(""),
+                                    );
+                                    ui.end_row();
 
-                            ui.label("alpha_enabled");
-                            ui.label(format!("{}", zone_object.material.alpha_enabled));
-                            ui.end_row();
+                                    ui.label("alpha_enabled");
+                                    ui.label(format!("{}", object_part.material.alpha_enabled));
+                                    ui.end_row();
 
-                            ui.label("alpha_test");
-                            ui.label(format!("{:?}", zone_object.material.alpha_test));
-                            ui.end_row();
+                                    ui.label("alpha_test");
+                                    ui.label(format!("{:?}", object_part.material.alpha_test));
+                                    ui.end_row();
 
-                            ui.label("alpha");
-                            ui.label(format!("{:?}", zone_object.material.alpha));
-                            ui.end_row();
+                                    ui.label("alpha");
+                                    ui.label(format!("{:?}", object_part.material.alpha));
+                                    ui.end_row();
 
-                            ui.label("blend_mode");
-                            ui.label(format!("{:?}", zone_object.material.blend_mode));
-                            ui.end_row();
+                                    ui.label("blend_mode");
+                                    ui.label(format!("{:?}", object_part.material.blend_mode));
+                                    ui.end_row();
 
-                            ui.label("glow");
-                            ui.label(format!("{:?}", zone_object.material.glow));
-                            ui.end_row();
+                                    ui.label("glow");
+                                    ui.label(format!("{:?}", object_part.material.glow));
+                                    ui.end_row();
 
-                            ui.label("is_skin");
-                            ui.label(format!("{}", zone_object.material.is_skin));
-                            ui.end_row();
+                                    ui.label("is_skin");
+                                    ui.label(format!("{}", object_part.material.is_skin));
+                                    ui.end_row();
 
-                            ui.label("specular_enabled");
-                            ui.label(format!("{:?}", zone_object.material.specular_enabled));
-                            ui.end_row();
+                                    ui.label("specular_enabled");
+                                    ui.label(format!(
+                                        "{:?}",
+                                        object_part.material.specular_enabled
+                                    ));
+                                    ui.end_row();
 
-                            ui.label("two_sided");
-                            ui.label(format!("{}", zone_object.material.two_sided));
-                            ui.end_row();
+                                    ui.label("two_sided");
+                                    ui.label(format!("{}", object_part.material.two_sided));
+                                    ui.end_row();
 
-                            ui.label("z_write_enabled");
-                            ui.label(format!("{}", zone_object.material.z_write_enabled));
-                            ui.end_row();
+                                    ui.label("z_write_enabled");
+                                    ui.label(format!("{}", object_part.material.z_write_enabled));
+                                    ui.end_row();
 
-                            ui.label("z_test_enabled");
-                            ui.label(format!("{}", zone_object.material.z_test_enabled));
-                            ui.end_row();
-                        });
+                                    ui.label("z_test_enabled");
+                                    ui.label(format!("{}", object_part.material.z_test_enabled));
+                                    ui.end_row();
+                                });
+                            }
+                        };
                     });
             }
             Err(QueryEntityError::NoSuchEntity) => {

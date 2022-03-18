@@ -27,13 +27,13 @@ use rose_data::{NpcDatabaseOptions, ZoneId};
 use rose_file_readers::VfsIndex;
 
 use character_model::CharacterModelList;
-use events::{ChatboxEvent, PickingEvent};
+use events::{ChatboxEvent, LoadZoneEvent, PickingEvent, ZoneEvent};
 use fly_camera::FlyCameraPlugin;
 use follow_camera::FollowCameraPlugin;
 use npc_model::NpcModelList;
 use render::RoseRenderPlugin;
 use resources::{
-    run_network_thread, AppState, GameData, LoadedZone, NetworkThread, NetworkThreadMessage,
+    run_network_thread, AppState, GameData, NetworkThread, NetworkThreadMessage,
     ServerConfiguration,
 };
 use systems::{
@@ -275,11 +275,6 @@ fn main() {
 
     // Setup state
     app.add_state(app_state);
-    if matches!(app_state, AppState::ZoneViewer) {
-        app.insert_resource(LoadedZone::with_next_zone(view_zone_id));
-    } else {
-        app.insert_resource(LoadedZone::default());
-    }
 
     app.add_system_set(
         SystemSet::on_enter(AppState::ZoneViewer).with_system(zone_viewer_setup_system),
@@ -323,8 +318,15 @@ fn main() {
                 .with_system(game_debug_ui_system),
         );
 
+    let mut load_zone_events = Events::<LoadZoneEvent>::default();
+    if matches!(app_state, AppState::ZoneViewer) {
+        load_zone_events.send(LoadZoneEvent::new(view_zone_id));
+    }
+
     app.insert_resource(Events::<PickingEvent>::default())
-        .insert_resource(Events::<ChatboxEvent>::default());
+        .insert_resource(Events::<ChatboxEvent>::default())
+        .insert_resource(load_zone_events)
+        .insert_resource(Events::<ZoneEvent>::default());
 
     app.add_system(collision_system)
         .add_system(collision_picking_system)

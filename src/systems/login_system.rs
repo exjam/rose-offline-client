@@ -1,6 +1,8 @@
 use bevy::{
     math::Vec3,
-    prelude::{Commands, Entity, FromWorld, Query, Res, ResMut, Transform, With, World},
+    prelude::{
+        Commands, Entity, EventWriter, FromWorld, Query, Res, ResMut, Transform, With, World,
+    },
     render::camera::Camera3d,
     window::Windows,
 };
@@ -10,11 +12,10 @@ use rose_data::ZoneId;
 use rose_game_common::messages::client::{ClientMessage, JoinServer};
 
 use crate::{
+    events::LoadZoneEvent,
     fly_camera::FlyCameraController,
     follow_camera::FollowCameraController,
-    resources::{
-        Account, LoadedZone, LoginConnection, NetworkThread, ServerConfiguration, ServerList,
-    },
+    resources::{Account, LoginConnection, NetworkThread, ServerConfiguration, ServerList},
 };
 
 enum LoginState {
@@ -62,7 +63,7 @@ impl FromWorld for Login {
 
 pub fn login_state_enter_system(
     mut commands: Commands,
-    mut loaded_zone: ResMut<LoadedZone>,
+    mut loaded_zone: EventWriter<LoadZoneEvent>,
     mut windows: ResMut<Windows>,
     query_cameras: Query<Entity, With<Camera3d>>,
 ) {
@@ -87,7 +88,7 @@ pub fn login_state_enter_system(
     commands.remove_resource::<Account>();
     commands.init_resource::<Login>();
 
-    loaded_zone.next_zone_id = Some(ZoneId::new(4).unwrap());
+    loaded_zone.send(LoadZoneEvent::new(ZoneId::new(4).unwrap()));
 }
 
 pub fn login_state_exit_system(mut commands: Commands) {

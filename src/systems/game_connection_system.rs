@@ -1,11 +1,13 @@
 use bevy::{
     math::{Quat, Vec3},
     prelude::{
-        BuildChildren, Commands, ComputedVisibility, DespawnRecursiveExt, Entity, EventWriter,
-        GlobalTransform, Local, Or, Query, Res, ResMut, State, Transform, Visibility, With,
+        BuildChildren, Commands, ComputedVisibility, DespawnRecursiveExt, Entity, EventReader,
+        EventWriter, GlobalTransform, Local, Or, Query, Res, ResMut, State, Transform, Visibility,
+        With,
     },
 };
 
+use rose_data::ZoneId;
 use rose_game_common::{
     components::{CharacterInfo, Destination, MoveMode, MoveSpeed, Npc, StatusEffects, Target},
     messages::{client::ClientMessage, server::ServerMessage},
@@ -14,14 +16,15 @@ use rose_network_common::ConnectionError;
 
 use crate::{
     components::{ClientEntity, ClientEntityId, CollisionRayCastSource, PlayerCharacter, Position},
-    events::ChatboxEvent,
-    resources::{AppState, GameConnection, GameData, LoadedZone},
+    events::{ChatboxEvent, LoadZoneEvent, ZoneEvent},
+    resources::{AppState, GameConnection, GameData},
 };
 
 pub struct ClientEntityList {
     pub client_entities: Vec<Option<Entity>>,
     pub player_entity: Option<Entity>,
     pub player_entity_id: Option<ClientEntityId>,
+    pub zone_id: Option<ZoneId>,
 }
 
 impl Default for ClientEntityList {
@@ -30,6 +33,7 @@ impl Default for ClientEntityList {
             client_entities: vec![None; 4096],
             player_entity: None,
             player_entity_id: None,
+            zone_id: None,
         }
     }
 }
@@ -57,9 +61,10 @@ pub fn game_connection_system(
     mut commands: Commands,
     game_connection: Option<Res<GameConnection>>,
     game_data: Res<GameData>,
-    mut loaded_zone: ResMut<LoadedZone>,
     mut app_state: ResMut<State<AppState>>,
     mut chatbox_events: EventWriter<ChatboxEvent>,
+    mut load_zone_events: EventWriter<LoadZoneEvent>,
+    mut zone_events: EventReader<ZoneEvent>,
     mut client_entity_list: Local<ClientEntityList>,
     query_entity_name: Query<
         (Option<&CharacterInfo>, Option<&Npc>),
@@ -71,6 +76,21 @@ pub fn game_connection_system(
     }
 
     let game_connection = game_connection.unwrap();
+
+    for zone_event in zone_events.iter() {
+        match zone_event {
+            &ZoneEvent::Loaded(zone_id) => {
+                if client_entity_list.zone_id == Some(zone_id) {
+                    // Tell server we are ready to join the zone
+                    game_connection
+                        .client_message_tx
+                        .send(ClientMessage::JoinZoneRequest)
+                        .ok();
+                }
+            }
+        }
+    }
+
     let result: Result<(), anyhow::Error> = loop {
         match game_connection.server_message_rx.try_recv() {
             Ok(ServerMessage::ConnectionResponse(response)) => match response {
@@ -80,9 +100,6 @@ pub fn game_connection_system(
                 }
             },
             Ok(ServerMessage::CharacterData(character_data)) => {
-                // Load next zone
-                loaded_zone.next_zone_id = Some(character_data.zone_id);
-
                 let status_effects = StatusEffects::default();
                 let ability_values = game_data.ability_value_calculator.calculate(
                     &character_data.character_info,
@@ -132,12 +149,9 @@ pub fn game_connection_system(
                         .id(),
                 );
 
-                // Tell server we are ready to join the zone
-                // TODO: Do this after zone loading completes ?
-                game_connection
-                    .client_message_tx
-                    .send(ClientMessage::JoinZoneRequest)
-                    .ok();
+                // Load next zone
+                load_zone_events.send(LoadZoneEvent::new(character_data.zone_id));
+                client_entity_list.zone_id = Some(character_data.zone_id);
             }
             Ok(ServerMessage::CharacterDataItems(message)) => {
                 if let Some(player_entity) = client_entity_list.player_entity {
@@ -329,9 +343,6 @@ pub fn game_connection_system(
             }
             Ok(ServerMessage::Teleport(message)) => {
                 if let Some(player_entity) = client_entity_list.player_entity {
-                    // Load next zone
-                    loaded_zone.next_zone_id = Some(message.zone_id);
-
                     // Update player position
                     commands
                         .entity(player_entity)
@@ -356,11 +367,9 @@ pub fn game_connection_system(
                     }
                     client_entity_list.clear();
 
-                    // TODO: Do this after zone loading completes ?
-                    game_connection
-                        .client_message_tx
-                        .send(ClientMessage::JoinZoneRequest)
-                        .ok();
+                    // Load next zone
+                    load_zone_events.send(LoadZoneEvent::new(message.zone_id));
+                    client_entity_list.zone_id = Some(message.zone_id);
                 }
             }
             Ok(ServerMessage::LocalChat(message)) => {
