@@ -9,7 +9,7 @@ use rose_game_common::messages::{
         AnnounceChat, CharacterData, CharacterDataItems, CharacterDataQuest,
         ConnectionRequestError, ConnectionResponse, JoinZoneResponse, LocalChat, MoveEntity,
         RemoveEntities, ServerMessage, ShoutChat, SpawnEntityMonster, SpawnEntityNpc, Teleport,
-        Whisper,
+        UpdateSpeed, Whisper,
     },
 };
 use rose_network_common::{Connection, Packet, PacketCodec};
@@ -22,7 +22,8 @@ use rose_network_irose::{
         PacketServerCharacterInventory, PacketServerCharacterQuestData, PacketServerJoinZone,
         PacketServerLocalChat, PacketServerMoveEntity, PacketServerRemoveEntities,
         PacketServerSelectCharacter, PacketServerShoutChat, PacketServerSpawnEntityMonster,
-        PacketServerSpawnEntityNpc, PacketServerTeleport, PacketServerWhisper, ServerPackets,
+        PacketServerSpawnEntityNpc, PacketServerTeleport, PacketServerUpdateSpeed,
+        PacketServerWhisper, ServerPackets,
     },
     ClientPacketCodec, IROSE_112_TABLE,
 };
@@ -229,6 +230,16 @@ impl GameClient {
                     .send(ServerMessage::Whisper(Whisper {
                         from: message.from.to_string(),
                         text: message.text.to_string(),
+                    }))
+                    .ok();
+            }
+            Some(ServerPackets::UpdateSpeed) => {
+                let message = PacketServerUpdateSpeed::try_from(&packet)?;
+                self.server_message_tx
+                    .send(ServerMessage::UpdateSpeed(UpdateSpeed {
+                        entity_id: message.entity_id,
+                        run_speed: message.run_speed,
+                        passive_attack_speed: message.passive_attack_speed,
                     }))
                     .ok();
             }

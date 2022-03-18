@@ -408,6 +408,13 @@ pub fn game_connection_system(
             Ok(ServerMessage::AnnounceChat(message)) => {
                 chatbox_events.send(ChatboxEvent::Announce(message.name, message.text));
             }
+            Ok(ServerMessage::UpdateSpeed(message)) => {
+                if let Some(entity) = client_entity_list.get(message.entity_id) {
+                    commands
+                        .entity(entity)
+                        .insert(MoveSpeed::new(message.run_speed as f32));
+                }
+            }
             Ok(message) => {
                 log::warn!("Received unexpected game server message: {:#?}", message);
             }
