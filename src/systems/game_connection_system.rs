@@ -9,14 +9,14 @@ use rose_data::ZoneId;
 use rose_game_common::{
     components::{
         CharacterInfo, ClientEntity, ClientEntityId, ClientEntityType, Destination, MoveMode,
-        MoveSpeed, Npc, Position, StatusEffects, Target,
+        MoveSpeed, Npc, StatusEffects, Target,
     },
     messages::{client::ClientMessage, server::ServerMessage},
 };
 use rose_network_common::ConnectionError;
 
 use crate::{
-    components::{CollisionRayCastSource, PlayerCharacter},
+    components::{CollisionRayCastSource, PlayerCharacter, Position},
     events::ChatboxEvent,
     resources::{AppState, GameConnection, GameData, LoadedZone},
 };
@@ -84,7 +84,7 @@ pub fn game_connection_system(
             },
             Ok(ServerMessage::CharacterData(character_data)) => {
                 // Load next zone
-                loaded_zone.next_zone_id = Some(character_data.position.zone_id);
+                loaded_zone.next_zone_id = Some(character_data.zone_id);
 
                 let status_effects = StatusEffects::default();
                 let ability_values = game_data.ability_value_calculator.calculate(
@@ -115,7 +115,7 @@ pub fn game_connection_system(
                             character_data.skill_points,
                             character_data.union_membership,
                             character_data.stamina,
-                            character_data.position.clone(),
+                            Position::new(character_data.position),
                         ))
                         .insert_bundle((
                             ability_values,
@@ -124,9 +124,9 @@ pub fn game_connection_system(
                             move_speed,
                             PlayerCharacter {},
                             Transform::from_xyz(
-                                character_data.position.position.x / 100.0,
-                                20.0,
-                                -character_data.position.position.y / 100.0,
+                                character_data.position.x / 100.0,
+                                character_data.position.z / 100.0 + 100.0,
+                                -character_data.position.y / 100.0,
                             ),
                             GlobalTransform::default(),
                             Visibility::default(),
@@ -210,9 +210,9 @@ pub fn game_connection_system(
                         message.npc,
                         message.team,
                         message.health,
-                        message.command,
+                        // TODO: message.command,
                         message.move_mode,
-                        message.position.clone(),
+                        Position::new(message.position),
                         ability_values,
                         move_speed,
                         status_effects,
@@ -224,9 +224,9 @@ pub fn game_connection_system(
                             ZoneId::new(1).unwrap(), // TODO: Is ZoneId important in ClientEntity for client?
                         ),
                         Transform::from_xyz(
-                            message.position.position.x / 100.0,
-                            100000.0,
-                            -message.position.position.y / 100.0,
+                            message.position.x / 100.0,
+                            message.position.z / 100.0 + 10000.0,
+                            -message.position.y / 100.0,
                         )
                         .with_rotation(Quat::from_axis_angle(
                             Vec3::Y,
@@ -279,9 +279,9 @@ pub fn game_connection_system(
                         message.npc,
                         message.team,
                         message.health,
-                        message.command,
+                        // TODO: message.command,
                         message.move_mode,
-                        message.position.clone(),
+                        Position::new(message.position),
                         ability_values,
                         move_speed,
                         status_effects,
@@ -293,9 +293,9 @@ pub fn game_connection_system(
                             ZoneId::new(1).unwrap(), // TODO: Is ZoneId important in ClientEntity for client?
                         ),
                         Transform::from_xyz(
-                            message.position.position.x / 100.0,
-                            100000.0,
-                            -message.position.position.y / 100.0,
+                            message.position.x / 100.0,
+                            message.position.z / 100.0 + 10000.0,
+                            -message.position.y / 100.0,
                         ),
                         GlobalTransform::default(),
                         Visibility::default(),
@@ -351,8 +351,8 @@ pub fn game_connection_system(
                     commands
                         .entity(player_entity)
                         .insert_bundle((
-                            Position::new(Vec3::new(message.x, message.y, 0.0), message.zone_id),
-                            Transform::from_xyz(message.x / 100.0, 20.0, -message.y / 100.0),
+                            Position::new(Vec3::new(message.x, message.y, 0.0)),
+                            Transform::from_xyz(message.x / 100.0, 100.0, -message.y / 100.0),
                         ))
                         .remove::<ClientEntity>();
 

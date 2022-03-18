@@ -97,6 +97,17 @@ pub fn game_debug_ui_system(
                 }
             });
 
+            ui.menu_button("Cheats", |ui| {
+                if ui.button("Move Speed 4000").clicked() {
+                    if let Some(game_connection) = game_connection.as_ref() {
+                        game_connection
+                            .client_message_tx
+                            .send(ClientMessage::Chat("/speed 4000".to_string()))
+                            .ok();
+                    }
+                }
+            });
+
             ui.menu_button("View", |ui| {
                 ui.selectable_value(&mut ui_state.show_zone_list, true, "Zone List");
             });

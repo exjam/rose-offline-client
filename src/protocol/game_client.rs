@@ -78,6 +78,7 @@ impl GameClient {
                     .send(ServerMessage::CharacterData(Box::new(CharacterData {
                         character_info: response.character_info,
                         position: response.position,
+                        zone_id: response.zone_id,
                         basic_stats: response.basic_stats,
                         level: response.level,
                         equipment: response.equipment,

@@ -3,7 +3,9 @@ use bevy::{
     math::{Quat, Vec3, Vec3Swizzles},
     prelude::{Commands, Entity, Query, Res, Transform},
 };
-use rose_game_common::components::{Destination, MoveSpeed, Position};
+use rose_game_common::components::{Destination, MoveSpeed};
+
+use crate::components::Position;
 
 pub fn update_position_system(
     mut commands: Commands,

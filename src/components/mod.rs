@@ -1,6 +1,7 @@
 mod character_model;
 mod collision;
 mod player_character;
+mod position;
 
 pub use character_model::{
     CharacterModel, CharacterModelPart, DebugModelSkeleton, ModelSkeleton, NpcModel,
@@ -10,3 +11,4 @@ pub use collision::{
     COLLISION_GROUP_PLAYER_MOVEABLE, COLLISION_GROUP_ZONE_OBJECT, COLLISION_GROUP_ZONE_TERRAIN,
 };
 pub use player_character::PlayerCharacter;
+pub use position::Position;
