@@ -1,12 +1,9 @@
 use bevy::{
     asset::{AssetServer, Handle},
     ecs::system::{lifetimeless::SRes, SystemParamItem},
-    math::{Mat4, Vec2},
+    math::Vec2,
     pbr::{AlphaMode, MaterialPipeline, MaterialPlugin, SpecializedMaterial},
-    prelude::{
-        App, Assets, Commands, Component, Entity, GlobalTransform, HandleUntyped, Mesh, Plugin,
-        Query,
-    },
+    prelude::{App, Assets, HandleUntyped, Mesh, Plugin},
     reflect::TypeUuid,
     render::{
         mesh::MeshVertexBufferLayout,
@@ -22,7 +19,7 @@ use bevy::{
         },
         renderer::RenderDevice,
         texture::Image,
-        RenderApp, RenderStage,
+        RenderApp,
     },
 };
 use bevy_inspector_egui::Inspectable;
@@ -34,16 +31,6 @@ pub const STATIC_MESH_MATERIAL_SHADER_HANDLE: HandleUntyped =
 
 #[derive(Default)]
 pub struct StaticMeshMaterialPlugin;
-
-#[derive(Component)]
-pub struct RoseSkeleton {
-    pub bones: Vec<Entity>,
-}
-
-#[derive(Component)]
-pub struct ExtractedSkeleton {
-    pub bones: Vec<Mat4>,
-}
 
 impl Plugin for StaticMeshMaterialPlugin {
     fn build(&self, app: &mut App) {
@@ -63,27 +50,8 @@ impl Plugin for StaticMeshMaterialPlugin {
         });
 
         if let Ok(render_app) = app.get_sub_app_mut(RenderApp) {
-            render_app
-                .insert_resource(StaticMeshMaterialSamplers { linear_sampler })
-                .add_system_to_stage(RenderStage::Extract, extract_skeletons);
+            render_app.insert_resource(StaticMeshMaterialSamplers { linear_sampler });
         }
-    }
-}
-
-fn extract_skeletons(
-    mut commands: Commands,
-    query_skeletons: Query<(Entity, &RoseSkeleton, &GlobalTransform)>,
-    query_bones: Query<&GlobalTransform>,
-) {
-    for (entity, skeleton, global_transform) in query_skeletons.iter() {
-        let inverse_root = global_transform.compute_matrix().inverse();
-        let mut bones_matrix = Vec::new();
-        for &bone in skeleton.bones.iter() {
-            bones_matrix.push(inverse_root * query_bones.get(bone).unwrap().compute_matrix());
-        }
-        commands.get_or_spawn(entity).insert(ExtractedSkeleton {
-            bones: bones_matrix,
-        });
     }
 }
 
@@ -123,6 +91,7 @@ pub struct StaticMeshMaterial {
     pub z_test_enabled: bool,
     pub z_write_enabled: bool,
     pub specular_enabled: bool,
+    pub skinned: bool,
 
     // lightmap texture, uv offset, uv scale
     pub lightmap_texture: Option<Handle<Image>>,
@@ -141,6 +110,7 @@ impl Default for StaticMeshMaterial {
             z_test_enabled: true,
             z_write_enabled: true,
             specular_enabled: false,
+            skinned: false,
             lightmap_texture: None,
             lightmap_uv_offset: Vec2::new(0.0, 0.0),
             lightmap_uv_scale: 1.0,
@@ -162,6 +132,8 @@ pub struct GpuStaticMeshMaterial {
     pub two_sided: bool,
     pub z_test_enabled: bool,
     pub z_write_enabled: bool,
+
+    pub skinned: bool,
 }
 
 impl RenderAsset for StaticMeshMaterial {
@@ -282,6 +254,7 @@ impl RenderAsset for StaticMeshMaterial {
             uniform_buffer,
             base_texture: material.base_texture,
             lightmap_texture: material.lightmap_texture,
+            skinned: material.skinned,
             flags,
             alpha_mode,
             two_sided: material.two_sided,
@@ -297,6 +270,7 @@ pub struct StaticMeshMaterialKey {
     two_sided: bool,
     z_test_enabled: bool,
     z_write_enabled: bool,
+    skinned: bool,
 }
 
 impl SpecializedMaterial for StaticMeshMaterial {
@@ -308,6 +282,7 @@ impl SpecializedMaterial for StaticMeshMaterial {
             two_sided: render_asset.two_sided,
             z_test_enabled: render_asset.z_test_enabled,
             z_write_enabled: render_asset.z_write_enabled,
+            skinned: render_asset.skinned,
         }
     }
 
@@ -334,6 +309,23 @@ impl SpecializedMaterial for StaticMeshMaterial {
                 .push(String::from("HAS_STATIC_MESH_LIGHTMAP"));
 
             vertex_attributes.push(MESH_ATTRIBUTE_UV_1.at_shader_location(2));
+        }
+
+        if layout.contains(Mesh::ATTRIBUTE_JOINT_INDEX)
+            && layout.contains(Mesh::ATTRIBUTE_JOINT_WEIGHT)
+        {
+            descriptor.vertex.shader_defs.push(String::from("SKINNED"));
+            descriptor
+                .fragment
+                .as_mut()
+                .unwrap()
+                .shader_defs
+                .push(String::from("SKINNED"));
+
+            vertex_attributes.push(Mesh::ATTRIBUTE_JOINT_INDEX.at_shader_location(3));
+            vertex_attributes.push(Mesh::ATTRIBUTE_JOINT_WEIGHT.at_shader_location(4));
+        } else if key.skinned {
+            panic!("strange");
         }
 
         descriptor.vertex.buffers = vec![layout.get_layout(&vertex_attributes)?];

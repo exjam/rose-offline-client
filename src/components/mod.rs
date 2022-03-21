@@ -1,12 +1,12 @@
+mod active_motion;
 mod character_model;
 mod client_entity;
 mod collision;
 mod player_character;
 mod position;
 
-pub use character_model::{
-    CharacterModel, CharacterModelPart, DebugModelSkeleton, ModelSkeleton, NpcModel,
-};
+pub use active_motion::ActiveMotion;
+pub use character_model::{CharacterModel, CharacterModelPart, DebugModelSkeleton, NpcModel};
 pub use client_entity::{ClientEntity, ClientEntityId};
 pub use collision::{
     CollisionRayCastSource, CollisionTriMesh, COLLISION_FILTER_CLICKABLE,

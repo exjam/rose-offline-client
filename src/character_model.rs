@@ -1,9 +1,10 @@
 use bevy::{
-    math::{Quat, Vec3},
+    math::{Mat4, Quat, Vec3},
     prelude::{
         AssetServer, Assets, BuildChildren, Commands, ComputedVisibility, Entity, GlobalTransform,
         Mesh, Transform, Visibility,
     },
+    render::mesh::skinning::{SkinnedMesh, SkinnedMeshInverseBindposes},
 };
 use enum_map::EnumMap;
 
@@ -12,7 +13,7 @@ use rose_file_readers::{VfsIndex, ZmdFile, ZscFile};
 use rose_game_common::components::{CharacterGender, CharacterInfo, Equipment};
 
 use crate::{
-    components::{CharacterModel, CharacterModelPart, ModelSkeleton},
+    components::{CharacterModel, CharacterModelPart},
     render::StaticMeshMaterial,
 };
 
@@ -144,14 +145,18 @@ pub fn spawn_character_model(
     model_entity: Entity,
     asset_server: &AssetServer,
     static_mesh_materials: &mut Assets<StaticMeshMaterial>,
+    skinned_mesh_inverse_bindposes_assets: &mut Assets<SkinnedMeshInverseBindposes>,
     character_model_list: &CharacterModelList,
     character_info: &CharacterInfo,
     equipment: &Equipment,
-) -> (CharacterModel, ModelSkeleton) {
-    let skeleton = spawn_skeleton(
+) -> (CharacterModel, SkinnedMesh) {
+    let skeleton = character_model_list.get_skeleton(character_info.gender);
+    let dummy_bone_offset = skeleton.bones.len();
+    let skinned_mesh = spawn_skeleton(
         commands,
         model_entity,
         character_model_list.get_skeleton(character_info.gender),
+        skinned_mesh_inverse_bindposes_assets,
     );
     let mut model_parts = EnumMap::default();
 
@@ -175,8 +180,9 @@ pub fn spawn_character_model(
                 static_mesh_materials,
                 character_model_list.get_model_list(character_info.gender, model_part),
                 model_id,
-                &skeleton,
-                model_part.default_bone_id(skeleton.dummy_bone_offset),
+                &skinned_mesh,
+                model_part.default_bone_id(dummy_bone_offset),
+                dummy_bone_offset,
             );
         }
     }
@@ -185,8 +191,9 @@ pub fn spawn_character_model(
         CharacterModel {
             gender: character_info.gender,
             model_parts,
+            dummy_bone_offset,
         },
-        skeleton,
+        skinned_mesh,
     )
 }
 
@@ -198,7 +205,7 @@ pub fn update_character_equipment(
     static_mesh_materials: &mut Assets<StaticMeshMaterial>,
     character_model_list: &CharacterModelList,
     character_model: &mut CharacterModel,
-    model_skeleton: &ModelSkeleton,
+    skinned_mesh: &SkinnedMesh,
     character_info: &CharacterInfo,
     equipment: &Equipment,
 ) {
@@ -231,11 +238,23 @@ pub fn update_character_equipment(
                     static_mesh_materials,
                     character_model_list.get_model_list(character_info.gender, model_part),
                     model_id,
-                    model_skeleton,
-                    model_part.default_bone_id(model_skeleton.dummy_bone_offset),
+                    skinned_mesh,
+                    model_part.default_bone_id(character_model.dummy_bone_offset),
+                    character_model.dummy_bone_offset,
                 );
             }
         }
+    }
+}
+
+fn transform_children(skeleton: &ZmdFile, bone_transforms: &mut Vec<Transform>, bone_index: usize) {
+    for (child_id, child_bone) in skeleton.bones.iter().enumerate() {
+        if child_id == bone_index || child_bone.parent as usize != bone_index {
+            continue;
+        }
+
+        bone_transforms[child_id] = bone_transforms[bone_index] * bone_transforms[child_id];
+        transform_children(skeleton, bone_transforms, child_id);
     }
 }
 
@@ -243,7 +262,9 @@ pub fn spawn_skeleton(
     commands: &mut Commands,
     model_entity: Entity,
     skeleton: &ZmdFile,
-) -> ModelSkeleton {
+    skinned_mesh_inverse_bindposes_assets: &mut Assets<SkinnedMeshInverseBindposes>,
+) -> SkinnedMesh {
+    let mut bind_pose = Vec::with_capacity(skeleton.bones.len());
     let mut bone_entities = Vec::with_capacity(skeleton.bones.len());
     let dummy_bone_offset = skeleton.bones.len();
 
@@ -261,12 +282,26 @@ pub fn spawn_skeleton(
             .with_translation(position)
             .with_rotation(rotation);
 
+        bind_pose.push(transform);
+
         bone_entities.push(
             commands
                 .spawn_bundle((transform, GlobalTransform::default()))
                 .id(),
         );
     }
+
+    // Apply parent-child transform hierarchy to calculate bind pose for each bone
+    transform_children(skeleton, &mut bind_pose, 0);
+    for (dummy_id, dummy_bone) in skeleton.dummy_bones.iter().enumerate() {
+        bind_pose[dummy_id + dummy_bone_offset] =
+            bind_pose[dummy_id + dummy_bone_offset] * bind_pose[dummy_bone.parent as usize];
+    }
+
+    let inverse_bind_pose: Vec<Mat4> = bind_pose
+        .iter()
+        .map(|x| x.compute_matrix().inverse())
+        .collect();
 
     for (i, bone) in skeleton
         .bones
@@ -283,9 +318,10 @@ pub fn spawn_skeleton(
         }
     }
 
-    ModelSkeleton {
-        bones: bone_entities,
-        dummy_bone_offset,
+    SkinnedMesh {
+        inverse_bindposes: skinned_mesh_inverse_bindposes_assets
+            .add(SkinnedMeshInverseBindposes::from(inverse_bind_pose)),
+        joints: bone_entities,
     }
 }
 
@@ -297,8 +333,9 @@ pub fn spawn_model(
     static_mesh_materials: &mut Assets<StaticMeshMaterial>,
     model_list: &ZscFile,
     model_id: usize,
-    model_skeleton: &ModelSkeleton,
+    skinned_mesh: &SkinnedMesh,
     default_bone_index: Option<usize>,
+    dummy_bone_offset: usize,
 ) -> (usize, Vec<Entity>) {
     let mut parts = Vec::new();
     let object = if let Some(object) = model_list.objects.get(model_id) {
@@ -326,6 +363,7 @@ pub fn spawn_model(
             z_write_enabled: zsc_material.z_write_enabled,
             z_test_enabled: zsc_material.z_test_enabled,
             specular_enabled: zsc_material.specular_enabled,
+            skinned: zsc_material.is_skin,
             ..Default::default()
         });
 
@@ -333,6 +371,7 @@ pub fn spawn_model(
             .spawn_bundle((
                 mesh,
                 material,
+                skinned_mesh.clone(),
                 Transform::default(),
                 GlobalTransform::default(),
                 Visibility::default(),
@@ -341,15 +380,15 @@ pub fn spawn_model(
             .id();
 
         let link_bone_entity = if let Some(bone_index) = object_part.bone_index {
-            model_skeleton.bones.get(bone_index as usize).cloned()
+            skinned_mesh.joints.get(bone_index as usize).cloned()
         } else if let Some(dummy_index) = object_part.dummy_index {
-            model_skeleton
-                .bones
-                .get(dummy_index as usize + model_skeleton.dummy_bone_offset)
+            skinned_mesh
+                .joints
+                .get(dummy_index as usize + dummy_bone_offset)
                 .cloned()
         } else if let Some(default_bone_index) = default_bone_index {
-            model_skeleton
-                .bones
+            skinned_mesh
+                .joints
                 .get(default_bone_index as usize)
                 .cloned()
         } else {

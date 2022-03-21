@@ -19,20 +19,21 @@ lazy_static = "1.4.0"
 log = "0.4.14"
 md5 = "0.7.0"
 num-traits = "0.2"
+rand = "0.8"
 smooth-bevy-cameras = "0.2.0"
 thiserror = "1.0"
 tokio = { version = "1.17", features = ["rt", "net", "sync", "macros", "io-util"] }
-rose-data = { git = "https://github.com/exjam/rose-offline", rev = "69e83e26100fa77ee36247df87962217db57f2ec" }
-rose-data-irose = { git = "https://github.com/exjam/rose-offline", rev = "69e83e26100fa77ee36247df87962217db57f2ec" }
-rose-file-readers = { git = "https://github.com/exjam/rose-offline", rev = "69e83e26100fa77ee36247df87962217db57f2ec" }
-rose-game-common = { git = "https://github.com/exjam/rose-offline", rev = "69e83e26100fa77ee36247df87962217db57f2ec" }
-rose-game-irose = { git = "https://github.com/exjam/rose-offline", rev = "69e83e26100fa77ee36247df87962217db57f2ec" }
-rose-network-common = { git = "https://github.com/exjam/rose-offline", rev = "69e83e26100fa77ee36247df87962217db57f2ec" }
-rose-network-irose = { git = "https://github.com/exjam/rose-offline", rev = "69e83e26100fa77ee36247df87962217db57f2ec" }
+rose-data = { git = "https://github.com/exjam/rose-offline", rev = "896ca93a9d13e35f22a19c2ddddf4c49e0632955" }
+rose-data-irose = { git = "https://github.com/exjam/rose-offline", rev = "896ca93a9d13e35f22a19c2ddddf4c49e0632955" }
+rose-file-readers = { git = "https://github.com/exjam/rose-offline", rev = "896ca93a9d13e35f22a19c2ddddf4c49e0632955" }
+rose-game-common = { git = "https://github.com/exjam/rose-offline", rev = "896ca93a9d13e35f22a19c2ddddf4c49e0632955" }
+rose-game-irose = { git = "https://github.com/exjam/rose-offline", rev = "896ca93a9d13e35f22a19c2ddddf4c49e0632955" }
+rose-network-common = { git = "https://github.com/exjam/rose-offline", rev = "896ca93a9d13e35f22a19c2ddddf4c49e0632955" }
+rose-network-irose = { git = "https://github.com/exjam/rose-offline", rev = "896ca93a9d13e35f22a19c2ddddf4c49e0632955" }
 
 [patch.crates-io]
-bevy = { git = "https://github.com/exjam/bevy", rev = "614f38e1c84fd8097fd81b734a8f1de5ebcd2b67" }
-bevy_ecs = { git = "https://github.com/exjam/bevy", rev = "614f38e1c84fd8097fd81b734a8f1de5ebcd2b67" }
+bevy = { git = "https://github.com/exjam/bevy", rev = "3838c808664613415e2c4a496f98ec04ebf4ee99" }
+bevy_ecs = { git = "https://github.com/exjam/bevy", rev = "3838c808664613415e2c4a496f98ec04ebf4ee99" }
 bevy_polyline = { git = "https://github.com/exjam/bevy_polyline", rev = "41d59d24dad7a10f5a1149c889f0108f5adc6692" }
 bevy_egui = { git = "https://github.com/exjam/bevy_egui", rev = "f9a1863adf5aa6d43f4c294b79a3637a37d1c700" }
 smooth-bevy-cameras = { git = "https://github.com/exjam/smooth-bevy-cameras", rev = "b9ea906f0f3c623f202d7a2a875e642845a390fc" }

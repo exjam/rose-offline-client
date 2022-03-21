@@ -4,12 +4,23 @@
 [[group(2), binding(0)]]
 var<uniform> mesh: Mesh;
 
+#ifdef SKINNED
+[[group(3), binding(0)]]
+var<uniform> joint_matrices: SkinnedMesh;
+#import bevy_pbr::skinning
+#endif
+
 struct Vertex {
     [[location(0)]] position: vec3<f32>;
     [[location(1)]] uv: vec2<f32>;
 
 #ifdef HAS_STATIC_MESH_LIGHTMAP
     [[location(2)]] lightmap_uv: vec2<f32>;
+#endif
+
+#ifdef SKINNED
+    [[location(3)]] joint_indexes: vec4<u32>;
+    [[location(4)]] joint_weights: vec4<f32>;
 #endif
 };
 
@@ -25,7 +36,6 @@ struct VertexOutput {
 
 [[stage(vertex)]]
 fn vertex(vertex: Vertex) -> VertexOutput {
-    let world_position = mesh.model * vec4<f32>(vertex.position, 1.0);
 
     var out: VertexOutput;
     out.uv = vertex.uv;
@@ -34,8 +44,14 @@ fn vertex(vertex: Vertex) -> VertexOutput {
     out.lightmap_uv = vertex.lightmap_uv;
 #endif
 
-    out.world_position = world_position;
-    out.clip_position = view.view_proj * world_position;
+#ifdef SKINNED
+    var model = skin_model(vertex.joint_indexes, vertex.joint_weights);
+    out.world_position = model * vec4<f32>(vertex.position, 1.0);
+#else
+    out.world_position = mesh.model * vec4<f32>(vertex.position, 1.0);
+#endif
+
+    out.clip_position = view.view_proj * out.world_position;
     return out;
 }
 

@@ -5,10 +5,12 @@ use bevy::{
         Assets, Color, Commands, Component, Entity, GlobalTransform, Handle, Query, ResMut,
         Transform, With, Without,
     },
+    render::mesh::skinning::SkinnedMesh,
 };
 use bevy_polyline::{Polyline, PolylineBundle, PolylineMaterial};
+use rand::prelude::SliceRandom;
 
-use crate::components::{DebugModelSkeleton, ModelSkeleton};
+use crate::components::DebugModelSkeleton;
 
 #[derive(Component)]
 pub struct DebugModelSkeletonData {
@@ -23,7 +25,7 @@ pub fn debug_model_skeleton_system(
         (
             Entity,
             &Transform,
-            &ModelSkeleton,
+            &SkinnedMesh,
             Option<&DebugModelSkeletonData>,
         ),
         With<DebugModelSkeleton>,
@@ -36,7 +38,9 @@ pub fn debug_model_skeleton_system(
     mut polylines: ResMut<Assets<Polyline>>,
     mut polyline_materials: ResMut<Assets<PolylineMaterial>>,
 ) {
-    for (entity, model_transform, model_skeleton, debug_skeleton) in
+    let mut rng = rand::thread_rng();
+
+    for (entity, model_transform, skinned_mesh, debug_skeleton) in
         query_update_debug_skeleton.iter()
     {
         let transform = Transform::from_matrix(model_transform.compute_matrix().inverse());
@@ -46,7 +50,7 @@ pub fn debug_model_skeleton_system(
             if let Some(polyline) = polylines.get_mut(debug_skeleton.polyline.clone()) {
                 polyline.vertices.clear();
 
-                for bone_entity in model_skeleton.bones.iter() {
+                for bone_entity in skinned_mesh.joints.iter() {
                     if let Ok((transform, parent)) = query_bone.get(*bone_entity) {
                         if let Some((parent_transform, _)) =
                             parent.and_then(|x| query_bone.get(x.0).ok())
@@ -67,7 +71,7 @@ pub fn debug_model_skeleton_system(
         } else {
             // Add a new debug skeleton
             let mut polyline_vertices = Vec::new();
-            for bone_entity in model_skeleton.bones.iter() {
+            for bone_entity in skinned_mesh.joints.iter() {
                 if let Ok((transform, parent)) = query_bone.get(*bone_entity) {
                     if let Some((parent_transform, _)) =
                         parent.and_then(|x| query_bone.get(x.0).ok())

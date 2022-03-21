@@ -21,6 +21,7 @@ mod render;
 mod resources;
 mod systems;
 mod vfs_asset_io;
+mod zmo_asset_loader;
 mod zms_asset_loader;
 
 use rose_data::{NpcDatabaseOptions, ZoneId};
@@ -37,7 +38,7 @@ use resources::{
     ServerConfiguration,
 };
 use systems::{
-    ability_values_system, character_model_system, character_select_enter_system,
+    ability_values_system, animation_system, character_model_system, character_select_enter_system,
     character_select_exit_system, character_select_system, collision_add_colliders_system,
     collision_system, debug_model_skeleton_system, game_connection_system, game_debug_ui_system,
     game_input_system, game_state_enter_system, game_ui_system, load_zone_system,
@@ -46,6 +47,7 @@ use systems::{
     world_connection_system, zone_viewer_setup_system, zone_viewer_system, DebugInspectorPlugin,
 };
 use vfs_asset_io::VfsAssetIo;
+use zmo_asset_loader::{ZmoAsset, ZmoAssetLoader};
 use zms_asset_loader::ZmsAssetLoader;
 
 pub struct VfsResource {
@@ -253,6 +255,8 @@ fn main() {
 
     // Initialise rose stuff
     app.init_asset_loader::<ZmsAssetLoader>()
+        .add_asset::<ZmoAsset>()
+        .init_asset_loader::<ZmoAssetLoader>()
         .add_plugin(FlyCameraPlugin::default())
         .add_plugin(FollowCameraPlugin::default())
         .add_plugin(RoseRenderPlugin)
@@ -323,7 +327,8 @@ fn main() {
         .insert_resource(Events::<ZoneEvent>::default());
 
     app.add_system(collision_system)
-        .add_system(collision_add_colliders_system);
+        .add_system(collision_add_colliders_system)
+        .add_system(animation_system);
     //
 
     // Setup network

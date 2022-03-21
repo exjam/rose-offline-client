@@ -1,11 +1,14 @@
-use bevy::prelude::{AssetServer, Assets, Commands, Entity};
+use bevy::{
+    prelude::{AssetServer, Assets, Commands, Entity},
+    render::mesh::skinning::{SkinnedMesh, SkinnedMeshInverseBindposes},
+};
 
 use rose_data::NpcId;
 use rose_file_readers::{ChrFile, VfsIndex, ZmdFile, ZscFile};
 
 use crate::{
     character_model::{spawn_model, spawn_skeleton},
-    components::{ModelSkeleton, NpcModel},
+    components::NpcModel,
     render::StaticMeshMaterial,
 };
 
@@ -30,22 +33,28 @@ pub fn spawn_npc_model(
     npc_model_list: &NpcModelList,
     asset_server: &AssetServer,
     static_mesh_materials: &mut Assets<StaticMeshMaterial>,
+    skinned_mesh_inverse_bindposes_assets: &mut Assets<SkinnedMeshInverseBindposes>,
     npc_id: NpcId,
     vfs: &VfsIndex,
-) -> Option<(NpcModel, ModelSkeleton)> {
+) -> Option<(NpcModel, SkinnedMesh)> {
     let npc_model_data = npc_model_list.chr_npc.npcs.get(&npc_id.get())?;
-    let model_skeleton = if let Some(skeleton) = npc_model_list
+    let (skinned_mesh, dummy_bone_offset) = if let Some(skeleton) = npc_model_list
         .chr_npc
         .skeleton_files
         .get(npc_model_data.skeleton_index as usize)
         .and_then(|p| vfs.read_file::<ZmdFile, _>(p).ok())
     {
-        spawn_skeleton(commands, model_entity, &skeleton)
+        (
+            spawn_skeleton(
+                commands,
+                model_entity,
+                &skeleton,
+                skinned_mesh_inverse_bindposes_assets,
+            ),
+            skeleton.bones.len(),
+        )
     } else {
-        ModelSkeleton {
-            bones: Vec::new(),
-            dummy_bone_offset: 0,
-        }
+        (SkinnedMesh::default(), 0)
     };
 
     let mut model_parts = Vec::with_capacity(16);
@@ -57,17 +66,27 @@ pub fn spawn_npc_model(
             static_mesh_materials,
             &npc_model_list.zsc_npc,
             *model_id as usize,
-            &model_skeleton,
+            &skinned_mesh,
             None,
+            dummy_bone_offset,
         );
         model_parts.append(&mut parts);
+    }
+
+    let mut action_motions = Vec::new();
+    for &(action_id, motion_id) in npc_model_data.motion_ids.iter() {
+        if let Some(motion_path) = npc_model_list.chr_npc.motion_files.get(motion_id as usize) {
+            action_motions.push((action_id, asset_server.load(motion_path)));
+        }
     }
 
     Some((
         NpcModel {
             npc_id,
             model_parts,
+            dummy_bone_offset,
+            action_motions,
         },
-        model_skeleton,
+        skinned_mesh,
     ))
 }

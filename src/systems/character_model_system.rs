@@ -1,10 +1,14 @@
-use bevy::prelude::{AssetServer, Assets, Changed, Commands, Entity, Or, Query, Res, ResMut};
+use bevy::{
+    core::Time,
+    prelude::{AssetServer, Assets, Changed, Commands, Entity, Or, Query, Res, ResMut},
+    render::mesh::skinning::{SkinnedMesh, SkinnedMeshInverseBindposes},
+};
 
 use rose_game_common::components::{CharacterInfo, Equipment};
 
 use crate::{
     character_model::{spawn_character_model, update_character_equipment, CharacterModelList},
-    components::{CharacterModel, ModelSkeleton},
+    components::{ActiveMotion, CharacterModel},
     render::StaticMeshMaterial,
 };
 
@@ -17,16 +21,17 @@ pub fn character_model_system(
             &CharacterInfo,
             &Equipment,
             Option<&mut CharacterModel>,
-            Option<&ModelSkeleton>,
+            Option<&SkinnedMesh>,
         ),
         Or<(Changed<CharacterInfo>, Changed<Equipment>)>,
     >,
     asset_server: Res<AssetServer>,
     character_model_list: Res<CharacterModelList>,
     mut static_mesh_materials: ResMut<Assets<StaticMeshMaterial>>,
+    mut skinned_mesh_inverse_bindposes_assets: ResMut<Assets<SkinnedMeshInverseBindposes>>,
+    time: Res<Time>,
 ) {
-    for (entity, character_info, equipment, mut character_model, model_skeleton) in query.iter_mut()
-    {
+    for (entity, character_info, equipment, mut character_model, skinned_mesh) in query.iter_mut() {
         if let Some(character_model) = character_model.as_mut() {
             update_character_equipment(
                 &mut commands,
@@ -35,23 +40,28 @@ pub fn character_model_system(
                 &mut static_mesh_materials,
                 &character_model_list,
                 character_model,
-                model_skeleton.as_ref().unwrap(),
+                skinned_mesh.as_ref().unwrap(),
                 character_info,
                 equipment,
             );
         } else {
-            let (character_model, model_skeleton) = spawn_character_model(
+            let (character_model, skinned_mesh) = spawn_character_model(
                 &mut commands,
                 entity,
                 &asset_server,
                 &mut static_mesh_materials,
+                &mut skinned_mesh_inverse_bindposes_assets,
                 &character_model_list,
                 character_info,
                 equipment,
             );
             commands
                 .entity(entity)
-                .insert_bundle((character_model, model_skeleton));
+                .insert_bundle((character_model, skinned_mesh))
+                .insert(ActiveMotion::new(
+                    asset_server.load("3DDATA/MOTION/AVATAR/ONEHAND_RUN_M1.ZMO"),
+                    time.seconds_since_startup(),
+                ));
         }
     }
 }

@@ -660,6 +660,7 @@ fn load_block_object(
                 z_write_enabled: zsc_material.z_write_enabled,
                 z_test_enabled: zsc_material.z_test_enabled,
                 specular_enabled: zsc_material.specular_enabled,
+                skinned: zsc_material.is_skin,
                 lightmap_uv_offset,
                 lightmap_uv_scale,
             });

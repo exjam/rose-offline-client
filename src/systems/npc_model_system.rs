@@ -1,24 +1,30 @@
-use bevy::prelude::{AssetServer, Assets, Changed, Commands, Entity, Query, Res, ResMut};
+use bevy::{
+    core::Time,
+    prelude::{AssetServer, Assets, Changed, Commands, Entity, Query, Res, ResMut},
+    render::mesh::skinning::{SkinnedMesh, SkinnedMeshInverseBindposes},
+};
 
 use rose_game_common::components::Npc;
 
 use crate::{
-    components::{ModelSkeleton, NpcModel},
+    components::{ActiveMotion, NpcModel},
     npc_model::{spawn_npc_model, NpcModelList},
     render::StaticMeshMaterial,
     VfsResource,
 };
 
-#[allow(clippy::type_complexity)]
+#[allow(clippy::type_complexity, clippy::too_many_arguments)]
 pub fn npc_model_system(
     mut commands: Commands,
-    mut query: Query<(Entity, &Npc, Option<&mut NpcModel>, Option<&ModelSkeleton>), Changed<Npc>>,
+    mut query: Query<(Entity, &Npc, Option<&mut NpcModel>, Option<&SkinnedMesh>), Changed<Npc>>,
     asset_server: Res<AssetServer>,
     npc_model_list: Res<NpcModelList>,
     vfs_resource: Res<VfsResource>,
     mut static_mesh_materials: ResMut<Assets<StaticMeshMaterial>>,
+    mut skinned_mesh_inverse_bindposes_assets: ResMut<Assets<SkinnedMeshInverseBindposes>>,
+    time: Res<Time>,
 ) {
-    for (entity, npc, mut current_npc_model, current_skeleton) in query.iter_mut() {
+    for (entity, npc, mut current_npc_model, skinned_mesh) in query.iter_mut() {
         if let Some(current_npc_model) = current_npc_model.as_mut() {
             if current_npc_model.npc_id == npc.id {
                 // Does not need new model, ignore
@@ -31,33 +37,48 @@ pub fn npc_model_system(
             }
 
             // Despawn model skeleton
-            if let Some(current_skeleton) = current_skeleton {
-                for bone_entity in current_skeleton.bones.iter() {
+            if let Some(skinned_mesh) = skinned_mesh {
+                for bone_entity in skinned_mesh.joints.iter() {
                     commands.entity(*bone_entity).despawn();
                 }
             }
         }
 
-        if let Some((npc_model, model_skeleton)) = spawn_npc_model(
+        if let Some((npc_model, skinned_mesh)) = spawn_npc_model(
             &mut commands,
             entity,
             &npc_model_list,
             &asset_server,
             &mut static_mesh_materials,
+            &mut skinned_mesh_inverse_bindposes_assets,
             npc.id,
             &vfs_resource.vfs,
         ) {
-            commands
-                .entity(entity)
-                .insert_bundle((npc_model, model_skeleton));
-        } else {
-            if current_npc_model.is_some() {
-                commands.entity(entity).remove::<NpcModel>();
+            let motion = npc_model
+                .action_motions
+                .iter()
+                .find(|(action_id, _)| *action_id == 1)
+                .or_else(|| npc_model.action_motions.get(0));
+            if let Some((_, motion)) = motion {
+                commands.entity(entity).insert(ActiveMotion::new(
+                    motion.clone(),
+                    time.seconds_since_startup(),
+                ));
             }
 
-            if current_skeleton.is_some() {
-                commands.entity(entity).remove::<ModelSkeleton>();
-            }
+            commands
+                .entity(entity)
+                .insert_bundle((npc_model, skinned_mesh));
+        } else {
+            commands
+                .entity(entity)
+                .insert(NpcModel {
+                    npc_id: npc.id,
+                    model_parts: Vec::new(),
+                    dummy_bone_offset: 0,
+                    action_motions: Vec::new(),
+                })
+                .remove::<SkinnedMesh>();
         }
     }
 }
