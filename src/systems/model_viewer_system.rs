@@ -48,6 +48,7 @@ impl Default for ModelViewerUiItemListState {
 pub fn model_viewer_enter_system(
     mut commands: Commands,
     query_cameras: Query<Entity, With<Camera3d>>,
+    game_data: Res<GameData>,
 ) {
     // Reset camera
     for entity in query_cameras.iter() {
@@ -91,17 +92,31 @@ pub fn model_viewer_enter_system(
         character_info,
         equipment,
         GlobalTransform::default(),
-        Transform::default().with_translation(Vec3::new(2.0, 0.0, 0.0)),
+        Transform::default().with_translation(Vec3::new(-2.0, 0.0, 0.0)),
         DebugModelSkeleton::default(),
     ));
 
     // Spawn our NPC model
-    commands.spawn_bundle((
-        Npc::new(NpcId::new(1).unwrap(), 0),
-        GlobalTransform::default(),
-        Transform::default().with_translation(Vec3::new(-2.0, 0.0, 0.0)),
-        DebugModelSkeleton::default(),
-    ));
+    if false {
+        for (count, npc) in game_data.npcs.iter().enumerate() {
+            commands.spawn_bundle((
+                Npc::new(npc.id, 0),
+                GlobalTransform::default(),
+                Transform::default().with_translation(Vec3::new(
+                    (count / 30) as f32 * 5.0,
+                    0.0,
+                    (count % 30) as f32 * 5.0,
+                )),
+            ));
+        }
+    } else {
+        commands.spawn_bundle((
+            Npc::new(NpcId::new(1).unwrap(), 0),
+            GlobalTransform::default(),
+            Transform::default().with_translation(Vec3::new(-2.0, 0.0, 0.0)),
+            DebugModelSkeleton::default(),
+        ));
+    }
 }
 
 #[allow(clippy::too_many_arguments)]
