@@ -1,6 +1,7 @@
 use bevy::{
     core::Time,
-    prelude::{AssetServer, Assets, Changed, Commands, Entity, Query, Res, ResMut},
+    math::Vec3,
+    prelude::{AssetServer, Assets, Changed, Commands, Entity, Query, Res, ResMut, Transform},
     render::mesh::skinning::{SkinnedMesh, SkinnedMeshInverseBindposes},
 };
 
@@ -10,21 +11,32 @@ use crate::{
     components::{ActiveMotion, NpcModel},
     npc_model::{spawn_npc_model, NpcModelList},
     render::StaticMeshMaterial,
+    resources::GameData,
     VfsResource,
 };
 
 #[allow(clippy::type_complexity, clippy::too_many_arguments)]
 pub fn npc_model_system(
     mut commands: Commands,
-    mut query: Query<(Entity, &Npc, Option<&mut NpcModel>, Option<&SkinnedMesh>), Changed<Npc>>,
+    mut query: Query<
+        (
+            Entity,
+            &Npc,
+            Option<&mut NpcModel>,
+            Option<&SkinnedMesh>,
+            &Transform,
+        ),
+        Changed<Npc>,
+    >,
     asset_server: Res<AssetServer>,
     npc_model_list: Res<NpcModelList>,
     vfs_resource: Res<VfsResource>,
     mut static_mesh_materials: ResMut<Assets<StaticMeshMaterial>>,
     mut skinned_mesh_inverse_bindposes_assets: ResMut<Assets<SkinnedMeshInverseBindposes>>,
+    game_data: Res<GameData>,
     time: Res<Time>,
 ) {
-    for (entity, npc, mut current_npc_model, skinned_mesh) in query.iter_mut() {
+    for (entity, npc, mut current_npc_model, skinned_mesh, transform) in query.iter_mut() {
         if let Some(current_npc_model) = current_npc_model.as_mut() {
             if current_npc_model.npc_id == npc.id {
                 // Does not need new model, ignore
@@ -66,9 +78,15 @@ pub fn npc_model_system(
                 ));
             }
 
+            let transform = if let Some(npc_data) = game_data.npcs.get_npc(npc.id) {
+                transform.with_scale(Vec3::new(npc_data.scale, npc_data.scale, npc_data.scale))
+            } else {
+                *transform
+            };
+
             commands
                 .entity(entity)
-                .insert_bundle((npc_model, skinned_mesh));
+                .insert_bundle((npc_model, skinned_mesh, transform));
         } else {
             commands
                 .entity(entity)
