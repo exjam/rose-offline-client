@@ -67,6 +67,7 @@ let STATIC_MESH_MATERIAL_FLAGS_ALPHA_MODE_OPAQUE: u32              = 1u;
 let STATIC_MESH_MATERIAL_FLAGS_ALPHA_MODE_MASK: u32                = 2u;
 let STATIC_MESH_MATERIAL_FLAGS_ALPHA_MODE_BLEND: u32               = 4u;
 let STATIC_MESH_MATERIAL_FLAGS_HAS_ALPHA_VALUE: u32                = 8u;
+let STATIC_MESH_MATERIAL_FLAGS_SPECULAR: u32                       = 16u;
 
 [[group(1), binding(0)]]
 var<uniform> material: StaticMeshMaterialData;

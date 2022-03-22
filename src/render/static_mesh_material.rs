@@ -67,6 +67,7 @@ bitflags::bitflags! {
         const ALPHA_MODE_MASK            = (1 << 1);
         const ALPHA_MODE_BLEND           = (1 << 2);
         const HAS_ALPHA_VALUE            = (1 << 3);
+        const SPECULAR                   = (1 << 4);
         const NONE                       = 0;
     }
 }
@@ -177,36 +178,38 @@ impl RenderAsset for StaticMeshMaterial {
 
         let mut flags = StaticMeshMaterialFlags::NONE;
         let mut alpha_cutoff = 0.5;
+        let mut alpha_value = 1.0;
         let mut alpha_mode = AlphaMode::Opaque;
 
-        if material.alpha_enabled {
-            flags |= StaticMeshMaterialFlags::ALPHA_MODE_BLEND;
-            alpha_mode = AlphaMode::Blend;
-        }
-
-        if let Some(alpha_ref) = material.alpha_test {
-            flags |= StaticMeshMaterialFlags::ALPHA_MODE_MASK;
-            alpha_cutoff = alpha_ref;
-            alpha_mode = AlphaMode::Mask(alpha_cutoff);
-        }
-
-        if !material.alpha_enabled && material.alpha_test.is_none() {
-            flags |= StaticMeshMaterialFlags::ALPHA_MODE_OPAQUE;
-        }
-
         if material.specular_enabled {
-            // Alpha is used for specular, so this is actually opaque
-            flags |= StaticMeshMaterialFlags::ALPHA_MODE_OPAQUE;
+            flags |= StaticMeshMaterialFlags::ALPHA_MODE_OPAQUE | StaticMeshMaterialFlags::SPECULAR;
             alpha_mode = AlphaMode::Opaque;
-        }
-
-        let alpha_value = if let Some(alpha_value) = material.alpha_value {
-            flags |= StaticMeshMaterialFlags::HAS_ALPHA_VALUE;
-            alpha_mode = AlphaMode::Blend;
-            alpha_value
+            alpha_cutoff = 1.0;
         } else {
-            1.0
-        };
+            if material.alpha_enabled {
+                flags |= StaticMeshMaterialFlags::ALPHA_MODE_BLEND;
+                alpha_mode = AlphaMode::Blend;
+
+                if let Some(alpha_ref) = material.alpha_test {
+                    flags |= StaticMeshMaterialFlags::ALPHA_MODE_MASK;
+                    alpha_cutoff = alpha_ref;
+                    alpha_mode = AlphaMode::Mask(alpha_cutoff);
+                }
+            } else {
+                flags |= StaticMeshMaterialFlags::ALPHA_MODE_OPAQUE;
+            }
+
+            if let Some(material_alpha_value) = material.alpha_value {
+                if material_alpha_value == 1.0 {
+                    flags |= StaticMeshMaterialFlags::ALPHA_MODE_OPAQUE;
+                    alpha_mode = AlphaMode::Opaque;
+                } else {
+                    flags |= StaticMeshMaterialFlags::HAS_ALPHA_VALUE;
+                    alpha_mode = AlphaMode::Blend;
+                    alpha_value = material_alpha_value;
+                }
+            }
+        }
 
         let value = StaticMeshMaterialUniformData {
             flags: flags.bits(),
