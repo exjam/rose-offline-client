@@ -21,8 +21,8 @@ use std::path::Path;
 
 use rose_data::{ZoneId, ZoneListEntry};
 use rose_file_readers::{
-    HimFile, IfoFile, IfoObject, LitFile, LitObject, TilFile, ZonFile, ZonTile, ZonTileRotation,
-    ZscCollisionFlags, ZscCollisionShape, ZscFile,
+    HimFile, IfoFile, IfoObject, LitFile, LitObject, StbFile, TilFile, ZonFile, ZonTile,
+    ZonTileRotation, ZscCollisionFlags, ZscCollisionShape, ZscFile,
 };
 
 use crate::{
@@ -78,6 +78,13 @@ pub struct ZoneObjectStaticObjectPart {
 }
 
 #[derive(Inspectable, Default)]
+pub struct ZoneObjectAnimatedObject {
+    pub mesh_path: String,
+    pub motion_path: String,
+    pub texture_path: String,
+}
+
+#[derive(Inspectable, Default)]
 pub struct ZoneObjectTerrain {
     pub block_x: u32,
     pub block_y: u32,
@@ -88,6 +95,7 @@ pub enum ZoneObject {
     Terrain(ZoneObjectTerrain),
     Water,
     StaticObjectPart(ZoneObjectStaticObjectPart),
+    AnimatedObject(ZoneObjectAnimatedObject),
 }
 
 pub enum LoadZoneState {
@@ -206,6 +214,10 @@ fn load_zone(
     let zsc_deco = vfs_resource
         .vfs
         .read_file::<ZscFile, _>(&zone_list_entry.zsc_deco_path)
+        .ok();
+    let stb_morph_object = vfs_resource
+        .vfs
+        .read_file::<StbFile, _>("3DDATA/STB/LIST_MORPH_OBJECT.STB")
         .ok();
 
     // Load zone tile array
@@ -331,6 +343,18 @@ fn load_zone(
                             zsc_deco,
                             &lightmap_path,
                             lit_object,
+                            object_instance,
+                        );
+                    }
+                }
+
+                if let Some(stb_morph_object) = stb_morph_object.as_ref() {
+                    for object_instance in ifo.animated_objects.iter() {
+                        load_animated_object(
+                            commands,
+                            asset_server,
+                            static_mesh_materials.as_mut(),
+                            stb_morph_object,
                             object_instance,
                         );
                     }
@@ -722,4 +746,84 @@ fn load_block_object(
                 }
             }
         });
+}
+
+fn load_animated_object(
+    commands: &mut Commands,
+    asset_server: &AssetServer,
+    static_mesh_materials: &mut Assets<StaticMeshMaterial>,
+    stb_morph_object: &StbFile,
+    object_instance: &IfoObject,
+) {
+    let object_id = object_instance.object_id as usize;
+    let mesh_path = stb_morph_object.get(object_id, 1);
+    let motion_path = stb_morph_object.get(object_id, 2);
+    let texture_path = stb_morph_object.get(object_id, 3);
+
+    let alpha_enabled = stb_morph_object.get_int(object_id, 4) != 0;
+    let two_sided = stb_morph_object.get_int(object_id, 5) != 0;
+    let alpha_test_enabled = stb_morph_object.get_int(object_id, 6) != 0;
+    let z_test_enabled = stb_morph_object.get_int(object_id, 7) != 0;
+    let z_write_enabled = stb_morph_object.get_int(object_id, 8) != 0;
+
+    // TODO: Animated object material blend op
+    let _src_blend = stb_morph_object.get_int(object_id, 9);
+    let _dst_blend = stb_morph_object.get_int(object_id, 10);
+    let _blend_op = stb_morph_object.get_int(object_id, 11);
+
+    let object_transform = Transform::default()
+        .with_translation(
+            Vec3::new(
+                object_instance.position.x,
+                object_instance.position.z,
+                -object_instance.position.y,
+            ) / 100.0
+                + Vec3::new(5200.0, 0.0, -5200.0),
+        )
+        .with_rotation(Quat::from_xyzw(
+            object_instance.rotation.x,
+            object_instance.rotation.z,
+            -object_instance.rotation.y,
+            object_instance.rotation.w,
+        ))
+        .with_scale(Vec3::new(
+            object_instance.scale.x,
+            object_instance.scale.z,
+            object_instance.scale.y,
+        ));
+
+    let mesh = asset_server.load::<Mesh, _>(mesh_path);
+    let material = static_mesh_materials.add(StaticMeshMaterial {
+        base_texture: Some(asset_server.load(texture_path)),
+        lightmap_texture: None,
+        alpha_value: None,
+        alpha_enabled,
+        alpha_test: if alpha_test_enabled { Some(0.5) } else { None },
+        two_sided,
+        z_write_enabled,
+        z_test_enabled,
+        specular_enabled: false,
+        skinned: false,
+        lightmap_uv_offset: Vec2::new(0.0, 0.0),
+        lightmap_uv_scale: 1.0,
+    });
+
+    // TODO: Animation object morph targets, blocked by lack of bevy morph targets
+    commands.spawn_bundle((
+        ZoneObject::AnimatedObject(ZoneObjectAnimatedObject {
+            mesh_path: mesh_path.to_string(),
+            motion_path: motion_path.to_string(),
+            texture_path: texture_path.to_string(),
+        }),
+        mesh,
+        material,
+        object_transform,
+        GlobalTransform::default(),
+        Visibility::default(),
+        ComputedVisibility::default(),
+        CollisionTriMesh {
+            group: COLLISION_GROUP_ZONE_OBJECT,
+            filter: COLLISION_FILTER_INSPECTABLE,
+        },
+    ));
 }

@@ -1,5 +1,3 @@
-use std::any::TypeId;
-
 use bevy::{
     ecs::event::Events,
     input::Input,
@@ -30,7 +28,8 @@ use crate::{
 use super::{
     collision_system::ray_from_screenspace,
     load_zone_system::{
-        ZoneObjectStaticObjectPart, ZoneObjectStaticObjectPartCollisionShape, ZoneObjectTerrain,
+        ZoneObjectAnimatedObject, ZoneObjectStaticObjectPart,
+        ZoneObjectStaticObjectPartCollisionShape, ZoneObjectTerrain,
     },
     ZoneObject,
 };
@@ -63,6 +62,7 @@ impl Plugin for DebugInspectorPlugin {
         inspectable_registry.register::<Handle<StaticMeshMaterial>>();
         inspectable_registry.register::<ZoneObject>();
         inspectable_registry.register::<ZoneObjectTerrain>();
+        inspectable_registry.register::<ZoneObjectAnimatedObject>();
         inspectable_registry.register::<ZoneObjectStaticObjectPart>();
         inspectable_registry.register::<ZoneObjectStaticObjectPartCollisionShape>();
 
@@ -83,9 +83,6 @@ impl Plugin for DebugInspectorPlugin {
             .ignore_component::<bevy_rapier3d::prelude::ColliderChangesComponent>();
         world_inspector_params
             .ignore_component::<bevy_rapier3d::prelude::ColliderBroadPhaseDataComponent>();
-        world_inspector_params
-            .read_only_components
-            .insert(TypeId::of::<ZoneObject>());
     }
 }
 
