@@ -41,14 +41,5 @@ image = { git = "https://github.com/image-rs/image", branch = "version-0.23" }
 bevy_rapier3d = { git = "https://github.com/exjam/bevy_rapier", branch = "fix_bevy_main" }
 bevy-inspector-egui = { git = "https://github.com/exjam/bevy-inspector-egui", rev = "051954a21d96c5c87c69af149f3f8e4812244d8c" }
 
-[patch."https://github.com/exjam/rose-offline"]
-rose-data = { path = "../rose-offline/rose-data" }
-rose-data-irose = { path = "../rose-offline/rose-data-irose" }
-rose-file-readers = { path = "../rose-offline/rose-file-readers" }
-rose-game-common = { path = "../rose-offline/rose-game-common" }
-rose-game-irose = { path = "../rose-offline/rose-game-irose" }
-rose-network-common = { path = "../rose-offline/rose-network-common" }
-rose-network-irose = { path = "../rose-offline/rose-network-irose" }
-
 [profile.dev.package."*"]
 opt-level = 3
