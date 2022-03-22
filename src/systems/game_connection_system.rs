@@ -1,22 +1,21 @@
 use bevy::{
     math::{Quat, Vec3},
     prelude::{
-        BuildChildren, Commands, ComputedVisibility, DespawnRecursiveExt, Entity, EventReader,
-        EventWriter, GlobalTransform, Local, Or, Query, Res, ResMut, State, Transform, Visibility,
-        With,
+        BuildChildren, Commands, ComputedVisibility, DespawnRecursiveExt, Entity, EventWriter,
+        GlobalTransform, Local, Or, Query, Res, ResMut, State, Transform, Visibility, With,
     },
 };
 
 use rose_data::ZoneId;
 use rose_game_common::{
     components::{CharacterInfo, Destination, MoveMode, MoveSpeed, Npc, StatusEffects, Target},
-    messages::{client::ClientMessage, server::ServerMessage},
+    messages::server::ServerMessage,
 };
 use rose_network_common::ConnectionError;
 
 use crate::{
     components::{ClientEntity, ClientEntityId, CollisionRayCastSource, PlayerCharacter, Position},
-    events::{ChatboxEvent, LoadZoneEvent, ZoneEvent},
+    events::{ChatboxEvent, GameConnectionEvent},
     resources::{AppState, GameConnection, GameData},
 };
 
@@ -63,38 +62,24 @@ pub fn game_connection_system(
     game_data: Res<GameData>,
     mut app_state: ResMut<State<AppState>>,
     mut chatbox_events: EventWriter<ChatboxEvent>,
-    mut load_zone_events: EventWriter<LoadZoneEvent>,
-    mut zone_events: EventReader<ZoneEvent>,
     mut client_entity_list: Local<ClientEntityList>,
     query_entity_name: Query<
         (Option<&CharacterInfo>, Option<&Npc>),
         Or<(With<CharacterInfo>, With<Npc>)>,
     >,
+    mut game_connection_events: EventWriter<GameConnectionEvent>,
 ) {
     if game_connection.is_none() {
         return;
     }
-
     let game_connection = game_connection.unwrap();
-
-    for zone_event in zone_events.iter() {
-        match zone_event {
-            &ZoneEvent::Loaded(zone_id) => {
-                if client_entity_list.zone_id == Some(zone_id) {
-                    // Tell server we are ready to join the zone
-                    game_connection
-                        .client_message_tx
-                        .send(ClientMessage::JoinZoneRequest)
-                        .ok();
-                }
-            }
-        }
-    }
 
     let result: Result<(), anyhow::Error> = loop {
         match game_connection.server_message_rx.try_recv() {
             Ok(ServerMessage::ConnectionResponse(response)) => match response {
-                Ok(_) => {}
+                Ok(_) => {
+                    client_entity_list.clear();
+                }
                 Err(_) => {
                     break Err(ConnectionError::ConnectionLost.into());
                 }
@@ -150,7 +135,8 @@ pub fn game_connection_system(
                 );
 
                 // Load next zone
-                load_zone_events.send(LoadZoneEvent::new(character_data.zone_id));
+                game_connection_events
+                    .send(GameConnectionEvent::JoiningZone(character_data.zone_id));
                 client_entity_list.zone_id = Some(character_data.zone_id);
             }
             Ok(ServerMessage::CharacterDataItems(message)) => {
@@ -195,6 +181,10 @@ pub fn game_connection_system(
                     if !matches!(app_state.current(), AppState::Game) {
                         app_state.set(AppState::Game).ok();
                     }
+
+                    game_connection_events.send(GameConnectionEvent::JoinedZone(
+                        client_entity_list.zone_id.unwrap(),
+                    ));
                 }
             }
             Ok(ServerMessage::SpawnEntityNpc(message)) => {
@@ -368,7 +358,7 @@ pub fn game_connection_system(
                     client_entity_list.clear();
 
                     // Load next zone
-                    load_zone_events.send(LoadZoneEvent::new(message.zone_id));
+                    game_connection_events.send(GameConnectionEvent::JoiningZone(message.zone_id));
                     client_entity_list.zone_id = Some(message.zone_id);
                 }
             }

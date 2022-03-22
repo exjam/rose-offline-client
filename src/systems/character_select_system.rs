@@ -1,30 +1,37 @@
 use bevy::{
+    core::Time,
     math::{Quat, Vec3},
     prelude::{
-        Commands, DespawnRecursiveExt, Entity, GlobalTransform, Query, Res, ResMut, State,
-        Transform, With,
+        AssetServer, Commands, DespawnRecursiveExt, Entity, EventReader, EventWriter,
+        GlobalTransform, Query, Res, ResMut, State, Transform, With,
     },
     render::camera::Camera3d,
     window::Windows,
 };
 use bevy_egui::{egui, EguiContext};
+use rose_data::ZoneId;
 use rose_game_common::messages::client::{ClientMessage, SelectCharacter};
 
 use crate::{
+    components::ActiveMotion,
+    events::{GameConnectionEvent, LoadZoneEvent, ZoneEvent},
     fly_camera::FlyCameraController,
     follow_camera::FollowCameraController,
-    resources::{AppState, CharacterList, ServerConfiguration, WorldConnection},
+    resources::{AppState, CharacterList, GameConnection, ServerConfiguration, WorldConnection},
 };
 
 enum CharacterSelectState {
+    Entering,
     CharacterSelect,
     // TODO: CharacterCreate,
-    JoinGameServer,
+    ConnectingGameServer,
+    Leaving,
+    Loading,
 }
 
 impl Default for CharacterSelectState {
     fn default() -> Self {
-        Self::CharacterSelect
+        Self::Entering
     }
 }
 
@@ -32,13 +39,27 @@ impl Default for CharacterSelectState {
 pub struct CharacterSelect {
     selected_character_index: usize,
     state: CharacterSelectState,
-    models: Vec<(String, Entity)>,
+    join_zone_id: Option<ZoneId>,
 }
+
+pub struct CharacterSelectModelList {
+    models: Vec<(Option<String>, Entity)>,
+}
+
+const CHARACTER_POSITIONS: [[f32; 3]; 5] = [
+    [5205.0, 1.0, -5205.0],
+    [5202.70, 1.0, -5206.53],
+    [5200.00, 1.0, -5207.07],
+    [5197.30, 1.0, -5206.53],
+    [5195.00, 1.0, -5205.00],
+];
 
 pub fn character_select_enter_system(
     mut commands: Commands,
     mut windows: ResMut<Windows>,
     query_cameras: Query<Entity, With<Camera3d>>,
+    asset_server: Res<AssetServer>,
+    time: Res<Time>,
 ) {
     if let Some(window) = windows.get_primary_mut() {
         window.set_cursor_lock_mode(false);
@@ -54,39 +75,83 @@ pub fn character_select_enter_system(
                     .looking_at(Vec3::new(5200.0, 3.4, -5200.0), Vec3::Y),
             )
             .remove::<FlyCameraController>()
-            .remove::<FollowCameraController>();
+            .remove::<FollowCameraController>()
+            .insert(
+                ActiveMotion::new(
+                    asset_server.load("3DDATA/TITLE/CAMERA01_INSELECT01.ZMO"),
+                    time.seconds_since_startup(),
+                )
+                .with_repeat_limit(1),
+            );
     }
 
+    // Reset state
     commands.insert_resource(CharacterSelect::default());
+
+    // Spawn entities to use for character list models
+    let mut models = Vec::with_capacity(CHARACTER_POSITIONS.len());
+    for position in CHARACTER_POSITIONS {
+        let entity = commands
+            .spawn_bundle((
+                GlobalTransform::default(),
+                Transform::from_translation(position.into())
+                    .with_rotation(Quat::from_rotation_y(std::f32::consts::PI))
+                    .with_scale(Vec3::new(1.5, 1.5, 1.5)),
+            ))
+            .id();
+        models.push((None, entity));
+    }
+    commands.insert_resource(CharacterSelectModelList { models });
 }
 
-pub fn character_select_exit_system(mut commands: Commands, ui_state: Res<CharacterSelect>) {
+pub fn character_select_exit_system(
+    mut commands: Commands,
+    model_list: Res<CharacterSelectModelList>,
+) {
     // Despawn character models
-    for (_, entity) in ui_state.models.iter() {
+    for (_, entity) in model_list.models.iter() {
         commands.entity(*entity).despawn_recursive();
     }
 
     commands.remove_resource::<CharacterList>();
     commands.remove_resource::<CharacterSelect>();
+    commands.remove_resource::<CharacterSelectModelList>();
 }
 
-const CHARACTER_POSITIONS: [[f32; 3]; 5] = [
-    [5205.0, 1.0, -5205.0],
-    [5202.70, 1.0, -5206.53],
-    [5200.00, 1.0, -5207.07],
-    [5197.30, 1.0, -5206.53],
-    [5195.00, 1.0, -5205.00],
-];
+pub fn character_select_models_system(
+    mut commands: Commands,
+    mut model_list: ResMut<CharacterSelectModelList>,
+    character_list: Option<Res<CharacterList>>,
+) {
+    // Ensure all character list models are up to date
+    if let Some(character_list) = character_list.as_ref() {
+        for (index, character) in character_list.characters.iter().enumerate() {
+            if model_list.models[index].0.as_ref() != Some(&character.info.name) {
+                commands
+                    .entity(model_list.models[index].1)
+                    .insert_bundle((character.info.clone(), character.equipment.clone()));
+                model_list.models[index].0 = Some(character.info.name.clone());
+            }
+        }
+    }
+}
 
 #[allow(clippy::too_many_arguments)]
 pub fn character_select_system(
     mut commands: Commands,
-    mut ui_state: ResMut<CharacterSelect>,
+    mut app_state: ResMut<State<AppState>>,
+    mut character_select_state: ResMut<CharacterSelect>,
     mut egui_context: ResMut<EguiContext>,
+    mut zone_events: EventReader<ZoneEvent>,
+    mut game_connection_events: EventReader<GameConnectionEvent>,
+    mut load_zone_events: EventWriter<LoadZoneEvent>,
+    query_camera: Query<(Entity, Option<&ActiveMotion>), With<Camera3d>>,
+    game_connection: Option<Res<GameConnection>>,
     world_connection: Option<Res<WorldConnection>>,
     character_list: Option<Res<CharacterList>>,
-    mut app_state: ResMut<State<AppState>>,
     server_configuration: Res<ServerConfiguration>,
+    asset_server: Res<AssetServer>,
+    time: Res<Time>,
 ) {
     if world_connection.is_none() {
         // Disconnected, return to login
@@ -94,32 +159,13 @@ pub fn character_select_system(
         return;
     }
 
-    if let Some(character_list) = character_list.as_ref() {
-        for character in character_list.characters.iter() {
-            if !ui_state
-                .models
-                .iter()
-                .any(|(name, _)| name == &character.info.name)
-            {
-                let index = ui_state.models.len();
-                let character_entity = commands
-                    .spawn_bundle((
-                        character.info.clone(),
-                        character.equipment.clone(),
-                        GlobalTransform::default(),
-                        Transform::from_translation(CHARACTER_POSITIONS[index].into())
-                            .with_rotation(Quat::from_rotation_y(std::f32::consts::PI))
-                            .with_scale(Vec3::new(1.5, 1.5, 1.5)),
-                    ))
-                    .id();
-                ui_state
-                    .models
-                    .push((character.info.name.clone(), character_entity));
+    match character_select_state.state {
+        CharacterSelectState::Entering => {
+            let (_, camera_motion) = query_camera.single();
+            if camera_motion.is_none() || server_configuration.auto_login {
+                character_select_state.state = CharacterSelectState::CharacterSelect;
             }
         }
-    }
-
-    match ui_state.state {
         CharacterSelectState::CharacterSelect => {
             egui::Window::new("Character Select")
                 .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
@@ -131,7 +177,7 @@ pub fn character_select_system(
                     if let Some(character_list) = character_list.as_ref() {
                         for (i, character) in character_list.characters.iter().enumerate() {
                             ui.selectable_value(
-                                &mut ui_state.selected_character_index,
+                                &mut character_select_state.selected_character_index,
                                 i,
                                 &character.info.name,
                             );
@@ -142,22 +188,25 @@ pub fn character_select_system(
                         try_play_character = true;
                     }
 
-                    if let Some(preset_character_name) =
-                        server_configuration.preset_character_name.as_ref()
-                    {
-                        let mut selected_character_index = None;
+                    if server_configuration.auto_login {
+                        if let Some(preset_character_name) =
+                            server_configuration.preset_character_name.as_ref()
+                        {
+                            let mut selected_character_index = None;
 
-                        if let Some(character_list) = character_list.as_ref() {
-                            for (i, character) in character_list.characters.iter().enumerate() {
-                                if &character.info.name == preset_character_name {
-                                    selected_character_index = Some(i);
+                            if let Some(character_list) = character_list.as_ref() {
+                                for (i, character) in character_list.characters.iter().enumerate() {
+                                    if &character.info.name == preset_character_name {
+                                        selected_character_index = Some(i);
+                                    }
                                 }
                             }
-                        }
 
-                        if let Some(selected_character_index) = selected_character_index {
-                            ui_state.selected_character_index = selected_character_index;
-                            try_play_character = true;
+                            if let Some(selected_character_index) = selected_character_index {
+                                character_select_state.selected_character_index =
+                                    selected_character_index;
+                                try_play_character = true;
+                            }
                         }
                     }
 
@@ -167,16 +216,17 @@ pub fn character_select_system(
                                 connection
                                     .client_message_tx
                                     .send(ClientMessage::SelectCharacter(SelectCharacter {
-                                        slot: ui_state.selected_character_index as u8,
+                                        slot: character_select_state.selected_character_index as u8,
                                         name: character_list.characters
-                                            [ui_state.selected_character_index]
+                                            [character_select_state.selected_character_index]
                                             .info
                                             .name
                                             .clone(),
                                     }))
                                     .ok();
 
-                                ui_state.state = CharacterSelectState::JoinGameServer;
+                                character_select_state.state =
+                                    CharacterSelectState::ConnectingGameServer;
                             }
                         }
                     }
@@ -186,13 +236,56 @@ pub fn character_select_system(
                     }
                 });
         }
-        CharacterSelectState::JoinGameServer => {
+        CharacterSelectState::ConnectingGameServer => {
             egui::Window::new("Connecting...")
                 .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
                 .collapsible(false)
                 .show(egui_context.ctx_mut(), |ui| {
                     ui.label("Connecting to game");
                 });
+
+            for event in game_connection_events.iter() {
+                if let &GameConnectionEvent::JoiningZone(zone_id) = event {
+                    // Start camera animation
+                    let (camera_entity, _) = query_camera.single();
+                    commands.entity(camera_entity).insert(
+                        ActiveMotion::new(
+                            asset_server.load("3DDATA/TITLE/CAMERA01_INGAME01.ZMO"),
+                            time.seconds_since_startup(),
+                        )
+                        .with_repeat_limit(1),
+                    );
+
+                    character_select_state.state = CharacterSelectState::Leaving;
+                    character_select_state.join_zone_id = Some(zone_id);
+                }
+            }
+        }
+        CharacterSelectState::Leaving => {
+            let (_, camera_motion) = query_camera.single();
+            if camera_motion.is_none() || server_configuration.auto_login {
+                // Wait until camera motion complete, then load the zone!
+                character_select_state.state = CharacterSelectState::Loading;
+                load_zone_events.send(LoadZoneEvent::new(
+                    character_select_state.join_zone_id.unwrap(),
+                ));
+            }
+        }
+        CharacterSelectState::Loading => {
+            for event in zone_events.iter() {
+                match event {
+                    &ZoneEvent::Loaded(_) => {
+                        // Tell server we are ready to join the zone, once the server replies
+                        // then game_connection_system will transition app state to in game
+                        if let Some(game_connection) = game_connection.as_ref() {
+                            game_connection
+                                .client_message_tx
+                                .send(ClientMessage::JoinZoneRequest)
+                                .ok();
+                        }
+                    }
+                }
+            }
         }
     }
 }

@@ -2,8 +2,8 @@ use bevy::{
     input::Input,
     math::Vec3,
     prelude::{
-        Camera, Commands, Entity, GlobalTransform, MouseButton, PerspectiveCameraBundle, Query,
-        Res, ResMut, Transform, With,
+        Camera, Commands, Entity, EventReader, EventWriter, GlobalTransform, MouseButton,
+        PerspectiveCameraBundle, Query, Res, ResMut, Transform, With,
     },
     render::camera::Camera3d,
     window::Windows,
@@ -16,7 +16,8 @@ use bevy_rapier3d::{
 use rose_game_common::messages::client::{ClientMessage, Move};
 
 use crate::{
-    components::{PlayerCharacter, COLLISION_FILTER_CLICKABLE},
+    components::{ActiveMotion, PlayerCharacter, COLLISION_FILTER_CLICKABLE},
+    events::{GameConnectionEvent, LoadZoneEvent, ZoneEvent},
     fly_camera::FlyCameraController,
     follow_camera::{FollowCameraBundle, FollowCameraController},
     resources::GameConnection,
@@ -35,6 +36,7 @@ pub fn game_state_enter_system(
         commands
             .entity(entity)
             .remove::<FlyCameraController>()
+            .remove::<ActiveMotion>()
             .insert_bundle(FollowCameraBundle::new(
                 FollowCameraController {
                     follow_entity: Some(player_entity),
@@ -45,6 +47,34 @@ pub fn game_state_enter_system(
                 player_transform.translation + Vec3::new(10.0, 10.0, 10.0),
                 player_transform.translation,
             ));
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn game_zone_change_system(
+    mut load_zone_events: EventWriter<LoadZoneEvent>,
+    mut game_connection_events: EventReader<GameConnectionEvent>,
+    mut zone_events: EventReader<ZoneEvent>,
+    game_connection: Option<Res<GameConnection>>,
+) {
+    for event in game_connection_events.iter() {
+        if let &GameConnectionEvent::JoiningZone(zone_id) = event {
+            load_zone_events.send(LoadZoneEvent::new(zone_id));
+        }
+    }
+
+    for zone_event in zone_events.iter() {
+        match zone_event {
+            &ZoneEvent::Loaded(_) => {
+                // Tell server we are ready to join the zone
+                if let Some(game_connection) = game_connection.as_ref() {
+                    game_connection
+                        .client_message_tx
+                        .send(ClientMessage::JoinZoneRequest)
+                        .ok();
+                }
+            }
+        }
     }
 }
 

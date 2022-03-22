@@ -12,7 +12,7 @@ use rose_data::{EquipmentIndex, EquipmentItem, ItemReference, ItemType, NpcId, Z
 use rose_game_common::components::{CharacterGender, CharacterInfo, Equipment, Npc};
 
 use crate::{
-    components::DebugModelSkeleton,
+    components::{ActiveMotion, DebugModelSkeleton},
     fly_camera::FlyCameraController,
     follow_camera::{FollowCameraBundle, FollowCameraController},
     resources::GameData,
@@ -55,6 +55,7 @@ pub fn model_viewer_enter_system(
         commands
             .entity(entity)
             .remove::<FlyCameraController>()
+            .remove::<ActiveMotion>()
             .insert_bundle(FollowCameraBundle::new(
                 FollowCameraController::default(),
                 PerspectiveCameraBundle::default(),

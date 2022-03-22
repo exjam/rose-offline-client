@@ -1,7 +1,9 @@
 use bevy::{
+    core::Time,
     math::Vec3,
     prelude::{
-        Commands, Entity, EventWriter, FromWorld, Query, Res, ResMut, Transform, With, World,
+        AssetServer, Commands, Entity, EventWriter, FromWorld, Query, Res, ResMut, Transform, With,
+        World,
     },
     render::camera::Camera3d,
     window::Windows,
@@ -12,6 +14,7 @@ use rose_data::ZoneId;
 use rose_game_common::messages::client::{ClientMessage, JoinServer};
 
 use crate::{
+    components::ActiveMotion,
     events::LoadZoneEvent,
     fly_camera::FlyCameraController,
     follow_camera::FollowCameraController,
@@ -66,6 +69,8 @@ pub fn login_state_enter_system(
     mut loaded_zone: EventWriter<LoadZoneEvent>,
     mut windows: ResMut<Windows>,
     query_cameras: Query<Entity, With<Camera3d>>,
+    asset_server: Res<AssetServer>,
+    time: Res<Time>,
 ) {
     // Ensure cursor is not locked
     if let Some(window) = windows.get_primary_mut() {
@@ -82,7 +87,11 @@ pub fn login_state_enter_system(
                     .looking_at(Vec3::new(5200.0, 35.0, -5300.0), Vec3::Y),
             )
             .remove::<FlyCameraController>()
-            .remove::<FollowCameraController>();
+            .remove::<FollowCameraController>()
+            .insert(ActiveMotion::new(
+                asset_server.load("3DDATA/TITLE/CAMERA01_INTRO01.ZMO"),
+                time.seconds_since_startup(),
+            ));
     }
 
     commands.remove_resource::<Account>();

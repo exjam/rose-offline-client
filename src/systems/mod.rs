@@ -22,14 +22,15 @@ pub use ability_values_system::ability_values_system;
 pub use animation_system::animation_system;
 pub use character_model_system::character_model_system;
 pub use character_select_system::{
-    character_select_enter_system, character_select_exit_system, character_select_system,
+    character_select_enter_system, character_select_exit_system, character_select_models_system,
+    character_select_system,
 };
 pub use collision_system::{collision_add_colliders_system, collision_system};
 pub use debug_inspector_system::DebugInspectorPlugin;
 pub use debug_model_skeleton_system::debug_model_skeleton_system;
 pub use game_connection_system::game_connection_system;
 pub use game_debug_ui_system::game_debug_ui_system;
-pub use game_system::{game_input_system, game_state_enter_system};
+pub use game_system::{game_input_system, game_state_enter_system, game_zone_change_system};
 pub use game_ui_system::game_ui_system;
 pub use load_zone_system::{load_zone_system, ZoneObject};
 pub use login_connection_system::login_connection_system;

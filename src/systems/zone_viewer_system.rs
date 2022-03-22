@@ -9,6 +9,7 @@ use bevy::{
 use bevy_egui::{egui, EguiContext};
 
 use crate::{
+    components::ActiveMotion,
     events::{DebugInspectorEvent, LoadZoneEvent},
     fly_camera::{FlyCameraBundle, FlyCameraController},
     follow_camera::FollowCameraController,
@@ -37,6 +38,7 @@ pub fn zone_viewer_setup_system(
         commands
             .entity(entity)
             .remove::<FollowCameraController>()
+            .remove::<ActiveMotion>()
             .insert_bundle(FlyCameraBundle::new(
                 FlyCameraController::default(),
                 PerspectiveCameraBundle::default(),

@@ -26,7 +26,7 @@ mod zms_asset_loader;
 use rose_data::{NpcDatabaseOptions, ZoneId};
 use rose_file_readers::VfsIndex;
 
-use events::{ChatboxEvent, LoadZoneEvent, ZoneEvent};
+use events::{ChatboxEvent, GameConnectionEvent, LoadZoneEvent, ZoneEvent};
 use fly_camera::FlyCameraPlugin;
 use follow_camera::FollowCameraPlugin;
 use model_loader::ModelLoader;
@@ -37,12 +37,13 @@ use resources::{
 };
 use systems::{
     ability_values_system, animation_system, character_model_system, character_select_enter_system,
-    character_select_exit_system, character_select_system, collision_add_colliders_system,
-    collision_system, debug_model_skeleton_system, game_connection_system, game_debug_ui_system,
-    game_input_system, game_state_enter_system, game_ui_system, load_zone_system,
-    login_connection_system, login_state_enter_system, login_state_exit_system, login_system,
-    model_viewer_enter_system, model_viewer_system, npc_model_system, update_position_system,
-    world_connection_system, zone_viewer_setup_system, zone_viewer_system, DebugInspectorPlugin,
+    character_select_exit_system, character_select_models_system, character_select_system,
+    collision_add_colliders_system, collision_system, debug_model_skeleton_system,
+    game_connection_system, game_debug_ui_system, game_input_system, game_state_enter_system,
+    game_ui_system, game_zone_change_system, load_zone_system, login_connection_system,
+    login_state_enter_system, login_state_exit_system, login_system, model_viewer_enter_system,
+    model_viewer_system, npc_model_system, update_position_system, world_connection_system,
+    zone_viewer_setup_system, zone_viewer_system, DebugInspectorPlugin,
 };
 use vfs_asset_io::VfsAssetIo;
 use zmo_asset_loader::{ZmoAsset, ZmoAssetLoader};
@@ -299,10 +300,12 @@ fn main() {
             .with_system(character_select_enter_system),
     )
     .add_system_set(
-        SystemSet::on_exit(AppState::GameCharacterSelect).with_system(character_select_exit_system),
+        SystemSet::on_update(AppState::GameCharacterSelect)
+            .with_system(character_select_system)
+            .with_system(character_select_models_system),
     )
     .add_system_set(
-        SystemSet::on_update(AppState::GameCharacterSelect).with_system(character_select_system),
+        SystemSet::on_exit(AppState::GameCharacterSelect).with_system(character_select_exit_system),
     );
 
     app.add_system_set(SystemSet::on_enter(AppState::Game).with_system(game_state_enter_system))
@@ -312,7 +315,8 @@ fn main() {
                 .with_system(update_position_system)
                 .with_system(game_input_system)
                 .with_system(game_ui_system)
-                .with_system(game_debug_ui_system),
+                .with_system(game_debug_ui_system)
+                .with_system(game_zone_change_system),
         );
 
     let mut load_zone_events = Events::<LoadZoneEvent>::default();
@@ -322,12 +326,12 @@ fn main() {
 
     app.insert_resource(Events::<ChatboxEvent>::default())
         .insert_resource(load_zone_events)
-        .insert_resource(Events::<ZoneEvent>::default());
+        .insert_resource(Events::<ZoneEvent>::default())
+        .insert_resource(Events::<GameConnectionEvent>::default());
 
     app.add_system(collision_system)
         .add_system(collision_add_colliders_system)
         .add_system(animation_system);
-    //
 
     // Setup network
     let (network_thread_tx, network_thread_rx) =
