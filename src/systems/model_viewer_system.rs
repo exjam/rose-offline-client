@@ -92,7 +92,7 @@ pub fn model_viewer_enter_system(
         character_info,
         equipment,
         GlobalTransform::default(),
-        Transform::default().with_translation(Vec3::new(-2.0, 0.0, 0.0)),
+        Transform::default().with_translation(Vec3::new(-5.0, 0.0, 0.0)),
         DebugModelSkeleton::default(),
     ));
 
@@ -113,7 +113,7 @@ pub fn model_viewer_enter_system(
         commands.spawn_bundle((
             Npc::new(NpcId::new(1).unwrap(), 0),
             GlobalTransform::default(),
-            Transform::default().with_translation(Vec3::new(-2.0, 0.0, 0.0)),
+            Transform::default().with_translation(Vec3::new(0.0, 0.0, 0.0)),
             DebugModelSkeleton::default(),
         ));
     }

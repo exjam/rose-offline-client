@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use bevy::{
     math::{Mat4, Quat, Vec3},
     prelude::{
@@ -8,47 +10,22 @@ use bevy::{
 };
 use enum_map::EnumMap;
 
-use rose_data::{EquipmentIndex, ItemType};
-use rose_file_readers::{VfsIndex, ZmdFile, ZscFile};
+use rose_data::NpcId;
+use rose_data::{EquipmentIndex, ItemType, NpcDatabase};
+use rose_file_readers::{ChrFile, VfsIndex, ZmdFile, ZscFile};
 use rose_game_common::components::{CharacterGender, CharacterInfo, Equipment};
 
 use crate::{
-    components::{CharacterModel, CharacterModelPart},
+    components::{CharacterModel, CharacterModelPart, NpcModel},
     render::StaticMeshMaterial,
 };
 
-impl CharacterModelPart {
-    fn default_bone_id(&self, dummy_bone_offset: usize) -> Option<usize> {
-        match *self {
-            CharacterModelPart::CharacterFace => Some(4),
-            CharacterModelPart::CharacterHair => Some(4),
-            CharacterModelPart::Head => Some(dummy_bone_offset + 6),
-            CharacterModelPart::FaceItem => Some(dummy_bone_offset + 4),
-            CharacterModelPart::Back => Some(dummy_bone_offset + 3),
-            _ => None,
-        }
-    }
-}
+pub struct ModelLoader {
+    vfs: Arc<VfsIndex>,
+    npc_database: Arc<NpcDatabase>,
 
-impl From<ItemType> for CharacterModelPart {
-    fn from(item_type: ItemType) -> Self {
-        match item_type {
-            ItemType::Face => CharacterModelPart::FaceItem,
-            ItemType::Head => CharacterModelPart::Head,
-            ItemType::Body => CharacterModelPart::Body,
-            ItemType::Hands => CharacterModelPart::Hands,
-            ItemType::Feet => CharacterModelPart::Feet,
-            ItemType::Back => CharacterModelPart::Back,
-            ItemType::Weapon => CharacterModelPart::Weapon,
-            ItemType::SubWeapon => CharacterModelPart::SubWeapon,
-            _ => panic!("Invalid ItemType for CharacterModelPart"),
-        }
-    }
-}
-
-pub struct CharacterModelList {
+    // Male
     skeleton_male: ZmdFile,
-
     face_male: ZscFile,
     hair_male: ZscFile,
     head_male: ZscFile,
@@ -56,6 +33,7 @@ pub struct CharacterModelList {
     arms_male: ZscFile,
     feet_male: ZscFile,
 
+    // Female
     skeleton_female: ZmdFile,
     face_female: ZscFile,
     hair_female: ZscFile,
@@ -64,15 +42,24 @@ pub struct CharacterModelList {
     arms_female: ZscFile,
     feet_female: ZscFile,
 
+    // Gender neutral
     face_item: ZscFile,
     back: ZscFile,
     weapon: ZscFile,
     sub_weapon: ZscFile,
+
+    // Npc
+    npc_chr: ChrFile,
+    npc_zsc: ZscFile,
 }
 
-impl CharacterModelList {
-    pub fn new(vfs: &VfsIndex) -> Result<CharacterModelList, anyhow::Error> {
-        Ok(CharacterModelList {
+impl ModelLoader {
+    pub fn new(
+        vfs: Arc<VfsIndex>,
+        npc_database: Arc<NpcDatabase>,
+    ) -> Result<ModelLoader, anyhow::Error> {
+        Ok(ModelLoader {
+            // Male
             skeleton_male: vfs.read_file::<ZmdFile, _>("3DDATA/AVATAR/MALE.ZMD")?,
             face_male: vfs.read_file::<ZscFile, _>("3DDATA/AVATAR/LIST_MFACE.ZSC")?,
             hair_male: vfs.read_file::<ZscFile, _>("3DDATA/AVATAR/LIST_MHAIR.ZSC")?,
@@ -80,6 +67,8 @@ impl CharacterModelList {
             body_male: vfs.read_file::<ZscFile, _>("3DDATA/AVATAR/LIST_MBODY.ZSC")?,
             arms_male: vfs.read_file::<ZscFile, _>("3DDATA/AVATAR/LIST_MARMS.ZSC")?,
             feet_male: vfs.read_file::<ZscFile, _>("3DDATA/AVATAR/LIST_MFOOT.ZSC")?,
+
+            // Female
             skeleton_female: vfs.read_file::<ZmdFile, _>("3DDATA/AVATAR/FEMALE.ZMD")?,
             face_female: vfs.read_file::<ZscFile, _>("3DDATA/AVATAR/LIST_WFACE.ZSC")?,
             hair_female: vfs.read_file::<ZscFile, _>("3DDATA/AVATAR/LIST_WHAIR.ZSC")?,
@@ -87,10 +76,19 @@ impl CharacterModelList {
             body_female: vfs.read_file::<ZscFile, _>("3DDATA/AVATAR/LIST_WBODY.ZSC")?,
             arms_female: vfs.read_file::<ZscFile, _>("3DDATA/AVATAR/LIST_WARMS.ZSC")?,
             feet_female: vfs.read_file::<ZscFile, _>("3DDATA/AVATAR/LIST_WFOOT.ZSC")?,
+
+            // Gender neutral
             face_item: vfs.read_file::<ZscFile, _>("3DDATA/AVATAR/LIST_FACEIEM.ZSC")?, // Not a typo
             back: vfs.read_file::<ZscFile, _>("3DDATA/AVATAR/LIST_BACK.ZSC")?,
             weapon: vfs.read_file::<ZscFile, _>("3DDATA/WEAPON/LIST_WEAPON.ZSC")?,
             sub_weapon: vfs.read_file::<ZscFile, _>("3DDATA/WEAPON/LIST_SUBWPN.ZSC")?,
+
+            // NPC
+            npc_chr: vfs.read_file::<ChrFile, _>("3DDATA/NPC/LIST_NPC.CHR")?,
+            npc_zsc: vfs.read_file::<ZscFile, _>("3DDATA/NPC/PART_NPC.ZSC")?,
+
+            vfs,
+            npc_database,
         })
     }
 
@@ -137,112 +135,241 @@ impl CharacterModelList {
             CharacterModelPart::SubWeapon => &self.sub_weapon,
         }
     }
-}
 
-#[allow(clippy::too_many_arguments)]
-pub fn spawn_character_model(
-    commands: &mut Commands,
-    model_entity: Entity,
-    asset_server: &AssetServer,
-    static_mesh_materials: &mut Assets<StaticMeshMaterial>,
-    skinned_mesh_inverse_bindposes_assets: &mut Assets<SkinnedMeshInverseBindposes>,
-    character_model_list: &CharacterModelList,
-    character_info: &CharacterInfo,
-    equipment: &Equipment,
-) -> (CharacterModel, SkinnedMesh) {
-    let skeleton = character_model_list.get_skeleton(character_info.gender);
-    let dummy_bone_offset = skeleton.bones.len();
-    let skinned_mesh = spawn_skeleton(
-        commands,
-        model_entity,
-        character_model_list.get_skeleton(character_info.gender),
-        skinned_mesh_inverse_bindposes_assets,
-    );
-    let mut model_parts = EnumMap::default();
-
-    for model_part in [
-        CharacterModelPart::CharacterFace,
-        CharacterModelPart::CharacterHair,
-        CharacterModelPart::Head,
-        CharacterModelPart::FaceItem,
-        CharacterModelPart::Body,
-        CharacterModelPart::Hands,
-        CharacterModelPart::Feet,
-        CharacterModelPart::Back,
-        CharacterModelPart::Weapon,
-        CharacterModelPart::SubWeapon,
-    ] {
-        if let Some(model_id) = get_model_part_index(character_info, equipment, model_part) {
-            model_parts[model_part] = spawn_model(
-                commands,
-                model_entity,
-                asset_server,
-                static_mesh_materials,
-                character_model_list.get_model_list(character_info.gender, model_part),
-                model_id,
-                &skinned_mesh,
-                model_part.default_bone_id(dummy_bone_offset),
-                dummy_bone_offset,
-            );
-        }
-    }
-
-    (
-        CharacterModel {
-            gender: character_info.gender,
-            model_parts,
-            dummy_bone_offset,
-        },
-        skinned_mesh,
-    )
-}
-
-#[allow(clippy::too_many_arguments)]
-pub fn update_character_equipment(
-    commands: &mut Commands,
-    model_entity: Entity,
-    asset_server: &AssetServer,
-    static_mesh_materials: &mut Assets<StaticMeshMaterial>,
-    character_model_list: &CharacterModelList,
-    character_model: &mut CharacterModel,
-    skinned_mesh: &SkinnedMesh,
-    character_info: &CharacterInfo,
-    equipment: &Equipment,
-) {
-    for model_part in [
-        CharacterModelPart::CharacterFace,
-        CharacterModelPart::CharacterHair,
-        CharacterModelPart::Head,
-        CharacterModelPart::FaceItem,
-        CharacterModelPart::Body,
-        CharacterModelPart::Hands,
-        CharacterModelPart::Feet,
-        CharacterModelPart::Back,
-        CharacterModelPart::Weapon,
-        CharacterModelPart::SubWeapon,
-    ] {
-        let model_id = get_model_part_index(character_info, equipment, model_part).unwrap_or(0);
-
-        if model_id != character_model.model_parts[model_part].0 {
-            // Despawn previous model
-            for &entity in character_model.model_parts[model_part].1.iter() {
-                commands.entity(entity).despawn();
-            }
-
-            // Spawn new model
-            if model_id != 0 {
-                character_model.model_parts[model_part] = spawn_model(
+    #[allow(clippy::too_many_arguments)]
+    pub fn spawn_npc_model(
+        &self,
+        commands: &mut Commands,
+        asset_server: &AssetServer,
+        static_mesh_materials: &mut Assets<StaticMeshMaterial>,
+        skinned_mesh_inverse_bindposes_assets: &mut Assets<SkinnedMeshInverseBindposes>,
+        model_entity: Entity,
+        npc_id: NpcId,
+    ) -> Option<(NpcModel, SkinnedMesh)> {
+        let npc_model_data = self.npc_chr.npcs.get(&npc_id.get())?;
+        let (skinned_mesh, dummy_bone_offset) = if let Some(skeleton) = self
+            .npc_chr
+            .skeleton_files
+            .get(npc_model_data.skeleton_index as usize)
+            .and_then(|p| self.vfs.read_file::<ZmdFile, _>(p).ok())
+        {
+            (
+                spawn_skeleton(
                     commands,
                     model_entity,
+                    &skeleton,
+                    skinned_mesh_inverse_bindposes_assets,
+                ),
+                skeleton.bones.len(),
+            )
+        } else {
+            (SkinnedMesh::default(), 0)
+        };
+
+        let mut model_parts = Vec::with_capacity(16);
+        for model_id in npc_model_data.model_ids.iter() {
+            let (_model_id, mut parts) = spawn_model(
+                commands,
+                asset_server,
+                static_mesh_materials,
+                model_entity,
+                &self.npc_zsc,
+                *model_id as usize,
+                &skinned_mesh,
+                None,
+                dummy_bone_offset,
+            );
+            model_parts.append(&mut parts);
+        }
+
+        if let Some(npc_data) = self.npc_database.get_npc(npc_id) {
+            if npc_data.right_hand_part_index != 0 {
+                let (_model_id, mut parts) = spawn_model(
+                    commands,
                     asset_server,
                     static_mesh_materials,
-                    character_model_list.get_model_list(character_info.gender, model_part),
+                    model_entity,
+                    &self.weapon,
+                    npc_data.right_hand_part_index as usize,
+                    &skinned_mesh,
+                    None,
+                    dummy_bone_offset,
+                );
+                model_parts.append(&mut parts);
+            }
+
+            if npc_data.left_hand_part_index != 0 {
+                let (_model_id, mut parts) = spawn_model(
+                    commands,
+                    asset_server,
+                    static_mesh_materials,
+                    model_entity,
+                    &self.sub_weapon,
+                    npc_data.left_hand_part_index as usize,
+                    &skinned_mesh,
+                    None,
+                    dummy_bone_offset,
+                );
+                model_parts.append(&mut parts);
+            }
+        }
+
+        let mut action_motions = Vec::new();
+        for &(action_id, motion_id) in npc_model_data.motion_ids.iter() {
+            if let Some(motion_path) = self.npc_chr.motion_files.get(motion_id as usize) {
+                action_motions.push((action_id, asset_server.load(motion_path)));
+            }
+        }
+
+        Some((
+            NpcModel {
+                npc_id,
+                model_parts,
+                dummy_bone_offset,
+                action_motions,
+            },
+            skinned_mesh,
+        ))
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn spawn_character_model(
+        &self,
+        commands: &mut Commands,
+        asset_server: &AssetServer,
+        static_mesh_materials: &mut Assets<StaticMeshMaterial>,
+        skinned_mesh_inverse_bindposes_assets: &mut Assets<SkinnedMeshInverseBindposes>,
+        model_entity: Entity,
+        character_info: &CharacterInfo,
+        equipment: &Equipment,
+    ) -> (CharacterModel, SkinnedMesh) {
+        let skeleton = self.get_skeleton(character_info.gender);
+        let dummy_bone_offset = skeleton.bones.len();
+        let skinned_mesh = spawn_skeleton(
+            commands,
+            model_entity,
+            self.get_skeleton(character_info.gender),
+            skinned_mesh_inverse_bindposes_assets,
+        );
+        let mut model_parts = EnumMap::default();
+
+        for model_part in [
+            CharacterModelPart::CharacterFace,
+            CharacterModelPart::CharacterHair,
+            CharacterModelPart::Head,
+            CharacterModelPart::FaceItem,
+            CharacterModelPart::Body,
+            CharacterModelPart::Hands,
+            CharacterModelPart::Feet,
+            CharacterModelPart::Back,
+            CharacterModelPart::Weapon,
+            CharacterModelPart::SubWeapon,
+        ] {
+            if let Some(model_id) = get_model_part_index(character_info, equipment, model_part) {
+                model_parts[model_part] = spawn_model(
+                    commands,
+                    asset_server,
+                    static_mesh_materials,
+                    model_entity,
+                    self.get_model_list(character_info.gender, model_part),
                     model_id,
-                    skinned_mesh,
-                    model_part.default_bone_id(character_model.dummy_bone_offset),
-                    character_model.dummy_bone_offset,
+                    &skinned_mesh,
+                    model_part.default_bone_id(dummy_bone_offset),
+                    dummy_bone_offset,
                 );
             }
+        }
+
+        (
+            CharacterModel {
+                gender: character_info.gender,
+                model_parts,
+                dummy_bone_offset,
+            },
+            skinned_mesh,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn update_character_equipment(
+        &self,
+        commands: &mut Commands,
+        asset_server: &AssetServer,
+        static_mesh_materials: &mut Assets<StaticMeshMaterial>,
+        model_entity: Entity,
+        character_info: &CharacterInfo,
+        equipment: &Equipment,
+        character_model: &mut CharacterModel,
+        skinned_mesh: &SkinnedMesh,
+    ) {
+        for model_part in [
+            CharacterModelPart::CharacterFace,
+            CharacterModelPart::CharacterHair,
+            CharacterModelPart::Head,
+            CharacterModelPart::FaceItem,
+            CharacterModelPart::Body,
+            CharacterModelPart::Hands,
+            CharacterModelPart::Feet,
+            CharacterModelPart::Back,
+            CharacterModelPart::Weapon,
+            CharacterModelPart::SubWeapon,
+        ] {
+            let model_id = get_model_part_index(character_info, equipment, model_part).unwrap_or(0);
+
+            if model_id != character_model.model_parts[model_part].0 {
+                // Despawn previous model
+                for &entity in character_model.model_parts[model_part].1.iter() {
+                    commands.entity(entity).despawn();
+                }
+
+                // Spawn new model
+                if model_id != 0 {
+                    character_model.model_parts[model_part] = spawn_model(
+                        commands,
+                        asset_server,
+                        static_mesh_materials,
+                        model_entity,
+                        self.get_model_list(character_info.gender, model_part),
+                        model_id,
+                        skinned_mesh,
+                        model_part.default_bone_id(character_model.dummy_bone_offset),
+                        character_model.dummy_bone_offset,
+                    );
+                }
+            }
+        }
+    }
+}
+
+trait DefaultBoneId {
+    fn default_bone_id(&self, dummy_bone_offset: usize) -> Option<usize>;
+}
+
+impl DefaultBoneId for CharacterModelPart {
+    fn default_bone_id(&self, dummy_bone_offset: usize) -> Option<usize> {
+        match *self {
+            CharacterModelPart::CharacterFace => Some(4),
+            CharacterModelPart::CharacterHair => Some(4),
+            CharacterModelPart::Head => Some(dummy_bone_offset + 6),
+            CharacterModelPart::FaceItem => Some(dummy_bone_offset + 4),
+            CharacterModelPart::Back => Some(dummy_bone_offset + 3),
+            _ => None,
+        }
+    }
+}
+
+impl From<ItemType> for CharacterModelPart {
+    fn from(item_type: ItemType) -> Self {
+        match item_type {
+            ItemType::Face => CharacterModelPart::FaceItem,
+            ItemType::Head => CharacterModelPart::Head,
+            ItemType::Body => CharacterModelPart::Body,
+            ItemType::Hands => CharacterModelPart::Hands,
+            ItemType::Feet => CharacterModelPart::Feet,
+            ItemType::Back => CharacterModelPart::Back,
+            ItemType::Weapon => CharacterModelPart::Weapon,
+            ItemType::SubWeapon => CharacterModelPart::SubWeapon,
+            _ => panic!("Invalid ItemType for CharacterModelPart"),
         }
     }
 }
@@ -258,7 +385,7 @@ fn transform_children(skeleton: &ZmdFile, bone_transforms: &mut Vec<Transform>, 
     }
 }
 
-pub fn spawn_skeleton(
+fn spawn_skeleton(
     commands: &mut Commands,
     model_entity: Entity,
     skeleton: &ZmdFile,
@@ -326,11 +453,11 @@ pub fn spawn_skeleton(
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn spawn_model(
+fn spawn_model(
     commands: &mut Commands,
-    model_entity: Entity,
     asset_server: &AssetServer,
     static_mesh_materials: &mut Assets<StaticMeshMaterial>,
+    model_entity: Entity,
     model_list: &ZscFile,
     model_id: usize,
     skinned_mesh: &SkinnedMesh,
@@ -366,13 +493,18 @@ pub fn spawn_model(
             skinned: zsc_material.is_skin,
             ..Default::default()
         });
+        let part_transform = Transform::default().with_scale(Vec3::new(
+            object_part.scale.x,
+            object_part.scale.z,
+            object_part.scale.y,
+        ));
 
         let entity = commands
             .spawn_bundle((
                 mesh,
                 material,
                 skinned_mesh.clone(),
-                Transform::default(),
+                part_transform,
                 GlobalTransform::default(),
                 Visibility::default(),
                 ComputedVisibility::default(),

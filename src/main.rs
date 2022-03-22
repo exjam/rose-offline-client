@@ -10,12 +10,11 @@ use bevy::{
 };
 use std::{path::Path, sync::Arc, time::Duration};
 
-mod character_model;
 mod components;
 mod events;
 mod fly_camera;
 mod follow_camera;
-mod npc_model;
+mod model_loader;
 mod protocol;
 mod render;
 mod resources;
@@ -27,11 +26,10 @@ mod zms_asset_loader;
 use rose_data::{NpcDatabaseOptions, ZoneId};
 use rose_file_readers::VfsIndex;
 
-use character_model::CharacterModelList;
 use events::{ChatboxEvent, LoadZoneEvent, ZoneEvent};
 use fly_camera::FlyCameraPlugin;
 use follow_camera::FollowCameraPlugin;
-use npc_model::NpcModelList;
+use model_loader::ModelLoader;
 use render::RoseRenderPlugin;
 use resources::{
     run_network_thread, AppState, GameData, NetworkThread, NetworkThreadMessage,
@@ -374,7 +372,7 @@ fn load_game_data(mut commands: Commands, vfs_resource: Res<VfsResource>) {
         ),
         data_decoder: rose_data_irose::get_data_decoder(),
         items: item_database,
-        npcs: npc_database,
+        npcs: npc_database.clone(),
         quests: Arc::new(
             rose_data_irose::get_quest_database(&vfs_resource.vfs)
                 .expect("Failed to load quest database"),
@@ -390,11 +388,8 @@ fn load_game_data(mut commands: Commands, vfs_resource: Res<VfsResource>) {
     });
 
     commands.insert_resource(
-        CharacterModelList::new(&vfs_resource.vfs).expect("Failed to load character model list"),
-    );
-
-    commands.insert_resource(
-        NpcModelList::new(&vfs_resource.vfs).expect("Failed to load NPC model list"),
+        ModelLoader::new(vfs_resource.vfs.clone(), npc_database)
+            .expect("Failed to create model loader"),
     );
 
     commands.spawn_bundle(PerspectiveCameraBundle::default());

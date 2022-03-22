@@ -9,10 +9,9 @@ use rose_game_common::components::Npc;
 
 use crate::{
     components::{ActiveMotion, NpcModel},
-    npc_model::{spawn_npc_model, NpcModelList},
+    model_loader::ModelLoader,
     render::StaticMeshMaterial,
     resources::GameData,
-    VfsResource,
 };
 
 #[allow(clippy::type_complexity, clippy::too_many_arguments)]
@@ -29,8 +28,7 @@ pub fn npc_model_system(
         Changed<Npc>,
     >,
     asset_server: Res<AssetServer>,
-    npc_model_list: Res<NpcModelList>,
-    vfs_resource: Res<VfsResource>,
+    model_loader: Res<ModelLoader>,
     mut static_mesh_materials: ResMut<Assets<StaticMeshMaterial>>,
     mut skinned_mesh_inverse_bindposes_assets: ResMut<Assets<SkinnedMeshInverseBindposes>>,
     game_data: Res<GameData>,
@@ -56,16 +54,15 @@ pub fn npc_model_system(
             }
         }
 
-        if let Some((npc_model, skinned_mesh)) = spawn_npc_model(
+        if let Some((npc_model, skinned_mesh)) = model_loader.spawn_npc_model(
             &mut commands,
-            entity,
-            &npc_model_list,
             &asset_server,
             &mut static_mesh_materials,
             &mut skinned_mesh_inverse_bindposes_assets,
+            entity,
             npc.id,
-            &vfs_resource.vfs,
         ) {
+            // TODO: Move animation assignment to animation_system
             let motion = npc_model
                 .action_motions
                 .iter()
