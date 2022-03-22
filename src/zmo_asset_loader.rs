@@ -60,9 +60,20 @@ impl AssetLoader for ZmoAssetLoader {
                         max_bone_id = max_bone_id.max(*bone_id);
                     }
 
+                    // Camera / morph target animations have only position channels
+                    // but no bone id so we can use bone id as a channel id instead.
+                    let assign_bone_id = max_bone_id == 0;
+                    if assign_bone_id {
+                        max_bone_id = (zmo.channels.len() - 1) as u32;
+                    }
+
                     let mut bones = vec![ZmoAssetBone::default(); (max_bone_id + 1) as usize];
-                    for (bone_id, channel) in zmo.channels.iter() {
-                        let bone_animation = &mut bones[*bone_id as usize];
+                    for (channel_id, (bone_id, channel)) in zmo.channels.iter().enumerate() {
+                        let bone_animation = if !assign_bone_id {
+                            &mut bones[*bone_id as usize]
+                        } else {
+                            &mut bones[channel_id]
+                        };
                         match channel {
                             ZmoChannel::Position(positions) => {
                                 bone_animation.translation = positions
