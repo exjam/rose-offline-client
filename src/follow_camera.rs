@@ -65,6 +65,7 @@ pub struct FollowCameraController {
     pub smoothing_weight: f32,
     pub follow_entity: Option<Entity>,
     pub follow_offset: Vec3,
+    pub follow_distance: f32,
 }
 
 impl Default for FollowCameraController {
@@ -72,12 +73,13 @@ impl Default for FollowCameraController {
         Self {
             mouse_rotate_sensitivity: Vec2::splat(0.006),
             mouse_translate_sensitivity: Vec2::splat(0.008),
-            mouse_wheel_zoom_sensitivity: 0.15,
+            mouse_wheel_zoom_sensitivity: 0.10,
             smoothing_weight: 0.8,
             enabled: true,
             pixels_per_line: 53.0,
             follow_entity: None,
             follow_offset: Vec3::default(),
+            follow_distance: 50.0,
         }
     }
 }
@@ -149,11 +151,11 @@ pub fn default_input_map(
 
 pub fn control_system(
     mut events: EventReader<ControlEvent>,
-    mut cameras: Query<(&FollowCameraController, &mut LookTransform, &Transform)>,
+    mut cameras: Query<(&mut FollowCameraController, &mut LookTransform, &Transform)>,
     query_target: Query<&Transform>,
 ) {
     // Can only control one camera at a time.
-    let (controller, mut transform, scene_transform) =
+    let (mut controller, mut transform, scene_transform) =
         if let Some((controller, transform, scene_transform)) = cameras.iter_mut().next() {
             (controller, transform, scene_transform)
         } else {
@@ -162,7 +164,6 @@ pub fn control_system(
 
     if controller.enabled {
         let mut look_angles = LookAngles::from_vector(-transform.look_direction().unwrap());
-        let mut radius_scalar = 1.0;
 
         for event in events.iter() {
             match event {
@@ -176,7 +177,8 @@ pub fn control_system(
                     transform.target += delta.x * right_dir + delta.y * up_dir;
                 }
                 ControlEvent::Zoom(scalar) => {
-                    radius_scalar *= scalar;
+                    controller.follow_distance =
+                        (controller.follow_distance * scalar).min(1000.0).max(1.0);
                 }
             }
         }
@@ -190,10 +192,7 @@ pub fn control_system(
 
         look_angles.assert_not_looking_up();
 
-        let new_radius = (radius_scalar * transform.radius())
-            .min(1000000.0)
-            .max(0.001);
-        transform.eye = transform.target + new_radius * look_angles.unit_vector();
+        transform.eye = transform.target + controller.follow_distance * look_angles.unit_vector();
     } else {
         events.iter(); // Drop the events.
     }
