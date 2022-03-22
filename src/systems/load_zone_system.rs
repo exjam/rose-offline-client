@@ -2,6 +2,7 @@ use bevy::{
     asset::LoadState,
     hierarchy::BuildChildren,
     math::{Quat, Vec2, Vec3},
+    pbr::{NotShadowCaster, NotShadowReceiver},
     prelude::{
         AssetServer, Assets, Commands, Component, ComputedVisibility, DespawnRecursiveExt, Entity,
         EventReader, EventWriter, GlobalTransform, Handle, Local, Mesh, Query, Res, ResMut,
@@ -495,6 +496,7 @@ fn load_block_heightmap(
             GlobalTransform::default(),
             Visibility::default(),
             ComputedVisibility::default(),
+            NotShadowCaster {},
         ))
         .insert_bundle(ColliderBundle {
             shape: ColliderShapeComponent(ColliderShape::trimesh(collider_verts, collider_indices)),
@@ -571,6 +573,8 @@ fn load_block_waterplanes(
                 GlobalTransform::default(),
                 Visibility::default(),
                 ComputedVisibility::default(),
+                NotShadowCaster {},
+                NotShadowReceiver {},
             ))
             .insert_bundle(ColliderBundle {
                 shape: ColliderShapeComponent(ColliderShape::trimesh(
@@ -736,6 +740,7 @@ fn load_block_object(
                         group: COLLISION_GROUP_ZONE_OBJECT,
                         filter: collision_filter,
                     },
+                    NotShadowCaster {},
                 ));
 
                 let active_motion = object_part.animation_path.as_ref().map(|animation_path| {
