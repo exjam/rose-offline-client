@@ -9,10 +9,10 @@ use bevy::{
 use bevy_egui::{egui, EguiContext};
 
 use rose_data::{EquipmentIndex, EquipmentItem, ItemReference, ItemType, NpcId, ZoneId};
-use rose_game_common::components::{CharacterGender, CharacterInfo, Equipment, Npc};
+use rose_game_common::components::{CharacterGender, CharacterInfo, Equipment, MoveMode, Npc};
 
 use crate::{
-    components::{ActiveMotion, DebugModelSkeleton},
+    components::{ActiveMotion, Command, DebugModelSkeleton},
     fly_camera::FlyCameraController,
     follow_camera::{FollowCameraBundle, FollowCameraController},
     resources::GameData,
@@ -113,6 +113,8 @@ pub fn model_viewer_enter_system(
     } else {
         commands.spawn_bundle((
             Npc::new(NpcId::new(1).unwrap(), 0),
+            Command::with_stop(),
+            MoveMode::Walk,
             GlobalTransform::default(),
             Transform::default().with_translation(Vec3::new(0.0, 0.0, 0.0)),
             DebugModelSkeleton::default(),
@@ -126,9 +128,32 @@ pub fn model_viewer_system(
     mut ui_item_list_state: Local<ModelViewerUiItemListState>,
     mut query_character: Query<&mut Equipment>,
     mut query_npc: Query<&mut Npc>,
+    mut query_command: Query<(&mut Command, &mut MoveMode)>,
     game_data: Res<GameData>,
     mut egui_context: ResMut<EguiContext>,
 ) {
+    egui::Window::new("Command").show(egui_context.ctx_mut(), |ui| {
+        if ui.button("Stop").clicked() {
+            for (mut command, _) in query_command.iter_mut() {
+                *command = Command::with_stop();
+            }
+        }
+
+        if ui.button("Walk").clicked() {
+            for (mut command, mut move_mode) in query_command.iter_mut() {
+                *command = Command::with_move(Vec3::default(), None, None);
+                *move_mode = MoveMode::Walk;
+            }
+        }
+
+        if ui.button("Run").clicked() {
+            for (mut command, mut move_mode) in query_command.iter_mut() {
+                *command = Command::with_move(Vec3::default(), None, None);
+                *move_mode = MoveMode::Run;
+            }
+        }
+    });
+
     egui::Window::new("Item List")
         .vscroll(true)
         .resizable(true)

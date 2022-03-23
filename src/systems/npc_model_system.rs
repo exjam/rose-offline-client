@@ -1,18 +1,82 @@
 use bevy::{
     core::Time,
     math::Vec3,
-    prelude::{AssetServer, Assets, Changed, Commands, Entity, Query, Res, ResMut, Transform},
+    prelude::{
+        AssetServer, Assets, Changed, Commands, Component, Entity, Handle, Query, Res, ResMut,
+        Transform,
+    },
     render::mesh::skinning::{SkinnedMesh, SkinnedMeshInverseBindposes},
 };
 
-use rose_game_common::components::Npc;
+use rose_game_common::components::{MoveMode, Npc};
 
 use crate::{
-    components::{ActiveMotion, NpcModel},
+    components::{ActiveMotion, Command, CommandData, NpcModel},
     model_loader::ModelLoader,
     render::StaticMeshMaterial,
     resources::GameData,
+    zmo_asset_loader::ZmoAsset,
 };
+
+#[derive(Component)]
+pub struct CommandNpcMotion {
+    pub command: CommandData,
+    pub move_mode: MoveMode,
+}
+
+fn get_command_motion(
+    npc_model: &NpcModel,
+    move_mode: &MoveMode,
+    command: &Command,
+) -> Option<Handle<ZmoAsset>> {
+    let action_index = match command.command {
+        CommandData::Stop => 0,
+        CommandData::Move(_) => match move_mode {
+            MoveMode::Walk => 1,
+            MoveMode::Run => 5,
+            _ => 1,
+        },
+    };
+
+    npc_model
+        .action_motions
+        .iter()
+        .find(|(action_id, _)| *action_id == action_index)
+        .or_else(|| npc_model.action_motions.get(0))
+        .map(|(_, motion)| motion.clone())
+}
+
+#[allow(clippy::type_complexity, clippy::too_many_arguments)]
+pub fn npc_model_animation_system(
+    mut commands: Commands,
+    mut query_command: Query<(
+        Entity,
+        &NpcModel,
+        &Command,
+        &MoveMode,
+        Option<&CommandNpcMotion>,
+    )>,
+    time: Res<Time>,
+) {
+    for (entity, npc_model, command, move_mode, command_npc_motion) in query_command.iter_mut() {
+        if command_npc_motion.map_or(false, |x| {
+            std::mem::discriminant(&x.command) == std::mem::discriminant(&command.command)
+                && x.move_mode == *move_mode
+        }) {
+            continue;
+        }
+
+        if let Some(motion) = get_command_motion(npc_model, move_mode, command) {
+            commands.entity(entity).insert_bundle((
+                CommandNpcMotion {
+                    command: command.command.clone(),
+                    move_mode: *move_mode,
+                },
+                ActiveMotion::new(motion.clone(), time.seconds_since_startup()),
+            ));
+        }
+    }
+}
 
 #[allow(clippy::type_complexity, clippy::too_many_arguments)]
 pub fn npc_model_system(
@@ -21,6 +85,8 @@ pub fn npc_model_system(
         (
             Entity,
             &Npc,
+            Option<&Command>,
+            Option<&MoveMode>,
             Option<&mut NpcModel>,
             Option<&SkinnedMesh>,
             &Transform,
@@ -34,7 +100,9 @@ pub fn npc_model_system(
     game_data: Res<GameData>,
     time: Res<Time>,
 ) {
-    for (entity, npc, mut current_npc_model, skinned_mesh, transform) in query.iter_mut() {
+    for (entity, npc, command, move_mode, mut current_npc_model, skinned_mesh, transform) in
+        query.iter_mut()
+    {
         if let Some(current_npc_model) = current_npc_model.as_mut() {
             if current_npc_model.npc_id == npc.id {
                 // Does not need new model, ignore
@@ -62,24 +130,23 @@ pub fn npc_model_system(
             entity,
             npc.id,
         ) {
-            // TODO: Move animation assignment to animation_system
-            let motion = npc_model
-                .action_motions
-                .iter()
-                .find(|(action_id, _)| *action_id == 1)
-                .or_else(|| npc_model.action_motions.get(0));
-            if let Some((_, motion)) = motion {
-                commands.entity(entity).insert(ActiveMotion::new(
-                    motion.clone(),
-                    time.seconds_since_startup(),
-                ));
-            }
-
             let transform = if let Some(npc_data) = game_data.npcs.get_npc(npc.id) {
                 transform.with_scale(Vec3::new(npc_data.scale, npc_data.scale, npc_data.scale))
             } else {
                 *transform
             };
+
+            if let (Some(command), Some(move_mode)) = (command, move_mode) {
+                if let Some(motion) = get_command_motion(&npc_model, move_mode, command) {
+                    commands.entity(entity).insert_bundle((
+                        CommandNpcMotion {
+                            command: command.command.clone(),
+                            move_mode: *move_mode,
+                        },
+                        ActiveMotion::new(motion.clone(), time.seconds_since_startup()),
+                    ));
+                }
+            }
 
             commands
                 .entity(entity)

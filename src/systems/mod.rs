@@ -38,7 +38,7 @@ pub use load_zone_system::{load_zone_system, ZoneObject};
 pub use login_connection_system::login_connection_system;
 pub use login_system::{login_state_enter_system, login_state_exit_system, login_system};
 pub use model_viewer_system::{model_viewer_enter_system, model_viewer_system};
-pub use npc_model_system::npc_model_system;
+pub use npc_model_system::{npc_model_animation_system, npc_model_system};
 pub use update_position_system::update_position_system;
 pub use world_connection_system::world_connection_system;
 pub use zone_viewer_system::{zone_viewer_setup_system, zone_viewer_system};
