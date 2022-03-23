@@ -1,6 +1,7 @@
 mod active_motion;
 mod client_entity;
 mod collision;
+mod command;
 mod model;
 mod player_character;
 mod position;
@@ -13,6 +14,7 @@ pub use collision::{
     COLLISION_GROUP_NPC, COLLISION_GROUP_ZONE_OBJECT, COLLISION_GROUP_ZONE_TERRAIN,
     COLLISION_GROUP_ZONE_WATER,
 };
+pub use command::{Command, CommandData, CommandMove, NextCommand};
 pub use model::{CharacterModel, CharacterModelPart, DebugModelSkeleton, NpcModel};
 pub use player_character::PlayerCharacter;
 pub use position::Position;

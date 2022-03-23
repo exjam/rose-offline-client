@@ -8,13 +8,16 @@ use bevy::{
 
 use rose_data::ZoneId;
 use rose_game_common::{
-    components::{CharacterInfo, Destination, MoveMode, MoveSpeed, Npc, StatusEffects, Target},
-    messages::server::ServerMessage,
+    components::{CharacterInfo, MoveMode, MoveSpeed, Npc, StatusEffects},
+    messages::server::{CommandState, ServerMessage},
 };
 use rose_network_common::ConnectionError;
 
 use crate::{
-    components::{ClientEntity, ClientEntityId, CollisionRayCastSource, PlayerCharacter, Position},
+    components::{
+        ClientEntity, ClientEntityId, CollisionRayCastSource, Command, NextCommand,
+        PlayerCharacter, Position,
+    },
     events::{ChatboxEvent, GameConnectionEvent},
     resources::{AppState, GameConnection, GameData},
 };
@@ -117,6 +120,8 @@ pub fn game_connection_system(
                             Position::new(character_data.position),
                         ))
                         .insert_bundle((
+                            Command::default(),
+                            NextCommand::default(),
                             ability_values,
                             status_effects,
                             move_mode,
@@ -157,6 +162,8 @@ pub fn game_connection_system(
                         .entity(player_entity)
                         .insert_bundle((
                             ClientEntity::new(message.entity_id),
+                            Command::default(),
+                            NextCommand::default(),
                             message.experience_points,
                             message.team,
                             message.health_points,
@@ -201,13 +208,27 @@ pub fn game_connection_system(
                     MoveMode::Run => MoveSpeed::new(ability_values.get_run_speed()),
                     MoveMode::Drive => MoveSpeed::new(ability_values.get_drive_speed()),
                 };
+                let target_entity = message
+                    .target_entity_id
+                    .and_then(|id| client_entity_list.get(id));
+                let next_command = match message.command {
+                    CommandState::Move => {
+                        if let Some(destination) = message.destination {
+                            NextCommand::with_move(destination, target_entity, None)
+                        } else {
+                            NextCommand::default()
+                        }
+                    }
+                    _ => NextCommand::default(),
+                };
 
                 let entity = commands
                     .spawn_bundle((
+                        Command::default(),
+                        next_command,
                         message.npc,
                         message.team,
                         message.health,
-                        // TODO: message.command,
                         message.move_mode,
                         Position::new(message.position),
                         ability_values,
@@ -240,16 +261,6 @@ pub fn game_connection_system(
                     })
                     .id();
 
-                if let Some(destination) = message.destination.as_ref() {
-                    commands.entity(entity).insert(destination.clone());
-                }
-                if let Some(target_entity) = message
-                    .target_entity_id
-                    .and_then(|id| client_entity_list.get(id))
-                {
-                    commands.entity(entity).insert(Target::new(target_entity));
-                }
-
                 client_entity_list.add(message.entity_id, entity);
             }
             Ok(ServerMessage::SpawnEntityMonster(message)) => {
@@ -266,13 +277,27 @@ pub fn game_connection_system(
                     MoveMode::Run => MoveSpeed::new(ability_values.get_run_speed()),
                     MoveMode::Drive => MoveSpeed::new(ability_values.get_drive_speed()),
                 };
+                let target_entity = message
+                    .target_entity_id
+                    .and_then(|id| client_entity_list.get(id));
+                let next_command = match message.command {
+                    CommandState::Move => {
+                        if let Some(destination) = message.destination {
+                            NextCommand::with_move(destination, target_entity, None)
+                        } else {
+                            NextCommand::default()
+                        }
+                    }
+                    _ => NextCommand::default(),
+                };
 
                 let entity = commands
                     .spawn_bundle((
+                        Command::default(),
+                        next_command,
                         message.npc,
                         message.team,
                         message.health,
-                        // TODO: message.command,
                         message.move_mode,
                         Position::new(message.position),
                         ability_values,
@@ -301,26 +326,19 @@ pub fn game_connection_system(
                     })
                     .id();
 
-                if let Some(destination) = message.destination.as_ref() {
-                    commands.entity(entity).insert(destination.clone());
-                }
-
-                if let Some(target_entity) = message
-                    .target_entity_id
-                    .and_then(|id| client_entity_list.get(id))
-                {
-                    commands.entity(entity).insert(Target::new(target_entity));
-                }
-
                 client_entity_list.add(message.entity_id, entity);
             }
             Ok(ServerMessage::MoveEntity(message)) => {
                 if let Some(entity) = client_entity_list.get(message.entity_id) {
-                    commands.entity(entity).insert(Destination::new(Vec3::new(
-                        message.x,
-                        message.y,
-                        message.z as f32,
-                    )));
+                    let target_entity = message
+                        .target_entity_id
+                        .and_then(|id| client_entity_list.get(id));
+
+                    commands.entity(entity).insert(NextCommand::with_move(
+                        Vec3::new(message.x, message.y, message.z as f32),
+                        target_entity,
+                        message.move_mode,
+                    ));
                 }
             }
             Ok(ServerMessage::RemoveEntities(message)) => {

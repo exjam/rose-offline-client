@@ -38,7 +38,7 @@ use resources::{
 use systems::{
     ability_values_system, animation_system, character_model_system, character_select_enter_system,
     character_select_exit_system, character_select_models_system, character_select_system,
-    collision_add_colliders_system, collision_system, debug_model_skeleton_system,
+    collision_add_colliders_system, collision_system, command_system, debug_model_skeleton_system,
     game_connection_system, game_debug_ui_system, game_input_system, game_state_enter_system,
     game_ui_system, game_zone_change_system, load_zone_system, login_connection_system,
     login_state_enter_system, login_state_exit_system, login_system, model_viewer_enter_system,
@@ -316,7 +316,7 @@ fn main() {
                 .with_system(game_input_system)
                 .with_system(game_ui_system)
                 .with_system(game_debug_ui_system)
-                .with_system(game_zone_change_system),
+                .with_system(command_system),
         );
 
     let mut load_zone_events = Events::<LoadZoneEvent>::default();
