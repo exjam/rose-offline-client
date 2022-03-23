@@ -3,7 +3,8 @@ use bevy::{
     core_pipeline::ClearColor,
     ecs::event::Events,
     prelude::{
-        AddAsset, App, AssetServer, Color, Commands, Msaa, PerspectiveCameraBundle, Res, SystemSet,
+        AddAsset, App, AssetServer, Color, Commands, CoreStage, Msaa, PerspectiveCameraBundle, Res,
+        StageLabel, SystemSet, SystemStage,
     },
     render::{render_resource::WgpuFeatures, settings::WgpuSettings},
     window::WindowDescriptor,
@@ -51,6 +52,12 @@ use zms_asset_loader::ZmsAssetLoader;
 
 pub struct VfsResource {
     vfs: Arc<VfsIndex>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, StageLabel)]
+enum GameStages {
+    Network,
+    ZoneChange,
 }
 
 fn main() {
@@ -319,6 +326,12 @@ fn main() {
                 .with_system(command_system),
         );
 
+    app.add_stage_after(
+        CoreStage::Update,
+        GameStages::ZoneChange,
+        SystemStage::parallel().with_system(game_zone_change_system),
+    );
+
     let mut load_zone_events = Events::<LoadZoneEvent>::default();
     if matches!(app_state, AppState::ZoneViewer) {
         load_zone_events.send(LoadZoneEvent::new(view_zone_id));
@@ -337,10 +350,16 @@ fn main() {
     let (network_thread_tx, network_thread_rx) =
         tokio::sync::mpsc::unbounded_channel::<NetworkThreadMessage>();
     let network_thread = std::thread::spawn(move || run_network_thread(network_thread_rx));
-    app.insert_resource(NetworkThread::new(network_thread_tx.clone()))
-        .add_system(login_connection_system)
-        .add_system(world_connection_system)
-        .add_system(game_connection_system);
+    app.insert_resource(NetworkThread::new(network_thread_tx.clone()));
+
+    app.add_stage_before(
+        CoreStage::Update,
+        GameStages::Network,
+        SystemStage::parallel()
+            .with_system(login_connection_system)
+            .with_system(world_connection_system)
+            .with_system(game_connection_system),
+    );
 
     app.add_startup_system(load_game_data);
     app.run();
