@@ -1,17 +1,30 @@
 use bevy::{
     core::Time,
-    math::Vec3,
+    math::{Quat, Vec3, Vec3A},
     prelude::{
-        AssetServer, Assets, Changed, Commands, Component, Entity, Handle, Query, Res, ResMut,
-        Transform, With,
+        AssetServer, Assets, Changed, Commands, Component, Entity, GlobalTransform, Handle, Query,
+        Res, ResMut, Transform, With, Without,
     },
-    render::mesh::skinning::{SkinnedMesh, SkinnedMeshInverseBindposes},
+    render::{
+        mesh::skinning::{SkinnedMesh, SkinnedMeshInverseBindposes},
+        primitives::Aabb,
+    },
 };
 
+use bevy_rapier3d::{
+    physics::ColliderBundle,
+    prelude::{
+        ColliderFlags, ColliderFlagsComponent, ColliderPosition, ColliderPositionComponent,
+        ColliderShape, ColliderShapeComponent, InteractionGroups,
+    },
+};
 use rose_game_common::components::{MoveMode, Npc};
 
 use crate::{
-    components::{ActiveMotion, Command, CommandData, NpcModel},
+    components::{
+        ActiveMotion, Command, CommandData, NpcModel, COLLISION_FILTER_CLICKABLE,
+        COLLISION_FILTER_INSPECTABLE, COLLISION_GROUP_NPC,
+    },
     model_loader::ModelLoader,
     render::StaticMeshMaterial,
     resources::GameData,
@@ -164,6 +177,107 @@ pub fn npc_model_system(
                     action_motions: Vec::new(),
                 })
                 .remove::<SkinnedMesh>();
+        }
+    }
+}
+
+#[derive(Component)]
+pub struct NpcColliderRootBoneOffset {
+    pub offset: Vec3,
+}
+
+pub fn npc_model_add_collider_system(
+    mut commands: Commands,
+    query_models: Query<(Entity, &NpcModel, &SkinnedMesh), Without<ColliderShapeComponent>>,
+    mut query_collider_position: Query<(
+        &SkinnedMesh,
+        &NpcColliderRootBoneOffset,
+        &mut ColliderPositionComponent,
+    )>,
+    query_aabb: Query<(&Aabb, Option<&SkinnedMesh>)>,
+    query_global_transform: Query<&GlobalTransform>,
+    inverse_bindposes: Res<Assets<SkinnedMeshInverseBindposes>>,
+) {
+    // Add colliders to NPC models without one
+    for (entity, npc_model, skinned_mesh) in query_models.iter() {
+        let mut min: Option<Vec3A> = None;
+        let mut max: Option<Vec3A> = None;
+        let mut all_parts_loaded = true;
+
+        // Collect the AABB of skinned mesh parts
+        for part_entity in npc_model.model_parts.iter() {
+            if let Ok((aabb, skinned_mesh)) = query_aabb.get(*part_entity) {
+                if skinned_mesh.is_some() {
+                    min = Some(min.map_or_else(|| aabb.min(), |min| min.min(aabb.min())));
+                    max = Some(max.map_or_else(|| aabb.max(), |max| max.max(aabb.max())));
+                }
+            } else {
+                all_parts_loaded = false;
+                break;
+            }
+        }
+
+        let inverse_bindpose = inverse_bindposes.get(&skinned_mesh.inverse_bindposes);
+        let root_bone_global_transform = query_global_transform.get(skinned_mesh.joints[0]).ok();
+        if min.is_none()
+            || max.is_none()
+            || !all_parts_loaded
+            || inverse_bindpose.is_none()
+            || root_bone_global_transform.is_none()
+        {
+            continue;
+        }
+        let min = min.unwrap();
+        let max = max.unwrap();
+        let root_bone_global_transform = root_bone_global_transform.unwrap();
+        let inverse_bindpose = inverse_bindpose.unwrap();
+        let root_bone_local_transform = Transform::from_matrix(inverse_bindpose[0].inverse());
+
+        let local_bound_center = 0.5 * (min + max);
+        let half_extents = Vec3::from(0.5 * (max - min)) * root_bone_global_transform.scale;
+        let root_bone_offset =
+            Vec3::from(local_bound_center) - root_bone_local_transform.translation;
+
+        commands
+            .entity(entity)
+            .insert_bundle(ColliderBundle {
+                shape: ColliderShapeComponent(ColliderShape::cuboid(
+                    half_extents.x,
+                    half_extents.y,
+                    half_extents.z,
+                )),
+                flags: ColliderFlagsComponent(ColliderFlags {
+                    collision_groups: InteractionGroups::new(
+                        COLLISION_GROUP_NPC,
+                        COLLISION_FILTER_INSPECTABLE | COLLISION_FILTER_CLICKABLE,
+                    ),
+                    ..Default::default()
+                }),
+                position: ColliderPositionComponent(ColliderPosition(
+                    (
+                        root_bone_global_transform.translation + root_bone_offset,
+                        root_bone_global_transform.rotation
+                            * Quat::from_axis_angle(Vec3::Z, std::f32::consts::PI / 2.0),
+                    )
+                        .into(),
+                )),
+                ..Default::default()
+            })
+            .insert(NpcColliderRootBoneOffset {
+                offset: root_bone_offset,
+            });
+    }
+
+    // Update any existing collider's position
+    for (skinned_mesh, root_bone_offset, mut collider_position) in
+        query_collider_position.iter_mut()
+    {
+        if let Ok(root_bone_global_transform) = query_global_transform.get(skinned_mesh.joints[0]) {
+            collider_position.translation =
+                (root_bone_global_transform.translation + root_bone_offset.offset).into();
+            collider_position.rotation = (root_bone_global_transform.rotation
+                * Quat::from_axis_angle(Vec3::Z, std::f32::consts::PI / 2.0))
+            .into();
         }
     }
 }

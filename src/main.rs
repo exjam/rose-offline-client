@@ -45,9 +45,9 @@ use systems::{
     debug_render_skeleton_system, game_connection_system, game_debug_ui_system, game_input_system,
     game_state_enter_system, game_ui_system, game_zone_change_system, load_zone_system,
     login_connection_system, login_state_enter_system, login_state_exit_system, login_system,
-    model_viewer_enter_system, model_viewer_system, npc_model_animation_system, npc_model_system,
-    update_position_system, world_connection_system, zone_viewer_setup_system, zone_viewer_system,
-    DebugInspectorPlugin,
+    model_viewer_enter_system, model_viewer_system, npc_model_add_collider_system,
+    npc_model_animation_system, npc_model_system, update_position_system, world_connection_system,
+    zone_viewer_setup_system, zone_viewer_system, DebugInspectorPlugin,
 };
 use vfs_asset_io::VfsAssetIo;
 use zmo_asset_loader::{ZmoAsset, ZmoAssetLoader};
@@ -363,6 +363,7 @@ fn main() {
         .add_system(character_model_add_collider_system.after("character_model_system"))
         .add_system(npc_model_system.label("npc_model_system"))
         .add_system(npc_model_animation_system.after("npc_model_system"))
+        .add_system(npc_model_add_collider_system.after("npc_model_system"))
         .add_system(debug_render_collider_system)
         .add_system(debug_render_skeleton_system)
         .add_system(collision_system)
