@@ -4,24 +4,29 @@ use bevy::{
     math::{Mat4, Quat, Vec3},
     prelude::{
         AssetServer, Assets, BuildChildren, Commands, ComputedVisibility, Entity, GlobalTransform,
-        Mesh, Transform, Visibility,
+        Handle, Mesh, Transform, Visibility,
     },
     render::mesh::skinning::{SkinnedMesh, SkinnedMeshInverseBindposes},
 };
-use enum_map::EnumMap;
+use enum_map::{enum_map, EnumMap};
 
-use rose_data::NpcId;
+use rose_data::{CharacterMotionAction, CharacterMotionList, ItemDatabase, NpcId};
 use rose_data::{EquipmentIndex, ItemType, NpcDatabase};
 use rose_file_readers::{ChrFile, VfsIndex, ZmdFile, ZscFile};
-use rose_game_common::components::{CharacterGender, CharacterInfo, Equipment};
+use rose_game_common::components::{
+    CharacterGender, CharacterInfo, Equipment, EquipmentItemDatabase,
+};
 
 use crate::{
     components::{CharacterModel, CharacterModelPart, NpcModel},
     render::StaticMeshMaterial,
+    zmo_asset_loader::ZmoAsset,
 };
 
 pub struct ModelLoader {
     vfs: Arc<VfsIndex>,
+    character_motion_list: Arc<CharacterMotionList>,
+    item_database: Arc<ItemDatabase>,
     npc_database: Arc<NpcDatabase>,
 
     // Male
@@ -56,6 +61,8 @@ pub struct ModelLoader {
 impl ModelLoader {
     pub fn new(
         vfs: Arc<VfsIndex>,
+        character_motion_list: Arc<CharacterMotionList>,
+        item_database: Arc<ItemDatabase>,
         npc_database: Arc<NpcDatabase>,
     ) -> Result<ModelLoader, anyhow::Error> {
         Ok(ModelLoader {
@@ -88,6 +95,8 @@ impl ModelLoader {
             npc_zsc: vfs.read_file::<ZscFile, _>("3DDATA/NPC/PART_NPC.ZSC")?,
 
             vfs,
+            character_motion_list,
+            item_database,
             npc_database,
         })
     }
@@ -232,6 +241,63 @@ impl ModelLoader {
         ))
     }
 
+    pub fn load_character_action_motions(
+        &self,
+        asset_server: &AssetServer,
+        character_info: &CharacterInfo,
+        equipment: &Equipment,
+    ) -> EnumMap<CharacterMotionAction, Handle<ZmoAsset>> {
+        let weapon_motion_type = self
+            .item_database
+            .get_equipped_weapon_item_data(equipment, EquipmentIndex::WeaponRight)
+            .map(|item_data| item_data.motion_type)
+            .unwrap_or(0) as usize;
+        let gender_index = match character_info.gender {
+            CharacterGender::Male => 0,
+            CharacterGender::Female => 1,
+        };
+        let get_motion = |action| {
+            if let Some(path) = self.character_motion_list.get_character_action_motion(
+                action,
+                weapon_motion_type,
+                gender_index,
+            ) {
+                return asset_server.load(path);
+            }
+
+            if gender_index == 1 {
+                if let Some(path) = self.character_motion_list.get_character_action_motion(
+                    action,
+                    weapon_motion_type,
+                    0,
+                ) {
+                    return asset_server.load(path);
+                }
+            }
+
+            if let Some(path) =
+                self.character_motion_list
+                    .get_character_action_motion(action, 0, gender_index)
+            {
+                return asset_server.load(path);
+            }
+
+            if gender_index == 1 {
+                if let Some(path) = self
+                    .character_motion_list
+                    .get_character_action_motion(action, 0, 0)
+                {
+                    return asset_server.load(path);
+                }
+            }
+
+            Handle::default()
+        };
+        enum_map! {
+            action => get_motion(action),
+        }
+    }
+
     #[allow(clippy::too_many_arguments)]
     pub fn spawn_character_model(
         &self,
@@ -285,6 +351,11 @@ impl ModelLoader {
                 gender: character_info.gender,
                 model_parts,
                 dummy_bone_offset,
+                action_motions: self.load_character_action_motions(
+                    asset_server,
+                    character_info,
+                    equipment,
+                ),
             },
             skinned_mesh,
         )
@@ -302,6 +373,16 @@ impl ModelLoader {
         character_model: &mut CharacterModel,
         skinned_mesh: &SkinnedMesh,
     ) {
+        // TODO: Detect modification to gender / face / hair
+
+        let weapon_model_id =
+            get_model_part_index(character_info, equipment, CharacterModelPart::Weapon)
+                .unwrap_or(0);
+        if weapon_model_id != character_model.model_parts[CharacterModelPart::Weapon].0 {
+            character_model.action_motions =
+                self.load_character_action_motions(asset_server, character_info, equipment);
+        }
+
         for model_part in [
             CharacterModelPart::CharacterFace,
             CharacterModelPart::CharacterHair,
@@ -335,6 +416,9 @@ impl ModelLoader {
                         model_part.default_bone_id(character_model.dummy_bone_offset),
                         character_model.dummy_bone_offset,
                     );
+                } else {
+                    character_model.model_parts[model_part].0 = model_id;
+                    character_model.model_parts[model_part].1.clear();
                 }
             }
         }
@@ -499,17 +583,21 @@ fn spawn_model(
             object_part.scale.y,
         ));
 
-        let entity = commands
+        let mut entity_commands = commands
             .spawn_bundle((
                 mesh,
                 material,
-                skinned_mesh.clone(),
                 part_transform,
                 GlobalTransform::default(),
                 Visibility::default(),
                 ComputedVisibility::default(),
-            ))
-            .id();
+            ));
+
+        if zsc_material.is_skin {
+            entity_commands.insert(skinned_mesh.clone());
+        }
+
+        let entity = entity_commands.id();
 
         let link_bone_entity = if let Some(bone_index) = object_part.bone_index {
             skinned_mesh.joints.get(bone_index as usize).cloned()

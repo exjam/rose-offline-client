@@ -3,7 +3,7 @@ use bevy::{
     math::Vec3,
     prelude::{
         AssetServer, Assets, Changed, Commands, Component, Entity, Handle, Query, Res, ResMut,
-        Transform,
+        Transform, With,
     },
     render::mesh::skinning::{SkinnedMesh, SkinnedMeshInverseBindposes},
 };
@@ -49,13 +49,16 @@ fn get_command_motion(
 #[allow(clippy::type_complexity, clippy::too_many_arguments)]
 pub fn npc_model_animation_system(
     mut commands: Commands,
-    mut query_command: Query<(
-        Entity,
-        &NpcModel,
-        &Command,
-        &MoveMode,
-        Option<&CommandNpcMotion>,
-    )>,
+    mut query_command: Query<
+        (
+            Entity,
+            &NpcModel,
+            &Command,
+            &MoveMode,
+            Option<&CommandNpcMotion>,
+        ),
+        With<SkinnedMesh>,
+    >,
     time: Res<Time>,
 ) {
     for (entity, npc_model, command, move_mode, command_npc_motion) in query_command.iter_mut() {

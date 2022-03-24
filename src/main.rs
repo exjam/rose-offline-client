@@ -37,14 +37,15 @@ use resources::{
     ServerConfiguration,
 };
 use systems::{
-    ability_values_system, animation_system, character_model_system, character_select_enter_system,
-    character_select_exit_system, character_select_models_system, character_select_system,
-    collision_add_colliders_system, collision_system, command_system, debug_model_skeleton_system,
-    game_connection_system, game_debug_ui_system, game_input_system, game_state_enter_system,
-    game_ui_system, game_zone_change_system, load_zone_system, login_connection_system,
-    login_state_enter_system, login_state_exit_system, login_system, model_viewer_enter_system,
-    model_viewer_system, npc_model_animation_system, npc_model_system, update_position_system,
-    world_connection_system, zone_viewer_setup_system, zone_viewer_system, DebugInspectorPlugin,
+    ability_values_system, animation_system, character_model_animation_system,
+    character_model_system, character_select_enter_system, character_select_exit_system,
+    character_select_models_system, character_select_system, collision_add_colliders_system,
+    collision_system, command_system, debug_model_skeleton_system, game_connection_system,
+    game_debug_ui_system, game_input_system, game_state_enter_system, game_ui_system,
+    game_zone_change_system, load_zone_system, login_connection_system, login_state_enter_system,
+    login_state_exit_system, login_system, model_viewer_enter_system, model_viewer_system,
+    npc_model_animation_system, npc_model_system, update_position_system, world_connection_system,
+    zone_viewer_setup_system, zone_viewer_system, DebugInspectorPlugin,
 };
 use vfs_asset_io::VfsAssetIo;
 use zmo_asset_loader::{ZmoAsset, ZmoAssetLoader};
@@ -279,6 +280,7 @@ fn main() {
 
     app.add_system(load_zone_system)
         .add_system(character_model_system)
+        .add_system(character_model_animation_system)
         .add_system(npc_model_system)
         .add_system(npc_model_animation_system)
         .add_system(debug_model_skeleton_system);
@@ -387,6 +389,10 @@ fn load_game_data(mut commands: Commands, vfs_resource: Res<VfsResource>) {
         rose_data_irose::get_skill_database(&vfs_resource.vfs)
             .expect("Failed to load skill database"),
     );
+    let character_motion_list = Arc::new(
+        rose_data_irose::get_character_motion_list(&vfs_resource.vfs)
+            .expect("Failed to load character motion list"),
+    );
 
     commands.insert_resource(GameData {
         ability_value_calculator: rose_game_irose::data::get_ability_value_calculator(
@@ -394,8 +400,9 @@ fn load_game_data(mut commands: Commands, vfs_resource: Res<VfsResource>) {
             skill_database.clone(),
             npc_database.clone(),
         ),
+        character_motion_list: character_motion_list.clone(),
         data_decoder: rose_data_irose::get_data_decoder(),
-        items: item_database,
+        items: item_database.clone(),
         npcs: npc_database.clone(),
         quests: Arc::new(
             rose_data_irose::get_quest_database(&vfs_resource.vfs)
@@ -412,8 +419,13 @@ fn load_game_data(mut commands: Commands, vfs_resource: Res<VfsResource>) {
     });
 
     commands.insert_resource(
-        ModelLoader::new(vfs_resource.vfs.clone(), npc_database)
-            .expect("Failed to create model loader"),
+        ModelLoader::new(
+            vfs_resource.vfs.clone(),
+            character_motion_list,
+            item_database,
+            npc_database,
+        )
+        .expect("Failed to create model loader"),
     );
 
     commands.spawn_bundle(PerspectiveCameraBundle::default());

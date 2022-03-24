@@ -1,16 +1,85 @@
 use bevy::{
     core::Time,
-    prelude::{AssetServer, Assets, Changed, Commands, Entity, Or, Query, Res, ResMut},
+    prelude::{
+        AssetServer, Assets, Changed, Commands, Component, Entity, Handle, Or, Query, Res, ResMut,
+        With,
+    },
     render::mesh::skinning::{SkinnedMesh, SkinnedMeshInverseBindposes},
 };
 
-use rose_game_common::components::{CharacterInfo, Equipment};
+use rose_data::CharacterMotionAction;
+use rose_game_common::components::{CharacterInfo, Equipment, MoveMode};
 
 use crate::{
-    components::{ActiveMotion, CharacterModel},
+    components::{ActiveMotion, CharacterModel, CharacterModelPart, Command, CommandData},
     model_loader::ModelLoader,
     render::StaticMeshMaterial,
+    zmo_asset_loader::ZmoAsset,
 };
+
+#[derive(Component)]
+pub struct CommandCharacterMotion {
+    pub command: CommandData,
+    pub move_mode: MoveMode,
+    pub weapon_id: usize,
+}
+
+fn get_command_motion(
+    character_model: &CharacterModel,
+    move_mode: &MoveMode,
+    command: &Command,
+) -> Handle<ZmoAsset> {
+    let action = match command.command {
+        CommandData::Stop => CharacterMotionAction::Stop1,
+        CommandData::Move(_) => match move_mode {
+            MoveMode::Walk => CharacterMotionAction::Walk,
+            MoveMode::Run => CharacterMotionAction::Run,
+            _ => todo!("Character animation for driving cart"),
+        },
+    };
+
+    character_model.action_motions[action].clone()
+}
+
+#[allow(clippy::type_complexity, clippy::too_many_arguments)]
+pub fn character_model_animation_system(
+    mut commands: Commands,
+    mut query_command: Query<
+        (
+            Entity,
+            &CharacterModel,
+            &Command,
+            &MoveMode,
+            Option<&CommandCharacterMotion>,
+        ),
+        With<SkinnedMesh>,
+    >,
+    time: Res<Time>,
+) {
+    for (entity, character_model, command, move_mode, command_npc_motion) in
+        query_command.iter_mut()
+    {
+        if command_npc_motion.map_or(false, |x| {
+            std::mem::discriminant(&x.command) == std::mem::discriminant(&command.command)
+                && x.move_mode == *move_mode
+                && x.weapon_id == character_model.model_parts[CharacterModelPart::Weapon].0
+        }) {
+            continue;
+        }
+
+        commands.entity(entity).insert_bundle((
+            CommandCharacterMotion {
+                command: command.command.clone(),
+                move_mode: *move_mode,
+                weapon_id: character_model.model_parts[CharacterModelPart::Weapon].0,
+            },
+            ActiveMotion::new(
+                get_command_motion(character_model, move_mode, command),
+                time.seconds_since_startup(),
+            ),
+        ));
+    }
+}
 
 #[allow(clippy::type_complexity)]
 pub fn character_model_system(
@@ -29,7 +98,6 @@ pub fn character_model_system(
     model_loader: Res<ModelLoader>,
     mut static_mesh_materials: ResMut<Assets<StaticMeshMaterial>>,
     mut skinned_mesh_inverse_bindposes_assets: ResMut<Assets<SkinnedMeshInverseBindposes>>,
-    time: Res<Time>,
 ) {
     for (entity, character_info, equipment, mut character_model, skinned_mesh) in query.iter_mut() {
         if let Some(character_model) = character_model.as_mut() {
@@ -55,12 +123,7 @@ pub fn character_model_system(
             );
             commands
                 .entity(entity)
-                .insert_bundle((character_model, skinned_mesh))
-                // TODO: Move animation assignment to animation_system
-                .insert(ActiveMotion::new(
-                    asset_server.load("3DDATA/MOTION/AVATAR/ONEHAND_RUN_M1.ZMO"),
-                    time.seconds_since_startup(),
-                ));
+                .insert_bundle((character_model, skinned_mesh));
         }
     }
 }
