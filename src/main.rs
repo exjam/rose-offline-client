@@ -1,10 +1,11 @@
 use bevy::{
     asset::AssetServerSettings,
     core_pipeline::ClearColor,
-    ecs::event::Events,
+    ecs::{event::Events, schedule::ShouldRun},
     prelude::{
-        AddAsset, App, AssetServer, Color, Commands, CoreStage, Msaa, PerspectiveCameraBundle, Res,
-        StageLabel, SystemSet, SystemStage,
+        AddAsset, App, AssetServer, Color, Commands, CoreStage, Msaa,
+        ParallelSystemDescriptorCoercion, PerspectiveCameraBundle, Res, StageLabel, State,
+        SystemSet, SystemStage,
     },
     render::{render_resource::WgpuFeatures, settings::WgpuSettings},
     window::WindowDescriptor,
@@ -37,15 +38,16 @@ use resources::{
     ServerConfiguration,
 };
 use systems::{
-    ability_values_system, animation_system, character_model_animation_system,
-    character_model_system, character_select_enter_system, character_select_exit_system,
-    character_select_models_system, character_select_system, collision_add_colliders_system,
-    collision_system, command_system, debug_model_skeleton_system, game_connection_system,
-    game_debug_ui_system, game_input_system, game_state_enter_system, game_ui_system,
-    game_zone_change_system, load_zone_system, login_connection_system, login_state_enter_system,
-    login_state_exit_system, login_system, model_viewer_enter_system, model_viewer_system,
-    npc_model_animation_system, npc_model_system, update_position_system, world_connection_system,
-    zone_viewer_setup_system, zone_viewer_system, DebugInspectorPlugin,
+    ability_values_system, animation_system, character_model_add_collider_system,
+    character_model_animation_system, character_model_system, character_select_enter_system,
+    character_select_exit_system, character_select_models_system, character_select_system,
+    collision_add_colliders_system, collision_system, command_system, debug_render_collider_system,
+    debug_render_skeleton_system, game_connection_system, game_debug_ui_system, game_input_system,
+    game_state_enter_system, game_ui_system, game_zone_change_system, load_zone_system,
+    login_connection_system, login_state_enter_system, login_state_exit_system, login_system,
+    model_viewer_enter_system, model_viewer_system, npc_model_animation_system, npc_model_system,
+    update_position_system, world_connection_system, zone_viewer_setup_system, zone_viewer_system,
+    DebugInspectorPlugin,
 };
 use vfs_asset_io::VfsAssetIo;
 use zmo_asset_loader::{ZmoAsset, ZmoAssetLoader};
@@ -59,6 +61,11 @@ pub struct VfsResource {
 enum GameStages {
     Network,
     ZoneChange,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, StageLabel)]
+enum ModelViewerStages {
+    Input,
 }
 
 fn main() {
@@ -278,33 +285,54 @@ fn main() {
             auto_login,
         });
 
-    app.add_system(load_zone_system)
-        .add_system(character_model_system)
-        .add_system(character_model_animation_system)
-        .add_system(npc_model_system)
-        .add_system(npc_model_animation_system)
-        .add_system(debug_model_skeleton_system);
-
     // Setup state
     app.add_state(app_state);
     app.add_plugin(DebugInspectorPlugin);
 
+    let mut load_zone_events = Events::<LoadZoneEvent>::default();
+    if matches!(app_state, AppState::ZoneViewer) {
+        load_zone_events.send(LoadZoneEvent::new(view_zone_id));
+    }
+
+    app.insert_resource(Events::<ChatboxEvent>::default())
+        .insert_resource(load_zone_events)
+        .insert_resource(Events::<ZoneEvent>::default())
+        .insert_resource(Events::<GameConnectionEvent>::default());
+
+    // Zone Viewer
     app.add_system_set(
         SystemSet::on_enter(AppState::ZoneViewer).with_system(zone_viewer_setup_system),
     )
     .add_system_set(SystemSet::on_update(AppState::ZoneViewer).with_system(zone_viewer_system));
 
+    // Model Viewer, we avoid deleting any entities during CoreStage::Update by using a custom
+    // stage which runs after Update. We cannot run before Update because the on_enter system
+    // below will have not run yet.
     app.add_system_set(
         SystemSet::on_enter(AppState::ModelViewer).with_system(model_viewer_enter_system),
-    )
-    .add_system_set(SystemSet::on_update(AppState::ModelViewer).with_system(model_viewer_system));
+    );
+    app.add_stage_after(
+        CoreStage::Update,
+        ModelViewerStages::Input,
+        SystemStage::parallel()
+            .with_system(model_viewer_system)
+            .with_run_criteria(|state: Res<State<AppState>>| -> ShouldRun {
+                if matches!(state.current(), AppState::ModelViewer) {
+                    ShouldRun::Yes
+                } else {
+                    ShouldRun::No
+                }
+            }),
+    );
 
+    // Game Login
     app.add_system_set(
         SystemSet::on_enter(AppState::GameLogin).with_system(login_state_enter_system),
     )
     .add_system_set(SystemSet::on_exit(AppState::GameLogin).with_system(login_state_exit_system))
     .add_system_set(SystemSet::on_update(AppState::GameLogin).with_system(login_system));
 
+    // Game Character Select
     app.add_system_set(
         SystemSet::on_enter(AppState::GameCharacterSelect)
             .with_system(character_select_enter_system),
@@ -318,6 +346,7 @@ fn main() {
         SystemSet::on_exit(AppState::GameCharacterSelect).with_system(character_select_exit_system),
     );
 
+    // Game
     app.add_system_set(SystemSet::on_enter(AppState::Game).with_system(game_state_enter_system))
         .add_system_set(
             SystemSet::on_update(AppState::Game)
@@ -329,25 +358,25 @@ fn main() {
                 .with_system(command_system),
         );
 
+    app.add_system(character_model_system.label("character_model_system"))
+        .add_system(character_model_animation_system.after("character_model_system"))
+        .add_system(character_model_add_collider_system.after("character_model_system"))
+        .add_system(npc_model_system.label("npc_model_system"))
+        .add_system(npc_model_animation_system.after("npc_model_system"))
+        .add_system(debug_render_collider_system)
+        .add_system(debug_render_skeleton_system)
+        .add_system(collision_system)
+        .add_system(collision_add_colliders_system)
+        .add_system(animation_system);
+
+    // Run zone change system after Update, so we do can add/remove entities
     app.add_stage_after(
         CoreStage::Update,
         GameStages::ZoneChange,
-        SystemStage::parallel().with_system(game_zone_change_system),
+        SystemStage::parallel()
+            .with_system(load_zone_system)
+            .with_system(game_zone_change_system),
     );
-
-    let mut load_zone_events = Events::<LoadZoneEvent>::default();
-    if matches!(app_state, AppState::ZoneViewer) {
-        load_zone_events.send(LoadZoneEvent::new(view_zone_id));
-    }
-
-    app.insert_resource(Events::<ChatboxEvent>::default())
-        .insert_resource(load_zone_events)
-        .insert_resource(Events::<ZoneEvent>::default())
-        .insert_resource(Events::<GameConnectionEvent>::default());
-
-    app.add_system(collision_system)
-        .add_system(collision_add_colliders_system)
-        .add_system(animation_system);
 
     // Setup network
     let (network_thread_tx, network_thread_rx) =
@@ -355,6 +384,7 @@ fn main() {
     let network_thread = std::thread::spawn(move || run_network_thread(network_thread_rx));
     app.insert_resource(NetworkThread::new(network_thread_tx.clone()));
 
+    // Run network systems before Update, so we can add/remove entities
     app.add_stage_before(
         CoreStage::Update,
         GameStages::Network,
