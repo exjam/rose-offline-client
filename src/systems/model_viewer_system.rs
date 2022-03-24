@@ -17,7 +17,7 @@ use rose_data::{EquipmentIndex, EquipmentItem, ItemReference, ItemType, ZoneId};
 use rose_game_common::components::{CharacterGender, CharacterInfo, Equipment, MoveMode, Npc};
 
 use crate::{
-    components::{ActiveMotion, Command, DebugModelSkeleton},
+    components::{ActiveMotion, Command, DebugRenderCollider, DebugRenderSkeleton},
     fly_camera::{FlyCameraBundle, FlyCameraController},
     follow_camera::FollowCameraController,
     resources::GameData,
@@ -25,6 +25,8 @@ use crate::{
 
 pub struct ModelViewerState {
     debug_skeletons: bool,
+    debug_colliders: bool,
+
     item_list_type: ItemType,
     valid_items: EnumMap<EquipmentIndex, Vec<ItemReference>>,
 
@@ -75,16 +77,19 @@ pub fn model_viewer_enter_system(
 
     commands.insert_resource(ModelViewerState {
         debug_skeletons: false,
+        debug_colliders: false,
+
         item_list_type: ItemType::Weapon,
         valid_items: enum_map! {
             equipment_index => get_valid_items(equipment_index.into()),
         },
+
         npcs: Vec::new(),
-        num_npcs: 0,
+        num_npcs: 5,
         max_num_npcs: game_data.npcs.iter().count(),
 
         characters: Vec::new(),
-        num_characters: 100,
+        num_characters: 5,
         max_num_characters: 500,
     });
 }
@@ -96,11 +101,35 @@ pub fn model_viewer_system(
     mut query_character: Query<(Entity, &mut Equipment)>,
     mut query_npc: Query<(Entity, &mut Npc)>,
     mut query_command: Query<(&mut Command, &mut MoveMode)>,
-    query_debug_skeletons: Query<Entity, With<DebugModelSkeleton>>,
+    query_debug_colliders: Query<Entity, With<DebugRenderCollider>>,
+    query_debug_skeletons: Query<Entity, With<DebugRenderSkeleton>>,
     game_data: Res<GameData>,
     mut egui_context: ResMut<EguiContext>,
 ) {
     egui::Window::new("Model Viewer").show(egui_context.ctx_mut(), |ui| {
+        if ui
+            .checkbox(&mut ui_state.debug_colliders, "Show Debug Colliders")
+            .clicked()
+        {
+            if ui_state.debug_colliders {
+                for (entity, _) in query_character.iter() {
+                    commands
+                        .entity(entity)
+                        .insert(DebugRenderCollider::default());
+                }
+
+                for (entity, _) in query_npc.iter() {
+                    commands
+                        .entity(entity)
+                        .insert(DebugRenderCollider::default());
+                }
+            } else {
+                for entity in query_debug_colliders.iter() {
+                    commands.entity(entity).remove::<DebugRenderCollider>();
+                }
+            }
+        }
+
         if ui
             .checkbox(&mut ui_state.debug_skeletons, "Show Debug Skeletons")
             .clicked()
@@ -109,17 +138,17 @@ pub fn model_viewer_system(
                 for (entity, _) in query_character.iter() {
                     commands
                         .entity(entity)
-                        .insert(DebugModelSkeleton::default());
+                        .insert(DebugRenderSkeleton::default());
                 }
 
                 for (entity, _) in query_npc.iter() {
                     commands
                         .entity(entity)
-                        .insert(DebugModelSkeleton::default());
+                        .insert(DebugRenderSkeleton::default());
                 }
             } else {
                 for entity in query_debug_skeletons.iter() {
-                    commands.entity(entity).remove::<DebugModelSkeleton>();
+                    commands.entity(entity).remove::<DebugRenderSkeleton>();
                 }
             }
         }
@@ -149,21 +178,27 @@ pub fn model_viewer_system(
                     .skip(ui_state.npcs.len())
                     .take(ui_state.num_npcs - ui_state.npcs.len())
                 {
-                    ui_state.npcs.push(
-                        commands
-                            .spawn_bundle((
-                                Npc::new(npc.id, 0),
-                                Command::with_stop(),
-                                MoveMode::Walk,
-                                GlobalTransform::default(),
-                                Transform::default().with_translation(Vec3::new(
-                                    2.5 + (count / 30) as f32 * 5.0,
-                                    0.0,
-                                    (count % 30) as f32 * -5.0,
-                                )),
-                            ))
-                            .id(),
-                    );
+                    let mut entity_commands = commands.spawn_bundle((
+                        Npc::new(npc.id, 0),
+                        Command::with_stop(),
+                        MoveMode::Walk,
+                        GlobalTransform::default(),
+                        Transform::default().with_translation(Vec3::new(
+                            2.5 + (count / 30) as f32 * 5.0,
+                            0.0,
+                            (count % 30) as f32 * -5.0,
+                        )),
+                    ));
+
+                    if ui_state.debug_colliders {
+                        entity_commands.insert(DebugRenderCollider::default());
+                    }
+
+                    if ui_state.debug_skeletons {
+                        entity_commands.insert(DebugRenderSkeleton::default());
+                    }
+
+                    ui_state.npcs.push(entity_commands.id());
                 }
             }
             Ordering::Equal => {}
@@ -223,22 +258,28 @@ pub fn model_viewer_system(
                         }
                     }
 
-                    ui_state.characters.push(
-                        commands
-                            .spawn_bundle((
-                                character_info,
-                                equipment,
-                                Command::with_stop(),
-                                MoveMode::Walk,
-                                GlobalTransform::default(),
-                                Transform::default().with_translation(Vec3::new(
-                                    -2.5 + (count / 25) as f32 * -5.0,
-                                    0.0,
-                                    (count % 25) as f32 * -5.0,
-                                )),
-                            ))
-                            .id(),
-                    );
+                    let mut entity_commands = commands.spawn_bundle((
+                        character_info,
+                        equipment,
+                        Command::with_stop(),
+                        MoveMode::Walk,
+                        GlobalTransform::default(),
+                        Transform::default().with_translation(Vec3::new(
+                            -2.5 + (count / 25) as f32 * -5.0,
+                            0.0,
+                            (count % 25) as f32 * -5.0,
+                        )),
+                    ));
+
+                    if ui_state.debug_colliders {
+                        entity_commands.insert(DebugRenderCollider::default());
+                    }
+
+                    if ui_state.debug_skeletons {
+                        entity_commands.insert(DebugRenderSkeleton::default());
+                    }
+
+                    ui_state.characters.push(entity_commands.id());
                 }
             }
             Ordering::Equal => {}
