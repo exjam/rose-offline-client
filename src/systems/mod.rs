@@ -5,7 +5,7 @@ mod character_select_system;
 mod collision_system;
 mod command_system;
 mod debug_inspector_system;
-mod debug_model_skeleton_system;
+mod debug_render_system;
 mod game_connection_system;
 mod game_debug_ui_system;
 mod game_system;
@@ -31,7 +31,7 @@ pub use character_select_system::{
 pub use collision_system::{collision_add_colliders_system, collision_system};
 pub use command_system::command_system;
 pub use debug_inspector_system::DebugInspectorPlugin;
-pub use debug_model_skeleton_system::debug_model_skeleton_system;
+pub use debug_render_system::{debug_render_collider_system, debug_render_skeleton_system};
 pub use game_connection_system::game_connection_system;
 pub use game_debug_ui_system::game_debug_ui_system;
 pub use game_system::{game_input_system, game_state_enter_system, game_zone_change_system};

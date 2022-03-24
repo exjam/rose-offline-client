@@ -35,6 +35,3 @@ pub struct NpcModel {
     pub dummy_bone_offset: usize,
     pub action_motions: Vec<(u16, Handle<ZmoAsset>)>,
 }
-
-#[derive(Component, Default)]
-pub struct DebugModelSkeleton;

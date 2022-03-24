@@ -583,15 +583,14 @@ fn spawn_model(
             object_part.scale.y,
         ));
 
-        let mut entity_commands = commands
-            .spawn_bundle((
-                mesh,
-                material,
-                part_transform,
-                GlobalTransform::default(),
-                Visibility::default(),
-                ComputedVisibility::default(),
-            ));
+        let mut entity_commands = commands.spawn_bundle((
+            mesh,
+            material,
+            part_transform,
+            GlobalTransform::default(),
+            Visibility::default(),
+            ComputedVisibility::default(),
+        ));
 
         if zsc_material.is_skin {
             entity_commands.insert(skinned_mesh.clone());
