@@ -1,6 +1,6 @@
 use bevy::{
     core::Time,
-    math::{Quat, Vec3, Vec3A, Vec3Swizzles},
+    math::{Quat, Vec3, Vec3A},
     prelude::{
         AssetServer, Assets, Changed, Commands, Component, Entity, GlobalTransform, Handle, Or,
         Query, Res, ResMut, Transform, With, Without,
@@ -96,7 +96,7 @@ pub fn character_model_animation_system(
 }
 
 #[derive(Component)]
-pub struct ColliderRootBoneOffset {
+pub struct CharacterColliderRootBoneOffset {
     pub offset: Vec3,
 }
 
@@ -105,11 +105,12 @@ pub fn character_model_add_collider_system(
     query_models: Query<(Entity, &CharacterModel, &SkinnedMesh), Without<ColliderShapeComponent>>,
     mut query_collider_position: Query<(
         &SkinnedMesh,
-        &ColliderRootBoneOffset,
+        &CharacterColliderRootBoneOffset,
         &mut ColliderPositionComponent,
     )>,
     query_aabb: Query<&Aabb>,
-    query_global_transform: Query<(&Transform, &GlobalTransform)>,
+    query_global_transform: Query<&GlobalTransform>,
+    inverse_bindposes: Res<Assets<SkinnedMeshInverseBindposes>>,
 ) {
     // Add colliders to character models without one
     for (entity, character_model, skinned_mesh) in query_models.iter() {
@@ -141,13 +142,21 @@ pub fn character_model_add_collider_system(
             }
         }
 
-        let root_bone_transforms = query_global_transform.get(skinned_mesh.joints[0]).ok();
-        if min.is_none() || max.is_none() || !all_parts_loaded || root_bone_transforms.is_none() {
+        let inverse_bindpose = inverse_bindposes.get(&skinned_mesh.inverse_bindposes);
+        let root_bone_global_transform = query_global_transform.get(skinned_mesh.joints[0]).ok();
+        if min.is_none()
+            || max.is_none()
+            || !all_parts_loaded
+            || root_bone_global_transform.is_none()
+            || inverse_bindpose.is_none()
+        {
             continue;
         }
         let min = min.unwrap();
         let max = max.unwrap();
-        let (root_bone_local_transform, root_bone_global_transform) = root_bone_transforms.unwrap();
+        let root_bone_global_transform = root_bone_global_transform.unwrap();
+        let inverse_bindpose = inverse_bindpose.unwrap();
+        let root_bone_local_transform = Transform::from_matrix(inverse_bindpose[0].inverse());
 
         let local_bound_center = 0.5 * (min + max);
         let half_extents = Vec3::from(0.5 * (max - min)) * root_bone_global_transform.scale;
@@ -171,7 +180,7 @@ pub fn character_model_add_collider_system(
                 }),
                 position: ColliderPositionComponent(ColliderPosition(
                     (
-                        root_bone_global_transform.translation + root_bone_offset.xyz(),
+                        root_bone_global_transform.translation + root_bone_offset,
                         root_bone_global_transform.rotation
                             * Quat::from_axis_angle(Vec3::Z, std::f32::consts::PI / 2.0),
                     )
@@ -179,7 +188,7 @@ pub fn character_model_add_collider_system(
                 )),
                 ..Default::default()
             })
-            .insert(ColliderRootBoneOffset {
+            .insert(CharacterColliderRootBoneOffset {
                 offset: root_bone_offset,
             });
     }
@@ -188,9 +197,7 @@ pub fn character_model_add_collider_system(
     for (skinned_mesh, root_bone_offset, mut collider_position) in
         query_collider_position.iter_mut()
     {
-        if let Ok((_, root_bone_global_transform)) =
-            query_global_transform.get(skinned_mesh.joints[0])
-        {
+        if let Ok(root_bone_global_transform) = query_global_transform.get(skinned_mesh.joints[0]) {
             collider_position.translation =
                 (root_bone_global_transform.translation + root_bone_offset.offset).into();
             collider_position.rotation = (root_bone_global_transform.rotation
