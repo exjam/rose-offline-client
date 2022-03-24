@@ -5,12 +5,6 @@ Definitely not a ROSE client.
 ## Required arguments:
 - `--data-idx=<path/to/data.idx>` Path to irose 129en data.idx
 
-## Zone Viewer Mode
-Use `--zone=<N>` to run in zone viewer mode, this allows you to view zones.
-
-## Model Viewer Mode
-Use `--model-viewer` to run in model viewer mode, which allows you to view character and NPC models.
-
 ## Game Mode
 Use `--game` to run in game mode, this is where we act as a full client which requires an irose 129en compatible server.
 - `--ip` Server IP for login server
@@ -23,6 +17,11 @@ You can also use `--auto-login` for automatic login in game mode.
 - `--channel-id=<N>` Channel ID for auto login (defaults to 0)
 - `--character-name=<name>` Character name for auto login (optional, auto login can be username/password only)
 
+## Model Viewer Mode
+Use `--model-viewer` to run in model viewer mode, which allows you to view character and NPC models.
+
+## Zone Viewer Mode
+Use `--zone=<N>` to run in zone viewer mode, this allows you to view zones.
 
 # Screenshots
 
