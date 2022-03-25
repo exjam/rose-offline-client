@@ -6,6 +6,7 @@ mod debug_render;
 mod model;
 mod player_character;
 mod position;
+mod selected_target;
 
 pub use active_motion::ActiveMotion;
 pub use client_entity::{ClientEntity, ClientEntityId};
@@ -20,3 +21,4 @@ pub use debug_render::{DebugRenderCollider, DebugRenderSkeleton};
 pub use model::{CharacterModel, CharacterModelPart, NpcModel};
 pub use player_character::PlayerCharacter;
 pub use position::Position;
+pub use selected_target::SelectedTarget;

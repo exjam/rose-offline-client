@@ -10,20 +10,30 @@ use bevy::{
 };
 use bevy_egui::EguiContext;
 use bevy_rapier3d::{
-    physics::{QueryPipelineColliderComponentsQuery, QueryPipelineColliderComponentsSet},
+    physics::{
+        IntoEntity, QueryPipelineColliderComponentsQuery, QueryPipelineColliderComponentsSet,
+    },
     prelude::{InteractionGroups, QueryPipeline},
 };
-use rose_game_common::messages::client::{ClientMessage, Move};
+use rose_game_common::{
+    components::Team,
+    messages::client::{Attack, ClientMessage, Move},
+};
 
 use crate::{
-    components::{ActiveMotion, PlayerCharacter, COLLISION_FILTER_CLICKABLE},
+    components::{
+        ActiveMotion, ClientEntity, PlayerCharacter, Position, SelectedTarget,
+        COLLISION_FILTER_CLICKABLE,
+    },
     events::{GameConnectionEvent, LoadZoneEvent, ZoneEvent},
     fly_camera::FlyCameraController,
     follow_camera::{FollowCameraBundle, FollowCameraController},
     resources::GameConnection,
 };
 
-use super::{collision_system::ray_from_screenspace, debug_inspector_system::DebugInspectorState};
+use super::{
+    collision_system::ray_from_screenspace, debug_inspector_system::DebugInspectorState, ZoneObject,
+};
 
 pub fn game_state_enter_system(
     mut commands: Commands,
@@ -80,6 +90,7 @@ pub fn game_zone_change_system(
 
 #[allow(clippy::too_many_arguments)]
 pub fn game_input_system(
+    mut commands: Commands,
     mouse_button_input: Res<Input<MouseButton>>,
     windows: Res<Windows>,
     query_camera: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
@@ -88,6 +99,13 @@ pub fn game_input_system(
     mut egui_ctx: ResMut<EguiContext>,
     game_connection: Option<Res<GameConnection>>,
     debug_inspector_state: Res<DebugInspectorState>,
+    query_hit_entity: Query<(
+        Option<&ClientEntity>,
+        Option<&Team>,
+        Option<&Position>,
+        Option<&ZoneObject>,
+    )>,
+    query_player: Query<(Entity, &Team, Option<&SelectedTarget>), With<PlayerCharacter>>,
 ) {
     let colliders = QueryPipelineColliderComponentsSet(&colliders);
     let cursor_position = windows.primary().cursor_position();
@@ -107,33 +125,78 @@ pub fn game_input_system(
         return;
     }
 
-    if mouse_button_input.just_pressed(MouseButton::Left) {
-        for (camera, camera_transform) in query_camera.iter() {
-            if let Some(ray) =
-                ray_from_screenspace(cursor_position, &windows, camera, camera_transform)
-            {
-                let hit = query_pipeline.cast_ray(
-                    &colliders,
-                    &ray,
-                    10000000.0,
-                    false,
-                    InteractionGroups::all().with_memberships(COLLISION_FILTER_CLICKABLE),
-                    None,
-                );
+    let (player_entity, player_team, player_selected_target) = query_player.single();
 
-                if let Some((_, distance)) = hit {
-                    let hit_position = ray.point_at(distance);
+    for (camera, camera_transform) in query_camera.iter() {
+        if let Some(ray) = ray_from_screenspace(cursor_position, &windows, camera, camera_transform)
+        {
+            let hit = query_pipeline.cast_ray(
+                &colliders,
+                &ray,
+                10000000.0,
+                false,
+                InteractionGroups::all().with_memberships(COLLISION_FILTER_CLICKABLE),
+                None,
+            );
 
-                    if let Some(game_connection) = game_connection.as_ref() {
-                        game_connection
-                            .client_message_tx
-                            .send(ClientMessage::Move(Move {
-                                target_entity_id: None,
-                                x: hit_position.x * 100.0,
-                                y: -hit_position.z * 100.0,
-                                z: f32::max(0.0, hit_position.y * 100.0) as u16,
-                            }))
-                            .ok();
+            if let Some((hit_collider_handle, distance)) = hit {
+                let hit_position = ray.point_at(distance);
+                let hit_entity = hit_collider_handle.entity();
+
+                if let Ok((hit_client_entity, hit_team, hit_entity_position, zone_object)) =
+                    query_hit_entity.get(hit_entity)
+                {
+                    if zone_object.is_some() {
+                        if mouse_button_input.just_pressed(MouseButton::Left) {
+                            if let Some(game_connection) = game_connection.as_ref() {
+                                game_connection
+                                    .client_message_tx
+                                    .send(ClientMessage::Move(Move {
+                                        target_entity_id: None,
+                                        x: hit_position.x * 100.0,
+                                        y: -hit_position.z * 100.0,
+                                        z: f32::max(0.0, hit_position.y * 100.0) as u16,
+                                    }))
+                                    .ok();
+                            }
+                        }
+                    } else if let (Some(hit_client_entity), Some(hit_team)) =
+                        (hit_client_entity, hit_team)
+                    {
+                        if mouse_button_input.just_pressed(MouseButton::Left) {
+                            if player_selected_target
+                                .map_or(false, |target| target.entity == hit_entity)
+                            {
+                                if hit_team.id == Team::DEFAULT_NPC_TEAM_ID {
+                                    if let Some(hit_entity_position) = hit_entity_position {
+                                        if let Some(game_connection) = game_connection.as_ref() {
+                                            game_connection
+                                                .client_message_tx
+                                                .send(ClientMessage::Move(Move {
+                                                    target_entity_id: Some(hit_client_entity.id),
+                                                    x: hit_entity_position.position.x,
+                                                    y: hit_entity_position.position.y,
+                                                    z: hit_entity_position.position.z as u16,
+                                                }))
+                                                .ok();
+                                        }
+                                    }
+                                } else if hit_team.id != player_team.id {
+                                    if let Some(game_connection) = game_connection.as_ref() {
+                                        game_connection
+                                            .client_message_tx
+                                            .send(ClientMessage::Attack(Attack {
+                                                target_entity_id: hit_client_entity.id,
+                                            }))
+                                            .ok();
+                                    }
+                                }
+                            } else {
+                                commands
+                                    .entity(player_entity)
+                                    .insert(SelectedTarget::new(hit_entity));
+                            }
+                        }
                     }
                 }
             }
