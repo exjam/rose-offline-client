@@ -49,6 +49,7 @@ fn get_command_motion(
             MoveMode::Run => 5,
             _ => 1,
         },
+        CommandData::Attack(_) => 2,
     };
 
     npc_model

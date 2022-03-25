@@ -341,6 +341,15 @@ pub fn game_connection_system(
                     ));
                 }
             }
+            Ok(ServerMessage::AttackEntity(message)) => {
+                if let Some(entity) = client_entity_list.get(message.entity_id) {
+                    if let Some(target_entity) = client_entity_list.get(message.target_entity_id) {
+                        commands
+                            .entity(entity)
+                            .insert(NextCommand::with_attack(target_entity));
+                    }
+                }
+            }
             Ok(ServerMessage::RemoveEntities(message)) => {
                 for entity_id in message.entity_ids {
                     if let Some(entity) = client_entity_list.get(entity_id) {

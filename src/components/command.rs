@@ -14,9 +14,15 @@ pub struct CommandMove {
 }
 
 #[derive(Clone, Debug)]
+pub struct CommandAttack {
+    pub target: Entity,
+}
+
+#[derive(Clone, Debug)]
 pub enum CommandData {
     Stop,
     Move(CommandMove),
+    Attack(CommandAttack),
 }
 
 #[derive(Component, Clone, Debug)]
@@ -31,23 +37,28 @@ pub struct Command {
     pub required_duration: Option<Duration>,
 }
 
-impl Default for Command {
-    fn default() -> Self {
+impl Command {
+    pub fn new(command: CommandData, required_duration: Option<Duration>) -> Self {
         Self {
-            command: CommandData::Stop,
-            duration: Duration::default(),
-            required_duration: None,
+            command,
+            duration: Duration::new(0, 0),
+            required_duration,
         }
     }
-}
 
-impl Command {
+    pub fn default() -> Self {
+        Self::with_stop()
+    }
+
     pub fn with_stop() -> Self {
-        Self {
-            command: CommandData::Stop,
-            duration: Duration::default(),
-            required_duration: None,
-        }
+        Self::new(CommandData::Stop, None)
+    }
+
+    pub fn with_attack(target: Entity, duration: Duration) -> Self {
+        Self::new(
+            CommandData::Attack(CommandAttack { target }),
+            Some(duration),
+        )
     }
 
     pub fn with_move(
@@ -55,15 +66,14 @@ impl Command {
         target: Option<Entity>,
         move_mode: Option<MoveMode>,
     ) -> Self {
-        Self {
-            command: CommandData::Move(CommandMove {
+        Self::new(
+            CommandData::Move(CommandMove {
                 destination,
                 target,
                 move_mode,
             }),
-            duration: Duration::default(),
-            required_duration: None,
-        }
+            None,
+        )
     }
 }
 
@@ -91,6 +101,12 @@ impl NextCommand {
                 target,
                 move_mode,
             })),
+        }
+    }
+
+    pub fn with_attack(target: Entity) -> Self {
+        Self {
+            command: Some(CommandData::Attack(CommandAttack { target })),
         }
     }
 }

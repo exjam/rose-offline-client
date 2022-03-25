@@ -6,7 +6,7 @@ use tokio::net::TcpStream;
 use rose_game_common::messages::{
     client::{ClientMessage, ConnectionRequest},
     server::{
-        AnnounceChat, CharacterData, CharacterDataItems, CharacterDataQuest,
+        AnnounceChat, AttackEntity, CharacterData, CharacterDataItems, CharacterDataQuest,
         ConnectionRequestError, ConnectionResponse, JoinZoneResponse, LocalChat, MoveEntity,
         RemoveEntities, ServerMessage, ShoutChat, SpawnEntityMonster, SpawnEntityNpc, Teleport,
         UpdateSpeed, Whisper,
@@ -15,10 +15,11 @@ use rose_game_common::messages::{
 use rose_network_common::{Connection, Packet, PacketCodec};
 use rose_network_irose::{
     game_client_packets::{
-        PacketClientChat, PacketClientConnectRequest, PacketClientJoinZone, PacketClientMove,
+        PacketClientAttack, PacketClientChat, PacketClientConnectRequest, PacketClientJoinZone,
+        PacketClientMove,
     },
     game_server_packets::{
-        ConnectResult, PacketConnectionReply, PacketServerAnnounceChat,
+        ConnectResult, PacketConnectionReply, PacketServerAnnounceChat, PacketServerAttackEntity,
         PacketServerCharacterInventory, PacketServerCharacterQuestData, PacketServerJoinZone,
         PacketServerLocalChat, PacketServerMoveEntity, PacketServerRemoveEntities,
         PacketServerSelectCharacter, PacketServerShoutChat, PacketServerSpawnEntityMonster,
@@ -139,6 +140,19 @@ impl GameClient {
                         y: response.y,
                         z: response.z,
                         move_mode: response.move_mode,
+                    }))
+                    .ok();
+            }
+            Some(ServerPackets::AttackEntity) => {
+                let response = PacketServerAttackEntity::try_from(&packet)?;
+                self.server_message_tx
+                    .send(ServerMessage::AttackEntity(AttackEntity {
+                        entity_id: response.entity_id,
+                        target_entity_id: response.target_entity_id,
+                        distance: response.distance,
+                        x: response.x,
+                        y: response.y,
+                        z: response.z,
                     }))
                     .ok();
             }
@@ -282,6 +296,13 @@ impl GameClient {
                         x: message.x,
                         y: message.y,
                         z: message.z,
+                    }))
+                    .await?
+            }
+            ClientMessage::Attack(message) => {
+                connection
+                    .write_packet(Packet::from(&PacketClientAttack {
+                        target_entity_id: message.target_entity_id,
                     }))
                     .await?
             }

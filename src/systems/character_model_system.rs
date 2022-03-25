@@ -46,6 +46,7 @@ fn get_command_motion(
 ) -> Handle<ZmoAsset> {
     let action = match command.command {
         CommandData::Stop => CharacterMotionAction::Stop1,
+        CommandData::Attack(_) => CharacterMotionAction::Attack,
         CommandData::Move(_) => match move_mode {
             MoveMode::Walk => CharacterMotionAction::Walk,
             MoveMode::Run => CharacterMotionAction::Run,
