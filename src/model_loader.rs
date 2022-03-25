@@ -373,8 +373,6 @@ impl ModelLoader {
         character_model: &mut CharacterModel,
         skinned_mesh: &SkinnedMesh,
     ) {
-        // TODO: Detect modification to gender / face / hair
-
         let weapon_model_id =
             get_model_part_index(character_info, equipment, CharacterModelPart::Weapon)
                 .unwrap_or(0);

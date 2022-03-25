@@ -19,7 +19,7 @@ use bevy_rapier3d::{
     },
 };
 use rose_data::CharacterMotionAction;
-use rose_game_common::components::{CharacterInfo, Equipment, MoveMode};
+use rose_game_common::components::{CharacterGender, CharacterInfo, Equipment, MoveMode};
 
 use crate::{
     components::{
@@ -34,6 +34,7 @@ use crate::{
 #[derive(Component)]
 pub struct CommandCharacterMotion {
     pub command: CommandData,
+    pub gender: CharacterGender,
     pub move_mode: MoveMode,
     pub weapon_id: usize,
 }
@@ -75,6 +76,7 @@ pub fn character_model_animation_system(
     {
         if command_npc_motion.map_or(false, |x| {
             std::mem::discriminant(&x.command) == std::mem::discriminant(&command.command)
+                && x.gender == character_model.gender
                 && x.move_mode == *move_mode
                 && x.weapon_id == character_model.model_parts[CharacterModelPart::Weapon].0
         }) {
@@ -84,6 +86,7 @@ pub fn character_model_animation_system(
         commands.entity(entity).insert_bundle((
             CommandCharacterMotion {
                 command: command.command.clone(),
+                gender: character_model.gender,
                 move_mode: *move_mode,
                 weapon_id: character_model.model_parts[CharacterModelPart::Weapon].0,
             },
@@ -227,29 +230,45 @@ pub fn character_model_system(
 ) {
     for (entity, character_info, equipment, mut character_model, skinned_mesh) in query.iter_mut() {
         if let Some(character_model) = character_model.as_mut() {
-            model_loader.update_character_equipment(
-                &mut commands,
-                &asset_server,
-                &mut static_mesh_materials,
-                entity,
-                character_info,
-                equipment,
-                character_model,
-                skinned_mesh.as_ref().unwrap(),
-            );
-        } else {
-            let (character_model, skinned_mesh) = model_loader.spawn_character_model(
-                &mut commands,
-                &asset_server,
-                &mut static_mesh_materials,
-                &mut skinned_mesh_inverse_bindposes_assets,
-                entity,
-                character_info,
-                equipment,
-            );
-            commands
-                .entity(entity)
-                .insert_bundle((character_model, skinned_mesh));
+            if character_model.gender == character_info.gender {
+                model_loader.update_character_equipment(
+                    &mut commands,
+                    &asset_server,
+                    &mut static_mesh_materials,
+                    entity,
+                    character_info,
+                    equipment,
+                    character_model,
+                    skinned_mesh.as_ref().unwrap(),
+                );
+                continue;
+            }
+
+            // If character gender changed, we must destroy the previous model and create a new one
+            for (_, (_, part_entities)) in character_model.model_parts.iter() {
+                for part_entity in part_entities.iter() {
+                    commands.entity(*part_entity).despawn();
+                }
+            }
+
+            if let Some(skinned_mesh) = skinned_mesh {
+                for joint in skinned_mesh.joints.iter() {
+                    commands.entity(*joint).despawn();
+                }
+            }
         }
+
+        let (character_model, skinned_mesh) = model_loader.spawn_character_model(
+            &mut commands,
+            &asset_server,
+            &mut static_mesh_materials,
+            &mut skinned_mesh_inverse_bindposes_assets,
+            entity,
+            character_info,
+            equipment,
+        );
+        commands
+            .entity(entity)
+            .insert_bundle((character_model, skinned_mesh));
     }
 }

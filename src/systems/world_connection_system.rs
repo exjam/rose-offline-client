@@ -1,8 +1,11 @@
-use bevy::prelude::{Commands, Res, ResMut, State};
+use bevy::prelude::{Commands, EventWriter, Res, ResMut, State};
 use rose_game_common::messages::{client::ClientMessage, server::ServerMessage};
 use rose_network_common::ConnectionError;
 
-use crate::resources::{Account, AppState, CharacterList, NetworkThread, WorldConnection};
+use crate::{
+    events::WorldConnectionEvent,
+    resources::{Account, AppState, CharacterList, NetworkThread, WorldConnection},
+};
 
 pub fn world_connection_system(
     mut commands: Commands,
@@ -10,6 +13,7 @@ pub fn world_connection_system(
     account: Option<Res<Account>>,
     network_thread: Res<NetworkThread>,
     mut app_state: ResMut<State<AppState>>,
+    mut world_connection_events: EventWriter<WorldConnectionEvent>,
 ) {
     if world_connection.is_none() {
         return;
@@ -50,8 +54,11 @@ pub fn world_connection_system(
                     break Err(ConnectionError::ConnectionLost.into());
                 }
             },
+            Ok(ServerMessage::CreateCharacter(response)) => {
+                world_connection_events
+                    .send(WorldConnectionEvent::CreateCharacterResponse(response));
+            }
             // TODO:
-            // ServerMessage::CreateCharacter
             // ServerMessage::DeleteCharacter
             //
             // ServerMessage::ReturnToCharacterSelect

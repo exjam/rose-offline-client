@@ -10,11 +10,17 @@ use bevy::{
 };
 use bevy_egui::{egui, EguiContext};
 use rose_data::ZoneId;
-use rose_game_common::messages::client::{ClientMessage, SelectCharacter};
+use rose_game_common::{
+    components::{CharacterGender, CharacterInfo, Equipment},
+    messages::{
+        client::{ClientMessage, CreateCharacter, SelectCharacter},
+        server::CreateCharacterError,
+    },
+};
 
 use crate::{
     components::ActiveMotion,
-    events::{GameConnectionEvent, LoadZoneEvent, ZoneEvent},
+    events::{GameConnectionEvent, LoadZoneEvent, WorldConnectionEvent, ZoneEvent},
     fly_camera::FlyCameraController,
     follow_camera::FollowCameraController,
     resources::{AppState, CharacterList, GameConnection, ServerConfiguration, WorldConnection},
@@ -23,28 +29,48 @@ use crate::{
 enum CharacterSelectState {
     Entering,
     CharacterSelect,
-    // TODO: CharacterCreate,
+    CharacterCreate,
+    CharacterCreating,
     ConnectingGameServer,
     Leaving,
     Loading,
 }
 
-impl Default for CharacterSelectState {
-    fn default() -> Self {
-        Self::Entering
-    }
-}
-
-#[derive(Default)]
 pub struct CharacterSelect {
     selected_character_index: usize,
     state: CharacterSelectState,
     join_zone_id: Option<ZoneId>,
+    create_character_entity: Option<Entity>,
+    create_character_name: String,
+    create_character_gender: CharacterGender,
+    create_character_hair_index: usize,
+    create_character_face_index: usize,
+    create_character_error_message: String,
+}
+
+impl Default for CharacterSelect {
+    fn default() -> Self {
+        Self {
+            selected_character_index: 0,
+            state: CharacterSelectState::Entering,
+            join_zone_id: None,
+            create_character_entity: None,
+            create_character_name: String::new(),
+            create_character_gender: CharacterGender::Male,
+            create_character_hair_index: 0,
+            create_character_face_index: 0,
+            create_character_error_message: String::new(),
+        }
+    }
 }
 
 pub struct CharacterSelectModelList {
     models: Vec<(Option<String>, Entity)>,
 }
+
+const CREATE_CHARACTER_FACE_LIST: [u8; 7] = [1, 8, 15, 22, 29, 36, 43];
+
+const CREATE_CHARACTER_HAIR_LIST: [u8; 5] = [0, 5, 10, 15, 20];
 
 const CHARACTER_POSITIONS: [[f32; 3]; 5] = [
     [5205.0, 1.0, -5205.0],
@@ -106,11 +132,16 @@ pub fn character_select_enter_system(
 
 pub fn character_select_exit_system(
     mut commands: Commands,
+    character_select_state: Res<CharacterSelect>,
     model_list: Res<CharacterSelectModelList>,
 ) {
     // Despawn character models
     for (_, entity) in model_list.models.iter() {
         commands.entity(*entity).despawn_recursive();
+    }
+
+    if let Some(entity) = character_select_state.create_character_entity {
+        commands.entity(entity).despawn_recursive();
     }
 
     commands.remove_resource::<CharacterList>();
@@ -144,8 +175,10 @@ pub fn character_select_system(
     mut egui_context: ResMut<EguiContext>,
     mut zone_events: EventReader<ZoneEvent>,
     mut game_connection_events: EventReader<GameConnectionEvent>,
+    mut world_connection_events: EventReader<WorldConnectionEvent>,
     mut load_zone_events: EventWriter<LoadZoneEvent>,
     query_camera: Query<(Entity, Option<&ActiveMotion>), With<Camera3d>>,
+    mut query_create_character_info: Query<&mut CharacterInfo>,
     game_connection: Option<Res<GameConnection>>,
     world_connection: Option<Res<WorldConnection>>,
     character_list: Option<Res<CharacterList>>,
@@ -231,10 +264,269 @@ pub fn character_select_system(
                         }
                     }
 
+                    if ui.button("Create").clicked() {
+                        let (camera_entity, _) = query_camera.single();
+                        commands.entity(camera_entity).insert(
+                            ActiveMotion::new(
+                                asset_server.load("3DDATA/TITLE/CAMERA01_CREATE01.ZMO"),
+                                time.seconds_since_startup(),
+                            )
+                            .with_repeat_limit(1),
+                        );
+
+                        character_select_state.state = CharacterSelectState::CharacterCreate;
+                    }
+
                     if ui.button("Logout").clicked() {
                         commands.remove_resource::<WorldConnection>();
                     }
                 });
+        }
+        CharacterSelectState::CharacterCreate => {
+            egui::Window::new("Character Create")
+                .anchor(egui::Align2::CENTER_CENTER, [-200.0, 0.0])
+                .collapsible(false)
+                .title_bar(false)
+                .show(egui_context.ctx_mut(), |ui| {
+                    egui::Grid::new("character_create_grid")
+                        .num_columns(2)
+                        .show(ui, |ui| {
+                            ui.label("Name");
+                            ui.text_edit_singleline(
+                                &mut character_select_state.create_character_name,
+                            );
+                            ui.end_row();
+
+                            ui.label("Gender");
+                            ui.horizontal(|ui| {
+                                ui.radio_value(
+                                    &mut character_select_state.create_character_gender,
+                                    CharacterGender::Male,
+                                    "Male",
+                                );
+                                ui.radio_value(
+                                    &mut character_select_state.create_character_gender,
+                                    CharacterGender::Female,
+                                    "Female",
+                                );
+                            });
+                            ui.end_row();
+
+                            ui.label("Face");
+                            ui.horizontal(|ui| {
+                                ui.add_enabled_ui(
+                                    character_select_state.create_character_face_index > 0,
+                                    |ui| {
+                                        if ui.button("<").clicked() {
+                                            character_select_state.create_character_face_index -= 1;
+                                        }
+                                    },
+                                );
+                                ui.label(format!(
+                                    "{}",
+                                    character_select_state.create_character_face_index + 1
+                                ));
+                                ui.add_enabled_ui(
+                                    character_select_state.create_character_face_index + 1
+                                        < CREATE_CHARACTER_FACE_LIST.len(),
+                                    |ui| {
+                                        if ui.button(">").clicked() {
+                                            character_select_state.create_character_face_index += 1;
+                                        }
+                                    },
+                                );
+                            });
+                            ui.end_row();
+
+                            ui.label("Hair");
+                            ui.horizontal(|ui| {
+                                ui.add_enabled_ui(
+                                    character_select_state.create_character_hair_index > 0,
+                                    |ui| {
+                                        if ui.button("<").clicked() {
+                                            character_select_state.create_character_hair_index -= 1;
+                                        }
+                                    },
+                                );
+                                ui.label(format!(
+                                    "{}",
+                                    character_select_state.create_character_hair_index + 1
+                                ));
+                                ui.add_enabled_ui(
+                                    character_select_state.create_character_hair_index + 1
+                                        < CREATE_CHARACTER_HAIR_LIST.len(),
+                                    |ui| {
+                                        if ui.button(">").clicked() {
+                                            character_select_state.create_character_hair_index += 1;
+                                        }
+                                    },
+                                );
+                            });
+                            ui.end_row();
+                        });
+
+                    ui.add_enabled_ui(
+                        character_select_state.create_character_name.len() > 3,
+                        |ui| {
+                            if ui.button("Create").clicked() {
+                                if let Some(world_connection) = world_connection.as_ref() {
+                                    world_connection
+                                        .client_message_tx
+                                        .send(ClientMessage::CreateCharacter(CreateCharacter {
+                                            gender: character_select_state.create_character_gender,
+                                            birth_stone: 0,
+                                            hair: CREATE_CHARACTER_HAIR_LIST
+                                                [character_select_state
+                                                    .create_character_hair_index],
+                                            face: CREATE_CHARACTER_FACE_LIST
+                                                [character_select_state
+                                                    .create_character_face_index],
+                                            name: character_select_state
+                                                .create_character_name
+                                                .clone(),
+                                        }))
+                                        .ok();
+                                }
+                                character_select_state.state =
+                                    CharacterSelectState::CharacterCreating;
+                            }
+                        },
+                    );
+
+                    if ui.button("Cancel").clicked() {
+                        let (camera_entity, _) = query_camera.single();
+                        commands.entity(camera_entity).insert(
+                            ActiveMotion::new(
+                                asset_server.load("3DDATA/TITLE/CAMERA01_OUTCREATE01.ZMO"),
+                                time.seconds_since_startup(),
+                            )
+                            .with_repeat_limit(1),
+                        );
+                        character_select_state.state = CharacterSelectState::CharacterSelect;
+                    }
+
+                    if !character_select_state
+                        .create_character_error_message
+                        .is_empty()
+                    {
+                        ui.label(
+                            egui::RichText::new(format!(
+                                "Error: {}",
+                                character_select_state.create_character_error_message
+                            ))
+                            .color(egui::Color32::RED),
+                        );
+                    }
+                });
+
+            if let Some(create_character_entity) = character_select_state.create_character_entity {
+                if let Ok(mut create_character_info) =
+                    query_create_character_info.get_mut(create_character_entity)
+                {
+                    let face = CREATE_CHARACTER_FACE_LIST
+                        [character_select_state.create_character_face_index];
+                    let hair = CREATE_CHARACTER_HAIR_LIST
+                        [character_select_state.create_character_hair_index];
+
+                    if create_character_info.face != face {
+                        create_character_info.face = face;
+                    }
+
+                    if create_character_info.hair != hair {
+                        create_character_info.hair = hair;
+                    }
+
+                    if create_character_info.gender
+                        != character_select_state.create_character_gender
+                    {
+                        create_character_info.gender =
+                            character_select_state.create_character_gender;
+                    }
+                }
+            } else {
+                let create_character_entity = commands
+                    .spawn_bundle((
+                        CharacterInfo {
+                            name: "CreateCharacter".to_string(),
+                            gender: character_select_state.create_character_gender,
+                            race: 0,
+                            birth_stone: 0,
+                            job: 0,
+                            face: CREATE_CHARACTER_FACE_LIST
+                                [character_select_state.create_character_face_index],
+                            hair: CREATE_CHARACTER_HAIR_LIST
+                                [character_select_state.create_character_hair_index],
+                            rank: 0,
+                            fame: 0,
+                            fame_b: 0,
+                            fame_g: 0,
+                            revive_zone_id: ZoneId::new(1).unwrap(),
+                            revive_position: Vec3::new(5200.0, 5200.0, 0.0),
+                            unique_id: 0,
+                        },
+                        Equipment::new(),
+                        Transform::from_translation(Vec3::new(5200.05, 7.47, -5200.18))
+                            .with_rotation(Quat::from_rotation_y(std::f32::consts::PI))
+                            .with_scale(Vec3::new(1.5, 1.5, 1.5)),
+                        GlobalTransform::default(),
+                    ))
+                    .id();
+                character_select_state.create_character_entity = Some(create_character_entity);
+            }
+        }
+        CharacterSelectState::CharacterCreating => {
+            egui::Window::new("Creating character...")
+                .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
+                .collapsible(false)
+                .show(egui_context.ctx_mut(), |ui| {
+                    ui.label("Creating character");
+                });
+
+            // Process response from server
+            for event in world_connection_events.iter() {
+                if let WorldConnectionEvent::CreateCharacterResponse(response) = event {
+                    match response {
+                        Ok(_) => {
+                            let (camera_entity, _) = query_camera.single();
+                            commands.entity(camera_entity).insert(
+                                ActiveMotion::new(
+                                    asset_server.load("3DDATA/TITLE/CAMERA01_OUTCREATE01.ZMO"),
+                                    time.seconds_since_startup(),
+                                )
+                                .with_repeat_limit(1),
+                            );
+                            character_select_state.state = CharacterSelectState::CharacterSelect;
+
+                            if let Some(world_connection) = world_connection.as_ref() {
+                                world_connection
+                                    .client_message_tx
+                                    .send(ClientMessage::GetCharacterList)
+                                    .ok();
+                            }
+                        }
+                        Err(CreateCharacterError::Failed) => {
+                            character_select_state.create_character_error_message =
+                                "Unknown error creating character".into();
+                            character_select_state.state = CharacterSelectState::CharacterCreate;
+                        }
+                        Err(CreateCharacterError::AlreadyExists) => {
+                            character_select_state.create_character_error_message =
+                                "Character name already exists".into();
+                            character_select_state.state = CharacterSelectState::CharacterCreate;
+                        }
+                        Err(CreateCharacterError::NoMoreSlots) => {
+                            character_select_state.create_character_error_message =
+                                "Cannot create more characters".into();
+                            character_select_state.state = CharacterSelectState::CharacterCreate;
+                        }
+                        Err(CreateCharacterError::InvalidValue) => {
+                            character_select_state.create_character_error_message =
+                                "Invalid value".into();
+                            character_select_state.state = CharacterSelectState::CharacterCreate;
+                        }
+                    }
+                }
+            }
         }
         CharacterSelectState::ConnectingGameServer => {
             egui::Window::new("Connecting...")
@@ -287,5 +579,17 @@ pub fn character_select_system(
                 }
             }
         }
+    }
+
+    if !matches!(
+        character_select_state.state,
+        CharacterSelectState::CharacterCreate | CharacterSelectState::CharacterCreating
+    ) {
+        if let Some(entity) = character_select_state.create_character_entity.take() {
+            commands.entity(entity).despawn_recursive();
+        }
+        character_select_state
+            .create_character_error_message
+            .clear();
     }
 }

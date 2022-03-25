@@ -28,7 +28,7 @@ mod zms_asset_loader;
 use rose_data::{NpcDatabaseOptions, ZoneId};
 use rose_file_readers::VfsIndex;
 
-use events::{ChatboxEvent, GameConnectionEvent, LoadZoneEvent, ZoneEvent};
+use events::{ChatboxEvent, GameConnectionEvent, LoadZoneEvent, WorldConnectionEvent, ZoneEvent};
 use fly_camera::FlyCameraPlugin;
 use follow_camera::FollowCameraPlugin;
 use model_loader::ModelLoader;
@@ -297,7 +297,8 @@ fn main() {
     app.insert_resource(Events::<ChatboxEvent>::default())
         .insert_resource(load_zone_events)
         .insert_resource(Events::<ZoneEvent>::default())
-        .insert_resource(Events::<GameConnectionEvent>::default());
+        .insert_resource(Events::<GameConnectionEvent>::default())
+        .insert_resource(Events::<WorldConnectionEvent>::default());
 
     // Zone Viewer
     app.add_system_set(

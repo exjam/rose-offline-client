@@ -4,17 +4,21 @@ use thiserror::Error;
 use tokio::net::TcpStream;
 
 use rose_game_common::messages::{
-    client::{ClientMessage, ConnectionRequest},
-    server::{ConnectionRequestError, ConnectionResponse, JoinServerResponse, ServerMessage},
+    client::{ClientMessage, ConnectionRequest, CreateCharacter},
+    server::{
+        ConnectionRequestError, ConnectionResponse, CreateCharacterError, CreateCharacterResponse,
+        JoinServerResponse, ServerMessage,
+    },
 };
 use rose_network_common::{Connection, Packet, PacketCodec};
 use rose_network_irose::{
     world_client_packets::{
-        PacketClientCharacterList, PacketClientConnectRequest, PacketClientSelectCharacter,
+        PacketClientCharacterList, PacketClientConnectRequest, PacketClientCreateCharacter,
+        PacketClientSelectCharacter,
     },
     world_server_packets::{
-        ConnectResult, PacketConnectionReply, PacketServerCharacterList, PacketServerMoveServer,
-        ServerPackets,
+        ConnectResult, CreateCharacterResult, PacketConnectionReply, PacketServerCharacterList,
+        PacketServerCreateCharacterReply, PacketServerMoveServer, ServerPackets,
     },
     ClientPacketCodec, IROSE_112_TABLE,
 };
@@ -81,7 +85,21 @@ impl WorldClient {
                     })))
                     .ok();
             }
-            // ServerPackets::CreateCharacterReply -> ServerMessage::CreateCharacter
+            Some(ServerPackets::CreateCharacterReply) => {
+                let response = PacketServerCreateCharacterReply::try_from(&packet)?;
+                let message = match response.result {
+                    CreateCharacterResult::Ok => Ok(CreateCharacterResponse { character_slot: 0 }),
+                    CreateCharacterResult::NameAlreadyExists => {
+                        Err(CreateCharacterError::AlreadyExists)
+                    }
+                    CreateCharacterResult::InvalidValue => Err(CreateCharacterError::InvalidValue),
+                    CreateCharacterResult::NoMoreSlots => Err(CreateCharacterError::NoMoreSlots),
+                    _ => Err(CreateCharacterError::Failed),
+                };
+                self.server_message_tx
+                    .send(ServerMessage::CreateCharacter(message))
+                    .ok();
+            }
             // ServerPackets::DeleteCharacterReply -> ServerMessage::DeleteCharacter
             // ServerPackets::ReturnToCharacterSelect -> ServerMessage::ReturnToCharacterSelect
             _ => println!("Unhandled world packet {:x}", packet.command),
@@ -120,7 +138,24 @@ impl WorldClient {
                     }))
                     .await?
             }
-            // ClientMessage::CreateCharacter -> ClientPackets::CreateCharacter
+            ClientMessage::CreateCharacter(CreateCharacter {
+                gender,
+                birth_stone,
+                hair,
+                face,
+                name,
+            }) => {
+                connection
+                    .write_packet(Packet::from(&PacketClientCreateCharacter {
+                        gender,
+                        birth_stone,
+                        hair,
+                        face,
+                        name: &name,
+                        start_point: 0,
+                    }))
+                    .await?
+            }
             // ClientMessage::DeleteCharacter -> ClientPackets::DeleteCharacter
             unimplemented => {
                 println!(
