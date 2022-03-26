@@ -28,7 +28,7 @@ mod vfs_asset_io;
 mod zmo_asset_loader;
 mod zms_asset_loader;
 
-use rose_data::{NpcDatabaseOptions, ZoneId};
+use rose_data::{CharacterMotionDatabaseOptions, NpcDatabaseOptions, ZoneId};
 use rose_file_readers::VfsIndex;
 
 use events::{ChatboxEvent, GameConnectionEvent, LoadZoneEvent, WorldConnectionEvent, ZoneEvent};
@@ -419,7 +419,7 @@ fn load_game_data(mut commands: Commands, vfs_resource: Res<VfsResource>) {
         rose_data_irose::get_npc_database(
             &vfs_resource.vfs,
             &NpcDatabaseOptions {
-                load_motion_file_data: false,
+                load_frame_data: false,
             },
         )
         .expect("Failed to load npc database"),
@@ -428,9 +428,14 @@ fn load_game_data(mut commands: Commands, vfs_resource: Res<VfsResource>) {
         rose_data_irose::get_skill_database(&vfs_resource.vfs)
             .expect("Failed to load skill database"),
     );
-    let character_motion_list = Arc::new(
-        rose_data_irose::get_character_motion_list(&vfs_resource.vfs)
-            .expect("Failed to load character motion list"),
+    let character_motion_database = Arc::new(
+        rose_data_irose::get_character_motion_database(
+            &vfs_resource.vfs,
+            &CharacterMotionDatabaseOptions {
+                load_frame_data: false,
+            },
+        )
+        .expect("Failed to load character motion list"),
     );
 
     commands.insert_resource(GameData {
@@ -439,7 +444,7 @@ fn load_game_data(mut commands: Commands, vfs_resource: Res<VfsResource>) {
             skill_database.clone(),
             npc_database.clone(),
         ),
-        character_motion_list: character_motion_list.clone(),
+        character_motion_database: character_motion_database.clone(),
         data_decoder: rose_data_irose::get_data_decoder(),
         items: item_database.clone(),
         npcs: npc_database.clone(),
@@ -460,7 +465,7 @@ fn load_game_data(mut commands: Commands, vfs_resource: Res<VfsResource>) {
     commands.insert_resource(
         ModelLoader::new(
             vfs_resource.vfs.clone(),
-            character_motion_list,
+            character_motion_database,
             item_database,
             npc_database,
         )

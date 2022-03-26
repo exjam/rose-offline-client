@@ -1,14 +1,16 @@
 mod active_motion;
+mod character_model;
 mod client_entity;
 mod collision;
 mod command;
 mod debug_render;
-mod model;
+mod npc_model;
 mod player_character;
 mod position;
 mod selected_target;
 
 pub use active_motion::ActiveMotion;
+pub use character_model::{CharacterModel, CharacterModelPart};
 pub use client_entity::{ClientEntity, ClientEntityId};
 pub use collision::{
     CollisionRayCastSource, CollisionTriMesh, COLLISION_FILTER_CLICKABLE,
@@ -18,7 +20,7 @@ pub use collision::{
 };
 pub use command::{Command, CommandAttack, CommandData, CommandMove, NextCommand};
 pub use debug_render::{DebugRenderCollider, DebugRenderSkeleton};
-pub use model::{CharacterModel, CharacterModelPart, NpcModel};
+pub use npc_model::NpcModel;
 pub use player_character::PlayerCharacter;
 pub use position::Position;
 pub use selected_target::SelectedTarget;

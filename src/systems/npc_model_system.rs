@@ -18,6 +18,8 @@ use bevy_rapier3d::{
         ColliderShape, ColliderShapeComponent, InteractionGroups,
     },
 };
+use enum_map::EnumMap;
+use rose_data::NpcMotionAction;
 use rose_game_common::components::{MoveMode, Npc};
 
 use crate::{
@@ -42,23 +44,24 @@ fn get_command_motion(
     move_mode: &MoveMode,
     command: &Command,
 ) -> Option<Handle<ZmoAsset>> {
-    let action_index = match command.command {
-        CommandData::Stop => 0,
+    let action = match command.command {
+        CommandData::Stop => NpcMotionAction::Stop,
         CommandData::Move(_) => match move_mode {
-            MoveMode::Walk => 1,
-            MoveMode::Run => 5,
-            _ => 1,
+            MoveMode::Walk => NpcMotionAction::Move,
+            MoveMode::Run => NpcMotionAction::Run,
+            _ => NpcMotionAction::Stop,
         },
-        CommandData::Attack(_) => 2,
-        CommandData::Die => 4,
+        CommandData::Attack(_) => NpcMotionAction::Attack,
+        CommandData::Die => NpcMotionAction::Die,
     };
 
-    npc_model
-        .action_motions
-        .iter()
-        .find(|(action_id, _)| *action_id == action_index)
-        .or_else(|| npc_model.action_motions.get(0))
-        .map(|(_, motion)| motion.clone())
+    if npc_model.action_motions[action].is_strong() {
+        Some(npc_model.action_motions[action].clone())
+    } else if npc_model.action_motions[NpcMotionAction::Stop].is_strong() {
+        Some(npc_model.action_motions[NpcMotionAction::Stop].clone())
+    } else {
+        None
+    }
 }
 
 pub fn npc_model_animation_system(
@@ -91,6 +94,8 @@ pub fn npc_model_animation_system(
                 },
                 ActiveMotion::new(motion.clone(), time.seconds_since_startup()),
             ));
+        } else {
+            commands.entity(entity).remove::<ActiveMotion>();
         }
     }
 }
@@ -174,7 +179,7 @@ pub fn npc_model_system(
                     npc_id: npc.id,
                     model_parts: Vec::new(),
                     dummy_bone_offset: 0,
-                    action_motions: Vec::new(),
+                    action_motions: EnumMap::default(),
                 })
                 .remove::<SkinnedMesh>();
         }

@@ -8,7 +8,7 @@ use rose_game_common::data::AbilityValueCalculator;
 
 pub struct GameData {
     pub ability_value_calculator: Box<dyn AbilityValueCalculator + Send + Sync>,
-    pub character_motion_list: Arc<CharacterMotionDatabase<String>>,
+    pub character_motion_database: Arc<CharacterMotionDatabase>,
     pub data_decoder: Box<dyn DataDecoder + Send + Sync>,
     pub items: Arc<ItemDatabase>,
     pub npcs: Arc<NpcDatabase>,

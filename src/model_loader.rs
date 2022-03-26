@@ -25,7 +25,7 @@ use crate::{
 
 pub struct ModelLoader {
     vfs: Arc<VfsIndex>,
-    character_motion_list: Arc<CharacterMotionDatabase<String>>,
+    character_motion_database: Arc<CharacterMotionDatabase>,
     item_database: Arc<ItemDatabase>,
     npc_database: Arc<NpcDatabase>,
 
@@ -61,7 +61,7 @@ pub struct ModelLoader {
 impl ModelLoader {
     pub fn new(
         vfs: Arc<VfsIndex>,
-        character_motion_list: Arc<CharacterMotionDatabase<String>>,
+        character_motion_database: Arc<CharacterMotionDatabase>,
         item_database: Arc<ItemDatabase>,
         npc_database: Arc<NpcDatabase>,
     ) -> Result<ModelLoader, anyhow::Error> {
@@ -95,7 +95,7 @@ impl ModelLoader {
             npc_zsc: vfs.read_file::<ZscFile, _>("3DDATA/NPC/PART_NPC.ZSC")?,
 
             vfs,
-            character_motion_list,
+            character_motion_database,
             item_database,
             npc_database,
         })
@@ -223,12 +223,15 @@ impl ModelLoader {
             }
         }
 
-        let mut action_motions = Vec::new();
-        for &(action_id, motion_id) in npc_model_data.motion_ids.iter() {
-            if let Some(motion_path) = self.npc_chr.motion_files.get(motion_id as usize) {
-                action_motions.push((action_id, asset_server.load(motion_path)));
+        let action_motions = enum_map! {
+            action => {
+                if let Some(motion_data) = self.npc_database.get_npc_action_motion(npc_id, action) {
+                    asset_server.load(&motion_data.path)
+                } else {
+                    Handle::default()
+                }
             }
-        }
+        };
 
         Some((
             NpcModel {
@@ -257,37 +260,36 @@ impl ModelLoader {
             CharacterGender::Female => 1,
         };
         let get_motion = |action| {
-            if let Some(path) = self.character_motion_list.get_character_action_motion(
+            if let Some(motion_data) = self.character_motion_database.get_character_action_motion(
                 action,
                 weapon_motion_type,
                 gender_index,
             ) {
-                return asset_server.load(path);
+                return asset_server.load(&motion_data.path);
             }
 
             if gender_index == 1 {
-                if let Some(path) = self.character_motion_list.get_character_action_motion(
-                    action,
-                    weapon_motion_type,
-                    0,
-                ) {
-                    return asset_server.load(path);
+                if let Some(motion_data) = self
+                    .character_motion_database
+                    .get_character_action_motion(action, weapon_motion_type, 0)
+                {
+                    return asset_server.load(&motion_data.path);
                 }
             }
 
-            if let Some(path) =
-                self.character_motion_list
+            if let Some(motion_data) =
+                self.character_motion_database
                     .get_character_action_motion(action, 0, gender_index)
             {
-                return asset_server.load(path);
+                return asset_server.load(&motion_data.path);
             }
 
             if gender_index == 1 {
-                if let Some(path) = self
-                    .character_motion_list
+                if let Some(motion_data) = self
+                    .character_motion_database
                     .get_character_action_motion(action, 0, 0)
                 {
-                    return asset_server.load(path);
+                    return asset_server.load(&motion_data.path);
                 }
             }
 
