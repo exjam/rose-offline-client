@@ -101,7 +101,6 @@ fn generate_cuboid_polyline(vertices: &mut Vec<Vec3>, size: Vec3) {
     vertices.push(Vec3::new(f32::NAN, f32::NAN, f32::NAN));
 }
 
-#[allow(clippy::type_complexity)]
 pub fn debug_render_collider_system(
     mut commands: Commands,
     query_update_collider_shape: Query<
@@ -182,7 +181,6 @@ pub fn debug_render_collider_system(
     }
 }
 
-#[allow(clippy::type_complexity)]
 pub fn debug_render_skeleton_system(
     mut commands: Commands,
     query_update_debug_skeleton: Query<

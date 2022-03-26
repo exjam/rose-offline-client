@@ -58,7 +58,6 @@ impl ClientEntityList {
     }
 }
 
-#[allow(clippy::too_many_arguments, clippy::type_complexity)]
 pub fn game_connection_system(
     mut commands: Commands,
     game_connection: Option<Res<GameConnection>>,

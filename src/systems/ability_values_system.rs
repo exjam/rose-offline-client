@@ -7,7 +7,6 @@ use rose_game_common::components::{
 
 use crate::resources::GameData;
 
-#[allow(clippy::type_complexity)]
 pub fn ability_values_system(
     mut query_set: QuerySet<(
         QueryState<

@@ -92,7 +92,6 @@ pub fn collision_system(
     }
 }
 
-#[allow(clippy::type_complexity)]
 pub fn collision_add_colliders_system(
     mut commands: Commands,
     meshes: Res<Assets<Mesh>>,

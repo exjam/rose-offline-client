@@ -7,7 +7,6 @@ use bevy::{
 
 use crate::{components::ActiveMotion, zmo_asset_loader::ZmoAsset};
 
-#[allow(clippy::type_complexity)]
 pub fn animation_system(
     mut commands: Commands,
     mut query_transform: Query<&mut Transform>,

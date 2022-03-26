@@ -140,7 +140,6 @@ pub struct GpuStaticMeshMaterial {
 impl RenderAsset for StaticMeshMaterial {
     type ExtractedAsset = StaticMeshMaterial;
     type PreparedAsset = GpuStaticMeshMaterial;
-    #[allow(clippy::type_complexity)]
     type Param = (
         SRes<RenderDevice>,
         SRes<MaterialPipeline<StaticMeshMaterial>>,

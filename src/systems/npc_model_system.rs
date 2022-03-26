@@ -60,7 +60,6 @@ fn get_command_motion(
         .map(|(_, motion)| motion.clone())
 }
 
-#[allow(clippy::type_complexity, clippy::too_many_arguments)]
 pub fn npc_model_animation_system(
     mut commands: Commands,
     mut query_command: Query<
@@ -95,7 +94,6 @@ pub fn npc_model_animation_system(
     }
 }
 
-#[allow(clippy::type_complexity, clippy::too_many_arguments)]
 pub fn npc_model_system(
     mut commands: Commands,
     mut query: Query<

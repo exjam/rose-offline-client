@@ -17,7 +17,6 @@ pub struct GameUiState {
     textbox_history: Vec<(egui::Color32, String)>,
 }
 
-#[allow(clippy::too_many_arguments, clippy::type_complexity)]
 pub fn game_ui_system(
     mut commands: Commands,
     mut egui_context: ResMut<EguiContext>,

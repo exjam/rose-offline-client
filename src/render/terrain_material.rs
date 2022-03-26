@@ -76,7 +76,6 @@ pub struct GpuTerrainMaterial {
 impl RenderAsset for TerrainMaterial {
     type ExtractedAsset = TerrainMaterial;
     type PreparedAsset = GpuTerrainMaterial;
-    #[allow(clippy::type_complexity)]
     type Param = (
         SRes<RenderDevice>,
         SRes<MaterialPipeline<TerrainMaterial>>,

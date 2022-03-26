@@ -57,7 +57,6 @@ fn get_command_motion(
     character_model.action_motions[action].clone()
 }
 
-#[allow(clippy::type_complexity, clippy::too_many_arguments)]
 pub fn character_model_animation_system(
     mut commands: Commands,
     mut query_command: Query<
@@ -211,7 +210,6 @@ pub fn character_model_add_collider_system(
     }
 }
 
-#[allow(clippy::type_complexity)]
 pub fn character_model_system(
     mut commands: Commands,
     mut query: Query<

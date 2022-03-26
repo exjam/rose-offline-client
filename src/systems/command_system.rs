@@ -12,7 +12,6 @@ use crate::components::{
     Position,
 };
 
-#[allow(clippy::type_complexity)]
 pub fn command_system(
     mut commands: Commands,
     mut query: Query<(

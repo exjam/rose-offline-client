@@ -358,7 +358,6 @@ type DrawWaterMaterial<M> = (
     DrawMesh,
 );
 
-#[allow(clippy::too_many_arguments, clippy::type_complexity)]
 fn queue_water_mesh_material_meshes(
     transparent_draw_functions: Res<DrawFunctions<Transparent3d>>,
     material_pipeline: Res<WaterMeshMaterialPipeline>,
