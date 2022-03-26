@@ -50,6 +50,7 @@ fn get_command_motion(
             _ => 1,
         },
         CommandData::Attack(_) => 2,
+        CommandData::Die => 4,
     };
 
     npc_model

@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use bevy::{
     math::{Quat, Vec3},
     prelude::{
@@ -8,7 +10,10 @@ use bevy::{
 
 use rose_data::ZoneId;
 use rose_game_common::{
-    components::{CharacterInfo, MoveMode, MoveSpeed, Npc, StatusEffects},
+    components::{
+        CharacterInfo, ExperiencePoints, HealthPoints, MoveMode, MoveSpeed, Npc, Stamina,
+        StatusEffects,
+    },
     messages::server::{CommandState, ServerMessage},
 };
 use rose_network_common::ConnectionError;
@@ -94,6 +99,8 @@ pub fn game_connection_system(
         (Option<&CharacterInfo>, Option<&Npc>),
         Or<(With<CharacterInfo>, With<Npc>)>,
     >,
+    mut query_xp_stamina: Query<(&mut ExperiencePoints, &mut Stamina)>,
+    mut query_health_points: Query<&mut HealthPoints>,
     mut game_connection_events: EventWriter<GameConnectionEvent>,
 ) {
     if game_connection.is_none() {
@@ -365,6 +372,12 @@ pub fn game_connection_system(
                     ));
                 }
             }
+            Ok(ServerMessage::StopMoveEntity(message)) => {
+                if let Some(entity) = client_entity_list.get(message.entity_id) {
+                    // TODO: Apply the stop entity message.xyz ?
+                    commands.entity(entity).insert(NextCommand::with_stop());
+                }
+            }
             Ok(ServerMessage::AttackEntity(message)) => {
                 if let Some(entity) = client_entity_list.get(message.entity_id) {
                     if let Some(target_entity) = client_entity_list.get(message.target_entity_id) {
@@ -379,6 +392,44 @@ pub fn game_connection_system(
                     if let Some(entity) = client_entity_list.get(entity_id) {
                         client_entity_list.remove(entity_id);
                         commands.entity(entity).despawn_recursive();
+                    }
+                }
+            }
+            Ok(ServerMessage::DamageEntity(message)) => {
+                if let Some(defender_entity) = client_entity_list.get(message.defender_entity_id) {
+                    if let Ok(mut health_points) = query_health_points.get_mut(defender_entity) {
+                        if health_points.hp < message.damage.amount as i32 {
+                            health_points.hp = 0;
+                        } else {
+                            health_points.hp -= message.damage.amount as i32;
+                        }
+                    }
+
+                    if message.is_killed {
+                        // TODO: Calculate die motion duration
+                        commands
+                            .entity(defender_entity)
+                            .insert_bundle((
+                                Command::with_die(Duration::from_secs(5)),
+                                NextCommand::default(),
+                            ))
+                            .remove::<ClientEntity>();
+                        client_entity_list.remove(message.defender_entity_id);
+                    }
+                }
+
+                if message.is_killed
+                    && client_entity_list.player_entity
+                        == client_entity_list.get(message.attacker_entity_id)
+                {
+                    if let Some(entity_name) = client_entity_list
+                        .get(message.defender_entity_id)
+                        .and_then(|entity| get_entity_name(entity, &game_data, &query_entity_name))
+                    {
+                        chatbox_events.send(ChatboxEvent::System(format!(
+                            "You have succeeded in hunting {}",
+                            entity_name
+                        )));
                     }
                 }
             }
@@ -429,11 +480,45 @@ pub fn game_connection_system(
             Ok(ServerMessage::AnnounceChat(message)) => {
                 chatbox_events.send(ChatboxEvent::Announce(message.name, message.text));
             }
+            Ok(ServerMessage::UpdateLevel(message)) => {
+                if let Some(entity) = client_entity_list.get(message.entity_id) {
+                    commands.entity(entity).insert_bundle((
+                        message.level.clone(),
+                        message.experience_points,
+                        message.stat_points,
+                        message.skill_points,
+                    ));
+
+                    if Some(entity) == client_entity_list.player_entity {
+                        chatbox_events.send(ChatboxEvent::System(format!(
+                            "Congratulations! You are now level {}!",
+                            message.level.level
+                        )));
+                    }
+                }
+            }
             Ok(ServerMessage::UpdateSpeed(message)) => {
                 if let Some(entity) = client_entity_list.get(message.entity_id) {
                     commands
                         .entity(entity)
                         .insert(MoveSpeed::new(message.run_speed as f32));
+                }
+            }
+            Ok(ServerMessage::UpdateXpStamina(message)) => {
+                if let Some(player_entity) = client_entity_list.player_entity {
+                    if let Ok((mut experience_points, mut stamina)) =
+                        query_xp_stamina.get_mut(player_entity)
+                    {
+                        if message.xp > experience_points.xp {
+                            chatbox_events.send(ChatboxEvent::System(format!(
+                                "You have earned {} experience points",
+                                message.xp - experience_points.xp
+                            )));
+                        }
+
+                        experience_points.xp = message.xp;
+                        stamina.stamina = message.stamina;
+                    }
                 }
             }
             Ok(message) => {

@@ -2,10 +2,13 @@ use std::time::Duration;
 
 use bevy::{
     core::Time,
+    hierarchy::DespawnRecursiveExt,
     math::Vec3Swizzles,
     prelude::{Commands, Entity, Query, Res},
 };
-use rose_game_common::components::{AbilityValues, Destination, MoveMode, MoveSpeed, Target};
+use rose_game_common::components::{
+    AbilityValues, Destination, HealthPoints, MoveMode, MoveSpeed, Target,
+};
 
 use crate::components::{
     CharacterModel, Command, CommandAttack, CommandData, CommandMove, NextCommand, NpcModel,
@@ -25,12 +28,13 @@ pub fn command_system(
         &mut NextCommand,
     )>,
     query_position: Query<&Position>,
+    query_attack_target: Query<(&Position, &HealthPoints)>,
     time: Res<Time>,
 ) {
     for (
         entity,
         ability_values,
-        character_model,
+        _character_model,
         npc_model,
         position,
         move_mode,
@@ -56,6 +60,17 @@ pub fn command_system(
         });
         if !command_motion_completed {
             // Current command still in animation
+            continue;
+        }
+
+        // Despawn NPC once the die animation completes
+        if matches!(command.command, CommandData::Die) {
+            if npc_model.is_some() {
+                commands.entity(entity).despawn_recursive();
+                continue;
+            }
+
+            // Cannot do any commands when dead
             continue;
         }
 
@@ -144,118 +159,126 @@ pub fn command_system(
             &mut CommandData::Attack(CommandAttack {
                 target: target_entity,
             }) => {
-                if let Ok(target_position) = query_position.get(target_entity) {
-                    let mut entity_commands = commands.entity(entity);
-                    let distance = position
-                        .position
-                        .xy()
-                        .distance(target_position.position.xy());
+                if let Ok((target_position, target_health_points)) =
+                    query_attack_target.get(target_entity)
+                {
+                    if target_health_points.hp > 0 {
+                        let mut entity_commands = commands.entity(entity);
+                        let distance = position
+                            .position
+                            .xy()
+                            .distance(target_position.position.xy());
 
-                    // Check if we are in attack range
-                    let attack_range = ability_values.get_attack_range() as f32;
-                    if distance < attack_range {
-                        let (attack_duration, hit_count) =
-                            if let Some(character_model) = character_model {
+                        // Check if we are in attack range
+                        let attack_range = ability_values.get_attack_range() as f32;
+                        if distance < attack_range {
+                            let (attack_duration, _hit_count) = (Duration::from_secs(1), 1);
+                            /*
+                            if let Some(_character_model) = character_model {
                                 // TODO: duration of character_model.action_motions[CharacterMotionAction::Attack];
                                 (Duration::from_secs(1), 1)
-                            } else if let Some(npc_model) = npc_model {
+                            } else if let Some(_npc_model) = npc_model {
                                 // TODO: NPC attack duration !
                                 (Duration::from_secs(1), 1)
                             } else {
                                 (Duration::from_secs(1), 1)
                             };
+                            */
 
-                        // TODO: If the weapon uses ammo, we must consume the ammo
-                        let mut cancel_attack = false;
-                        /*
-                        if let Some(mut equipment) = equipment {
-                            if let Some(weapon_data) = equipment
-                                .get_equipment_item(EquipmentIndex::WeaponRight)
-                                .and_then(|weapon_item| {
-                                    game_data.items.get_base_item(weapon_item.item)
-                                })
-                            {
-                                let ammo_index = match weapon_data.class {
-                                    ItemClass::Bow | ItemClass::Crossbow => Some(AmmoIndex::Arrow),
-                                    ItemClass::Gun | ItemClass::DualGuns => Some(AmmoIndex::Bullet),
-                                    ItemClass::Launcher => Some(AmmoIndex::Throw),
-                                    _ => None,
-                                };
+                            // TODO: If the weapon uses ammo, we must consume the ammo
+                            let cancel_attack = false;
+                            /*
+                            if let Some(mut equipment) = equipment {
+                                if let Some(weapon_data) = equipment
+                                    .get_equipment_item(EquipmentIndex::WeaponRight)
+                                    .and_then(|weapon_item| {
+                                        game_data.items.get_base_item(weapon_item.item)
+                                    })
+                                {
+                                    let ammo_index = match weapon_data.class {
+                                        ItemClass::Bow | ItemClass::Crossbow => Some(AmmoIndex::Arrow),
+                                        ItemClass::Gun | ItemClass::DualGuns => Some(AmmoIndex::Bullet),
+                                        ItemClass::Launcher => Some(AmmoIndex::Throw),
+                                        _ => None,
+                                    };
 
-                                if let Some(ammo_index) = ammo_index {
-                                    if equipment
-                                        .get_ammo_slot_mut(ammo_index)
-                                        .try_take_quantity(hit_count as u32)
-                                        .is_none()
-                                    {
-                                        cancel_attack = true;
-                                    } else if let Some(game_client) = game_client {
-                                        match equipment.get_ammo_item(ammo_index) {
-                                            Some(ammo_item) => {
-                                                if (ammo_item.quantity & 0x0F) == 0 {
-                                                    game_client
-                                                        .server_message_tx
-                                                        .send(ServerMessage::UpdateInventory(
-                                                            vec![(
-                                                                ItemSlot::Ammo(ammo_index),
-                                                                Some(Item::Stackable(
-                                                                    ammo_item.clone(),
-                                                                )),
-                                                            )],
-                                                            None,
-                                                        ))
-                                                        .ok();
+                                    if let Some(ammo_index) = ammo_index {
+                                        if equipment
+                                            .get_ammo_slot_mut(ammo_index)
+                                            .try_take_quantity(hit_count as u32)
+                                            .is_none()
+                                        {
+                                            cancel_attack = true;
+                                        } else if let Some(game_client) = game_client {
+                                            match equipment.get_ammo_item(ammo_index) {
+                                                Some(ammo_item) => {
+                                                    if (ammo_item.quantity & 0x0F) == 0 {
+                                                        game_client
+                                                            .server_message_tx
+                                                            .send(ServerMessage::UpdateInventory(
+                                                                vec![(
+                                                                    ItemSlot::Ammo(ammo_index),
+                                                                    Some(Item::Stackable(
+                                                                        ammo_item.clone(),
+                                                                    )),
+                                                                )],
+                                                                None,
+                                                            ))
+                                                            .ok();
+                                                    }
                                                 }
-                                            }
-                                            None => {
-                                                server_messages.send_entity_message(
-                                                    client_entity,
-                                                    ServerMessage::UpdateAmmo(
-                                                        client_entity.id,
-                                                        ammo_index,
-                                                        None,
-                                                    ),
-                                                );
+                                                None => {
+                                                    server_messages.send_entity_message(
+                                                        client_entity,
+                                                        ServerMessage::UpdateAmmo(
+                                                            client_entity.id,
+                                                            ammo_index,
+                                                            None,
+                                                        ),
+                                                    );
+                                                }
                                             }
                                         }
                                     }
                                 }
                             }
-                        }
-                        */
+                            */
 
-                        if cancel_attack {
-                            // Not enough ammo, cancel attack
-                            *next_command = NextCommand::default();
+                            if cancel_attack {
+                                // Not enough ammo, cancel attack
+                                *next_command = NextCommand::default();
+                            } else {
+                                // In range, set current command to attack
+                                *command = Command::with_attack(target_entity, attack_duration);
+
+                                // Remove our destination component, as we have reached it!
+                                entity_commands.remove::<Destination>();
+
+                                // Update target
+                                entity_commands.insert(Target::new(target_entity));
+                            }
                         } else {
-                            // In range, set current command to attack
-                            *command = Command::with_attack(target_entity, attack_duration);
+                            // Not in range, set current command to move
+                            *command = Command::with_move(
+                                target_position.position,
+                                Some(target_entity),
+                                Some(MoveMode::Run),
+                            );
 
-                            // Remove our destination component, as we have reached it!
-                            entity_commands.remove::<Destination>();
+                            // Set destination to move towards
+                            entity_commands.insert(Destination::new(target_position.position));
 
                             // Update target
                             entity_commands.insert(Target::new(target_entity));
                         }
                     } else {
-                        // Not in range, set current command to move
-                        *command = Command::with_move(
-                            target_position.position,
-                            Some(target_entity),
-                            Some(MoveMode::Run),
-                        );
-
-                        // Set destination to move towards
-                        entity_commands.insert(Destination::new(target_position.position));
-
-                        // Update target
-                        entity_commands.insert(Target::new(target_entity));
+                        *next_command = NextCommand::default();
                     }
                 } else {
-                    // TODO: Do we send a stop command ?
                     *next_command = NextCommand::default();
                 }
             }
+            CommandData::Die => {}
         }
     }
 }

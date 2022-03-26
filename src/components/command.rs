@@ -23,6 +23,7 @@ pub enum CommandData {
     Stop,
     Move(CommandMove),
     Attack(CommandAttack),
+    Die,
 }
 
 #[derive(Component, Clone, Debug)]
@@ -52,6 +53,10 @@ impl Command {
 
     pub fn with_stop() -> Self {
         Self::new(CommandData::Stop, None)
+    }
+
+    pub fn with_die(required_duration: Duration) -> Self {
+        Self::new(CommandData::Die, Some(required_duration))
     }
 
     pub fn with_attack(target: Entity, duration: Duration) -> Self {
