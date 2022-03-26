@@ -7,9 +7,10 @@ use rose_game_common::messages::{
     client::{ClientMessage, ConnectionRequest},
     server::{
         AnnounceChat, AttackEntity, CharacterData, CharacterDataItems, CharacterDataQuest,
-        ConnectionRequestError, ConnectionResponse, JoinZoneResponse, LocalChat, MoveEntity,
-        RemoveEntities, ServerMessage, ShoutChat, SpawnEntityMonster, SpawnEntityNpc, Teleport,
-        UpdateSpeed, Whisper,
+        ConnectionRequestError, ConnectionResponse, DamageEntity, JoinZoneResponse, LocalChat,
+        MoveEntity, RemoveEntities, ServerMessage, ShoutChat, SpawnEntityItemDrop,
+        SpawnEntityMonster, SpawnEntityNpc, StopMoveEntity, Teleport, UpdateLevel, UpdateSpeed,
+        UpdateXpStamina, Whisper,
     },
 };
 use rose_network_common::{Connection, Packet, PacketCodec};
@@ -20,10 +21,12 @@ use rose_network_irose::{
     },
     game_server_packets::{
         ConnectResult, PacketConnectionReply, PacketServerAnnounceChat, PacketServerAttackEntity,
-        PacketServerCharacterInventory, PacketServerCharacterQuestData, PacketServerJoinZone,
-        PacketServerLocalChat, PacketServerMoveEntity, PacketServerRemoveEntities,
-        PacketServerSelectCharacter, PacketServerShoutChat, PacketServerSpawnEntityMonster,
-        PacketServerSpawnEntityNpc, PacketServerTeleport, PacketServerUpdateSpeed,
+        PacketServerCharacterInventory, PacketServerCharacterQuestData, PacketServerDamageEntity,
+        PacketServerJoinZone, PacketServerLocalChat, PacketServerMoveEntity,
+        PacketServerRemoveEntities, PacketServerSelectCharacter, PacketServerShoutChat,
+        PacketServerSpawnEntityItemDrop, PacketServerSpawnEntityMonster,
+        PacketServerSpawnEntityNpc, PacketServerStopMoveEntity, PacketServerTeleport,
+        PacketServerUpdateLevel, PacketServerUpdateSpeed, PacketServerUpdateXpStamina,
         PacketServerWhisper, ServerPackets,
     },
     ClientPacketCodec, IROSE_112_TABLE,
@@ -143,6 +146,17 @@ impl GameClient {
                     }))
                     .ok();
             }
+            Some(ServerPackets::StopMoveEntity) => {
+                let response = PacketServerStopMoveEntity::try_from(&packet)?;
+                self.server_message_tx
+                    .send(ServerMessage::StopMoveEntity(StopMoveEntity {
+                        entity_id: response.entity_id,
+                        x: response.x,
+                        y: response.y,
+                        z: response.z,
+                    }))
+                    .ok();
+            }
             Some(ServerPackets::AttackEntity) => {
                 let response = PacketServerAttackEntity::try_from(&packet)?;
                 self.server_message_tx
@@ -188,6 +202,30 @@ impl GameClient {
                         target_entity_id: message.target_entity_id,
                         move_mode: message.move_mode,
                         status_effects: message.status_effects,
+                    }))
+                    .ok();
+            }
+            Some(ServerPackets::SpawnEntityItemDrop) => {
+                let message = PacketServerSpawnEntityItemDrop::try_from(&packet)?;
+                self.server_message_tx
+                    .send(ServerMessage::SpawnEntityItemDrop(SpawnEntityItemDrop {
+                        entity_id: message.entity_id,
+                        position: message.position,
+                        dropped_item: message.dropped_item,
+                        remaining_time: message.remaining_time,
+                        owner_entity_id: message.owner_entity_id,
+                    }))
+                    .ok();
+            }
+            Some(ServerPackets::DamageEntity) => {
+                let message = PacketServerDamageEntity::try_from(&packet)?;
+                self.server_message_tx
+                    .send(ServerMessage::DamageEntity(DamageEntity {
+                        attacker_entity_id: message.attacker_entity_id,
+                        defender_entity_id: message.defender_entity_id,
+                        damage: message.damage,
+                        is_killed: message.is_killed,
+                        from_skill: None,
                     }))
                     .ok();
             }
@@ -248,6 +286,18 @@ impl GameClient {
                     }))
                     .ok();
             }
+            Some(ServerPackets::UpdateLevel) => {
+                let message = PacketServerUpdateLevel::try_from(&packet)?;
+                self.server_message_tx
+                    .send(ServerMessage::UpdateLevel(UpdateLevel {
+                        entity_id: message.entity_id,
+                        level: message.level,
+                        experience_points: message.experience_points,
+                        stat_points: message.stat_points,
+                        skill_points: message.skill_points,
+                    }))
+                    .ok();
+            }
             Some(ServerPackets::UpdateSpeed) => {
                 let message = PacketServerUpdateSpeed::try_from(&packet)?;
                 self.server_message_tx
@@ -255,6 +305,16 @@ impl GameClient {
                         entity_id: message.entity_id,
                         run_speed: message.run_speed,
                         passive_attack_speed: message.passive_attack_speed,
+                    }))
+                    .ok();
+            }
+            Some(ServerPackets::UpdateXpStamina) => {
+                let message = PacketServerUpdateXpStamina::try_from(&packet)?;
+                self.server_message_tx
+                    .send(ServerMessage::UpdateXpStamina(UpdateXpStamina {
+                        xp: message.xp,
+                        stamina: message.stamina,
+                        source_entity_id: message.source_entity_id,
                     }))
                     .ok();
             }
