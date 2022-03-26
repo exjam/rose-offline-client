@@ -1,6 +1,7 @@
 use std::cmp::Ordering;
 
 use bevy::{
+    core::Time,
     hierarchy::DespawnRecursiveExt,
     math::Vec3,
     prelude::{
@@ -13,11 +14,16 @@ use bevy_egui::{egui, EguiContext};
 use enum_map::{enum_map, EnumMap};
 use rand::prelude::SliceRandom;
 
-use rose_data::{EquipmentIndex, EquipmentItem, ItemReference, ItemType, ZoneId};
-use rose_game_common::components::{CharacterGender, CharacterInfo, Equipment, MoveMode, Npc};
+use rose_data::{
+    CharacterMotionAction, EquipmentIndex, EquipmentItem, ItemReference, ItemType, NpcMotionAction,
+    ZoneId,
+};
+use rose_game_common::components::{CharacterGender, CharacterInfo, Equipment, Npc};
 
 use crate::{
-    components::{ActiveMotion, Command, DebugRenderCollider, DebugRenderSkeleton},
+    components::{
+        ActiveMotion, CharacterModel, DebugRenderCollider, DebugRenderSkeleton, NpcModel,
+    },
     fly_camera::{FlyCameraBundle, FlyCameraController},
     follow_camera::FollowCameraController,
     resources::GameData,
@@ -100,10 +106,12 @@ pub fn model_viewer_system(
     mut ui_state: ResMut<ModelViewerState>,
     mut query_character: Query<(Entity, &mut Equipment)>,
     mut query_npc: Query<(Entity, &mut Npc)>,
-    mut query_command: Query<(&mut Command, &mut MoveMode)>,
+    query_character_model: Query<(Entity, &CharacterModel)>,
+    query_npc_model: Query<(Entity, &NpcModel)>,
     query_debug_colliders: Query<Entity, With<DebugRenderCollider>>,
     query_debug_skeletons: Query<Entity, With<DebugRenderSkeleton>>,
     game_data: Res<GameData>,
+    time: Res<Time>,
     mut egui_context: ResMut<EguiContext>,
 ) {
     egui::Window::new("Model Viewer").show(egui_context.ctx_mut(), |ui| {
@@ -180,8 +188,6 @@ pub fn model_viewer_system(
                 {
                     let mut entity_commands = commands.spawn_bundle((
                         Npc::new(npc.id, 0),
-                        Command::with_stop(),
-                        MoveMode::Walk,
                         GlobalTransform::default(),
                         Transform::default().with_translation(Vec3::new(
                             2.5 + (count / 30) as f32 * 5.0,
@@ -261,8 +267,6 @@ pub fn model_viewer_system(
                     let mut entity_commands = commands.spawn_bundle((
                         character_info,
                         equipment,
-                        Command::with_stop(),
-                        MoveMode::Walk,
                         GlobalTransform::default(),
                         Transform::default().with_translation(Vec3::new(
                             -2.5 + (count / 25) as f32 * -5.0,
@@ -286,26 +290,35 @@ pub fn model_viewer_system(
         }
     });
 
-    egui::Window::new("Command").show(egui_context.ctx_mut(), |ui| {
-        if ui.button("Stop").clicked() {
-            for (mut command, _) in query_command.iter_mut() {
-                *command = Command::with_stop();
-            }
-        }
+    egui::Window::new("Animation").show(egui_context.ctx_mut(), |ui| {
+        let mut animation_button =
+            |name: &str, character_action: CharacterMotionAction, npc_action: NpcMotionAction| {
+                if ui.button(name).clicked() {
+                    for (entity, character_model) in query_character_model.iter() {
+                        commands.entity(entity).insert(ActiveMotion::new_repeating(
+                            character_model.action_motions[character_action].clone(),
+                            time.seconds_since_startup(),
+                        ));
+                    }
 
-        if ui.button("Walk").clicked() {
-            for (mut command, mut move_mode) in query_command.iter_mut() {
-                *command = Command::with_move(Vec3::default(), None, None);
-                *move_mode = MoveMode::Walk;
-            }
-        }
+                    for (entity, npc_model) in query_npc_model.iter() {
+                        commands.entity(entity).insert(ActiveMotion::new_repeating(
+                            npc_model.action_motions[npc_action].clone(),
+                            time.seconds_since_startup(),
+                        ));
+                    }
+                }
+            };
 
-        if ui.button("Run").clicked() {
-            for (mut command, mut move_mode) in query_command.iter_mut() {
-                *command = Command::with_move(Vec3::default(), None, None);
-                *move_mode = MoveMode::Run;
-            }
-        }
+        animation_button("Stop", CharacterMotionAction::Stop1, NpcMotionAction::Stop);
+        animation_button("Walk", CharacterMotionAction::Walk, NpcMotionAction::Move);
+        animation_button("Run", CharacterMotionAction::Run, NpcMotionAction::Run);
+        animation_button(
+            "Attack",
+            CharacterMotionAction::Attack,
+            NpcMotionAction::Attack,
+        );
+        animation_button("Die", CharacterMotionAction::Die, NpcMotionAction::Die);
     });
 
     egui::Window::new("Item List")
