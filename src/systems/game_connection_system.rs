@@ -18,8 +18,8 @@ use rose_network_common::ConnectionError;
 
 use crate::{
     components::{
-        ClientEntity, ClientEntityId, CollisionRayCastSource, Command, NextCommand,
-        PlayerCharacter, Position,
+        ClientEntity, ClientEntityId, ClientEntityType, CollisionRayCastSource, Command,
+        NextCommand, PlayerCharacter, Position,
     },
     events::{ChatboxEvent, GameConnectionEvent},
     resources::{AppState, GameConnection, GameData},
@@ -190,7 +190,7 @@ pub fn game_connection_system(
                     commands
                         .entity(player_entity)
                         .insert_bundle((
-                            ClientEntity::new(message.entity_id),
+                            ClientEntity::new(message.entity_id, ClientEntityType::Character),
                             Command::with_stop(),
                             NextCommand::default(),
                             message.experience_points,
@@ -281,7 +281,7 @@ pub fn game_connection_system(
                         status_effects,
                     ))
                     .insert_bundle((
-                        ClientEntity::new(message.entity_id),
+                        ClientEntity::new(message.entity_id, ClientEntityType::Character),
                         Transform::from_xyz(
                             message.position.x / 100.0,
                             message.position.z / 100.0 + 10000.0,
@@ -353,7 +353,7 @@ pub fn game_connection_system(
                         status_effects,
                     ))
                     .insert_bundle((
-                        ClientEntity::new(message.entity_id),
+                        ClientEntity::new(message.entity_id, ClientEntityType::Npc),
                         Transform::from_xyz(
                             message.position.x / 100.0,
                             message.position.z / 100.0 + 10000.0,
@@ -429,7 +429,7 @@ pub fn game_connection_system(
                         status_effects,
                     ))
                     .insert_bundle((
-                        ClientEntity::new(message.entity_id),
+                        ClientEntity::new(message.entity_id, ClientEntityType::Monster),
                         Transform::from_xyz(
                             message.position.x / 100.0,
                             message.position.z / 100.0 + 10000.0,
@@ -458,7 +458,7 @@ pub fn game_connection_system(
                     .spawn_bundle((
                         ItemDrop::with_dropped_item(message.dropped_item),
                         Position::new(message.position),
-                        ClientEntity::new(message.entity_id),
+                        ClientEntity::new(message.entity_id, ClientEntityType::ItemDrop),
                         Transform::from_xyz(
                             message.position.x / 100.0,
                             message.position.z / 100.0 + 10000.0,

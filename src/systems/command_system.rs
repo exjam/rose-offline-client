@@ -8,17 +8,24 @@ use bevy::{
 use rand::prelude::SliceRandom;
 
 use rose_data::{CharacterMotionAction, NpcMotionAction};
-use rose_game_common::components::{
-    AbilityValues, Destination, HealthPoints, MoveMode, MoveSpeed, Target,
+use rose_game_common::{
+    components::{AbilityValues, Destination, HealthPoints, MoveMode, MoveSpeed, Target},
+    messages::client::ClientMessage,
 };
 
 use crate::{
     components::{
-        ActiveMotion, CharacterModel, Command, CommandAttack, CommandMove, NextCommand, NpcModel,
-        Position,
+        ActiveMotion, CharacterModel, ClientEntity, ClientEntityType, Command, CommandAttack,
+        CommandMove, NextCommand, NpcModel, PlayerCharacter, Position,
     },
+    resources::GameConnection,
     zmo_asset_loader::ZmoAsset,
 };
+
+const NPC_MOVE_TO_DISTANCE: f32 = 250.0;
+const CHARACTER_MOVE_TO_DISTANCE: f32 = 1000.0;
+const ITEM_DROP_MOVE_TO_DISTANCE: f32 = 150.0;
+// const ITEM_DROP_PICKUP_DISTANCE: f32 = 200.0;
 
 fn get_attack_animation<R: rand::Rng + ?Sized>(
     rng: &mut R,
@@ -168,6 +175,7 @@ pub fn command_system(
     mut commands: Commands,
     mut query: Query<(
         Entity,
+        Option<&PlayerCharacter>,
         &AbilityValues,
         Option<&mut ActiveMotion>,
         Option<&CharacterModel>,
@@ -179,14 +187,16 @@ pub fn command_system(
         &mut NextCommand,
         &mut Transform,
     )>,
-    query_position: Query<&Position>,
+    query_move_target: Query<(&Position, &ClientEntity)>,
     query_attack_target: Query<(&Position, &HealthPoints)>,
+    game_connection: Option<Res<GameConnection>>,
     time: Res<Time>,
 ) {
     let mut rng = rand::thread_rng();
 
     for (
         entity,
+        player_character,
         ability_values,
         mut active_motion,
         character_model,
@@ -265,10 +275,21 @@ pub fn command_system(
                 move_mode: command_move_mode,
             }) => {
                 let mut entity_commands = commands.entity(entity);
+                let mut pickup_item_entity_id = None;
 
                 if let Some(target_entity) = target {
-                    if let Ok(target_position) = query_position.get(*target_entity) {
-                        let required_distance = Some(250.0);
+                    if let Ok((target_position, target_client_entity)) =
+                        query_move_target.get(*target_entity)
+                    {
+                        let required_distance = match target_client_entity.entity_type {
+                            ClientEntityType::Character => Some(CHARACTER_MOVE_TO_DISTANCE),
+                            ClientEntityType::Npc => Some(NPC_MOVE_TO_DISTANCE),
+                            ClientEntityType::ItemDrop => {
+                                pickup_item_entity_id = Some(target_client_entity.id);
+                                Some(ITEM_DROP_MOVE_TO_DISTANCE)
+                            }
+                            _ => None,
+                        };
 
                         if let Some(required_distance) = required_distance {
                             let offset = (target_position.position.xy() - position.position.xy())
@@ -315,6 +336,18 @@ pub fn command_system(
                 if distance < 0.1 {
                     // Reached destination, stop moving
                     *next_command = NextCommand::with_stop();
+
+                    // If the player has moved to an item, pick it up
+                    if player_character.is_some() {
+                        if let Some(pickup_item_entity_id) = pickup_item_entity_id {
+                            if let Some(game_connection) = game_connection.as_ref() {
+                                game_connection
+                                    .client_message_tx
+                                    .send(ClientMessage::PickupItemDrop(pickup_item_entity_id))
+                                    .ok();
+                            }
+                        }
+                    }
                 } else {
                     // Move towards destination
                     if let Some(motion) = get_move_animation(move_mode, character_model, npc_model)

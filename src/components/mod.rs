@@ -12,7 +12,7 @@ mod selected_target;
 
 pub use active_motion::ActiveMotion;
 pub use character_model::{CharacterModel, CharacterModelPart};
-pub use client_entity::{ClientEntity, ClientEntityId};
+pub use client_entity::{ClientEntity, ClientEntityId, ClientEntityType};
 pub use collision::{
     CollisionRayCastSource, CollisionTriMesh, COLLISION_FILTER_CLICKABLE,
     COLLISION_FILTER_COLLIDABLE, COLLISION_FILTER_INSPECTABLE, COLLISION_GROUP_CHARACTER,

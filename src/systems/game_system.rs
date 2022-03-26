@@ -171,9 +171,16 @@ pub fn game_input_system(
                     {
                         if mouse_button_input.just_pressed(MouseButton::Left) {
                             if let Some(game_connection) = game_connection.as_ref() {
+                                // Move to target item drop, once we are close enough the command_system
+                                // will send the pickup client message to perform the actual pickup
                                 game_connection
                                     .client_message_tx
-                                    .send(ClientMessage::PickupItemDrop(hit_client_entity.id))
+                                    .send(ClientMessage::Move(Move {
+                                        target_entity_id: Some(hit_client_entity.id),
+                                        x: hit_position.x * 100.0,
+                                        y: -hit_position.z * 100.0,
+                                        z: f32::max(0.0, hit_position.y * 100.0) as u16,
+                                    }))
                                     .ok();
                             }
                         }
