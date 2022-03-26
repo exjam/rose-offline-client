@@ -10,7 +10,7 @@ use bevy::{
 };
 use enum_map::{enum_map, EnumMap};
 
-use rose_data::{CharacterMotionAction, CharacterMotionList, ItemDatabase, NpcId};
+use rose_data::{CharacterMotionAction, CharacterMotionDatabase, ItemDatabase, NpcId};
 use rose_data::{EquipmentIndex, ItemType, NpcDatabase};
 use rose_file_readers::{ChrFile, VfsIndex, ZmdFile, ZscFile};
 use rose_game_common::components::{
@@ -25,7 +25,7 @@ use crate::{
 
 pub struct ModelLoader {
     vfs: Arc<VfsIndex>,
-    character_motion_list: Arc<CharacterMotionList>,
+    character_motion_list: Arc<CharacterMotionDatabase<String>>,
     item_database: Arc<ItemDatabase>,
     npc_database: Arc<NpcDatabase>,
 
@@ -61,7 +61,7 @@ pub struct ModelLoader {
 impl ModelLoader {
     pub fn new(
         vfs: Arc<VfsIndex>,
-        character_motion_list: Arc<CharacterMotionList>,
+        character_motion_list: Arc<CharacterMotionDatabase<String>>,
         item_database: Arc<ItemDatabase>,
         npc_database: Arc<NpcDatabase>,
     ) -> Result<ModelLoader, anyhow::Error> {
