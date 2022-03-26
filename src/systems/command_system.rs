@@ -2,8 +2,8 @@ use bevy::{
     core::Time,
     ecs::system::EntityCommands,
     hierarchy::DespawnRecursiveExt,
-    math::Vec3Swizzles,
-    prelude::{Commands, Entity, Handle, Query, Res},
+    math::{Quat, Vec3, Vec3Swizzles},
+    prelude::{Commands, Entity, Handle, Mut, Query, Res, Transform},
 };
 use rand::prelude::SliceRandom;
 
@@ -133,21 +133,35 @@ fn get_stop_animation(
 
 fn update_active_motion(
     entity_commands: &mut EntityCommands,
-    active_motion: Option<&ActiveMotion>,
+    active_motion: &mut Option<Mut<ActiveMotion>>,
     motion: Handle<ZmoAsset>,
     time: &Time,
+    animation_speed: f32,
     repeat: bool,
 ) {
-    if active_motion.map_or(false, |x| x.motion == motion) {
-        // Already playing this animation
-        return;
+    if let Some(active_motion) = active_motion.as_mut() {
+        if active_motion.motion == motion {
+            // Already playing this animation
+            active_motion.animation_speed = animation_speed;
+            return;
+        }
     }
 
     entity_commands.insert(if repeat {
         ActiveMotion::new_repeating(motion, time.seconds_since_startup())
+            .with_animation_speed(animation_speed)
     } else {
         ActiveMotion::new_once(motion, time.seconds_since_startup())
+            .with_animation_speed(animation_speed)
     });
+}
+
+fn get_attack_animation_speed(ability_values: &AbilityValues) -> f32 {
+    i32::max(ability_values.get_attack_speed(), 30) as f32 / 100.0
+}
+
+fn get_move_animation_speed(move_speed: &MoveSpeed) -> f32 {
+    (move_speed.speed + 180.0) / 600.0
 }
 
 pub fn command_system(
@@ -155,13 +169,15 @@ pub fn command_system(
     mut query: Query<(
         Entity,
         &AbilityValues,
-        Option<&ActiveMotion>,
+        Option<&mut ActiveMotion>,
         Option<&CharacterModel>,
         Option<&NpcModel>,
         &Position,
         &MoveMode,
+        &MoveSpeed,
         &mut Command,
         &mut NextCommand,
+        &mut Transform,
     )>,
     query_position: Query<&Position>,
     query_attack_target: Query<(&Position, &HealthPoints)>,
@@ -172,18 +188,20 @@ pub fn command_system(
     for (
         entity,
         ability_values,
-        active_motion,
+        mut active_motion,
         character_model,
         npc_model,
         position,
         move_mode,
+        move_speed,
         mut command,
         mut next_command,
+        mut transform,
     ) in query.iter_mut()
     {
         if !next_command.is_die()
             && command.requires_animation_complete()
-            && !active_motion.map_or(true, |x| x.complete)
+            && !active_motion.as_ref().map_or(true, |x| x.complete)
         {
             // Current command still in animation
             continue;
@@ -209,9 +227,10 @@ pub fn command_system(
                 if let Some(motion) = get_stop_animation(character_model, npc_model) {
                     update_active_motion(
                         &mut commands.entity(entity),
-                        active_motion,
+                        &mut active_motion,
                         motion,
                         &time,
+                        1.0,
                         true,
                     );
                 }
@@ -229,9 +248,10 @@ pub fn command_system(
                 if let Some(motion) = get_stop_animation(character_model, npc_model) {
                     update_active_motion(
                         &mut commands.entity(entity),
-                        active_motion,
+                        &mut active_motion,
                         motion,
                         &time,
+                        1.0,
                         true,
                     );
                 }
@@ -301,9 +321,10 @@ pub fn command_system(
                     {
                         update_active_motion(
                             &mut entity_commands,
-                            active_motion,
+                            &mut active_motion,
                             motion,
                             &time,
+                            get_move_animation_speed(move_speed),
                             true,
                         );
                     }
@@ -343,12 +364,20 @@ pub fn command_system(
                     // Target in range, start attack
                     if let Some(motion) = get_attack_animation(&mut rng, character_model, npc_model)
                     {
-                        // TODO: Apply attack speed multiplier to motion playback speed
+                        // Update rotation to ensure facing enemy
+                        let dx = target_position.position.x - position.position.x;
+                        let dy = target_position.position.y - position.position.y;
+                        transform.rotation = Quat::from_axis_angle(
+                            Vec3::Y,
+                            dy.atan2(dx) + std::f32::consts::PI / 2.0,
+                        );
+
                         update_active_motion(
                             &mut entity_commands,
-                            active_motion,
+                            &mut active_motion,
                             motion,
                             &time,
+                            get_attack_animation_speed(ability_values),
                             false,
                         );
                         *command = Command::with_attack(target_entity);
@@ -364,9 +393,10 @@ pub fn command_system(
                     if let Some(motion) = motion {
                         update_active_motion(
                             &mut entity_commands,
-                            active_motion,
+                            &mut active_motion,
                             motion,
                             &time,
+                            get_move_animation_speed(move_speed),
                             true,
                         );
                         *command = Command::with_move(
@@ -387,9 +417,10 @@ pub fn command_system(
                 if let Some(motion) = motion {
                     update_active_motion(
                         &mut commands.entity(entity),
-                        active_motion,
+                        &mut active_motion,
                         motion,
                         &time,
+                        1.0,
                         false,
                     );
                 }

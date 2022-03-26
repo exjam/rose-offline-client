@@ -257,6 +257,7 @@ pub fn game_connection_system(
                     &status_effects,
                 );
                 ability_values.run_speed = message.move_speed.speed;
+                ability_values.attack_speed += message.passive_attack_speed;
                 ability_values.passive_attack_speed = message.passive_attack_speed;
 
                 /*

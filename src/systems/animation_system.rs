@@ -30,7 +30,9 @@ pub fn animation_system(
         let current_motion = current_motion.unwrap();
 
         let current_animation_time = current_time - active_motion.start_time;
-        let current_frame_index_exact = current_animation_time * (current_motion.fps() as f64);
+        let current_frame_index_exact = current_animation_time
+            * (current_motion.fps() as f64)
+            * active_motion.animation_speed as f64;
         let current_frame_fract = current_frame_index_exact.fract() as f32;
         let current_loop_count = current_frame_index_exact as usize / current_motion.num_frames();
         if current_loop_count >= active_motion.repeat_limit.unwrap_or(usize::MAX) {
