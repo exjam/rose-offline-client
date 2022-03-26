@@ -270,14 +270,20 @@ impl ModelLoader {
             _ => 0,
         };
 
+        let root_bone = commands
+            .spawn_bundle((Transform::default(), GlobalTransform::default()))
+            .id();
+        commands.entity(model_entity).add_child(root_bone);
+
         (
             ItemDropModel {
                 dropped_item: dropped_item.cloned(),
+                root_bone,
                 model_parts: spawn_model(
                     commands,
                     asset_server,
                     static_mesh_materials,
-                    model_entity,
+                    root_bone,
                     &self.field_item,
                     model_id,
                     None,

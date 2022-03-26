@@ -55,10 +55,15 @@ pub fn item_drop_model_system(
             item_drop.item.as_ref(),
         );
 
-        commands.entity(entity).insert_bundle((
-            item_drop_model,
-            ActiveMotion::new_once(drop_motion, time.seconds_since_startup()),
-        ));
+        let root_model_bone = item_drop_model.root_bone;
+        commands
+            .entity(root_model_bone)
+            .insert_bundle((ActiveMotion::new_once(
+                drop_motion,
+                time.seconds_since_startup(),
+            ),));
+
+        commands.entity(entity).insert(item_drop_model);
     }
 }
 
