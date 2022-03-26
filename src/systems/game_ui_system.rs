@@ -1,7 +1,9 @@
 use bevy::prelude::{Commands, Entity, EventReader, Local, Query, Res, ResMut, With};
 use bevy_egui::{egui, EguiContext};
 use rose_game_common::{
-    components::{AbilityValues, CharacterInfo, HealthPoints, Npc},
+    components::{
+        AbilityValues, CharacterInfo, ExperiencePoints, HealthPoints, Level, ManaPoints, Npc,
+    },
     messages::client::ClientMessage,
 };
 
@@ -24,7 +26,19 @@ pub fn game_ui_system(
     game_connection: Option<Res<GameConnection>>,
     mut chatbox_events: EventReader<ChatboxEvent>,
     game_data: Res<GameData>,
-    query_player: Query<(Entity, Option<&SelectedTarget>), With<PlayerCharacter>>,
+    query_player: Query<
+        (
+            Entity,
+            Option<&SelectedTarget>,
+            &AbilityValues,
+            &CharacterInfo,
+            &Level,
+            &HealthPoints,
+            &ManaPoints,
+            &ExperiencePoints,
+        ),
+        With<PlayerCharacter>,
+    >,
     query_target: Query<(
         &AbilityValues,
         &HealthPoints,
@@ -32,7 +46,82 @@ pub fn game_ui_system(
         Option<&CharacterInfo>,
     )>,
 ) {
-    let (player_entity, player_target) = query_player.single();
+    let (
+        player_entity,
+        player_target,
+        player_ability_values,
+        player_info,
+        player_level,
+        player_health_points,
+        player_mana_points,
+        player_experience_points,
+    ) = query_player.single();
+
+    egui::Window::new("Player Info")
+        .anchor(egui::Align2::LEFT_TOP, [10.0, 30.0])
+        .collapsible(false)
+        .title_bar(false)
+        .show(egui_context.ctx_mut(), |ui| {
+            ui.label(&player_info.name);
+
+            egui::Grid::new("player_info_grid")
+                .num_columns(2)
+                .show(ui, |ui| {
+                    ui.label("HP");
+                    ui.scope(|ui| {
+                        ui.style_mut().visuals.selection.bg_fill = egui::Color32::DARK_RED;
+                        ui.add(
+                            egui::ProgressBar::new(
+                                player_health_points.hp as f32
+                                    / player_ability_values.get_max_health() as f32,
+                            )
+                            .text(format!(
+                                "{} / {}",
+                                player_health_points.hp,
+                                player_ability_values.get_max_health()
+                            )),
+                        )
+                    });
+                    ui.end_row();
+
+                    ui.label("MP");
+                    ui.scope(|ui| {
+                        ui.style_mut().visuals.selection.bg_fill = egui::Color32::DARK_BLUE;
+                        ui.add(
+                            egui::ProgressBar::new(
+                                player_mana_points.mp as f32
+                                    / player_ability_values.get_max_mana() as f32,
+                            )
+                            .text(format!(
+                                "{} / {}",
+                                player_mana_points.mp,
+                                player_ability_values.get_max_mana()
+                            )),
+                        );
+                    });
+                    ui.end_row();
+
+                    ui.label("XP");
+                    ui.scope(|ui| {
+                        let need_xp = game_data
+                            .ability_value_calculator
+                            .calculate_levelup_require_xp(player_level.level);
+                        ui.style_mut().visuals.selection.bg_fill =
+                            egui::Color32::from_rgb(145, 133, 0);
+                        ui.add(
+                            egui::ProgressBar::new(
+                                player_experience_points.xp as f32 / need_xp as f32,
+                            )
+                            .show_percentage(),
+                        )
+                        .on_hover_text(format!("{} / {}", player_experience_points.xp, need_xp));
+                    });
+                    ui.end_row();
+                });
+
+            ui.label(format!("Level {}", player_level.level));
+        });
+
     if let Some(player_target) = player_target {
         if let Ok((ability_values, health_points, npc, character_info)) =
             query_target.get(player_target.entity)
@@ -118,7 +207,7 @@ pub fn game_ui_system(
     }
 
     egui::Window::new("Chat Box")
-        .anchor(egui::Align2::LEFT_BOTTOM, [5.0, -5.0])
+        .anchor(egui::Align2::LEFT_BOTTOM, [10.0, -10.0])
         .collapsible(false)
         .title_bar(false)
         .frame(egui::Frame::window(&chatbox_style))
