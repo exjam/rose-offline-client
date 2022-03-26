@@ -8,9 +8,9 @@ use rose_game_common::messages::{
     server::{
         AnnounceChat, AttackEntity, CharacterData, CharacterDataItems, CharacterDataQuest,
         ConnectionRequestError, ConnectionResponse, DamageEntity, JoinZoneResponse, LocalChat,
-        MoveEntity, RemoveEntities, ServerMessage, ShoutChat, SpawnEntityItemDrop,
-        SpawnEntityMonster, SpawnEntityNpc, StopMoveEntity, Teleport, UpdateLevel, UpdateSpeed,
-        UpdateXpStamina, Whisper,
+        MoveEntity, RemoveEntities, ServerMessage, ShoutChat, SpawnEntityCharacter,
+        SpawnEntityItemDrop, SpawnEntityMonster, SpawnEntityNpc, StopMoveEntity, Teleport,
+        UpdateLevel, UpdateSpeed, UpdateXpStamina, Whisper,
     },
 };
 use rose_network_common::{Connection, Packet, PacketCodec};
@@ -24,10 +24,10 @@ use rose_network_irose::{
         PacketServerCharacterInventory, PacketServerCharacterQuestData, PacketServerDamageEntity,
         PacketServerJoinZone, PacketServerLocalChat, PacketServerMoveEntity,
         PacketServerRemoveEntities, PacketServerSelectCharacter, PacketServerShoutChat,
-        PacketServerSpawnEntityItemDrop, PacketServerSpawnEntityMonster,
-        PacketServerSpawnEntityNpc, PacketServerStopMoveEntity, PacketServerTeleport,
-        PacketServerUpdateLevel, PacketServerUpdateSpeed, PacketServerUpdateXpStamina,
-        PacketServerWhisper, ServerPackets,
+        PacketServerSpawnEntityCharacter, PacketServerSpawnEntityItemDrop,
+        PacketServerSpawnEntityMonster, PacketServerSpawnEntityNpc, PacketServerStopMoveEntity,
+        PacketServerTeleport, PacketServerUpdateLevel, PacketServerUpdateSpeed,
+        PacketServerUpdateXpStamina, PacketServerWhisper, ServerPackets,
     },
     ClientPacketCodec, IROSE_112_TABLE,
 };
@@ -168,6 +168,30 @@ impl GameClient {
                         y: response.y,
                         z: response.z,
                     }))
+                    .ok();
+            }
+            Some(ServerPackets::SpawnEntityCharacter) => {
+                let message = PacketServerSpawnEntityCharacter::try_from(&packet)?;
+                self.server_message_tx
+                    .send(ServerMessage::SpawnEntityCharacter(Box::new(
+                        SpawnEntityCharacter {
+                            entity_id: message.entity_id,
+                            position: message.position,
+                            team: message.team,
+                            health: message.health,
+                            destination: message.destination,
+                            command: message.command,
+                            target_entity_id: message.target_entity_id,
+                            move_mode: message.move_mode,
+                            status_effects: message.status_effects,
+                            character_info: message.character_info,
+                            equipment: message.equipment,
+                            level: message.level,
+                            move_speed: message.move_speed,
+                            passive_attack_speed: message.passive_attack_speed,
+                            personal_store_info: message.personal_store_info,
+                        },
+                    )))
                     .ok();
             }
             Some(ServerPackets::SpawnEntityNpc) => {

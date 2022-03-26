@@ -9,8 +9,8 @@ use bevy::{
 use rose_data::ZoneId;
 use rose_game_common::{
     components::{
-        CharacterInfo, ExperiencePoints, HealthPoints, ItemDrop, MoveMode, MoveSpeed, Npc, Stamina,
-        StatusEffects,
+        BasicStats, CharacterInfo, ExperiencePoints, HealthPoints, ItemDrop, MoveMode, MoveSpeed,
+        Npc, SkillList, Stamina, StatusEffects,
     },
     messages::server::{CommandState, ServerMessage},
 };
@@ -223,6 +223,86 @@ pub fn game_connection_system(
                     ));
                 }
             }
+            Ok(ServerMessage::SpawnEntityCharacter(message)) => {
+                let status_effects = StatusEffects {
+                    active: message.status_effects,
+                    ..Default::default()
+                };
+                let target_entity = message
+                    .target_entity_id
+                    .and_then(|id| client_entity_list.get(id));
+                let next_command = match message.command {
+                    CommandState::Move => {
+                        if let Some(destination) = message.destination {
+                            NextCommand::with_move(destination, target_entity, None)
+                        } else {
+                            NextCommand::default()
+                        }
+                    }
+                    CommandState::Attack => {
+                        if let Some(target_entity) = target_entity {
+                            NextCommand::with_attack(target_entity)
+                        } else {
+                            NextCommand::default()
+                        }
+                    }
+                    _ => NextCommand::default(),
+                };
+                let mut ability_values = game_data.ability_value_calculator.calculate(
+                    &message.character_info,
+                    &message.level,
+                    &message.equipment,
+                    &BasicStats::default(),
+                    &SkillList::default(),
+                    &status_effects,
+                );
+                ability_values.run_speed = message.move_speed.speed;
+                ability_values.passive_attack_speed = message.passive_attack_speed;
+
+                /*
+                TODO:
+                pub personal_store_info: Option<(i32, String)>,
+                 */
+
+                let entity = commands
+                    .spawn_bundle((
+                        Command::with_stop(),
+                        next_command,
+                        message.character_info,
+                        message.team,
+                        message.health,
+                        message.move_mode,
+                        Position::new(message.position),
+                        message.equipment,
+                        message.level,
+                        message.move_speed,
+                        ability_values,
+                        status_effects,
+                    ))
+                    .insert_bundle((
+                        ClientEntity::new(message.entity_id),
+                        Transform::from_xyz(
+                            message.position.x / 100.0,
+                            message.position.z / 100.0 + 10000.0,
+                            -message.position.y / 100.0,
+                        ),
+                        GlobalTransform::default(),
+                        Visibility::default(),
+                        ComputedVisibility::default(),
+                    ))
+                    .with_children(|child_builder| {
+                        child_builder.spawn_bundle((
+                            CollisionRayCastSource {},
+                            Transform::default()
+                                .with_translation(Vec3::new(0.0, 1.35, 0.0))
+                                .looking_at(-Vec3::Y, Vec3::X),
+                            GlobalTransform::default(),
+                        ));
+                    })
+                    .id();
+
+                client_entity_list.add(message.entity_id, entity);
+            }
             Ok(ServerMessage::SpawnEntityNpc(message)) => {
                 let status_effects = StatusEffects {
                     active: message.status_effects,
@@ -244,6 +324,13 @@ pub fn game_connection_system(
                     CommandState::Move => {
                         if let Some(destination) = message.destination {
                             NextCommand::with_move(destination, target_entity, None)
+                        } else {
+                            NextCommand::default()
+                        }
+                    }
+                    CommandState::Attack => {
+                        if let Some(target_entity) = target_entity {
+                            NextCommand::with_attack(target_entity)
                         } else {
                             NextCommand::default()
                         }
@@ -313,6 +400,13 @@ pub fn game_connection_system(
                     CommandState::Move => {
                         if let Some(destination) = message.destination {
                             NextCommand::with_move(destination, target_entity, None)
+                        } else {
+                            NextCommand::default()
+                        }
+                    }
+                    CommandState::Attack => {
+                        if let Some(target_entity) = target_entity {
+                            NextCommand::with_attack(target_entity)
                         } else {
                             NextCommand::default()
                         }

@@ -343,6 +343,7 @@ pub fn command_system(
                     // Target in range, start attack
                     if let Some(motion) = get_attack_animation(&mut rng, character_model, npc_model)
                     {
+                        // TODO: Apply attack speed multiplier to motion playback speed
                         update_active_motion(
                             &mut entity_commands,
                             active_motion,
