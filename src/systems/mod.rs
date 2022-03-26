@@ -32,6 +32,7 @@ pub use collision_system::{collision_add_colliders_system, collision_system};
 pub use command_system::command_system;
 pub use debug_inspector_system::DebugInspectorPlugin;
 pub use debug_render_system::{debug_render_collider_system, debug_render_skeleton_system};
+pub use diagnostics_ui_system::diagnostics_ui_system;
 pub use game_connection_system::game_connection_system;
 pub use game_debug_ui_system::game_debug_ui_system;
 pub use game_system::{game_input_system, game_state_enter_system, game_zone_change_system};
