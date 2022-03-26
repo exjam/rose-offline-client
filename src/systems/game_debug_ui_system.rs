@@ -139,24 +139,26 @@ pub fn game_debug_ui_system(
         .default_height(300.0)
         .open(show_zone_list)
         .show(ctx, |ui| {
-            egui::Grid::new("zone_list_grid").show(ui, |ui| {
-                ui.label("id");
-                ui.label("name");
-                ui.end_row();
-
-                for zone in game_data.zone_list.iter() {
-                    ui.label(format!("{}", zone.id.get()));
-                    ui.label(&zone.name);
-                    if ui.button("Teleport").clicked() {
-                        if let Some(game_connection) = game_connection.as_ref() {
-                            game_connection
-                                .client_message_tx
-                                .send(ClientMessage::Chat(format!("/mm {}", zone.id.get())))
-                                .ok();
-                        }
-                    }
+            egui::Grid::new("zone_list_grid")
+                .num_columns(3)
+                .show(ui, |ui| {
+                    ui.label("id");
+                    ui.label("name");
                     ui.end_row();
-                }
-            });
+
+                    for zone in game_data.zone_list.iter() {
+                        ui.label(format!("{}", zone.id.get()));
+                        ui.label(&zone.name);
+                        if ui.button("Teleport").clicked() {
+                            if let Some(game_connection) = game_connection.as_ref() {
+                                game_connection
+                                    .client_message_tx
+                                    .send(ClientMessage::Chat(format!("/mm {}", zone.id.get())))
+                                    .ok();
+                            }
+                        }
+                        ui.end_row();
+                    }
+                });
         });
 }

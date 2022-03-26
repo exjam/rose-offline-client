@@ -344,50 +344,52 @@ pub fn model_viewer_system(
                 ui.selectable_value(&mut ui_state.item_list_type, ItemType::Vehicle, "Vehicle");
             });
 
-            egui::Grid::new("item_list_grid").show(ui, |ui| {
-                ui.label("id");
-                ui.label("name");
-                ui.end_row();
+            egui::Grid::new("item_list_grid")
+                .num_columns(3)
+                .show(ui, |ui| {
+                    ui.label("id");
+                    ui.label("name");
+                    ui.end_row();
 
-                let equipment_index = ui_state.item_list_type.try_into().ok();
+                    let equipment_index = ui_state.item_list_type.try_into().ok();
 
-                if ui_state.item_list_type.is_equipment_item() {
-                    ui.label("0");
-                    ui.label("None");
-                    if ui.button("Equip").clicked() {
-                        if let Some(equipment_index) = equipment_index {
-                            for (_, mut equipment) in query_character.iter_mut() {
-                                equipment.equipped_items[equipment_index] = None;
+                    if ui_state.item_list_type.is_equipment_item() {
+                        ui.label("0");
+                        ui.label("None");
+                        if ui.button("Equip").clicked() {
+                            if let Some(equipment_index) = equipment_index {
+                                for (_, mut equipment) in query_character.iter_mut() {
+                                    equipment.equipped_items[equipment_index] = None;
+                                }
                             }
                         }
+                        ui.end_row();
                     }
-                    ui.end_row();
-                }
 
-                for item_reference in game_data.items.iter_items(ui_state.item_list_type) {
-                    if let Some(item_data) = game_data.items.get_base_item(item_reference) {
-                        if !item_data.name.is_empty() {
-                            ui.label(format!("{}", item_reference.item_number));
-                            ui.label(&item_data.name);
+                    for item_reference in game_data.items.iter_items(ui_state.item_list_type) {
+                        if let Some(item_data) = game_data.items.get_base_item(item_reference) {
+                            if !item_data.name.is_empty() {
+                                ui.label(format!("{}", item_reference.item_number));
+                                ui.label(&item_data.name);
 
-                            if let Some(equipment_index) = equipment_index {
-                                if ui.button("Equip").clicked() {
-                                    for (_, mut equipment) in query_character.iter_mut() {
-                                        equipment.equipped_items[equipment_index] =
-                                            Some(EquipmentItem::new(&item_reference).unwrap());
+                                if let Some(equipment_index) = equipment_index {
+                                    if ui.button("Equip").clicked() {
+                                        for (_, mut equipment) in query_character.iter_mut() {
+                                            equipment.equipped_items[equipment_index] =
+                                                Some(EquipmentItem::new(&item_reference).unwrap());
 
-                                        if item_data.class.is_two_handed_weapon() {
-                                            equipment.equipped_items[EquipmentIndex::WeaponLeft] =
-                                                None;
+                                            if item_data.class.is_two_handed_weapon() {
+                                                equipment.equipped_items
+                                                    [EquipmentIndex::WeaponLeft] = None;
+                                            }
                                         }
                                     }
                                 }
+                                ui.end_row();
                             }
-                            ui.end_row();
                         }
                     }
-                }
-            });
+                });
         });
 
     egui::Window::new("NPC List")
@@ -395,21 +397,23 @@ pub fn model_viewer_system(
         .resizable(true)
         .default_height(300.0)
         .show(egui_context.ctx_mut(), |ui| {
-            egui::Grid::new("npc_list_grid").show(ui, |ui| {
-                ui.label("id");
-                ui.label("name");
-                ui.end_row();
-
-                for npc_data in game_data.npcs.iter() {
-                    ui.label(format!("{}", npc_data.id.get()));
-                    ui.label(&npc_data.name);
-                    if ui.button("View").clicked() {
-                        for (_, mut npc) in query_npc.iter_mut() {
-                            npc.id = npc_data.id;
-                        }
-                    }
+            egui::Grid::new("npc_list_grid")
+                .num_columns(3)
+                .show(ui, |ui| {
+                    ui.label("id");
+                    ui.label("name");
                     ui.end_row();
-                }
-            });
+
+                    for npc_data in game_data.npcs.iter() {
+                        ui.label(format!("{}", npc_data.id.get()));
+                        ui.label(&npc_data.name);
+                        if ui.button("View").clicked() {
+                            for (_, mut npc) in query_npc.iter_mut() {
+                                npc.id = npc_data.id;
+                            }
+                        }
+                        ui.end_row();
+                    }
+                });
         });
 }

@@ -70,19 +70,21 @@ pub fn zone_viewer_system(
         .default_height(300.0)
         .open(&mut ui_state.zone_list_open)
         .show(egui_context.ctx_mut(), |ui| {
-            egui::Grid::new("zone_list_grid").show(ui, |ui| {
-                ui.label("id");
-                ui.label("name");
-                ui.end_row();
-
-                for zone in game_data.zone_list.iter() {
-                    ui.label(format!("{}", zone.id.get()));
-                    ui.label(&zone.name);
-                    if ui.button("Load").clicked() {
-                        load_zone_events.send(LoadZoneEvent::new(zone.id));
-                    }
+            egui::Grid::new("zone_list_grid")
+                .num_columns(3)
+                .show(ui, |ui| {
+                    ui.label("id");
+                    ui.label("name");
                     ui.end_row();
-                }
-            });
+
+                    for zone in game_data.zone_list.iter() {
+                        ui.label(format!("{}", zone.id.get()));
+                        ui.label(&zone.name);
+                        if ui.button("Load").clicked() {
+                            load_zone_events.send(LoadZoneEvent::new(zone.id));
+                        }
+                        ui.end_row();
+                    }
+                });
         });
 }
