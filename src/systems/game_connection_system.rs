@@ -58,6 +58,31 @@ impl ClientEntityList {
     }
 }
 
+fn get_entity_name(
+    entity: Entity,
+    game_data: &GameData,
+    query_entity_name: &Query<
+        (Option<&CharacterInfo>, Option<&Npc>),
+        Or<(With<CharacterInfo>, With<Npc>)>,
+    >,
+) -> Option<String> {
+    match query_entity_name.get(entity) {
+        Ok((Some(character_info), None)) => {
+            return Some(character_info.name.clone());
+        }
+        Ok((None, Some(npc))) => {
+            if let Some(npc_data) = game_data.npcs.get_npc(npc.id) {
+                if !npc_data.name.is_empty() {
+                    return Some(npc_data.name.clone());
+                }
+            }
+        }
+        _ => {}
+    }
+
+    None
+}
+
 pub fn game_connection_system(
     mut commands: Commands,
     game_connection: Option<Res<GameConnection>>,
@@ -390,22 +415,8 @@ pub fn game_connection_system(
             }
             Ok(ServerMessage::LocalChat(message)) => {
                 if let Some(entity) = client_entity_list.get(message.entity_id) {
-                    match query_entity_name.get(entity) {
-                        Ok((Some(character_info), None)) => {
-                            chatbox_events
-                                .send(ChatboxEvent::Say(character_info.name.clone(), message.text));
-                        }
-                        Ok((None, Some(npc))) => {
-                            if let Some(npc_data) = game_data.npcs.get_npc(npc.id) {
-                                if !npc_data.name.is_empty() {
-                                    chatbox_events.send(ChatboxEvent::Say(
-                                        npc_data.name.clone(),
-                                        message.text,
-                                    ));
-                                }
-                            }
-                        }
-                        _ => {}
+                    if let Some(name) = get_entity_name(entity, &game_data, &query_entity_name) {
+                        chatbox_events.send(ChatboxEvent::Say(name, message.text));
                     }
                 }
             }
