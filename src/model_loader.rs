@@ -14,11 +14,11 @@ use rose_data::{CharacterMotionAction, CharacterMotionDatabase, ItemDatabase, Np
 use rose_data::{EquipmentIndex, ItemType, NpcDatabase};
 use rose_file_readers::{ChrFile, VfsIndex, ZmdFile, ZscFile};
 use rose_game_common::components::{
-    CharacterGender, CharacterInfo, Equipment, EquipmentItemDatabase,
+    CharacterGender, CharacterInfo, DroppedItem, Equipment, EquipmentItemDatabase,
 };
 
 use crate::{
-    components::{CharacterModel, CharacterModelPart, NpcModel},
+    components::{CharacterModel, CharacterModelPart, ItemDropModel, NpcModel},
     render::StaticMeshMaterial,
     zmo_asset_loader::ZmoAsset,
 };
@@ -56,6 +56,10 @@ pub struct ModelLoader {
     // Npc
     npc_chr: ChrFile,
     npc_zsc: ZscFile,
+
+    // Field Item
+    field_item: ZscFile,
+    field_item_motion_path: String,
 }
 
 impl ModelLoader {
@@ -93,6 +97,10 @@ impl ModelLoader {
             // NPC
             npc_chr: vfs.read_file::<ChrFile, _>("3DDATA/NPC/LIST_NPC.CHR")?,
             npc_zsc: vfs.read_file::<ZscFile, _>("3DDATA/NPC/PART_NPC.ZSC")?,
+
+            // Field items
+            field_item: vfs.read_file::<ZscFile, _>("3DDATA/ITEM/LIST_FIELDITEM.ZSC")?,
+            field_item_motion_path: "3DDATA/MOTION/ITEM_ANI.ZMO".to_string(),
 
             vfs,
             character_motion_database,
@@ -184,7 +192,7 @@ impl ModelLoader {
                 model_entity,
                 &self.npc_zsc,
                 *model_id as usize,
-                &skinned_mesh,
+                Some(&skinned_mesh),
                 None,
                 dummy_bone_offset,
             );
@@ -200,7 +208,7 @@ impl ModelLoader {
                     model_entity,
                     &self.weapon,
                     npc_data.right_hand_part_index as usize,
-                    &skinned_mesh,
+                    Some(&skinned_mesh),
                     None,
                     dummy_bone_offset,
                 );
@@ -215,7 +223,7 @@ impl ModelLoader {
                     model_entity,
                     &self.sub_weapon,
                     npc_data.left_hand_part_index as usize,
-                    &skinned_mesh,
+                    Some(&skinned_mesh),
                     None,
                     dummy_bone_offset,
                 );
@@ -242,6 +250,44 @@ impl ModelLoader {
             },
             skinned_mesh,
         ))
+    }
+
+    pub fn spawn_item_drop_model(
+        &self,
+        commands: &mut Commands,
+        asset_server: &AssetServer,
+        static_mesh_materials: &mut Assets<StaticMeshMaterial>,
+        model_entity: Entity,
+        dropped_item: Option<&DroppedItem>,
+    ) -> (ItemDropModel, Handle<ZmoAsset>) {
+        let model_id = match dropped_item {
+            Some(DroppedItem::Item(item)) => self
+                .item_database
+                .get_base_item(item.get_item_reference())
+                .map(|item_data| item_data.field_model_index)
+                .unwrap_or(0) as usize,
+            Some(DroppedItem::Money(_)) => 0,
+            _ => 0,
+        };
+
+        (
+            ItemDropModel {
+                dropped_item: dropped_item.cloned(),
+                model_parts: spawn_model(
+                    commands,
+                    asset_server,
+                    static_mesh_materials,
+                    model_entity,
+                    &self.field_item,
+                    model_id,
+                    None,
+                    None,
+                    0,
+                )
+                .1,
+            },
+            asset_server.load(&self.field_item_motion_path),
+        )
     }
 
     pub fn load_character_action_motions(
@@ -341,7 +387,7 @@ impl ModelLoader {
                     model_entity,
                     self.get_model_list(character_info.gender, model_part),
                     model_id,
-                    &skinned_mesh,
+                    Some(&skinned_mesh),
                     model_part.default_bone_id(dummy_bone_offset),
                     dummy_bone_offset,
                 );
@@ -412,7 +458,7 @@ impl ModelLoader {
                         model_entity,
                         self.get_model_list(character_info.gender, model_part),
                         model_id,
-                        skinned_mesh,
+                        Some(skinned_mesh),
                         model_part.default_bone_id(character_model.dummy_bone_offset),
                         character_model.dummy_bone_offset,
                     );
@@ -544,7 +590,7 @@ fn spawn_model(
     model_entity: Entity,
     model_list: &ZscFile,
     model_id: usize,
-    skinned_mesh: &SkinnedMesh,
+    skinned_mesh: Option<&SkinnedMesh>,
     default_bone_index: Option<usize>,
     dummy_bone_offset: usize,
 ) -> (usize, Vec<Entity>) {
@@ -593,26 +639,33 @@ fn spawn_model(
         ));
 
         if zsc_material.is_skin {
-            entity_commands.insert(skinned_mesh.clone());
+            if let Some(skinned_mesh) = skinned_mesh {
+                entity_commands.insert(skinned_mesh.clone());
+            }
         }
 
         let entity = entity_commands.id();
 
-        let link_bone_entity = if let Some(bone_index) = object_part.bone_index {
-            skinned_mesh.joints.get(bone_index as usize).cloned()
-        } else if let Some(dummy_index) = object_part.dummy_index {
-            skinned_mesh
-                .joints
-                .get(dummy_index as usize + dummy_bone_offset)
-                .cloned()
-        } else if let Some(default_bone_index) = default_bone_index {
-            skinned_mesh
-                .joints
-                .get(default_bone_index as usize)
-                .cloned()
+        let link_bone_entity = if let Some(skinned_mesh) = skinned_mesh {
+            if let Some(bone_index) = object_part.bone_index {
+                skinned_mesh.joints.get(bone_index as usize).cloned()
+            } else if let Some(dummy_index) = object_part.dummy_index {
+                skinned_mesh
+                    .joints
+                    .get(dummy_index as usize + dummy_bone_offset)
+                    .cloned()
+            } else if let Some(default_bone_index) = default_bone_index {
+                skinned_mesh
+                    .joints
+                    .get(default_bone_index as usize)
+                    .cloned()
+            } else {
+                None
+            }
         } else {
             None
         };
+
         commands
             .entity(link_bone_entity.unwrap_or(model_entity))
             .add_child(entity);

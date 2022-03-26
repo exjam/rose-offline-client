@@ -17,7 +17,7 @@ use rose_network_common::{Connection, Packet, PacketCodec};
 use rose_network_irose::{
     game_client_packets::{
         PacketClientAttack, PacketClientChat, PacketClientConnectRequest, PacketClientJoinZone,
-        PacketClientMove,
+        PacketClientMove, PacketClientPickupItemDrop,
     },
     game_server_packets::{
         ConnectResult, PacketConnectionReply, PacketServerAnnounceChat, PacketServerAttackEntity,
@@ -363,6 +363,13 @@ impl GameClient {
                 connection
                     .write_packet(Packet::from(&PacketClientAttack {
                         target_entity_id: message.target_entity_id,
+                    }))
+                    .await?
+            }
+            ClientMessage::PickupItemDrop(target_entity_id) => {
+                connection
+                    .write_packet(Packet::from(&PacketClientPickupItemDrop {
+                        target_entity_id,
                     }))
                     .await?
             }

@@ -16,7 +16,7 @@ use bevy_rapier3d::{
     prelude::{InteractionGroups, QueryPipeline},
 };
 use rose_game_common::{
-    components::Team,
+    components::{ItemDrop, Team},
     messages::client::{Attack, ClientMessage, Move},
 };
 
@@ -103,6 +103,7 @@ pub fn game_input_system(
         Option<&ClientEntity>,
         Option<&Team>,
         Option<&Position>,
+        Option<&ItemDrop>,
         Option<&ZoneObject>,
     )>,
     query_player: Query<(Entity, &Team, Option<&SelectedTarget>), With<PlayerCharacter>>,
@@ -143,10 +144,15 @@ pub fn game_input_system(
                 let hit_position = ray.point_at(distance);
                 let hit_entity = hit_collider_handle.entity();
 
-                if let Ok((hit_client_entity, hit_team, hit_entity_position, zone_object)) =
-                    query_hit_entity.get(hit_entity)
+                if let Ok((
+                    hit_client_entity,
+                    hit_team,
+                    hit_entity_position,
+                    hit_item_drop,
+                    hit_zone_object,
+                )) = query_hit_entity.get(hit_entity)
                 {
-                    if zone_object.is_some() {
+                    if hit_zone_object.is_some() {
                         if mouse_button_input.just_pressed(MouseButton::Left) {
                             if let Some(game_connection) = game_connection.as_ref() {
                                 game_connection
@@ -157,6 +163,17 @@ pub fn game_input_system(
                                         y: -hit_position.z * 100.0,
                                         z: f32::max(0.0, hit_position.y * 100.0) as u16,
                                     }))
+                                    .ok();
+                            }
+                        }
+                    } else if let (Some(hit_client_entity), Some(_)) =
+                        (hit_client_entity, hit_item_drop)
+                    {
+                        if mouse_button_input.just_pressed(MouseButton::Left) {
+                            if let Some(game_connection) = game_connection.as_ref() {
+                                game_connection
+                                    .client_message_tx
+                                    .send(ClientMessage::PickupItemDrop(hit_client_entity.id))
                                     .ok();
                             }
                         }

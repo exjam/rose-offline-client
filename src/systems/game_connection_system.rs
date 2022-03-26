@@ -9,7 +9,7 @@ use bevy::{
 use rose_data::ZoneId;
 use rose_game_common::{
     components::{
-        CharacterInfo, ExperiencePoints, HealthPoints, MoveMode, MoveSpeed, Npc, Stamina,
+        CharacterInfo, ExperiencePoints, HealthPoints, ItemDrop, MoveMode, MoveSpeed, Npc, Stamina,
         StatusEffects,
     },
     messages::server::{CommandState, ServerMessage},
@@ -334,6 +334,35 @@ pub fn game_connection_system(
                         status_effects,
                     ))
                     .insert_bundle((
+                        ClientEntity::new(message.entity_id),
+                        Transform::from_xyz(
+                            message.position.x / 100.0,
+                            message.position.z / 100.0 + 10000.0,
+                            -message.position.y / 100.0,
+                        ),
+                        GlobalTransform::default(),
+                        Visibility::default(),
+                        ComputedVisibility::default(),
+                    ))
+                    .with_children(|child_builder| {
+                        child_builder.spawn_bundle((
+                            CollisionRayCastSource {},
+                            Transform::default()
+                                .with_translation(Vec3::new(0.0, 1.35, 0.0))
+                                .looking_at(-Vec3::Y, Vec3::X),
+                            GlobalTransform::default(),
+                        ));
+                    })
+                    .id();
+
+                client_entity_list.add(message.entity_id, entity);
+            }
+            Ok(ServerMessage::SpawnEntityItemDrop(message)) => {
+                // TODO: Use message.remaining_time, message.owner_entity_id ?
+                let entity = commands
+                    .spawn_bundle((
+                        ItemDrop::with_dropped_item(message.dropped_item),
+                        Position::new(message.position),
                         ClientEntity::new(message.entity_id),
                         Transform::from_xyz(
                             message.position.x / 100.0,
