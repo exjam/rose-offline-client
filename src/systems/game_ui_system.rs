@@ -109,6 +109,11 @@ pub fn game_ui_system(
                     .textbox_history
                     .push((egui::Color32::LIGHT_RED, text.clone()));
             }
+            ChatboxEvent::System(text) => {
+                ui_state
+                    .textbox_history
+                    .push((egui::Color32::from_rgb(255, 182, 193), text.clone()));
+            }
         }
     }
 

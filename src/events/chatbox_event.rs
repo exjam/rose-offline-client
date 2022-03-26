@@ -3,4 +3,5 @@ pub enum ChatboxEvent {
     Shout(String, String),
     Whisper(String, String),
     Announce(Option<String>, String),
+    System(String),
 }
