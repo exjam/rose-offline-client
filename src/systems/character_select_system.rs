@@ -102,13 +102,10 @@ pub fn character_select_enter_system(
             )
             .remove::<FlyCameraController>()
             .remove::<FollowCameraController>()
-            .insert(
-                ActiveMotion::new(
-                    asset_server.load("3DDATA/TITLE/CAMERA01_INSELECT01.ZMO"),
-                    time.seconds_since_startup(),
-                )
-                .with_repeat_limit(1),
-            );
+            .insert(ActiveMotion::new_once(
+                asset_server.load("3DDATA/TITLE/CAMERA01_INSELECT01.ZMO"),
+                time.seconds_since_startup(),
+            ));
     }
 
     // Reset state
@@ -266,13 +263,12 @@ pub fn character_select_system(
 
                     if ui.button("Create").clicked() {
                         let (camera_entity, _) = query_camera.single();
-                        commands.entity(camera_entity).insert(
-                            ActiveMotion::new(
+                        commands
+                            .entity(camera_entity)
+                            .insert(ActiveMotion::new_once(
                                 asset_server.load("3DDATA/TITLE/CAMERA01_CREATE01.ZMO"),
                                 time.seconds_since_startup(),
-                            )
-                            .with_repeat_limit(1),
-                        );
+                            ));
 
                         character_select_state.state = CharacterSelectState::CharacterCreate;
                     }
@@ -395,13 +391,12 @@ pub fn character_select_system(
 
                     if ui.button("Cancel").clicked() {
                         let (camera_entity, _) = query_camera.single();
-                        commands.entity(camera_entity).insert(
-                            ActiveMotion::new(
+                        commands
+                            .entity(camera_entity)
+                            .insert(ActiveMotion::new_once(
                                 asset_server.load("3DDATA/TITLE/CAMERA01_OUTCREATE01.ZMO"),
                                 time.seconds_since_startup(),
-                            )
-                            .with_repeat_limit(1),
-                        );
+                            ));
                         character_select_state.state = CharacterSelectState::CharacterSelect;
                     }
 
@@ -488,13 +483,12 @@ pub fn character_select_system(
                 match response {
                     Ok(_) => {
                         let (camera_entity, _) = query_camera.single();
-                        commands.entity(camera_entity).insert(
-                            ActiveMotion::new(
+                        commands
+                            .entity(camera_entity)
+                            .insert(ActiveMotion::new_once(
                                 asset_server.load("3DDATA/TITLE/CAMERA01_OUTCREATE01.ZMO"),
                                 time.seconds_since_startup(),
-                            )
-                            .with_repeat_limit(1),
-                        );
+                            ));
                         character_select_state.state = CharacterSelectState::CharacterSelect;
 
                         if let Some(world_connection) = world_connection.as_ref() {
@@ -539,13 +533,12 @@ pub fn character_select_system(
                 if let &GameConnectionEvent::JoiningZone(zone_id) = event {
                     // Start camera animation
                     let (camera_entity, _) = query_camera.single();
-                    commands.entity(camera_entity).insert(
-                        ActiveMotion::new(
+                    commands
+                        .entity(camera_entity)
+                        .insert(ActiveMotion::new_once(
                             asset_server.load("3DDATA/TITLE/CAMERA01_INGAME01.ZMO"),
                             time.seconds_since_startup(),
-                        )
-                        .with_repeat_limit(1),
-                    );
+                        ));
 
                     character_select_state.state = CharacterSelectState::Leaving;
                     character_select_state.join_zone_id = Some(zone_id);

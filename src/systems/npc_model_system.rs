@@ -1,16 +1,14 @@
 use bevy::{
-    core::Time,
     math::{Quat, Vec3, Vec3A},
     prelude::{
-        AssetServer, Assets, Changed, Commands, Component, Entity, GlobalTransform, Handle, Query,
-        Res, ResMut, Transform, With, Without,
+        AssetServer, Assets, Changed, Commands, Component, Entity, GlobalTransform, Query, Res,
+        ResMut, Transform, Without,
     },
     render::{
         mesh::skinning::{SkinnedMesh, SkinnedMeshInverseBindposes},
         primitives::Aabb,
     },
 };
-
 use bevy_rapier3d::{
     physics::ColliderBundle,
     prelude::{
@@ -19,86 +17,17 @@ use bevy_rapier3d::{
     },
 };
 use enum_map::EnumMap;
-use rose_data::NpcMotionAction;
-use rose_game_common::components::{MoveMode, Npc};
+
+use rose_game_common::components::Npc;
 
 use crate::{
     components::{
-        ActiveMotion, Command, CommandData, NpcModel, COLLISION_FILTER_CLICKABLE,
-        COLLISION_FILTER_INSPECTABLE, COLLISION_GROUP_NPC,
+        NpcModel, COLLISION_FILTER_CLICKABLE, COLLISION_FILTER_INSPECTABLE, COLLISION_GROUP_NPC,
     },
     model_loader::ModelLoader,
     render::StaticMeshMaterial,
     resources::GameData,
-    zmo_asset_loader::ZmoAsset,
 };
-
-#[derive(Component)]
-pub struct CommandNpcMotion {
-    pub command: CommandData,
-    pub move_mode: MoveMode,
-}
-
-fn get_command_motion(
-    npc_model: &NpcModel,
-    move_mode: &MoveMode,
-    command: &Command,
-) -> Option<Handle<ZmoAsset>> {
-    let action = match command.command {
-        CommandData::Stop => NpcMotionAction::Stop,
-        CommandData::Move(_) => match move_mode {
-            MoveMode::Walk => NpcMotionAction::Move,
-            MoveMode::Run => NpcMotionAction::Run,
-            _ => NpcMotionAction::Stop,
-        },
-        CommandData::Attack(_) => NpcMotionAction::Attack,
-        CommandData::Die => NpcMotionAction::Die,
-    };
-
-    if npc_model.action_motions[action].is_strong() {
-        Some(npc_model.action_motions[action].clone())
-    } else if npc_model.action_motions[NpcMotionAction::Stop].is_strong() {
-        Some(npc_model.action_motions[NpcMotionAction::Stop].clone())
-    } else {
-        None
-    }
-}
-
-pub fn npc_model_animation_system(
-    mut commands: Commands,
-    mut query_command: Query<
-        (
-            Entity,
-            &NpcModel,
-            &Command,
-            &MoveMode,
-            Option<&CommandNpcMotion>,
-        ),
-        With<SkinnedMesh>,
-    >,
-    time: Res<Time>,
-) {
-    for (entity, npc_model, command, move_mode, command_npc_motion) in query_command.iter_mut() {
-        if command_npc_motion.map_or(false, |x| {
-            std::mem::discriminant(&x.command) == std::mem::discriminant(&command.command)
-                && x.move_mode == *move_mode
-        }) {
-            continue;
-        }
-
-        if let Some(motion) = get_command_motion(npc_model, move_mode, command) {
-            commands.entity(entity).insert_bundle((
-                CommandNpcMotion {
-                    command: command.command.clone(),
-                    move_mode: *move_mode,
-                },
-                ActiveMotion::new(motion.clone(), time.seconds_since_startup()),
-            ));
-        } else {
-            commands.entity(entity).remove::<ActiveMotion>();
-        }
-    }
-}
 
 pub fn npc_model_system(
     mut commands: Commands,
@@ -106,8 +35,6 @@ pub fn npc_model_system(
         (
             Entity,
             &Npc,
-            Option<&Command>,
-            Option<&MoveMode>,
             Option<&mut NpcModel>,
             Option<&SkinnedMesh>,
             &Transform,
@@ -119,11 +46,8 @@ pub fn npc_model_system(
     mut static_mesh_materials: ResMut<Assets<StaticMeshMaterial>>,
     mut skinned_mesh_inverse_bindposes_assets: ResMut<Assets<SkinnedMeshInverseBindposes>>,
     game_data: Res<GameData>,
-    time: Res<Time>,
 ) {
-    for (entity, npc, command, move_mode, mut current_npc_model, skinned_mesh, transform) in
-        query.iter_mut()
-    {
+    for (entity, npc, mut current_npc_model, skinned_mesh, transform) in query.iter_mut() {
         if let Some(current_npc_model) = current_npc_model.as_mut() {
             if current_npc_model.npc_id == npc.id {
                 // Does not need new model, ignore
@@ -156,18 +80,6 @@ pub fn npc_model_system(
             } else {
                 *transform
             };
-
-            if let (Some(command), Some(move_mode)) = (command, move_mode) {
-                if let Some(motion) = get_command_motion(&npc_model, move_mode, command) {
-                    commands.entity(entity).insert_bundle((
-                        CommandNpcMotion {
-                            command: command.command.clone(),
-                            move_mode: *move_mode,
-                        },
-                        ActiveMotion::new(motion.clone(), time.seconds_since_startup()),
-                    ));
-                }
-            }
 
             commands
                 .entity(entity)

@@ -1,5 +1,3 @@
-use std::time::Duration;
-
 use bevy::{
     math::{Quat, Vec3},
     prelude::{
@@ -151,7 +149,7 @@ pub fn game_connection_system(
                             Position::new(character_data.position),
                         ))
                         .insert_bundle((
-                            Command::default(),
+                            Command::with_stop(),
                             NextCommand::default(),
                             ability_values,
                             status_effects,
@@ -193,7 +191,7 @@ pub fn game_connection_system(
                         .entity(player_entity)
                         .insert_bundle((
                             ClientEntity::new(message.entity_id),
-                            Command::default(),
+                            Command::with_stop(),
                             NextCommand::default(),
                             message.experience_points,
                             message.team,
@@ -255,7 +253,7 @@ pub fn game_connection_system(
 
                 let entity = commands
                     .spawn_bundle((
-                        Command::default(),
+                        Command::with_stop(),
                         next_command,
                         message.npc,
                         message.team,
@@ -324,7 +322,7 @@ pub fn game_connection_system(
 
                 let entity = commands
                     .spawn_bundle((
-                        Command::default(),
+                        Command::with_stop(),
                         next_command,
                         message.npc,
                         message.team,
@@ -406,13 +404,9 @@ pub fn game_connection_system(
                     }
 
                     if message.is_killed {
-                        // TODO: Calculate die motion duration
                         commands
                             .entity(defender_entity)
-                            .insert_bundle((
-                                Command::with_die(Duration::from_secs(5)),
-                                NextCommand::default(),
-                            ))
+                            .insert(NextCommand::with_die())
                             .remove::<ClientEntity>();
                         client_entity_list.remove(message.defender_entity_id);
                     }

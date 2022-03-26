@@ -2,7 +2,7 @@ use bevy::{
     math::Vec3,
     prelude::{Component, Entity},
 };
-use std::time::Duration;
+use std::ops::{Deref, DerefMut};
 
 use rose_game_common::components::MoveMode;
 
@@ -18,100 +18,108 @@ pub struct CommandAttack {
     pub target: Entity,
 }
 
-#[derive(Clone, Debug)]
-pub enum CommandData {
+#[derive(Component, Clone, Debug)]
+pub enum Command {
     Stop,
     Move(CommandMove),
     Attack(CommandAttack),
     Die,
 }
 
-#[derive(Component, Clone, Debug)]
-pub struct Command {
-    // Current command that is executing
-    pub command: CommandData,
-
-    // How long the current command has been executing
-    pub duration: Duration,
-
-    // The duration required to complete this command, if None then the command is immediately interruptible
-    pub required_duration: Option<Duration>,
-}
-
 impl Command {
-    pub fn new(command: CommandData, required_duration: Option<Duration>) -> Self {
-        Self {
-            command,
-            duration: Duration::new(0, 0),
-            required_duration,
-        }
-    }
-
-    pub fn default() -> Self {
-        Self::with_stop()
+    pub fn with_die() -> Self {
+        Self::Die
     }
 
     pub fn with_stop() -> Self {
-        Self::new(CommandData::Stop, None)
-    }
-
-    pub fn with_die(required_duration: Duration) -> Self {
-        Self::new(CommandData::Die, Some(required_duration))
-    }
-
-    pub fn with_attack(target: Entity, duration: Duration) -> Self {
-        Self::new(
-            CommandData::Attack(CommandAttack { target }),
-            Some(duration),
-        )
-    }
-
-    pub fn with_move(
-        destination: Vec3,
-        target: Option<Entity>,
-        move_mode: Option<MoveMode>,
-    ) -> Self {
-        Self::new(
-            CommandData::Move(CommandMove {
-                destination,
-                target,
-                move_mode,
-            }),
-            None,
-        )
-    }
-}
-
-#[derive(Component, Default)]
-pub struct NextCommand {
-    pub command: Option<CommandData>,
-}
-
-impl NextCommand {
-    #[allow(dead_code)]
-    pub fn with_stop() -> Self {
-        Self {
-            command: Some(CommandData::Stop),
-        }
-    }
-
-    pub fn with_move(
-        destination: Vec3,
-        target: Option<Entity>,
-        move_mode: Option<MoveMode>,
-    ) -> Self {
-        Self {
-            command: Some(CommandData::Move(CommandMove {
-                destination,
-                target,
-                move_mode,
-            })),
-        }
+        Self::Stop
     }
 
     pub fn with_attack(target: Entity) -> Self {
-        Self {
-            command: Some(CommandData::Attack(CommandAttack { target })),
+        Self::Attack(CommandAttack { target })
+    }
+
+    pub fn with_move(
+        destination: Vec3,
+        target: Option<Entity>,
+        move_mode: Option<MoveMode>,
+    ) -> Self {
+        Self::Move(CommandMove {
+            destination,
+            target,
+            move_mode,
+        })
+    }
+
+    pub fn is_die(&self) -> bool {
+        matches!(self, Command::Die)
+    }
+
+    pub fn is_stop(&self) -> bool {
+        matches!(self, Command::Stop)
+    }
+
+    pub fn requires_animation_complete(&self) -> bool {
+        match self {
+            Command::Stop => false,
+            Command::Move(_) => false,
+            Command::Attack(_) => true,
+            Command::Die => true,
         }
+    }
+}
+
+#[derive(Component)]
+pub struct NextCommand(Option<Command>);
+
+impl NextCommand {
+    pub fn new(command: Option<Command>) -> Self {
+        Self(command)
+    }
+
+    pub fn default() -> Self {
+        Self::new(None)
+    }
+
+    pub fn is_die(&self) -> bool {
+        matches!(self.0, Some(Command::Die))
+    }
+
+    pub fn with_die() -> Self {
+        Self(Some(Command::Die))
+    }
+
+    pub fn with_stop() -> Self {
+        Self(Some(Command::Stop))
+    }
+
+    pub fn with_move(
+        destination: Vec3,
+        target: Option<Entity>,
+        move_mode: Option<MoveMode>,
+    ) -> Self {
+        Self(Some(Command::Move(CommandMove {
+            destination,
+            target,
+            move_mode,
+        })))
+    }
+
+    pub fn with_attack(target: Entity) -> Self {
+        Self(Some(Command::Attack(CommandAttack { target })))
+    }
+}
+
+impl Deref for NextCommand {
+    type Target = Option<Command>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for NextCommand {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
     }
 }

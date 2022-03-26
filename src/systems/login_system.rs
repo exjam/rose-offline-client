@@ -88,7 +88,7 @@ pub fn login_state_enter_system(
             )
             .remove::<FlyCameraController>()
             .remove::<FollowCameraController>()
-            .insert(ActiveMotion::new(
+            .insert(ActiveMotion::new_repeating(
                 asset_server.load("3DDATA/TITLE/CAMERA01_INTRO01.ZMO"),
                 time.seconds_since_startup(),
             ));

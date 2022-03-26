@@ -744,7 +744,7 @@ fn load_block_object(
                 ));
 
                 let active_motion = object_part.animation_path.as_ref().map(|animation_path| {
-                    ActiveMotion::new(asset_server.load(animation_path.path()), 0.0)
+                    ActiveMotion::new_repeating(asset_server.load(animation_path.path()), 0.0)
                 });
                 if let Some(active_motion) = active_motion {
                     part_commands.insert(active_motion);

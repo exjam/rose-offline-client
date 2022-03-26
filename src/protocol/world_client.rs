@@ -176,7 +176,11 @@ impl WorldClient {
                 packet = connection.read_packet() => {
                     match packet {
                         Ok(packet) => {
-                            self.handle_packet(packet).await?;
+                            let packet_command = packet.command;
+                            match self.handle_packet(packet).await {
+                                Ok(_) => {},
+                                Err(err) => { log::error!("Error {} whilst handling packet {:03X}", err, packet_command) },
+                            }
                         },
                         Err(error) => {
                             return Err(error);

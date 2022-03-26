@@ -1,16 +1,14 @@
 use bevy::{
-    core::Time,
     math::{Quat, Vec3, Vec3A},
     prelude::{
-        AssetServer, Assets, Changed, Commands, Component, Entity, GlobalTransform, Handle, Or,
-        Query, Res, ResMut, Transform, With, Without,
+        AssetServer, Assets, Changed, Commands, Component, Entity, GlobalTransform, Or, Query, Res,
+        ResMut, Transform, Without,
     },
     render::{
         mesh::skinning::{SkinnedMesh, SkinnedMeshInverseBindposes},
         primitives::Aabb,
     },
 };
-
 use bevy_rapier3d::{
     physics::ColliderBundle,
     prelude::{
@@ -18,86 +16,17 @@ use bevy_rapier3d::{
         ColliderShape, ColliderShapeComponent, InteractionGroups,
     },
 };
-use rose_data::CharacterMotionAction;
-use rose_game_common::components::{CharacterGender, CharacterInfo, Equipment, MoveMode};
+
+use rose_game_common::components::{CharacterInfo, Equipment};
 
 use crate::{
     components::{
-        ActiveMotion, CharacterModel, CharacterModelPart, Command, CommandData,
-        COLLISION_FILTER_CLICKABLE, COLLISION_FILTER_INSPECTABLE, COLLISION_GROUP_CHARACTER,
+        CharacterModel, CharacterModelPart, COLLISION_FILTER_CLICKABLE,
+        COLLISION_FILTER_INSPECTABLE, COLLISION_GROUP_CHARACTER,
     },
     model_loader::ModelLoader,
     render::StaticMeshMaterial,
-    zmo_asset_loader::ZmoAsset,
 };
-
-#[derive(Component)]
-pub struct CommandCharacterMotion {
-    pub command: CommandData,
-    pub gender: CharacterGender,
-    pub move_mode: MoveMode,
-    pub weapon_id: usize,
-}
-
-fn get_command_motion(
-    character_model: &CharacterModel,
-    move_mode: &MoveMode,
-    command: &Command,
-) -> Handle<ZmoAsset> {
-    let action = match command.command {
-        CommandData::Stop => CharacterMotionAction::Stop1,
-        CommandData::Die => CharacterMotionAction::Die,
-        CommandData::Attack(_) => CharacterMotionAction::Attack,
-        CommandData::Move(_) => match move_mode {
-            MoveMode::Walk => CharacterMotionAction::Walk,
-            MoveMode::Run => CharacterMotionAction::Run,
-            _ => todo!("Character animation for driving cart"),
-        },
-    };
-
-    character_model.action_motions[action].clone()
-}
-
-pub fn character_model_animation_system(
-    mut commands: Commands,
-    mut query_command: Query<
-        (
-            Entity,
-            &CharacterModel,
-            &Command,
-            &MoveMode,
-            Option<&CommandCharacterMotion>,
-        ),
-        With<SkinnedMesh>,
-    >,
-    time: Res<Time>,
-) {
-    for (entity, character_model, command, move_mode, command_npc_motion) in
-        query_command.iter_mut()
-    {
-        if command_npc_motion.map_or(false, |x| {
-            std::mem::discriminant(&x.command) == std::mem::discriminant(&command.command)
-                && x.gender == character_model.gender
-                && x.move_mode == *move_mode
-                && x.weapon_id == character_model.model_parts[CharacterModelPart::Weapon].0
-        }) {
-            continue;
-        }
-
-        commands.entity(entity).insert_bundle((
-            CommandCharacterMotion {
-                command: command.command.clone(),
-                gender: character_model.gender,
-                move_mode: *move_mode,
-                weapon_id: character_model.model_parts[CharacterModelPart::Weapon].0,
-            },
-            ActiveMotion::new(
-                get_command_motion(character_model, move_mode, command),
-                time.seconds_since_startup(),
-            ),
-        ));
-    }
-}
 
 #[derive(Component)]
 pub struct CharacterColliderRootBoneOffset {

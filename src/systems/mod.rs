@@ -6,6 +6,7 @@ mod collision_system;
 mod command_system;
 mod debug_inspector_system;
 mod debug_render_system;
+mod diagnostics_ui_system;
 mod game_connection_system;
 mod game_debug_ui_system;
 mod game_system;
@@ -21,9 +22,7 @@ mod zone_viewer_system;
 
 pub use ability_values_system::ability_values_system;
 pub use animation_system::animation_system;
-pub use character_model_system::{
-    character_model_add_collider_system, character_model_animation_system, character_model_system,
-};
+pub use character_model_system::{character_model_add_collider_system, character_model_system};
 pub use character_select_system::{
     character_select_enter_system, character_select_exit_system, character_select_models_system,
     character_select_system,
@@ -41,9 +40,7 @@ pub use load_zone_system::{load_zone_system, ZoneObject};
 pub use login_connection_system::login_connection_system;
 pub use login_system::{login_state_enter_system, login_state_exit_system, login_system};
 pub use model_viewer_system::{model_viewer_enter_system, model_viewer_system};
-pub use npc_model_system::{
-    npc_model_add_collider_system, npc_model_animation_system, npc_model_system,
-};
+pub use npc_model_system::{npc_model_add_collider_system, npc_model_system};
 pub use update_position_system::update_position_system;
 pub use world_connection_system::world_connection_system;
 pub use zone_viewer_system::{zone_viewer_setup_system, zone_viewer_system};

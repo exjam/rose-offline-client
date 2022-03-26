@@ -11,7 +11,7 @@ pub struct ActiveMotion {
 }
 
 impl ActiveMotion {
-    pub fn new(motion: Handle<ZmoAsset>, start_time: f64) -> Self {
+    pub fn new_repeating(motion: Handle<ZmoAsset>, start_time: f64) -> Self {
         Self {
             motion,
             start_time,
@@ -20,8 +20,22 @@ impl ActiveMotion {
         }
     }
 
-    pub fn with_repeat_limit(mut self, repeat_limit: usize) -> Self {
-        self.repeat_limit = Some(repeat_limit);
-        self
+    pub fn new_once(motion: Handle<ZmoAsset>, start_time: f64) -> Self {
+        Self {
+            motion,
+            start_time,
+            repeat_limit: Some(1),
+            complete: false,
+        }
+    }
+
+    #[allow(dead_code)]
+    pub fn new_repeat_n(motion: Handle<ZmoAsset>, start_time: f64, repeat_count: usize) -> Self {
+        Self {
+            motion,
+            start_time,
+            repeat_limit: Some(repeat_count),
+            complete: false,
+        }
     }
 }

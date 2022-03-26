@@ -1,25 +1,161 @@
-use std::time::Duration;
-
 use bevy::{
     core::Time,
+    ecs::system::EntityCommands,
     hierarchy::DespawnRecursiveExt,
     math::Vec3Swizzles,
-    prelude::{Commands, Entity, Query, Res},
+    prelude::{Commands, Entity, Handle, Query, Res},
 };
+use rand::prelude::SliceRandom;
+
+use rose_data::{CharacterMotionAction, NpcMotionAction};
 use rose_game_common::components::{
     AbilityValues, Destination, HealthPoints, MoveMode, MoveSpeed, Target,
 };
 
-use crate::components::{
-    CharacterModel, Command, CommandAttack, CommandData, CommandMove, NextCommand, NpcModel,
-    Position,
+use crate::{
+    components::{
+        ActiveMotion, CharacterModel, Command, CommandAttack, CommandMove, NextCommand, NpcModel,
+        Position,
+    },
+    zmo_asset_loader::ZmoAsset,
 };
+
+fn get_attack_animation<R: rand::Rng + ?Sized>(
+    rng: &mut R,
+    character_model: Option<&CharacterModel>,
+    npc_model: Option<&NpcModel>,
+) -> Option<Handle<ZmoAsset>> {
+    if let Some(character_model) = character_model {
+        let mut action = *[
+            CharacterMotionAction::Attack,
+            CharacterMotionAction::Attack2,
+            CharacterMotionAction::Attack3,
+        ]
+        .choose(rng)
+        .unwrap();
+
+        if !character_model.action_motions[action].is_strong() {
+            // Not all weapons have 3 attack animations ?
+            action = CharacterMotionAction::Attack;
+        }
+
+        if character_model.action_motions[action].is_strong() {
+            Some(character_model.action_motions[action].clone())
+        } else {
+            None
+        }
+    } else if let Some(npc_model) = npc_model {
+        if npc_model.action_motions[NpcMotionAction::Attack].is_strong() {
+            Some(npc_model.action_motions[NpcMotionAction::Attack].clone())
+        } else {
+            None
+        }
+    } else {
+        None
+    }
+}
+
+fn get_die_animation(
+    character_model: Option<&CharacterModel>,
+    npc_model: Option<&NpcModel>,
+) -> Option<Handle<ZmoAsset>> {
+    if let Some(character_model) = character_model {
+        if character_model.action_motions[CharacterMotionAction::Die].is_strong() {
+            Some(character_model.action_motions[CharacterMotionAction::Die].clone())
+        } else {
+            None
+        }
+    } else if let Some(npc_model) = npc_model {
+        if npc_model.action_motions[NpcMotionAction::Die].is_strong() {
+            Some(npc_model.action_motions[NpcMotionAction::Die].clone())
+        } else {
+            None
+        }
+    } else {
+        None
+    }
+}
+
+fn get_move_animation(
+    move_mode: &MoveMode,
+    character_model: Option<&CharacterModel>,
+    npc_model: Option<&NpcModel>,
+) -> Option<Handle<ZmoAsset>> {
+    if let Some(character_model) = character_model {
+        let action = match move_mode {
+            MoveMode::Walk => CharacterMotionAction::Walk,
+            MoveMode::Run => CharacterMotionAction::Run,
+            MoveMode::Drive => todo!("Character drive animation"),
+        };
+
+        if character_model.action_motions[action].is_strong() {
+            Some(character_model.action_motions[action].clone())
+        } else {
+            None
+        }
+    } else if let Some(npc_model) = npc_model {
+        let action = match move_mode {
+            MoveMode::Walk => NpcMotionAction::Move,
+            MoveMode::Run => NpcMotionAction::Run,
+            MoveMode::Drive => todo!("NPC drive animation"),
+        };
+
+        if npc_model.action_motions[action].is_strong() {
+            Some(npc_model.action_motions[action].clone())
+        } else {
+            None
+        }
+    } else {
+        None
+    }
+}
+
+fn get_stop_animation(
+    character_model: Option<&CharacterModel>,
+    npc_model: Option<&NpcModel>,
+) -> Option<Handle<ZmoAsset>> {
+    if let Some(character_model) = character_model {
+        if character_model.action_motions[CharacterMotionAction::Stop1].is_strong() {
+            Some(character_model.action_motions[CharacterMotionAction::Stop1].clone())
+        } else {
+            None
+        }
+    } else if let Some(npc_model) = npc_model {
+        if npc_model.action_motions[NpcMotionAction::Stop].is_strong() {
+            Some(npc_model.action_motions[NpcMotionAction::Stop].clone())
+        } else {
+            None
+        }
+    } else {
+        None
+    }
+}
+
+fn update_active_motion(
+    entity_commands: &mut EntityCommands,
+    active_motion: Option<&ActiveMotion>,
+    motion: Handle<ZmoAsset>,
+    time: &Time,
+    repeat: bool,
+) {
+    if active_motion.map_or(false, |x| x.motion == motion) {
+        // Already playing this animation
+        return;
+    }
+
+    entity_commands.insert(if repeat {
+        ActiveMotion::new_repeating(motion, time.seconds_since_startup())
+    } else {
+        ActiveMotion::new_once(motion, time.seconds_since_startup())
+    });
+}
 
 pub fn command_system(
     mut commands: Commands,
     mut query: Query<(
         Entity,
         &AbilityValues,
+        Option<&ActiveMotion>,
         Option<&CharacterModel>,
         Option<&NpcModel>,
         &Position,
@@ -31,10 +167,13 @@ pub fn command_system(
     query_attack_target: Query<(&Position, &HealthPoints)>,
     time: Res<Time>,
 ) {
+    let mut rng = rand::thread_rng();
+
     for (
         entity,
         ability_values,
-        _character_model,
+        active_motion,
+        character_model,
         npc_model,
         position,
         move_mode,
@@ -42,56 +181,65 @@ pub fn command_system(
         mut next_command,
     ) in query.iter_mut()
     {
-        command.duration += Duration::from_secs_f64(time.delta_seconds_f64());
-
-        let required_duration = match &mut command.command {
-            CommandData::Attack(_) => {
-                let attack_speed = i32::max(ability_values.get_attack_speed(), 30) as f32 / 100.0;
-                command
-                    .required_duration
-                    .map(|duration| duration.div_f32(attack_speed))
-            }
-            _ => command.required_duration,
-        };
-
-        // Some commands require the whole animation to complete before we can move to next command
-        let command_motion_completed = required_duration.map_or(true, |required_duration| {
-            command.duration >= required_duration
-        });
-        if !command_motion_completed {
+        if !next_command.is_die()
+            && command.requires_animation_complete()
+            && !active_motion.map_or(true, |x| x.complete)
+        {
             // Current command still in animation
             continue;
         }
 
-        // Despawn NPC once the die animation completes
-        if matches!(command.command, CommandData::Die) {
+        // Cannot do any commands when dead
+        if command.is_die() {
             if npc_model.is_some() {
+                // Despawn NPC once the die animation completes
                 commands.entity(entity).despawn_recursive();
                 continue;
             }
 
-            // Cannot do any commands when dead
             continue;
         }
 
-        if next_command.command.is_none() {
-            // We have completed current command and there is no next command, so clear any current.
-            *command = Command::default();
-
-            // Nothing to do when there is no next command
-            continue;
+        if next_command.is_none() {
+            if !command.is_stop() {
+                // Set current command to stop
+                *next_command = NextCommand::with_stop();
+            } else {
+                // Nothing to do, ensure we are using correct idle animation
+                if let Some(motion) = get_stop_animation(character_model, npc_model) {
+                    update_active_motion(
+                        &mut commands.entity(entity),
+                        active_motion,
+                        motion,
+                        &time,
+                        true,
+                    );
+                }
+                continue;
+            }
         }
 
-        match next_command.command.as_mut().unwrap() {
-            CommandData::Stop => {
+        match (*next_command).as_mut().unwrap() {
+            Command::Stop => {
                 commands
                     .entity(entity)
                     .remove::<Destination>()
                     .remove::<Target>();
+
+                if let Some(motion) = get_stop_animation(character_model, npc_model) {
+                    update_active_motion(
+                        &mut commands.entity(entity),
+                        active_motion,
+                        motion,
+                        &time,
+                        true,
+                    );
+                }
+
                 *command = Command::with_stop();
                 *next_command = NextCommand::default();
             }
-            CommandData::Move(CommandMove {
+            Command::Move(CommandMove {
                 destination,
                 target,
                 move_mode: command_move_mode,
@@ -145,9 +293,20 @@ pub fn command_system(
 
                 let distance = position.position.xy().distance(destination.xy());
                 if distance < 0.1 {
-                    *command = Command::with_stop();
-                    entity_commands.remove::<Target>().remove::<Destination>();
+                    // Reached destination, stop moving
+                    *next_command = NextCommand::with_stop();
                 } else {
+                    // Move towards destination
+                    if let Some(motion) = get_move_animation(move_mode, character_model, npc_model)
+                    {
+                        update_active_motion(
+                            &mut entity_commands,
+                            active_motion,
+                            motion,
+                            &time,
+                            true,
+                        );
+                    }
                     *command = Command::with_move(*destination, *target, *command_move_mode);
                     entity_commands.insert(Destination::new(*destination));
 
@@ -156,129 +315,87 @@ pub fn command_system(
                     }
                 }
             }
-            &mut CommandData::Attack(CommandAttack {
+            &mut Command::Attack(CommandAttack {
                 target: target_entity,
             }) => {
-                if let Ok((target_position, target_health_points)) =
-                    query_attack_target.get(target_entity)
-                {
-                    if target_health_points.hp > 0 {
-                        let mut entity_commands = commands.entity(entity);
-                        let distance = position
-                            .position
-                            .xy()
-                            .distance(target_position.position.xy());
+                let query_result = query_attack_target.get(target_entity);
+                if query_result.is_err() {
+                    // Invalid target, stop attacking
+                    *next_command = NextCommand::with_stop();
+                    continue;
+                }
+                let (target_position, target_health_points) = query_result.unwrap();
 
-                        // Check if we are in attack range
-                        let attack_range = ability_values.get_attack_range() as f32;
-                        if distance < attack_range {
-                            let (attack_duration, _hit_count) = (Duration::from_secs(1), 1);
-                            /*
-                            if let Some(_character_model) = character_model {
-                                // TODO: duration of character_model.action_motions[CharacterMotionAction::Attack];
-                                (Duration::from_secs(1), 1)
-                            } else if let Some(_npc_model) = npc_model {
-                                // TODO: NPC attack duration !
-                                (Duration::from_secs(1), 1)
-                            } else {
-                                (Duration::from_secs(1), 1)
-                            };
-                            */
+                if target_health_points.hp <= 0 {
+                    // Target is dead, stop attacking
+                    *next_command = NextCommand::with_stop();
+                    continue;
+                }
 
-                            // TODO: If the weapon uses ammo, we must consume the ammo
-                            let cancel_attack = false;
-                            /*
-                            if let Some(mut equipment) = equipment {
-                                if let Some(weapon_data) = equipment
-                                    .get_equipment_item(EquipmentIndex::WeaponRight)
-                                    .and_then(|weapon_item| {
-                                        game_data.items.get_base_item(weapon_item.item)
-                                    })
-                                {
-                                    let ammo_index = match weapon_data.class {
-                                        ItemClass::Bow | ItemClass::Crossbow => Some(AmmoIndex::Arrow),
-                                        ItemClass::Gun | ItemClass::DualGuns => Some(AmmoIndex::Bullet),
-                                        ItemClass::Launcher => Some(AmmoIndex::Throw),
-                                        _ => None,
-                                    };
+                let mut entity_commands = commands.entity(entity);
+                let distance = position
+                    .position
+                    .xy()
+                    .distance(target_position.position.xy());
 
-                                    if let Some(ammo_index) = ammo_index {
-                                        if equipment
-                                            .get_ammo_slot_mut(ammo_index)
-                                            .try_take_quantity(hit_count as u32)
-                                            .is_none()
-                                        {
-                                            cancel_attack = true;
-                                        } else if let Some(game_client) = game_client {
-                                            match equipment.get_ammo_item(ammo_index) {
-                                                Some(ammo_item) => {
-                                                    if (ammo_item.quantity & 0x0F) == 0 {
-                                                        game_client
-                                                            .server_message_tx
-                                                            .send(ServerMessage::UpdateInventory(
-                                                                vec![(
-                                                                    ItemSlot::Ammo(ammo_index),
-                                                                    Some(Item::Stackable(
-                                                                        ammo_item.clone(),
-                                                                    )),
-                                                                )],
-                                                                None,
-                                                            ))
-                                                            .ok();
-                                                    }
-                                                }
-                                                None => {
-                                                    server_messages.send_entity_message(
-                                                        client_entity,
-                                                        ServerMessage::UpdateAmmo(
-                                                            client_entity.id,
-                                                            ammo_index,
-                                                            None,
-                                                        ),
-                                                    );
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                            */
-
-                            if cancel_attack {
-                                // Not enough ammo, cancel attack
-                                *next_command = NextCommand::default();
-                            } else {
-                                // In range, set current command to attack
-                                *command = Command::with_attack(target_entity, attack_duration);
-
-                                // Remove our destination component, as we have reached it!
-                                entity_commands.remove::<Destination>();
-
-                                // Update target
-                                entity_commands.insert(Target::new(target_entity));
-                            }
-                        } else {
-                            // Not in range, set current command to move
-                            *command = Command::with_move(
-                                target_position.position,
-                                Some(target_entity),
-                                Some(MoveMode::Run),
-                            );
-
-                            // Set destination to move towards
-                            entity_commands.insert(Destination::new(target_position.position));
-
-                            // Update target
-                            entity_commands.insert(Target::new(target_entity));
-                        }
+                let attack_range = ability_values.get_attack_range() as f32;
+                if distance < attack_range {
+                    // Target in range, start attack
+                    if let Some(motion) = get_attack_animation(&mut rng, character_model, npc_model)
+                    {
+                        update_active_motion(
+                            &mut entity_commands,
+                            active_motion,
+                            motion,
+                            &time,
+                            false,
+                        );
+                        *command = Command::with_attack(target_entity);
+                        entity_commands.remove::<Destination>();
+                        entity_commands.insert(Target::new(target_entity));
                     } else {
+                        // No attack animation, stop attack
                         *next_command = NextCommand::default();
                     }
                 } else {
-                    *next_command = NextCommand::default();
+                    // Not in range, move towards target
+                    let motion = get_move_animation(move_mode, character_model, npc_model);
+                    if let Some(motion) = motion {
+                        update_active_motion(
+                            &mut entity_commands,
+                            active_motion,
+                            motion,
+                            &time,
+                            true,
+                        );
+                        *command = Command::with_move(
+                            target_position.position,
+                            Some(target_entity),
+                            Some(MoveMode::Run),
+                        );
+                        entity_commands.insert(Destination::new(target_position.position));
+                        entity_commands.insert(Target::new(target_entity));
+                    } else {
+                        // No move animation, stop attack
+                        *next_command = NextCommand::default();
+                    }
                 }
             }
-            CommandData::Die => {}
+            Command::Die => {
+                let motion = get_die_animation(character_model, npc_model);
+                if let Some(motion) = motion {
+                    update_active_motion(
+                        &mut commands.entity(entity),
+                        active_motion,
+                        motion,
+                        &time,
+                        false,
+                    );
+                }
+
+                *command = Command::with_die();
+                *next_command = NextCommand::default();
+            }
         }
     }
 }
