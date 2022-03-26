@@ -484,46 +484,45 @@ pub fn character_select_system(
 
             // Process response from server
             for event in world_connection_events.iter() {
-                if let WorldConnectionEvent::CreateCharacterResponse(response) = event {
-                    match response {
-                        Ok(_) => {
-                            let (camera_entity, _) = query_camera.single();
-                            commands.entity(camera_entity).insert(
-                                ActiveMotion::new(
-                                    asset_server.load("3DDATA/TITLE/CAMERA01_OUTCREATE01.ZMO"),
-                                    time.seconds_since_startup(),
-                                )
-                                .with_repeat_limit(1),
-                            );
-                            character_select_state.state = CharacterSelectState::CharacterSelect;
+                let WorldConnectionEvent::CreateCharacterResponse(response) = event;
+                match response {
+                    Ok(_) => {
+                        let (camera_entity, _) = query_camera.single();
+                        commands.entity(camera_entity).insert(
+                            ActiveMotion::new(
+                                asset_server.load("3DDATA/TITLE/CAMERA01_OUTCREATE01.ZMO"),
+                                time.seconds_since_startup(),
+                            )
+                            .with_repeat_limit(1),
+                        );
+                        character_select_state.state = CharacterSelectState::CharacterSelect;
 
-                            if let Some(world_connection) = world_connection.as_ref() {
-                                world_connection
-                                    .client_message_tx
-                                    .send(ClientMessage::GetCharacterList)
-                                    .ok();
-                            }
+                        if let Some(world_connection) = world_connection.as_ref() {
+                            world_connection
+                                .client_message_tx
+                                .send(ClientMessage::GetCharacterList)
+                                .ok();
                         }
-                        Err(CreateCharacterError::Failed) => {
-                            character_select_state.create_character_error_message =
-                                "Unknown error creating character".into();
-                            character_select_state.state = CharacterSelectState::CharacterCreate;
-                        }
-                        Err(CreateCharacterError::AlreadyExists) => {
-                            character_select_state.create_character_error_message =
-                                "Character name already exists".into();
-                            character_select_state.state = CharacterSelectState::CharacterCreate;
-                        }
-                        Err(CreateCharacterError::NoMoreSlots) => {
-                            character_select_state.create_character_error_message =
-                                "Cannot create more characters".into();
-                            character_select_state.state = CharacterSelectState::CharacterCreate;
-                        }
-                        Err(CreateCharacterError::InvalidValue) => {
-                            character_select_state.create_character_error_message =
-                                "Invalid value".into();
-                            character_select_state.state = CharacterSelectState::CharacterCreate;
-                        }
+                    }
+                    Err(CreateCharacterError::Failed) => {
+                        character_select_state.create_character_error_message =
+                            "Unknown error creating character".into();
+                        character_select_state.state = CharacterSelectState::CharacterCreate;
+                    }
+                    Err(CreateCharacterError::AlreadyExists) => {
+                        character_select_state.create_character_error_message =
+                            "Character name already exists".into();
+                        character_select_state.state = CharacterSelectState::CharacterCreate;
+                    }
+                    Err(CreateCharacterError::NoMoreSlots) => {
+                        character_select_state.create_character_error_message =
+                            "Cannot create more characters".into();
+                        character_select_state.state = CharacterSelectState::CharacterCreate;
+                    }
+                    Err(CreateCharacterError::InvalidValue) => {
+                        character_select_state.create_character_error_message =
+                            "Invalid value".into();
+                        character_select_state.state = CharacterSelectState::CharacterCreate;
                     }
                 }
             }
