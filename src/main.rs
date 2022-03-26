@@ -355,11 +355,15 @@ fn main() {
         .add_system_set(
             SystemSet::on_update(AppState::Game)
                 .with_system(ability_values_system)
+                .with_system(command_system)
                 .with_system(update_position_system)
-                .with_system(game_input_system)
-                .with_system(game_ui_system)
-                .with_system(game_debug_ui_system)
-                .with_system(command_system),
+                .with_system(game_ui_system.label("game_ui_system"))
+                .with_system(
+                    game_debug_ui_system
+                        .label("game_debug_ui_system")
+                        .after("game_ui_system"),
+                )
+                .with_system(game_input_system.after("game_debug_ui_system")),
         );
 
     app.add_system(character_model_system.label("character_model_system"))
