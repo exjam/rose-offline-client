@@ -1,6 +1,7 @@
 use bevy_egui::egui;
 
-use rose_game_common::components::{Inventory, ItemSlot};
+use rose_data::Item;
+use rose_game_common::components::{Equipment, Inventory, ItemSlot};
 
 use crate::{
     resources::{GameData, Icons},
@@ -18,6 +19,7 @@ pub struct DragAndDropSlot<'w> {
     id: egui::Id,
     game_data: &'w GameData,
     icons: &'w Icons,
+    equipment: &'w Equipment,
     inventory: &'w Inventory,
     ui_state_dnd: Option<&'w mut UiStateDragAndDrop>,
 }
@@ -27,6 +29,7 @@ impl<'w> DragAndDropSlot<'w> {
         dnd_id: DragAndDropId,
         game_data: &'w GameData,
         icons: &'w Icons,
+        equipment: &'w Equipment,
         inventory: &'w Inventory,
         ui_state_dnd: &'w mut UiStateDragAndDrop,
         size: impl Into<egui::Vec2>,
@@ -41,6 +44,7 @@ impl<'w> DragAndDropSlot<'w> {
             id,
             game_data,
             icons,
+            equipment,
             inventory,
             ui_state_dnd: Some(ui_state_dnd),
         }
@@ -48,8 +52,32 @@ impl<'w> DragAndDropSlot<'w> {
 }
 
 impl<'w> DragAndDropSlot<'w> {
+    fn get_item(&self) -> Option<Item> {
+        match self.dnd_id {
+            DragAndDropId::Inventory(ItemSlot::Equipment(equipment_index)) => self
+                .equipment
+                .get_equipment_item(equipment_index)
+                .cloned()
+                .map(Item::Equipment),
+            DragAndDropId::Inventory(ItemSlot::Ammo(ammo_index)) => self
+                .equipment
+                .get_ammo_item(ammo_index)
+                .cloned()
+                .map(Item::Stackable),
+            DragAndDropId::Inventory(ItemSlot::Vehicle(vehicle_part_index)) => self
+                .equipment
+                .get_vehicle_item(vehicle_part_index)
+                .cloned()
+                .map(Item::Equipment),
+            DragAndDropId::Inventory(item_slot) => self.inventory.get_item(item_slot).cloned(),
+        }
+    }
+
     pub fn is_empty(&self) -> bool {
         match self.dnd_id {
+            DragAndDropId::Inventory(ItemSlot::Equipment(equipment_index)) => {
+                self.equipment.get_equipment_item(equipment_index).is_none()
+            }
             DragAndDropId::Inventory(item_slot) => self.inventory.get_item(item_slot).is_none(),
         }
     }
@@ -58,20 +86,15 @@ impl<'w> DragAndDropSlot<'w> {
         let (rect, response) = ui.allocate_exact_size(self.size, egui::Sense::hover());
         if ui.is_rect_visible(rect) {
             use egui::epaint::*;
-            let Self {
-                dnd_id,
-                game_data,
-                icons,
-                inventory,
-                ..
-            } = self;
+            match self.dnd_id {
+                DragAndDropId::Inventory(_) => {
+                    if let Some(item) = self.get_item() {
+                        let item_data = self
+                            .game_data
+                            .items
+                            .get_base_item(item.get_item_reference());
 
-            match dnd_id {
-                &DragAndDropId::Inventory(item_slot) => {
-                    if let Some(item) = inventory.get_item(item_slot) {
-                        let item_data = game_data.items.get_base_item(item.get_item_reference());
-
-                        if let Some((texture_id, uv)) = icons.get_item_icon(
+                        if let Some((texture_id, uv)) = self.icons.get_item_icon(
                             item_data
                                 .map(|item_data| item_data.icon_index as usize)
                                 .unwrap_or(0),
