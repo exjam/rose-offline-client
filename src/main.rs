@@ -16,6 +16,7 @@ use bevy::{
 };
 use bevy_egui::EguiContext;
 use std::{path::Path, sync::Arc};
+use ui::{ui_drag_and_drop_system, ui_inventory_system, UiStateDragAndDrop, UiStateInventory};
 
 mod components;
 mod events;
@@ -26,6 +27,7 @@ mod protocol;
 mod render;
 mod resources;
 mod systems;
+mod ui;
 mod vfs_asset_io;
 mod zmo_asset_loader;
 mod zms_asset_loader;
@@ -373,6 +375,9 @@ fn main() {
     );
 
     // Game
+    app.insert_resource(UiStateDragAndDrop::default())
+        .insert_resource(UiStateInventory::default());
+
     app.add_system_set(SystemSet::on_enter(AppState::Game).with_system(game_state_enter_system))
         .add_system_set(
             SystemSet::on_update(AppState::Game)
@@ -385,8 +390,10 @@ fn main() {
                         .label("game_debug_ui_system")
                         .after("game_ui_system"),
                 )
-                .with_system(game_input_system.after("game_debug_ui_system")),
+                .with_system(game_input_system.after("game_debug_ui_system"))
+                .with_system(ui_inventory_system.after("game_debug_ui_system")),
         );
+    app.add_system_to_stage(CoreStage::PostUpdate, ui_drag_and_drop_system);
 
     // Setup network
     let (network_thread_tx, network_thread_rx) =

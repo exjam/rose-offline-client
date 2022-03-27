@@ -13,10 +13,18 @@ use crate::{
     resources::{GameConnection, GameData},
 };
 
-#[derive(Default)]
 pub struct GameUiState {
     textbox_text: String,
     textbox_history: Vec<(egui::Color32, String)>,
+}
+
+impl Default for GameUiState {
+    fn default() -> Self {
+        Self {
+            textbox_text: Default::default(),
+            textbox_history: Default::default(),
+        }
+    }
 }
 
 pub fn game_ui_system(
