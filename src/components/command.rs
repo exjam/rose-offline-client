@@ -24,6 +24,7 @@ pub enum Command {
     Move(CommandMove),
     Attack(CommandAttack),
     Die,
+    PickupItem(Entity),
 }
 
 impl Command {
@@ -37,6 +38,10 @@ impl Command {
 
     pub fn with_attack(target: Entity) -> Self {
         Self::Attack(CommandAttack { target })
+    }
+
+    pub fn with_pickup_item(target: Entity) -> Self {
+        Self::PickupItem(target)
     }
 
     pub fn with_move(
@@ -65,6 +70,7 @@ impl Command {
             Command::Move(_) => false,
             Command::Attack(_) => true,
             Command::Die => true,
+            Command::PickupItem(_) => true,
         }
     }
 }
@@ -91,6 +97,10 @@ impl NextCommand {
 
     pub fn with_stop() -> Self {
         Self(Some(Command::Stop))
+    }
+
+    pub fn with_pickup_item(target: Entity) -> Self {
+        Self(Some(Command::PickupItem(target)))
     }
 
     pub fn with_move(

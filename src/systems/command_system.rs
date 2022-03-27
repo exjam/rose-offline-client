@@ -25,7 +25,6 @@ use crate::{
 const NPC_MOVE_TO_DISTANCE: f32 = 250.0;
 const CHARACTER_MOVE_TO_DISTANCE: f32 = 1000.0;
 const ITEM_DROP_MOVE_TO_DISTANCE: f32 = 150.0;
-// const ITEM_DROP_PICKUP_DISTANCE: f32 = 200.0;
 
 fn get_attack_animation<R: rand::Rng + ?Sized>(
     rng: &mut R,
@@ -130,6 +129,21 @@ fn get_stop_animation(
     } else if let Some(npc_model) = npc_model {
         if npc_model.action_motions[NpcMotionAction::Stop].is_strong() {
             Some(npc_model.action_motions[NpcMotionAction::Stop].clone())
+        } else {
+            None
+        }
+    } else {
+        None
+    }
+}
+
+fn get_pickup_animation(
+    character_model: Option<&CharacterModel>,
+    _npc_model: Option<&NpcModel>,
+) -> Option<Handle<ZmoAsset>> {
+    if let Some(character_model) = character_model {
+        if character_model.action_motions[CharacterMotionAction::Pickitem].is_strong() {
+            Some(character_model.action_motions[CharacterMotionAction::Pickitem].clone())
         } else {
             None
         }
@@ -275,32 +289,24 @@ pub fn command_system(
                 move_mode: command_move_mode,
             }) => {
                 let mut entity_commands = commands.entity(entity);
-                let mut pickup_item_entity_id = None;
+                let mut pickup_item_entity = None;
+                let mut required_distance = None;
 
                 if let Some(target_entity) = target {
                     if let Ok((target_position, target_client_entity)) =
                         query_move_target.get(*target_entity)
                     {
-                        let required_distance = match target_client_entity.entity_type {
+                        *destination = target_position.position;
+                        required_distance = match target_client_entity.entity_type {
                             ClientEntityType::Character => Some(CHARACTER_MOVE_TO_DISTANCE),
                             ClientEntityType::Npc => Some(NPC_MOVE_TO_DISTANCE),
                             ClientEntityType::ItemDrop => {
-                                pickup_item_entity_id = Some(target_client_entity.id);
+                                pickup_item_entity =
+                                    Some((*target_entity, target_client_entity.id));
                                 Some(ITEM_DROP_MOVE_TO_DISTANCE)
                             }
                             _ => None,
                         };
-
-                        if let Some(required_distance) = required_distance {
-                            let offset = (target_position.position.xy() - position.position.xy())
-                                .normalize()
-                                * required_distance;
-                            destination.x = target_position.position.x - offset.x;
-                            destination.y = target_position.position.y - offset.y;
-                            destination.z = target_position.position.z;
-                        } else {
-                            *destination = target_position.position;
-                        }
                     } else {
                         *target = None;
                         entity_commands.remove::<Target>();
@@ -333,18 +339,21 @@ pub fn command_system(
                 }
 
                 let distance = position.position.xy().distance(destination.xy());
-                if distance < 0.1 {
+                if distance < required_distance.unwrap_or(0.1) {
                     // Reached destination, stop moving
                     *next_command = NextCommand::with_stop();
 
                     // If the player has moved to an item, pick it up
                     if player_character.is_some() {
-                        if let Some(pickup_item_entity_id) = pickup_item_entity_id {
+                        if let Some((pickup_item_entity, pickup_item_entity_id)) =
+                            pickup_item_entity
+                        {
                             if let Some(game_connection) = game_connection.as_ref() {
                                 game_connection
                                     .client_message_tx
                                     .send(ClientMessage::PickupItemDrop(pickup_item_entity_id))
                                     .ok();
+                                *next_command = NextCommand::with_pickup_item(pickup_item_entity);
                             }
                         }
                     }
@@ -459,6 +468,29 @@ pub fn command_system(
                 }
 
                 *command = Command::with_die();
+                *next_command = NextCommand::default();
+            }
+            &mut Command::PickupItem(item_entity) => {
+                if let Ok((target_position, _)) = query_move_target.get(item_entity) {
+                    // Update rotation to face pickup item
+                    let dx = target_position.position.x - position.position.x;
+                    let dy = target_position.position.y - position.position.y;
+                    transform.rotation =
+                        Quat::from_axis_angle(Vec3::Y, dy.atan2(dx) + std::f32::consts::PI / 2.0);
+                }
+
+                if let Some(motion) = get_pickup_animation(character_model, npc_model) {
+                    update_active_motion(
+                        &mut commands.entity(entity),
+                        &mut active_motion,
+                        motion,
+                        &time,
+                        1.0,
+                        false,
+                    );
+                }
+
+                *command = Command::with_pickup_item(item_entity);
                 *next_command = NextCommand::default();
             }
         }
