@@ -8,12 +8,13 @@ use bevy::{
     log::{Level, LogSettings},
     prelude::{
         AddAsset, App, AssetServer, Color, Commands, CoreStage, Msaa,
-        ParallelSystemDescriptorCoercion, PerspectiveCameraBundle, Res, StageLabel, State,
+        ParallelSystemDescriptorCoercion, PerspectiveCameraBundle, Res, ResMut, StageLabel, State,
         SystemSet, SystemStage,
     },
     render::{render_resource::WgpuFeatures, settings::WgpuSettings},
     window::WindowDescriptor,
 };
+use bevy_egui::EguiContext;
 use std::{path::Path, sync::Arc};
 
 mod components;
@@ -38,7 +39,7 @@ use follow_camera::FollowCameraPlugin;
 use model_loader::ModelLoader;
 use render::RoseRenderPlugin;
 use resources::{
-    run_network_thread, AppState, GameData, NetworkThread, NetworkThreadMessage,
+    run_network_thread, AppState, GameData, Icons, NetworkThread, NetworkThreadMessage,
     ServerConfiguration,
 };
 use systems::{
@@ -410,7 +411,12 @@ fn main() {
     network_thread.join().ok();
 }
 
-fn load_game_data(mut commands: Commands, vfs_resource: Res<VfsResource>) {
+fn load_game_data(
+    mut commands: Commands,
+    vfs_resource: Res<VfsResource>,
+    asset_server: Res<AssetServer>,
+    mut egui_context: ResMut<EguiContext>,
+) {
     let item_database = Arc::new(
         rose_data_irose::get_item_database(&vfs_resource.vfs)
             .expect("Failed to load item database"),
@@ -473,4 +479,24 @@ fn load_game_data(mut commands: Commands, vfs_resource: Res<VfsResource>) {
     );
 
     commands.spawn_bundle(PerspectiveCameraBundle::default());
+
+    // Load icons
+    let mut item_pages = Vec::new();
+    for i in 1..=14 {
+        let image_handle = asset_server.load(&format!("3DDATA/CONTROL/RES/ICON{:02}.DDS", i));
+        let texture_id = egui_context.add_image(image_handle.clone_weak());
+        item_pages.push((image_handle, texture_id));
+    }
+
+    let mut skill_pages = Vec::new();
+    for i in 1..=2 {
+        let image_handle = asset_server.load(&format!("3DDATA/CONTROL/RES/SKILL{:02}.DDS", i));
+        let texture_id = egui_context.add_image(image_handle.clone_weak());
+        skill_pages.push((image_handle, texture_id));
+    }
+
+    commands.insert_resource(Icons {
+        item_pages,
+        skill_pages,
+    });
 }
