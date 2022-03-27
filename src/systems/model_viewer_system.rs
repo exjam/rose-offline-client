@@ -26,7 +26,7 @@ use crate::{
     },
     fly_camera::{FlyCameraBundle, FlyCameraController},
     follow_camera::FollowCameraController,
-    resources::GameData,
+    resources::{GameData, Icons},
 };
 
 pub struct ModelViewerState {
@@ -111,6 +111,7 @@ pub fn model_viewer_system(
     query_debug_colliders: Query<Entity, With<DebugRenderCollider>>,
     query_debug_skeletons: Query<Entity, With<DebugRenderSkeleton>>,
     game_data: Res<GameData>,
+    icons: Res<Icons>,
     time: Res<Time>,
     mut egui_context: ResMut<EguiContext>,
 ) {
@@ -360,6 +361,7 @@ pub fn model_viewer_system(
             egui::Grid::new("item_list_grid")
                 .num_columns(3)
                 .show(ui, |ui| {
+                    ui.label("icon");
                     ui.label("id");
                     ui.label("name");
                     ui.end_row();
@@ -367,6 +369,7 @@ pub fn model_viewer_system(
                     let equipment_index = ui_state.item_list_type.try_into().ok();
 
                     if ui_state.item_list_type.is_equipment_item() {
+                        ui.label(" ");
                         ui.label("0");
                         ui.label("None");
                         if ui.button("Equip").clicked() {
@@ -382,6 +385,15 @@ pub fn model_viewer_system(
                     for item_reference in game_data.items.iter_items(ui_state.item_list_type) {
                         if let Some(item_data) = game_data.items.get_base_item(item_reference) {
                             if !item_data.name.is_empty() {
+                                if let Some((icon_texture_id, icon_uv)) =
+                                    icons.get_item_icon(item_data.icon_index as usize)
+                                {
+                                    ui.add(
+                                        egui::Image::new(icon_texture_id, [40.0, 40.0]).uv(icon_uv),
+                                    );
+                                } else {
+                                    ui.label(" ");
+                                }
                                 ui.label(format!("{}", item_reference.item_number));
                                 ui.label(&item_data.name);
 
