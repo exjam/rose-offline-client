@@ -8,9 +8,9 @@ use rose_game_common::messages::{
     server::{
         AnnounceChat, AttackEntity, CharacterData, CharacterDataItems, CharacterDataQuest,
         ConnectionRequestError, ConnectionResponse, DamageEntity, JoinZoneResponse, LocalChat,
-        MoveEntity, RemoveEntities, ServerMessage, ShoutChat, SpawnEntityCharacter,
-        SpawnEntityItemDrop, SpawnEntityMonster, SpawnEntityNpc, StopMoveEntity, Teleport,
-        UpdateLevel, UpdateSpeed, UpdateXpStamina, Whisper,
+        MoveEntity, PickupItemDropResult, RemoveEntities, ServerMessage, ShoutChat,
+        SpawnEntityCharacter, SpawnEntityItemDrop, SpawnEntityMonster, SpawnEntityNpc,
+        StopMoveEntity, Teleport, UpdateLevel, UpdateSpeed, UpdateXpStamina, Whisper,
     },
 };
 use rose_network_common::{Connection, Packet, PacketCodec};
@@ -23,8 +23,8 @@ use rose_network_irose::{
         ConnectResult, PacketConnectionReply, PacketServerAnnounceChat, PacketServerAttackEntity,
         PacketServerCharacterInventory, PacketServerCharacterQuestData, PacketServerDamageEntity,
         PacketServerJoinZone, PacketServerLocalChat, PacketServerMoveEntity,
-        PacketServerRemoveEntities, PacketServerSelectCharacter, PacketServerShoutChat,
-        PacketServerSpawnEntityCharacter, PacketServerSpawnEntityItemDrop,
+        PacketServerPickupItemDropResult, PacketServerRemoveEntities, PacketServerSelectCharacter,
+        PacketServerShoutChat, PacketServerSpawnEntityCharacter, PacketServerSpawnEntityItemDrop,
         PacketServerSpawnEntityMonster, PacketServerSpawnEntityNpc, PacketServerStopMoveEntity,
         PacketServerTeleport, PacketServerUpdateLevel, PacketServerUpdateSpeed,
         PacketServerUpdateXpStamina, PacketServerWhisper, ServerPackets,
@@ -167,6 +167,15 @@ impl GameClient {
                         x: response.x,
                         y: response.y,
                         z: response.z,
+                    }))
+                    .ok();
+            }
+            Some(ServerPackets::PickupItemDropResult) => {
+                let message = PacketServerPickupItemDropResult::try_from(&packet)?;
+                self.server_message_tx
+                    .send(ServerMessage::PickupItemDropResult(PickupItemDropResult {
+                        item_entity_id: message.item_entity_id,
+                        result: message.result,
                     }))
                     .ok();
             }

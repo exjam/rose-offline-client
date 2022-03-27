@@ -9,10 +9,10 @@ use bevy::{
 use rose_data::ZoneId;
 use rose_game_common::{
     components::{
-        BasicStats, CharacterInfo, ExperiencePoints, HealthPoints, ItemDrop, MoveMode, MoveSpeed,
-        Npc, SkillList, Stamina, StatusEffects,
+        BasicStats, CharacterInfo, ExperiencePoints, HealthPoints, Inventory, ItemDrop, MoveMode,
+        MoveSpeed, Npc, SkillList, Stamina, StatusEffects,
     },
-    messages::server::{CommandState, ServerMessage},
+    messages::server::{CommandState, PickupItemDropContent, PickupItemDropError, ServerMessage},
 };
 use rose_network_common::ConnectionError;
 
@@ -97,6 +97,7 @@ pub fn game_connection_system(
         (Option<&CharacterInfo>, Option<&Npc>),
         Or<(With<CharacterInfo>, With<Npc>)>,
     >,
+    mut query_inventory: Query<&mut Inventory>,
     mut query_xp_stamina: Query<(&mut ExperiencePoints, &mut Stamina)>,
     mut query_health_points: Query<&mut HealthPoints>,
     mut game_connection_events: EventWriter<GameConnectionEvent>,
@@ -629,7 +630,7 @@ pub fn game_connection_system(
                     {
                         if message.xp > experience_points.xp {
                             chatbox_events.send(ChatboxEvent::System(format!(
-                                "You have earned {} experience points",
+                                "You have earned {} experience points.",
                                 message.xp - experience_points.xp
                             )));
                         }
@@ -639,6 +640,47 @@ pub fn game_connection_system(
                     }
                 }
             }
+            Ok(ServerMessage::PickupItemDropResult(message)) => match message.result {
+                Ok(PickupItemDropContent::Item(item_slot, item)) => {
+                    if let Some(player_entity) = client_entity_list.player_entity {
+                        if let Ok(mut inventory) = query_inventory.get_mut(player_entity) {
+                            if let Some(inventory_slot) = inventory.get_item_slot_mut(item_slot) {
+                                if let Some(item_data) =
+                                    game_data.items.get_base_item(item.get_item_reference())
+                                {
+                                    chatbox_events.send(ChatboxEvent::System(format!(
+                                        "You have earned {}.",
+                                        item_data.name
+                                    )));
+                                }
+                                *inventory_slot = Some(item);
+                            }
+                        }
+                    }
+                }
+                Ok(PickupItemDropContent::Money(money)) => {
+                    if let Some(player_entity) = client_entity_list.player_entity {
+                        if let Ok(mut inventory) = query_inventory.get_mut(player_entity) {
+                            chatbox_events.send(ChatboxEvent::System(format!(
+                                "You have earned {} zuly.",
+                                money.0
+                            )));
+                            inventory.try_add_money(money).ok();
+                        }
+                    }
+                }
+                Err(PickupItemDropError::InventoryFull) => {
+                    chatbox_events.send(ChatboxEvent::System(
+                        "Cannot pickup item, inventory full.".to_string(),
+                    ));
+                }
+                Err(PickupItemDropError::NoPermission) => {
+                    chatbox_events.send(ChatboxEvent::System(
+                        "Cannot pickup item, it does not belong to you.".to_string(),
+                    ));
+                }
+                Err(_) => {}
+            },
             Ok(message) => {
                 log::warn!("Received unexpected game server message: {:#?}", message);
             }
