@@ -16,7 +16,10 @@ use bevy::{
 };
 use bevy_egui::EguiContext;
 use std::{path::Path, sync::Arc};
-use ui::{ui_drag_and_drop_system, ui_inventory_system, UiStateDragAndDrop, UiStateInventory};
+use ui::{
+    ui_chatbox_system, ui_drag_and_drop_system, ui_inventory_system, ui_player_info_system,
+    ui_selected_target_system, UiStateDragAndDrop, UiStateInventory,
+};
 
 mod components;
 mod events;
@@ -50,12 +53,11 @@ use systems::{
     character_select_models_system, character_select_system, collision_add_colliders_system,
     collision_system, command_system, debug_render_collider_system, debug_render_skeleton_system,
     diagnostics_ui_system, game_connection_system, game_debug_ui_system, game_input_system,
-    game_state_enter_system, game_ui_system, game_zone_change_system,
-    item_drop_model_add_collider_system, item_drop_model_system, load_zone_system,
-    login_connection_system, login_state_enter_system, login_state_exit_system, login_system,
-    model_viewer_enter_system, model_viewer_system, npc_model_add_collider_system,
-    npc_model_system, update_position_system, world_connection_system, zone_viewer_setup_system,
-    zone_viewer_system, DebugInspectorPlugin,
+    game_state_enter_system, game_zone_change_system, item_drop_model_add_collider_system,
+    item_drop_model_system, load_zone_system, login_connection_system, login_state_enter_system,
+    login_state_exit_system, login_system, model_viewer_enter_system, model_viewer_system,
+    npc_model_add_collider_system, npc_model_system, update_position_system,
+    world_connection_system, zone_viewer_setup_system, zone_viewer_system, DebugInspectorPlugin,
 };
 use vfs_asset_io::VfsAssetIo;
 use zmo_asset_loader::{ZmoAsset, ZmoAssetLoader};
@@ -384,14 +386,12 @@ fn main() {
                 .with_system(ability_values_system)
                 .with_system(command_system.after("animation_system"))
                 .with_system(update_position_system)
-                .with_system(game_ui_system.label("game_ui_system"))
-                .with_system(
-                    game_debug_ui_system
-                        .label("game_debug_ui_system")
-                        .after("game_ui_system"),
-                )
-                .with_system(game_input_system.after("game_debug_ui_system"))
-                .with_system(ui_inventory_system.after("game_debug_ui_system")),
+                .with_system(ui_chatbox_system.before("game_debug_ui_system"))
+                .with_system(ui_inventory_system.before("game_debug_ui_system"))
+                .with_system(ui_player_info_system.before("game_debug_ui_system"))
+                .with_system(ui_selected_target_system.before("game_debug_ui_system"))
+                .with_system(game_debug_ui_system.label("game_debug_ui_system"))
+                .with_system(game_input_system.after("game_debug_ui_system")),
         );
     app.add_system_to_stage(CoreStage::PostUpdate, ui_drag_and_drop_system);
 
