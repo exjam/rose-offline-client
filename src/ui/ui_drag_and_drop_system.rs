@@ -5,8 +5,7 @@ use crate::ui::DragAndDropId;
 
 #[derive(Default)]
 pub struct UiStateDragAndDrop {
-    pub source: Option<DragAndDropId>,
-    pub destination: Option<DragAndDropId>,
+    pub dragged_item: Option<DragAndDropId>,
 }
 
 pub fn ui_drag_and_drop_system(
@@ -15,9 +14,8 @@ pub fn ui_drag_and_drop_system(
 ) {
     let input = egui_context.ctx_mut().input();
 
-    // When mouse is released, clear drag and drop state
+    // When mouse is released, clear dragged item state
     if input.pointer.any_released() && !input.pointer.button_down(egui::PointerButton::Primary) {
-        ui_state_dnd.source = None;
-        ui_state_dnd.destination = None;
+        ui_state_dnd.dragged_item = None;
     }
 }
