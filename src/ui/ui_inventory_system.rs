@@ -2,15 +2,16 @@ use bevy::prelude::{EventWriter, Query, Res, ResMut, With};
 use bevy_egui::{egui, EguiContext};
 use enum_map::{enum_map, EnumMap};
 
-use rose_data::{AmmoIndex, EquipmentIndex, Item, VehiclePartIndex};
-use rose_game_common::components::{
-    Equipment, Inventory, InventoryPageType, ItemSlot, INVENTORY_PAGE_SIZE,
+use rose_data::{AmmoIndex, EquipmentIndex, Item, ItemClass, ItemType, VehiclePartIndex};
+use rose_game_common::{
+    components::{Equipment, Inventory, InventoryPageType, ItemSlot, INVENTORY_PAGE_SIZE},
+    messages::client::{ChangeEquipment, ClientMessage},
 };
 
 use crate::{
     components::PlayerCharacter,
     events::ChatboxEvent,
-    resources::{GameData, Icons},
+    resources::{GameConnection, GameData, Icons},
     ui::{DragAndDropId, DragAndDropSlot, UiStateDragAndDrop},
 };
 
@@ -48,9 +49,9 @@ const EQUIPMENT_GRID_SLOTS: [[std::option::Option<rose_game_common::components::
         Some(ItemSlot::Ammo(AmmoIndex::Arrow)),
     ],
     [
-        Some(ItemSlot::Equipment(EquipmentIndex::WeaponLeft)),
-        Some(ItemSlot::Equipment(EquipmentIndex::Body)),
         Some(ItemSlot::Equipment(EquipmentIndex::WeaponRight)),
+        Some(ItemSlot::Equipment(EquipmentIndex::Body)),
+        Some(ItemSlot::Equipment(EquipmentIndex::WeaponLeft)),
         Some(ItemSlot::Ammo(AmmoIndex::Bullet)),
     ],
     [
@@ -130,6 +131,7 @@ fn ui_add_inventory_slot(
     inventory_slot: ItemSlot,
     equipment: &Equipment,
     inventory: &Inventory,
+    game_connection: Option<&Res<GameConnection>>,
     game_data: &GameData,
     icons: &Icons,
     ui_state_inventory: &mut UiStateInventory,
@@ -183,24 +185,38 @@ fn ui_add_inventory_slot(
         [40.0, 40.0],
     ));
 
-    let mut equip_inventory_slot = None;
-    let mut unequip_inventory_slot = None;
+    let mut equip_equipment_inventory_slot = None;
+    let mut equip_ammo_inventory_slot = None;
+    let mut equip_vehicle_inventory_slot = None;
+    let mut unequip_equipment_index = None;
+    let mut unequip_ammo_index = None;
+    let mut unequip_vehicle_part_index = None;
     let mut use_inventory_slot = None;
     let mut drop_inventory_slot = None;
     let mut swap_inventory_slots = None;
 
     if response.double_clicked() {
         match inventory_slot {
-            ItemSlot::Inventory(InventoryPageType::Equipment, _)
-            | ItemSlot::Inventory(InventoryPageType::Vehicles, _)
-            | ItemSlot::Inventory(InventoryPageType::Materials, _) => {
-                equip_inventory_slot = Some(inventory_slot);
+            ItemSlot::Inventory(InventoryPageType::Equipment, _) => {
+                equip_equipment_inventory_slot = Some(inventory_slot);
+            }
+            ItemSlot::Inventory(InventoryPageType::Vehicles, _) => {
+                equip_vehicle_inventory_slot = Some(inventory_slot);
+            }
+            ItemSlot::Inventory(InventoryPageType::Materials, _) => {
+                equip_ammo_inventory_slot = Some(inventory_slot);
             }
             ItemSlot::Inventory(InventoryPageType::Consumables, _) => {
                 use_inventory_slot = Some(inventory_slot);
             }
-            ItemSlot::Equipment(_) | ItemSlot::Ammo(_) | ItemSlot::Vehicle(_) => {
-                unequip_inventory_slot = Some(inventory_slot);
+            ItemSlot::Equipment(equipment_index) => {
+                unequip_equipment_index = Some(equipment_index);
+            }
+            ItemSlot::Ammo(ammo_index) => {
+                unequip_ammo_index = Some(ammo_index);
+            }
+            ItemSlot::Vehicle(vehicle_part_index) => {
+                unequip_vehicle_part_index = Some(vehicle_part_index);
             }
         }
     }
@@ -210,15 +226,31 @@ fn ui_add_inventory_slot(
             if matches!(
                 inventory_slot,
                 ItemSlot::Inventory(InventoryPageType::Equipment, _)
+            ) && ui.button("Equip").clicked()
+            {
+                equip_equipment_inventory_slot = Some(inventory_slot);
+            }
+
+            if matches!(
+                inventory_slot,
                     | ItemSlot::Inventory(InventoryPageType::Vehicles, _)
+            ) && ui.button("Equip").clicked()
+            {
+                equip_vehicle_inventory_slot = Some(inventory_slot);
+            }
+
+            if matches!(
+                inventory_slot,
                     | ItemSlot::Inventory(InventoryPageType::Materials, _)
             ) && ui.button("Equip").clicked()
             {
-                equip_inventory_slot = Some(inventory_slot);
+                equip_ammo_inventory_slot = Some(inventory_slot);
             }
 
-            if matches!(inventory_slot, ItemSlot::Equipment(_)) && ui.button("Unequip").clicked() {
-                unequip_inventory_slot = Some(inventory_slot);
+            if let ItemSlot::Equipment(equipment_index) = inventory_slot {
+                if ui.button("Unequip").clicked() {
+                    unequip_equipment_index = Some(equipment_index);
+                }
             }
 
             if matches!(
@@ -248,8 +280,14 @@ fn ui_add_inventory_slot(
                 ItemSlot::Inventory(_, _) => {
                     swap_inventory_slots = Some((inventory_slot, dropped_inventory_slot))
                 }
-                ItemSlot::Equipment(_) | ItemSlot::Ammo(_) | ItemSlot::Vehicle(_) => {
-                    unequip_inventory_slot = Some(inventory_slot);
+                ItemSlot::Equipment(equipment_index) => {
+                    unequip_equipment_index = Some(equipment_index);
+                }
+                ItemSlot::Ammo(ammo_index) => {
+                    unequip_ammo_index = Some(ammo_index);
+                }
+                ItemSlot::Vehicle(vehicle_part_index) => {
+                    unequip_vehicle_part_index = Some(vehicle_part_index);
                 }
             },
             ItemSlot::Equipment(_) => {
@@ -257,7 +295,7 @@ fn ui_add_inventory_slot(
                     dropped_inventory_slot,
                     ItemSlot::Inventory(InventoryPageType::Equipment, _)
                 ) {
-                    equip_inventory_slot = Some(dropped_inventory_slot);
+                    equip_equipment_inventory_slot = Some(dropped_inventory_slot);
                 }
             }
             ItemSlot::Ammo(_) => {
@@ -265,7 +303,7 @@ fn ui_add_inventory_slot(
                     dropped_inventory_slot,
                     ItemSlot::Inventory(InventoryPageType::Materials, _)
                 ) {
-                    equip_inventory_slot = Some(dropped_inventory_slot);
+                    equip_ammo_inventory_slot = Some(dropped_inventory_slot);
                 }
             }
             ItemSlot::Vehicle(_) => {
@@ -273,24 +311,141 @@ fn ui_add_inventory_slot(
                     dropped_inventory_slot,
                     ItemSlot::Inventory(InventoryPageType::Vehicles, _)
                 ) {
-                    equip_inventory_slot = Some(dropped_inventory_slot);
+                    equip_vehicle_inventory_slot = Some(dropped_inventory_slot);
                 }
             }
         }
     }
 
-    if let Some(equip_inventory_slot) = equip_inventory_slot {
-        chatbox_events.send(ChatboxEvent::System(format!(
-            "TODO: Equip item {:?}",
-            equip_inventory_slot
-        )));
+    if let Some(equip_inventory_slot) = equip_equipment_inventory_slot {
+        if let Some(item) = inventory.get_item(equip_inventory_slot) {
+            let equipment_index = match item.get_item_type() {
+                ItemType::Face => Some(EquipmentIndex::Face),
+                ItemType::Head => Some(EquipmentIndex::Head),
+                ItemType::Body => Some(EquipmentIndex::Body),
+                ItemType::Hands => Some(EquipmentIndex::Hands),
+                ItemType::Feet => Some(EquipmentIndex::Feet),
+                ItemType::Back => Some(EquipmentIndex::Back),
+                ItemType::Jewellery => {
+                    if let Some(item_data) =
+                        game_data.items.get_base_item(item.get_item_reference())
+                    {
+                        match item_data.class {
+                            ItemClass::Ring => Some(EquipmentIndex::Ring),
+                            ItemClass::Necklace => Some(EquipmentIndex::Necklace),
+                            ItemClass::Earring => Some(EquipmentIndex::Earring),
+                            _ => None,
+                        }
+                    } else {
+                        None
+                    }
+                }
+                ItemType::Weapon => Some(EquipmentIndex::WeaponRight),
+                ItemType::SubWeapon => Some(EquipmentIndex::WeaponLeft),
+                _ => None,
+            };
+
+            if let Some(equipment_index) = equipment_index {
+                if let Some(game_connection) = game_connection {
+                    game_connection
+                        .client_message_tx
+                        .send(ClientMessage::ChangeEquipment(ChangeEquipment {
+                            equipment_index,
+                            item_slot: Some(equip_inventory_slot),
+                        }))
+                        .ok();
+                }
+            }
+        }
     }
 
-    if let Some(unequip_inventory_slot) = unequip_inventory_slot {
-        chatbox_events.send(ChatboxEvent::System(format!(
-            "TODO: Unequip item {:?}",
-            unequip_inventory_slot
-        )));
+    if let Some(equip_inventory_slot) = equip_ammo_inventory_slot {
+        if let Some(item) = inventory.get_item(equip_inventory_slot) {
+            let ammo_index =
+                if let Some(item_data) = game_data.items.get_base_item(item.get_item_reference()) {
+                    match item_data.class {
+                        ItemClass::Arrow => Some(AmmoIndex::Arrow),
+                        ItemClass::Bullet => Some(AmmoIndex::Bullet),
+                        ItemClass::Shell => Some(AmmoIndex::Throw),
+                        _ => None,
+                    }
+                } else {
+                    None
+                };
+
+            if let Some(ammo_index) = ammo_index {
+                if let Some(game_connection) = game_connection {
+                    game_connection
+                        .client_message_tx
+                        .send(ClientMessage::ChangeAmmo(ammo_index, None))
+                        .ok();
+                }
+            }
+        }
+    }
+
+    if let Some(equip_inventory_slot) = equip_vehicle_inventory_slot {
+        if let Some(item) = inventory.get_item(equip_inventory_slot) {
+            let vehicle_part_index = if let Some(item_data) =
+                game_data.items.get_base_item(item.get_item_reference())
+            {
+                match item_data.class {
+                    ItemClass::CartBody | ItemClass::CastleGearBody => Some(VehiclePartIndex::Body),
+                    ItemClass::CartEngine | ItemClass::CastleGearEngine => {
+                        Some(VehiclePartIndex::Engine)
+                    }
+                    ItemClass::CartWheels | ItemClass::CastleGearLeg => Some(VehiclePartIndex::Leg),
+                    ItemClass::CartAccessory | ItemClass::CastleGearWeapon => {
+                        Some(VehiclePartIndex::Arms)
+                    }
+                    _ => None,
+                }
+            } else {
+                None
+            };
+
+            if let Some(vehicle_part_index) = vehicle_part_index {
+                if let Some(game_connection) = game_connection {
+                    game_connection
+                        .client_message_tx
+                        .send(ClientMessage::ChangeVehiclePart(vehicle_part_index, None))
+                        .ok();
+                }
+            }
+        }
+    }
+
+    if let Some(unequip_ammo_index) = unequip_ammo_index {
+        if let Some(game_connection) = game_connection {
+            game_connection
+                .client_message_tx
+                .send(ClientMessage::ChangeAmmo(unequip_ammo_index, None))
+                .ok();
+        }
+    }
+
+    if let Some(unequip_equipment_index) = unequip_equipment_index {
+        if let Some(game_connection) = game_connection {
+            game_connection
+                .client_message_tx
+                .send(ClientMessage::ChangeEquipment(ChangeEquipment {
+                    equipment_index: unequip_equipment_index,
+                    item_slot: None,
+                }))
+                .ok();
+        }
+    }
+
+    if let Some(unequip_vehicle_part_index) = unequip_vehicle_part_index {
+        if let Some(game_connection) = game_connection {
+            game_connection
+                .client_message_tx
+                .send(ClientMessage::ChangeVehiclePart(
+                    unequip_vehicle_part_index,
+                    None,
+                ))
+                .ok();
+        }
     }
 
     if let Some(use_inventory_slot) = use_inventory_slot {
@@ -331,6 +486,7 @@ pub fn ui_inventory_system(
     mut ui_state_inventory: ResMut<UiStateInventory>,
     mut ui_state_dnd: ResMut<UiStateDragAndDrop>,
     query_player: Query<(&Equipment, &Inventory), With<PlayerCharacter>>,
+    game_connection: Option<Res<GameConnection>>,
     game_data: Res<GameData>,
     icons: Res<Icons>,
     mut chatbox_events: EventWriter<ChatboxEvent>,
@@ -370,6 +526,7 @@ pub fn ui_inventory_system(
                                     item_slot,
                                     player_equipment,
                                     player_inventory,
+                                    game_connection.as_ref(),
                                     &game_data,
                                     &icons,
                                     &mut ui_state_inventory,
@@ -432,6 +589,7 @@ pub fn ui_inventory_system(
                                 inventory_slot,
                                 player_equipment,
                                 player_inventory,
+                                game_connection.as_ref(),
                                 &game_data,
                                 &icons,
                                 &mut ui_state_inventory,

@@ -4,20 +4,22 @@ use thiserror::Error;
 use tokio::net::TcpStream;
 
 use rose_game_common::messages::{
-    client::{ClientMessage, ConnectionRequest},
+    client::{ChangeEquipment, ClientMessage, ConnectionRequest},
     server::{
         AnnounceChat, AttackEntity, CharacterData, CharacterDataItems, CharacterDataQuest,
         ConnectionRequestError, ConnectionResponse, DamageEntity, JoinZoneResponse, LocalChat,
         MoveEntity, PickupItemDropResult, RemoveEntities, ServerMessage, ShoutChat,
         SpawnEntityCharacter, SpawnEntityItemDrop, SpawnEntityMonster, SpawnEntityNpc,
-        StopMoveEntity, Teleport, UpdateLevel, UpdateSpeed, UpdateXpStamina, Whisper,
+        StopMoveEntity, Teleport, UpdateEquipment, UpdateLevel, UpdateSpeed, UpdateVehiclePart,
+        UpdateXpStamina, Whisper,
     },
 };
 use rose_network_common::{Connection, Packet, PacketCodec};
 use rose_network_irose::{
     game_client_packets::{
-        PacketClientAttack, PacketClientChat, PacketClientConnectRequest, PacketClientJoinZone,
-        PacketClientMove, PacketClientPickupItemDrop,
+        PacketClientAttack, PacketClientChangeAmmo, PacketClientChangeEquipment,
+        PacketClientChangeVehiclePart, PacketClientChat, PacketClientConnectRequest,
+        PacketClientJoinZone, PacketClientMove, PacketClientPickupItemDrop,
     },
     game_server_packets::{
         ConnectResult, PacketConnectionReply, PacketServerAnnounceChat, PacketServerAttackEntity,
@@ -26,8 +28,10 @@ use rose_network_irose::{
         PacketServerPickupItemDropResult, PacketServerRemoveEntities, PacketServerSelectCharacter,
         PacketServerShoutChat, PacketServerSpawnEntityCharacter, PacketServerSpawnEntityItemDrop,
         PacketServerSpawnEntityMonster, PacketServerSpawnEntityNpc, PacketServerStopMoveEntity,
-        PacketServerTeleport, PacketServerUpdateLevel, PacketServerUpdateSpeed,
-        PacketServerUpdateXpStamina, PacketServerWhisper, ServerPackets,
+        PacketServerTeleport, PacketServerUpdateAmmo, PacketServerUpdateEquipment,
+        PacketServerUpdateInventory, PacketServerUpdateLevel, PacketServerUpdateSpeed,
+        PacketServerUpdateVehiclePart, PacketServerUpdateXpStamina, PacketServerWhisper,
+        ServerPackets,
     },
     ClientPacketCodec, IROSE_112_TABLE,
 };
@@ -319,6 +323,45 @@ impl GameClient {
                     }))
                     .ok();
             }
+            Some(ServerPackets::UpdateAmmo) => {
+                let message = PacketServerUpdateAmmo::try_from(&packet)?;
+                self.server_message_tx
+                    .send(ServerMessage::UpdateAmmo(
+                        message.entity_id,
+                        message.ammo_index,
+                        message.item,
+                    ))
+                    .ok();
+            }
+            Some(ServerPackets::UpdateEquipment) => {
+                let message = PacketServerUpdateEquipment::try_from(&packet)?;
+                self.server_message_tx
+                    .send(ServerMessage::UpdateEquipment(UpdateEquipment {
+                        entity_id: message.entity_id,
+                        equipment_index: message.equipment_index,
+                        item: message.item,
+                    }))
+                    .ok();
+            }
+            Some(ServerPackets::UpdateInventory) => {
+                let message = PacketServerUpdateInventory::try_from(&packet)?;
+                self.server_message_tx
+                    .send(ServerMessage::UpdateInventory(
+                        message.items,
+                        message.with_money,
+                    ))
+                    .ok();
+            }
+            Some(ServerPackets::UpdateVehiclePart) => {
+                let message = PacketServerUpdateVehiclePart::try_from(&packet)?;
+                self.server_message_tx
+                    .send(ServerMessage::UpdateVehiclePart(UpdateVehiclePart {
+                        entity_id: message.entity_id,
+                        vehicle_part_index: message.vehicle_part_index,
+                        item: message.item,
+                    }))
+                    .ok();
+            }
             Some(ServerPackets::UpdateLevel) => {
                 let message = PacketServerUpdateLevel::try_from(&packet)?;
                 self.server_message_tx
@@ -409,6 +452,33 @@ impl GameClient {
             ClientMessage::Chat(ref text) => {
                 connection
                     .write_packet(Packet::from(&PacketClientChat { text }))
+                    .await?
+            }
+            ClientMessage::ChangeAmmo(ammo_index, item_slot) => {
+                connection
+                    .write_packet(Packet::from(&PacketClientChangeAmmo {
+                        ammo_index,
+                        item_slot,
+                    }))
+                    .await?
+            }
+            ClientMessage::ChangeEquipment(ChangeEquipment {
+                equipment_index,
+                item_slot,
+            }) => {
+                connection
+                    .write_packet(Packet::from(&PacketClientChangeEquipment {
+                        equipment_index,
+                        item_slot,
+                    }))
+                    .await?
+            }
+            ClientMessage::ChangeVehiclePart(vehicle_part_index, item_slot) => {
+                connection
+                    .write_packet(Packet::from(&PacketClientChangeVehiclePart {
+                        vehicle_part_index,
+                        item_slot,
+                    }))
                     .await?
             }
             unimplemented => {

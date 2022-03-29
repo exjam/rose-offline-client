@@ -9,8 +9,8 @@ use bevy::{
 use rose_data::ZoneId;
 use rose_game_common::{
     components::{
-        BasicStats, CharacterInfo, ExperiencePoints, HealthPoints, Inventory, ItemDrop, MoveMode,
-        MoveSpeed, Npc, SkillList, Stamina, StatusEffects,
+        BasicStats, CharacterInfo, Equipment, ExperiencePoints, HealthPoints, Inventory, ItemDrop,
+        MoveMode, MoveSpeed, Npc, SkillList, Stamina, StatusEffects,
     },
     messages::server::{CommandState, PickupItemDropContent, PickupItemDropError, ServerMessage},
 };
@@ -97,7 +97,7 @@ pub fn game_connection_system(
         (Option<&CharacterInfo>, Option<&Npc>),
         Or<(With<CharacterInfo>, With<Npc>)>,
     >,
-    mut query_inventory: Query<&mut Inventory>,
+    mut query_inventory: Query<(&mut Equipment, &mut Inventory)>,
     mut query_xp_stamina: Query<(&mut ExperiencePoints, &mut Stamina)>,
     mut query_health_points: Query<&mut HealthPoints>,
     mut game_connection_events: EventWriter<GameConnectionEvent>,
@@ -599,6 +599,42 @@ pub fn game_connection_system(
             Ok(ServerMessage::AnnounceChat(message)) => {
                 chatbox_events.send(ChatboxEvent::Announce(message.name, message.text));
             }
+            Ok(ServerMessage::UpdateAmmo(entity_id, ammo_index, item)) => {
+                if let Some(entity) = client_entity_list.get(entity_id) {
+                    if let Ok((mut equipment, _)) = query_inventory.get_mut(entity) {
+                        equipment.equipped_ammo[ammo_index] = item;
+                    }
+                }
+            }
+            Ok(ServerMessage::UpdateEquipment(message)) => {
+                if let Some(entity) = client_entity_list.get(message.entity_id) {
+                    if let Ok((mut equipment, _)) = query_inventory.get_mut(entity) {
+                        equipment.equipped_items[message.equipment_index] = message.item;
+                    }
+                }
+            }
+            Ok(ServerMessage::UpdateInventory(update_items, update_money)) => {
+                if let Some(player_entity) = client_entity_list.player_entity {
+                    if let Ok((_, mut inventory)) = query_inventory.get_mut(player_entity) {
+                        for (item_slot, item) in update_items {
+                            if let Some(item_slot) = inventory.get_item_slot_mut(item_slot) {
+                                *item_slot = item;
+                            }
+                        }
+
+                        if let Some(money) = update_money {
+                            inventory.money = money;
+                        }
+                    }
+                }
+            }
+            Ok(ServerMessage::UpdateVehiclePart(message)) => {
+                if let Some(entity) = client_entity_list.get(message.entity_id) {
+                    if let Ok((mut equipment, _)) = query_inventory.get_mut(entity) {
+                        equipment.equipped_vehicle[message.vehicle_part_index] = message.item;
+                    }
+                }
+            }
             Ok(ServerMessage::UpdateLevel(message)) => {
                 if let Some(entity) = client_entity_list.get(message.entity_id) {
                     commands.entity(entity).insert_bundle((
@@ -643,7 +679,7 @@ pub fn game_connection_system(
             Ok(ServerMessage::PickupItemDropResult(message)) => match message.result {
                 Ok(PickupItemDropContent::Item(item_slot, item)) => {
                     if let Some(player_entity) = client_entity_list.player_entity {
-                        if let Ok(mut inventory) = query_inventory.get_mut(player_entity) {
+                        if let Ok((_, mut inventory)) = query_inventory.get_mut(player_entity) {
                             if let Some(inventory_slot) = inventory.get_item_slot_mut(item_slot) {
                                 if let Some(item_data) =
                                     game_data.items.get_base_item(item.get_item_reference())
@@ -660,7 +696,7 @@ pub fn game_connection_system(
                 }
                 Ok(PickupItemDropContent::Money(money)) => {
                     if let Some(player_entity) = client_entity_list.player_entity {
-                        if let Ok(mut inventory) = query_inventory.get_mut(player_entity) {
+                        if let Ok((_, mut inventory)) = query_inventory.get_mut(player_entity) {
                             chatbox_events.send(ChatboxEvent::System(format!(
                                 "You have earned {} zuly.",
                                 money.0
