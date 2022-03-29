@@ -173,6 +173,10 @@ fn ui_add_inventory_slot(
     let response = ui.add(DragAndDropSlot::new(
         DragAndDropId::Inventory(inventory_slot),
         contents,
+        match item.as_ref() {
+            Some(Item::Stackable(stackable_item)) => Some(stackable_item.quantity as usize),
+            _ => None,
+        },
         drag_accepts,
         &mut ui_state_dnd.dragged_item,
         &mut dropped_item,

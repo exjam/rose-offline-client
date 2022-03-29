@@ -12,6 +12,8 @@ pub struct DragAndDropSlot<'a> {
     size: egui::Vec2,
     border_width: f32,
     contents: Option<(egui::TextureId, egui::Rect)>,
+    quantity: Option<usize>,
+    quantity_margin: f32,
     accepts: fn(&DragAndDropId) -> bool,
     dragged_item: Option<&'a mut Option<DragAndDropId>>,
     dropped_item: Option<&'a mut Option<DragAndDropId>>,
@@ -21,6 +23,7 @@ impl<'a> DragAndDropSlot<'a> {
     pub fn new(
         dnd_id: DragAndDropId,
         contents: Option<(egui::TextureId, egui::Rect)>,
+        quantity: Option<usize>,
         accepts: fn(&DragAndDropId) -> bool,
         dragged_item: &'a mut Option<DragAndDropId>,
         dropped_item: &'a mut Option<DragAndDropId>,
@@ -31,6 +34,8 @@ impl<'a> DragAndDropSlot<'a> {
             size: size.into(),
             border_width: 1.0,
             contents,
+            quantity,
+            quantity_margin: 2.0,
             accepts,
             dragged_item: Some(dragged_item),
             dropped_item: Some(dropped_item),
@@ -88,6 +93,42 @@ impl<'w> DragAndDropSlot<'w> {
                 let mut mesh = Mesh::with_texture(texture_id);
                 mesh.add_rect_with_uv(content_rect, uv, egui::Color32::WHITE);
                 ui.painter().add(Shape::mesh(mesh));
+
+                if let Some(quantity) = self.quantity {
+                    let text_galley = ui.fonts().layout_no_wrap(
+                        format!("{}", quantity),
+                        FontId::monospace(12.0),
+                        Color32::WHITE,
+                    );
+
+                    ui.painter().add(egui::Shape::Rect(egui::epaint::RectShape {
+                        rect: Rect::from_min_max(
+                            egui::Pos2::new(
+                                content_rect.max.x
+                                    - text_galley.rect.right()
+                                    - self.quantity_margin,
+                                content_rect.min.y,
+                            ),
+                            egui::Pos2::new(
+                                content_rect.max.x,
+                                content_rect.min.y
+                                    + self.quantity_margin * 2.0
+                                    + text_galley.rect.height(),
+                            ),
+                        ),
+                        rounding: egui::Rounding::none(),
+                        fill: Color32::from_rgba_unmultiplied(50, 50, 50, 200),
+                        stroke: Stroke::none(),
+                    }));
+
+                    ui.painter().add(Shape::galley(
+                        egui::Pos2::new(
+                            content_rect.max.x - text_galley.rect.right(),
+                            content_rect.min.y + self.quantity_margin,
+                        ),
+                        text_galley,
+                    ));
+                }
 
                 if response.dragged_by(egui::PointerButton::Primary) {
                     if let Some(pointer_pos) = response.interact_pointer_pos() {
