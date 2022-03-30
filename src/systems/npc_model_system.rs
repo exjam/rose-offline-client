@@ -144,16 +144,16 @@ pub fn npc_model_add_collider_system(
         {
             continue;
         }
-        let min = min.unwrap();
-        let max = max.unwrap();
         let root_bone_global_transform = root_bone_global_transform.unwrap();
         let inverse_bindpose = inverse_bindpose.unwrap();
         let root_bone_local_transform = Transform::from_matrix(inverse_bindpose[0].inverse());
 
+        let min = Vec3::from(min.unwrap()) * root_bone_global_transform.scale;
+        let max = Vec3::from(max.unwrap()) * root_bone_global_transform.scale;
         let local_bound_center = 0.5 * (min + max);
-        let half_extents = Vec3::from(0.5 * (max - min)) * root_bone_global_transform.scale;
+        let half_extents = 0.5 * (max - min);
         let root_bone_offset =
-            Vec3::from(local_bound_center) - root_bone_local_transform.translation;
+            local_bound_center - root_bone_local_transform.translation * root_bone_global_transform.scale;
 
         commands
             .entity(entity)
