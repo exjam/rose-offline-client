@@ -62,7 +62,7 @@ impl AssetLoader for ZmoAssetLoader {
 
                     // Camera / morph target animations have only position channels
                     // but no bone id so we can use bone id as a channel id instead.
-                    let assign_bone_id = max_bone_id == 0;
+                    let assign_bone_id = max_bone_id == 0 && zmo.channels.len() > 2;
                     if assign_bone_id {
                         max_bone_id = (zmo.channels.len() - 1) as u32;
                     }
