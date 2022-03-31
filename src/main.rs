@@ -388,6 +388,7 @@ fn main() {
                 .with_system(update_position_system)
                 .with_system(ui_chatbox_system.before("game_debug_ui_system"))
                 .with_system(ui_inventory_system.before("game_debug_ui_system"))
+                .with_system(ui_skill_list_system.before("game_debug_ui_system"))
                 .with_system(ui_player_info_system.before("game_debug_ui_system"))
                 .with_system(ui_selected_target_system.before("game_debug_ui_system"))
                 .with_system(game_debug_ui_system.label("game_debug_ui_system"))

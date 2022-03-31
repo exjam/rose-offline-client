@@ -1,10 +1,11 @@
 use bevy_egui::egui;
 
-use rose_game_common::components::ItemSlot;
+use rose_game_common::components::{ItemSlot, SkillSlot};
 
 #[derive(Copy, Clone, Debug)]
 pub enum DragAndDropId {
     Inventory(ItemSlot),
+    Skill(SkillSlot),
 }
 
 pub struct DragAndDropSlot<'a> {
