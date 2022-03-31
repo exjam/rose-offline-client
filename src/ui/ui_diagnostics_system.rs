@@ -4,7 +4,7 @@ use bevy::{
 };
 use bevy_egui::{egui, EguiContext};
 
-pub fn diagnostics_ui_system(mut egui_context: ResMut<EguiContext>, diagnostics: Res<Diagnostics>) {
+pub fn ui_diagnostics_system(mut egui_context: ResMut<EguiContext>, diagnostics: Res<Diagnostics>) {
     egui::Window::new("Diagnostics")
         .vscroll(true)
         .resizable(false)
