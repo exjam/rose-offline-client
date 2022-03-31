@@ -1,4 +1,4 @@
-use bevy::prelude::{EventWriter, Query, Res, ResMut, With};
+use bevy::prelude::{EventWriter, Local, Query, Res, ResMut, With};
 use bevy_egui::{egui, EguiContext};
 use enum_map::{enum_map, EnumMap};
 
@@ -483,7 +483,7 @@ fn ui_add_inventory_slot(
 
 pub fn ui_inventory_system(
     mut egui_context: ResMut<EguiContext>,
-    mut ui_state_inventory: ResMut<UiStateInventory>,
+    mut ui_state_inventory: Local<UiStateInventory>,
     mut ui_state_dnd: ResMut<UiStateDragAndDrop>,
     query_player: Query<(&Equipment, &Inventory), With<PlayerCharacter>>,
     game_connection: Option<Res<GameConnection>>,
