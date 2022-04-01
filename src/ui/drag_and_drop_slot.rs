@@ -6,6 +6,7 @@ use rose_game_common::components::{ItemSlot, SkillSlot};
 pub enum DragAndDropId {
     Inventory(ItemSlot),
     Skill(SkillSlot),
+    Hotbar(usize, usize),
 }
 
 pub struct DragAndDropSlot<'a> {

@@ -126,6 +126,33 @@ fn drag_accepts_vehicles(drag_source: &DragAndDropId) -> bool {
     )
 }
 
+pub trait GetItem {
+    fn get_item(&self, item_slot: ItemSlot) -> Option<Item>;
+}
+
+impl GetItem for (&Equipment, &Inventory) {
+    fn get_item(&self, item_slot: ItemSlot) -> Option<Item> {
+        let equipment = self.0;
+        let inventory = self.1;
+
+        match item_slot {
+            ItemSlot::Inventory(_, _) => inventory.get_item(item_slot).cloned(),
+            ItemSlot::Equipment(equipment_index) => equipment
+                .get_equipment_item(equipment_index)
+                .cloned()
+                .map(Item::Equipment),
+            ItemSlot::Ammo(ammo_index) => equipment
+                .get_ammo_item(ammo_index)
+                .cloned()
+                .map(Item::Stackable),
+            ItemSlot::Vehicle(vehicle_part_index) => equipment
+                .get_vehicle_item(vehicle_part_index)
+                .cloned()
+                .map(Item::Equipment),
+        }
+    }
+}
+
 fn ui_add_inventory_slot(
     ui: &mut egui::Ui,
     inventory_slot: ItemSlot,
@@ -150,22 +177,7 @@ fn ui_add_inventory_slot(
         ItemSlot::Vehicle(_) => drag_accepts_vehicles,
     };
 
-    let item = match inventory_slot {
-        ItemSlot::Inventory(_, _) => inventory.get_item(inventory_slot).cloned(),
-        ItemSlot::Equipment(equipment_index) => equipment
-            .get_equipment_item(equipment_index)
-            .cloned()
-            .map(Item::Equipment),
-        ItemSlot::Ammo(ammo_index) => equipment
-            .get_ammo_item(ammo_index)
-            .cloned()
-            .map(Item::Stackable),
-        ItemSlot::Vehicle(vehicle_part_index) => equipment
-            .get_vehicle_item(vehicle_part_index)
-            .cloned()
-            .map(Item::Equipment),
-    };
-
+    let item = (equipment, inventory).get_item(inventory_slot);
     let item_data = item
         .as_ref()
         .and_then(|item| game_data.items.get_base_item(item.get_item_reference()));

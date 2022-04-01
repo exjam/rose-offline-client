@@ -313,7 +313,7 @@ pub fn character_select_system(
                                 ui.add_enabled_ui(
                                     character_select_state.create_character_face_index > 0,
                                     |ui| {
-                                        if ui.button("<").clicked() {
+                                        if ui.button("⬅").clicked() {
                                             character_select_state.create_character_face_index -= 1;
                                         }
                                     },
@@ -326,7 +326,7 @@ pub fn character_select_system(
                                     character_select_state.create_character_face_index + 1
                                         < CREATE_CHARACTER_FACE_LIST.len(),
                                     |ui| {
-                                        if ui.button(">").clicked() {
+                                        if ui.button("➡").clicked() {
                                             character_select_state.create_character_face_index += 1;
                                         }
                                     },
