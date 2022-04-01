@@ -1,5 +1,4 @@
 use bevy::{
-    core::Time,
     math::{Quat, Vec3},
     prelude::{
         AssetServer, Commands, DespawnRecursiveExt, Entity, EventReader, EventWriter,
@@ -85,7 +84,6 @@ pub fn character_select_enter_system(
     mut windows: ResMut<Windows>,
     query_cameras: Query<Entity, With<Camera3d>>,
     asset_server: Res<AssetServer>,
-    time: Res<Time>,
 ) {
     if let Some(window) = windows.get_primary_mut() {
         window.set_cursor_lock_mode(false);
@@ -104,7 +102,6 @@ pub fn character_select_enter_system(
             .remove::<FollowCameraController>()
             .insert(ActiveMotion::new_once(
                 asset_server.load("3DDATA/TITLE/CAMERA01_INSELECT01.ZMO"),
-                time.seconds_since_startup(),
             ));
     }
 
@@ -181,7 +178,6 @@ pub fn character_select_system(
     character_list: Option<Res<CharacterList>>,
     server_configuration: Res<ServerConfiguration>,
     asset_server: Res<AssetServer>,
-    time: Res<Time>,
 ) {
     if world_connection.is_none() {
         // Disconnected, return to login
@@ -267,7 +263,6 @@ pub fn character_select_system(
                             .entity(camera_entity)
                             .insert(ActiveMotion::new_once(
                                 asset_server.load("3DDATA/TITLE/CAMERA01_CREATE01.ZMO"),
-                                time.seconds_since_startup(),
                             ));
 
                         character_select_state.state = CharacterSelectState::CharacterCreate;
@@ -395,7 +390,6 @@ pub fn character_select_system(
                             .entity(camera_entity)
                             .insert(ActiveMotion::new_once(
                                 asset_server.load("3DDATA/TITLE/CAMERA01_OUTCREATE01.ZMO"),
-                                time.seconds_since_startup(),
                             ));
                         character_select_state.state = CharacterSelectState::CharacterSelect;
                     }
@@ -487,7 +481,6 @@ pub fn character_select_system(
                             .entity(camera_entity)
                             .insert(ActiveMotion::new_once(
                                 asset_server.load("3DDATA/TITLE/CAMERA01_OUTCREATE01.ZMO"),
-                                time.seconds_since_startup(),
                             ));
                         character_select_state.state = CharacterSelectState::CharacterSelect;
 
@@ -537,7 +530,6 @@ pub fn character_select_system(
                         .entity(camera_entity)
                         .insert(ActiveMotion::new_once(
                             asset_server.load("3DDATA/TITLE/CAMERA01_INGAME01.ZMO"),
-                            time.seconds_since_startup(),
                         ));
 
                     character_select_state.state = CharacterSelectState::Leaving;

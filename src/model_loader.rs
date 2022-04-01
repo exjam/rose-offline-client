@@ -19,7 +19,8 @@ use rose_game_common::components::{
 
 use crate::{
     components::{CharacterModel, CharacterModelPart, ItemDropModel, NpcModel},
-    render::StaticMeshMaterial,
+    effect_loader::spawn_effect,
+    render::{EffectMeshMaterial, ParticleMaterial, StaticMeshMaterial},
     zmo_asset_loader::ZmoAsset,
 };
 
@@ -158,6 +159,8 @@ impl ModelLoader {
         &self,
         commands: &mut Commands,
         asset_server: &AssetServer,
+        effect_mesh_materials: &mut Assets<EffectMeshMaterial>,
+        particle_materials: &mut Assets<ParticleMaterial>,
         static_mesh_materials: &mut Assets<StaticMeshMaterial>,
         skinned_mesh_inverse_bindposes_assets: &mut Assets<SkinnedMeshInverseBindposes>,
         model_entity: Entity,
@@ -197,6 +200,27 @@ impl ModelLoader {
                 dummy_bone_offset,
             );
             model_parts.append(&mut parts);
+        }
+
+        for (link_dummy_bone_id, effect_id) in npc_model_data.effect_ids.iter() {
+            if let Some(effect_path) = self.npc_chr.effect_files.get(*effect_id as usize) {
+                if let Some(dummy_bone_entity) = skinned_mesh
+                    .joints
+                    .get(dummy_bone_offset + *link_dummy_bone_id as usize)
+                {
+                    if let Some(effect_entity) = spawn_effect(
+                        &self.vfs,
+                        commands,
+                        asset_server,
+                        particle_materials,
+                        effect_mesh_materials,
+                        effect_path.into(),
+                    ) {
+                        commands.entity(*dummy_bone_entity).add_child(effect_entity);
+                        model_parts.push(effect_entity);
+                    }
+                }
+            }
         }
 
         if let Some(npc_data) = self.npc_database.get_npc(npc_id) {

@@ -373,12 +373,12 @@ fn queue_water_mesh_material_meshes(
         &mut RenderPhase<Transparent3d>,
     )>,
 ) {
-    for (view, visible_entities, mut transparent_phase) in views.iter_mut() {
-        let draw_transparent = transparent_draw_functions
-            .read()
-            .get_id::<DrawWaterMaterial<WaterMeshMaterial>>()
-            .unwrap();
+    let draw_transparent = transparent_draw_functions
+        .read()
+        .get_id::<DrawWaterMaterial<WaterMeshMaterial>>()
+        .unwrap();
 
+    for (view, visible_entities, mut transparent_phase) in views.iter_mut() {
         let inverse_view_matrix = view.transform.compute_matrix().inverse();
         let inverse_view_row_2 = inverse_view_matrix.row(2);
         let msaa_key = MeshPipelineKey::from_msaa_samples(msaa.samples);

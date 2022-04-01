@@ -4,42 +4,42 @@ use crate::zmo_asset_loader::ZmoAsset;
 
 #[derive(Component, Default)]
 pub struct ActiveMotion {
-    pub start_time: f64,
     pub motion: Handle<ZmoAsset>,
     pub repeat_limit: Option<usize>, // If None, repeats forever
     pub complete: bool,
     pub animation_speed: f32,
+    pub start_time: Option<f64>,
 }
 
 impl ActiveMotion {
-    pub fn new_repeating(motion: Handle<ZmoAsset>, start_time: f64) -> Self {
+    pub fn new_repeating(motion: Handle<ZmoAsset>) -> Self {
         Self {
             motion,
-            start_time,
             repeat_limit: None,
             complete: false,
             animation_speed: 1.0,
+            start_time: None,
         }
     }
 
-    pub fn new_once(motion: Handle<ZmoAsset>, start_time: f64) -> Self {
+    pub fn new_once(motion: Handle<ZmoAsset>) -> Self {
         Self {
             motion,
-            start_time,
             repeat_limit: Some(1),
             complete: false,
             animation_speed: 1.0,
+            start_time: None,
         }
     }
 
     #[allow(dead_code)]
-    pub fn new_repeat_n(motion: Handle<ZmoAsset>, start_time: f64, repeat_count: usize) -> Self {
+    pub fn new_repeat_n(motion: Handle<ZmoAsset>, repeat_count: usize) -> Self {
         Self {
             motion,
-            start_time,
             repeat_limit: Some(repeat_count),
             complete: false,
             animation_speed: 1.0,
+            start_time: None,
         }
     }
 

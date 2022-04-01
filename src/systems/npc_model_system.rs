@@ -25,7 +25,7 @@ use crate::{
         NpcModel, COLLISION_FILTER_CLICKABLE, COLLISION_FILTER_INSPECTABLE, COLLISION_GROUP_NPC,
     },
     model_loader::ModelLoader,
-    render::StaticMeshMaterial,
+    render::{EffectMeshMaterial, ParticleMaterial, StaticMeshMaterial},
     resources::GameData,
 };
 
@@ -43,6 +43,8 @@ pub fn npc_model_system(
     >,
     asset_server: Res<AssetServer>,
     model_loader: Res<ModelLoader>,
+    mut effect_mesh_materials: ResMut<Assets<EffectMeshMaterial>>,
+    mut particle_materials: ResMut<Assets<ParticleMaterial>>,
     mut static_mesh_materials: ResMut<Assets<StaticMeshMaterial>>,
     mut skinned_mesh_inverse_bindposes_assets: ResMut<Assets<SkinnedMeshInverseBindposes>>,
     game_data: Res<GameData>,
@@ -70,6 +72,8 @@ pub fn npc_model_system(
         if let Some((npc_model, skinned_mesh)) = model_loader.spawn_npc_model(
             &mut commands,
             &asset_server,
+            &mut effect_mesh_materials,
+            &mut particle_materials,
             &mut static_mesh_materials,
             &mut skinned_mesh_inverse_bindposes_assets,
             entity,

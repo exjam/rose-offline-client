@@ -3,6 +3,10 @@ use bevy::{
     render::{mesh::MeshVertexAttribute, render_resource::VertexFormat},
 };
 
+mod effect_mesh_material;
+mod particle_material;
+mod particle_pipeline;
+pub mod particle_render_data;
 mod static_mesh_material;
 mod terrain_material;
 mod texture_array;
@@ -17,11 +21,16 @@ pub const MESH_ATTRIBUTE_UV_2: MeshVertexAttribute =
 pub const MESH_ATTRIBUTE_UV_3: MeshVertexAttribute =
     MeshVertexAttribute::new("Vertex_Uv4", 519697814, VertexFormat::Float32x2);
 
+pub use effect_mesh_material::EffectMeshMaterial;
+pub use particle_material::ParticleMaterial;
 pub use static_mesh_material::StaticMeshMaterial;
 pub use terrain_material::{TerrainMaterial, TERRAIN_MESH_ATTRIBUTE_TILE_INFO};
 pub use texture_array::{GpuTextureArray, TextureArray, TextureArrayBuilder};
 pub use water_mesh_material::WaterMeshMaterial;
 
+use effect_mesh_material::EffectMeshMaterialPlugin;
+use particle_material::ParticleMaterialPlugin;
+use particle_pipeline::ParticleRenderPlugin;
 use static_mesh_material::StaticMeshMaterialPlugin;
 use terrain_material::TerrainMaterialPlugin;
 use texture_array::TextureArrayPlugin;
@@ -34,7 +43,10 @@ impl Plugin for RoseRenderPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugin(TextureArrayPlugin)
             .add_plugin(TerrainMaterialPlugin)
+            .add_plugin(EffectMeshMaterialPlugin)
             .add_plugin(StaticMeshMaterialPlugin)
-            .add_plugin(WaterMeshMaterialPlugin);
+            .add_plugin(WaterMeshMaterialPlugin)
+            .add_plugin(ParticleMaterialPlugin)
+            .add_plugin(ParticleRenderPlugin);
     }
 }

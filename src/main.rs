@@ -18,6 +18,7 @@ use bevy_egui::EguiContext;
 use std::{path::Path, sync::Arc};
 
 mod components;
+mod effect_loader;
 mod events;
 mod fly_camera;
 mod follow_camera;
@@ -52,8 +53,8 @@ use systems::{
     game_zone_change_system, item_drop_model_add_collider_system, item_drop_model_system,
     load_zone_system, login_connection_system, login_state_enter_system, login_state_exit_system,
     login_system, model_viewer_enter_system, model_viewer_system, npc_model_add_collider_system,
-    npc_model_system, update_position_system, world_connection_system, zone_viewer_setup_system,
-    zone_viewer_system, DebugInspectorPlugin,
+    npc_model_system, particle_sequence_system, update_position_system, world_connection_system,
+    zone_viewer_setup_system, zone_viewer_system, DebugInspectorPlugin,
 };
 use ui::{
     ui_chatbox_system, ui_diagnostics_system, ui_drag_and_drop_system, ui_hotbar_system,
@@ -319,6 +320,7 @@ fn main() {
         .add_system(collision_system)
         .add_system(collision_add_colliders_system)
         .add_system(animation_system.label("animation_system"))
+        .add_system(particle_sequence_system)
         .add_system(ui_diagnostics_system);
 
     // Run zone change system after Update, so we do can add/remove entities

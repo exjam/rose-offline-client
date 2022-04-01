@@ -1,12 +1,11 @@
 use std::cmp::Ordering;
 
 use bevy::{
-    core::Time,
     hierarchy::DespawnRecursiveExt,
     math::Vec3,
     prelude::{
-        Commands, Entity, GlobalTransform, PerspectiveCameraBundle, Query, Res, ResMut, Transform,
-        With,
+        AssetServer, Assets, Commands, Entity, GlobalTransform, PerspectiveCameraBundle, Query,
+        Res, ResMut, Transform, With,
     },
     render::camera::Camera3d,
 };
@@ -24,9 +23,12 @@ use crate::{
     components::{
         ActiveMotion, CharacterModel, DebugRenderCollider, DebugRenderSkeleton, NpcModel,
     },
+    effect_loader::spawn_effect,
     fly_camera::{FlyCameraBundle, FlyCameraController},
     follow_camera::FollowCameraController,
+    render::{EffectMeshMaterial, ParticleMaterial},
     resources::{GameData, Icons},
+    VfsResource,
 };
 
 pub struct ModelViewerState {
@@ -50,6 +52,10 @@ pub fn model_viewer_enter_system(
     mut commands: Commands,
     query_cameras: Query<Entity, With<Camera3d>>,
     game_data: Res<GameData>,
+    vfs_resource: Res<VfsResource>,
+    asset_server: Res<AssetServer>,
+    mut effect_mesh_materials: ResMut<Assets<EffectMeshMaterial>>,
+    mut particle_materials: ResMut<Assets<ParticleMaterial>>,
 ) {
     // Reset camera
     for entity in query_cameras.iter() {
@@ -91,13 +97,22 @@ pub fn model_viewer_enter_system(
         },
 
         npcs: Vec::new(),
-        num_npcs: 5,
+        num_npcs: 1,
         max_num_npcs: game_data.npcs.iter().count(),
 
         characters: Vec::new(),
-        num_characters: 5,
+        num_characters: 0,
         max_num_characters: 500,
     });
+
+    spawn_effect(
+        &vfs_resource.vfs,
+        &mut commands,
+        &asset_server,
+        &mut particle_materials,
+        &mut effect_mesh_materials,
+        "3DDATA/EFFECT/TWIST_01.EFT".into(),
+    );
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -112,7 +127,6 @@ pub fn model_viewer_system(
     query_debug_skeletons: Query<Entity, With<DebugRenderSkeleton>>,
     game_data: Res<GameData>,
     icons: Res<Icons>,
-    time: Res<Time>,
     mut egui_context: ResMut<EguiContext>,
 ) {
     egui::Window::new("Model Viewer").show(egui_context.ctx_mut(), |ui| {
@@ -298,14 +312,12 @@ pub fn model_viewer_system(
                     for (entity, character_model) in query_character_model.iter() {
                         commands.entity(entity).insert(ActiveMotion::new_repeating(
                             character_model.action_motions[character_action].clone(),
-                            time.seconds_since_startup(),
                         ));
                     }
 
                     for (entity, npc_model) in query_npc_model.iter() {
                         commands.entity(entity).insert(ActiveMotion::new_repeating(
                             npc_model.action_motions[npc_action].clone(),
-                            time.seconds_since_startup(),
                         ));
                     }
                 }

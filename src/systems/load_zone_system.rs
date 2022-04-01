@@ -32,10 +32,12 @@ use crate::{
         COLLISION_FILTER_INSPECTABLE, COLLISION_GROUP_ZONE_OBJECT, COLLISION_GROUP_ZONE_TERRAIN,
         COLLISION_GROUP_ZONE_WATER,
     },
+    effect_loader::spawn_effect,
     events::{LoadZoneEvent, ZoneEvent},
     render::{
-        StaticMeshMaterial, TerrainMaterial, TextureArray, TextureArrayBuilder, WaterMeshMaterial,
-        MESH_ATTRIBUTE_UV_1, TERRAIN_MESH_ATTRIBUTE_TILE_INFO,
+        EffectMeshMaterial, ParticleMaterial, StaticMeshMaterial, TerrainMaterial, TextureArray,
+        TextureArrayBuilder, WaterMeshMaterial, MESH_ATTRIBUTE_UV_1,
+        TERRAIN_MESH_ATTRIBUTE_TILE_INFO,
     },
     resources::GameData,
     VfsResource,
@@ -119,10 +121,11 @@ pub fn load_zone_system(
     game_data: Res<GameData>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut terrain_materials: ResMut<Assets<TerrainMaterial>>,
+    mut effect_mesh_materials: ResMut<Assets<EffectMeshMaterial>>,
+    mut particle_materials: ResMut<Assets<ParticleMaterial>>,
     mut static_mesh_materials: ResMut<Assets<StaticMeshMaterial>>,
     mut water_mesh_materials: ResMut<Assets<WaterMeshMaterial>>,
     mut texture_arrays: ResMut<Assets<TextureArray>>,
-
     mut load_zone_state: Local<LoadZoneState>,
     mut load_zone_event: EventReader<LoadZoneEvent>,
     mut zone_events: EventWriter<ZoneEvent>,
@@ -184,6 +187,8 @@ pub fn load_zone_system(
             &vfs_resource,
             &mut meshes,
             &mut terrain_materials,
+            &mut effect_mesh_materials,
+            &mut particle_materials,
             &mut static_mesh_materials,
             &mut water_mesh_materials,
             &mut texture_arrays,
@@ -200,6 +205,8 @@ fn load_zone(
     vfs_resource: &VfsResource,
     meshes: &mut ResMut<Assets<Mesh>>,
     terrain_materials: &mut ResMut<Assets<TerrainMaterial>>,
+    effect_mesh_materials: &mut ResMut<Assets<EffectMeshMaterial>>,
+    particle_materials: &mut ResMut<Assets<ParticleMaterial>>,
     static_mesh_materials: &mut ResMut<Assets<StaticMeshMaterial>>,
     water_mesh_materials: &mut ResMut<Assets<WaterMeshMaterial>>,
     texture_arrays: &mut ResMut<Assets<TextureArray>>,
@@ -312,6 +319,9 @@ fn load_zone(
                         load_block_object(
                             commands,
                             asset_server,
+                            vfs_resource,
+                            effect_mesh_materials.as_mut(),
+                            particle_materials.as_mut(),
                             static_mesh_materials.as_mut(),
                             zsc_cnst,
                             &lightmap_path,
@@ -340,6 +350,9 @@ fn load_zone(
                         load_block_object(
                             commands,
                             asset_server,
+                            vfs_resource,
+                            effect_mesh_materials.as_mut(),
+                            particle_materials.as_mut(),
                             static_mesh_materials.as_mut(),
                             zsc_deco,
                             &lightmap_path,
@@ -596,6 +609,9 @@ fn load_block_waterplanes(
 fn load_block_object(
     commands: &mut Commands,
     asset_server: &AssetServer,
+    vfs_resource: &VfsResource,
+    effect_mesh_materials: &mut Assets<EffectMeshMaterial>,
+    particle_materials: &mut Assets<ParticleMaterial>,
     static_mesh_materials: &mut Assets<StaticMeshMaterial>,
     zsc: &ZscFile,
     lightmap_path: &Path,
@@ -628,30 +644,29 @@ fn load_block_object(
         vec![None; zsc.materials.len()];
     let mut mesh_cache: Vec<Option<Handle<Mesh>>> = vec![None; zsc.meshes.len()];
 
-    commands
+    let object_entity = commands
         .spawn_bundle((object_transform, GlobalTransform::default()))
         .with_children(|object_commands| {
             for (part_index, object_part) in object.parts.iter().enumerate() {
-                let part_transform = //object_transform *
-            Transform::default()
-                .with_translation(
-                    Vec3::new(
-                        object_part.position.x,
-                        object_part.position.z,
-                        -object_part.position.y,
-                    ) / 100.0,
-                )
-                .with_rotation(Quat::from_xyzw(
-                    object_part.rotation.x,
-                    object_part.rotation.z,
-                    -object_part.rotation.y,
-                    object_part.rotation.w,
-                ))
-                .with_scale(Vec3::new(
-                    object_part.scale.x,
-                    object_part.scale.z,
-                    object_part.scale.y,
-                ));
+                let part_transform = Transform::default()
+                    .with_translation(
+                        Vec3::new(
+                            object_part.position.x,
+                            object_part.position.z,
+                            -object_part.position.y,
+                        ) / 100.0,
+                    )
+                    .with_rotation(Quat::from_xyzw(
+                        object_part.rotation.x,
+                        object_part.rotation.z,
+                        -object_part.rotation.y,
+                        object_part.rotation.w,
+                    ))
+                    .with_scale(Vec3::new(
+                        object_part.scale.x,
+                        object_part.scale.z,
+                        object_part.scale.y,
+                    ));
 
                 let mesh_id = object_part.mesh_id as usize;
                 let mesh = mesh_cache[mesh_id].clone().unwrap_or_else(|| {
@@ -744,13 +759,52 @@ fn load_block_object(
                 ));
 
                 let active_motion = object_part.animation_path.as_ref().map(|animation_path| {
-                    ActiveMotion::new_repeating(asset_server.load(animation_path.path()), 0.0)
+                    ActiveMotion::new_repeating(asset_server.load(animation_path.path()))
                 });
                 if let Some(active_motion) = active_motion {
                     part_commands.insert(active_motion);
                 }
             }
-        });
+        })
+        .id();
+
+    for object_effect in object.effects.iter() {
+        let effect_transform = Transform::default()
+            .with_translation(
+                Vec3::new(
+                    object_effect.position.x,
+                    object_effect.position.z,
+                    -object_effect.position.y,
+                ) / 100.0,
+            )
+            .with_rotation(Quat::from_xyzw(
+                object_effect.rotation.x,
+                object_effect.rotation.z,
+                -object_effect.rotation.y,
+                object_effect.rotation.w,
+            ))
+            .with_scale(Vec3::new(
+                object_effect.scale.x,
+                object_effect.scale.z,
+                object_effect.scale.y,
+            ));
+
+        // TODO: object_effect.effect_type
+
+        if let Some(effect_path) = zsc.effects.get(object_effect.effect_id as usize) {
+            if let Some(effect_entity) = spawn_effect(
+                &vfs_resource.vfs,
+                commands,
+                asset_server,
+                particle_materials,
+                effect_mesh_materials,
+                effect_path.into(),
+            ) {
+                commands.entity(object_entity).add_child(effect_entity);
+                commands.entity(effect_entity).insert(effect_transform);
+            }
+        }
+    }
 }
 
 fn load_animated_object(

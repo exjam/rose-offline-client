@@ -1,5 +1,4 @@
 use bevy::{
-    core::Time,
     math::Vec3,
     prelude::{
         AssetServer, Commands, Entity, EventWriter, FromWorld, Query, Res, ResMut, Transform, With,
@@ -70,7 +69,6 @@ pub fn login_state_enter_system(
     mut windows: ResMut<Windows>,
     query_cameras: Query<Entity, With<Camera3d>>,
     asset_server: Res<AssetServer>,
-    time: Res<Time>,
 ) {
     // Ensure cursor is not locked
     if let Some(window) = windows.get_primary_mut() {
@@ -90,7 +88,6 @@ pub fn login_state_enter_system(
             .remove::<FollowCameraController>()
             .insert(ActiveMotion::new_repeating(
                 asset_server.load("3DDATA/TITLE/CAMERA01_INTRO01.ZMO"),
-                time.seconds_since_startup(),
             ));
     }
 

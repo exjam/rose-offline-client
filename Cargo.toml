@@ -11,6 +11,7 @@ bevy-inspector-egui = "0.8.2"
 bevy_rapier3d = "0.12"
 bevy_polyline = "0.1"
 bitflags = "1.2"
+bytemuck = { version = "1.7.0", features = ["derive"] }
 clap = "3.1"
 crossbeam-channel = "0.5"
 enum-map = { version = "2.0", features = ["serde"] }
@@ -18,18 +19,19 @@ image = { version = "0.23", default-features = false, features = ["dds"] }
 lazy_static = "1.4.0"
 log = "0.4.14"
 md5 = "0.7.0"
+num-derive = "0.3"
 num-traits = "0.2"
 rand = "0.8"
 smooth-bevy-cameras = "0.2.0"
 thiserror = "1.0"
 tokio = { version = "1.17", features = ["rt", "net", "sync", "macros", "io-util"] }
-rose-data = { git = "https://github.com/exjam/rose-offline", rev = "666fba8bd7d9e09ff764f4e60bc6f3f3f25c3923" }
-rose-data-irose = { git = "https://github.com/exjam/rose-offline", rev = "666fba8bd7d9e09ff764f4e60bc6f3f3f25c3923" }
-rose-file-readers = { git = "https://github.com/exjam/rose-offline", rev = "666fba8bd7d9e09ff764f4e60bc6f3f3f25c3923" }
-rose-game-common = { git = "https://github.com/exjam/rose-offline", rev = "666fba8bd7d9e09ff764f4e60bc6f3f3f25c3923" }
-rose-game-irose = { git = "https://github.com/exjam/rose-offline", rev = "666fba8bd7d9e09ff764f4e60bc6f3f3f25c3923" }
-rose-network-common = { git = "https://github.com/exjam/rose-offline", rev = "666fba8bd7d9e09ff764f4e60bc6f3f3f25c3923" }
-rose-network-irose = { git = "https://github.com/exjam/rose-offline", rev = "666fba8bd7d9e09ff764f4e60bc6f3f3f25c3923" }
+rose-data = { git = "https://github.com/exjam/rose-offline", rev = "913ad83f64f92be5af8d6f5a70df9b04f12b24dc" }
+rose-data-irose = { git = "https://github.com/exjam/rose-offline", rev = "913ad83f64f92be5af8d6f5a70df9b04f12b24dc" }
+rose-file-readers = { git = "https://github.com/exjam/rose-offline", rev = "913ad83f64f92be5af8d6f5a70df9b04f12b24dc" }
+rose-game-common = { git = "https://github.com/exjam/rose-offline", rev = "913ad83f64f92be5af8d6f5a70df9b04f12b24dc" }
+rose-game-irose = { git = "https://github.com/exjam/rose-offline", rev = "913ad83f64f92be5af8d6f5a70df9b04f12b24dc" }
+rose-network-common = { git = "https://github.com/exjam/rose-offline", rev = "913ad83f64f92be5af8d6f5a70df9b04f12b24dc" }
+rose-network-irose = { git = "https://github.com/exjam/rose-offline", rev = "913ad83f64f92be5af8d6f5a70df9b04f12b24dc" }
 
 [patch.crates-io]
 bevy = { git = "https://github.com/exjam/bevy", rev = "434fc561ff30052900fa1542f3a5c2beb693cb39" }

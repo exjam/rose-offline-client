@@ -11,9 +11,9 @@ pub fn animation_system(
     mut commands: Commands,
     mut query_transform: Query<&mut Transform>,
     mut query_projection: Query<&mut PerspectiveProjection>,
-    query_active_motions: Query<(
+    mut query_active_motions: Query<(
         Entity,
-        &ActiveMotion,
+        &mut ActiveMotion,
         Option<&SkinnedMesh>,
         Option<&Camera3d>,
     )>,
@@ -22,15 +22,21 @@ pub fn animation_system(
 ) {
     let current_time = time.seconds_since_startup();
 
-    for (entity, active_motion, skinned_mesh, camera_3d) in query_active_motions.iter() {
+    for (entity, mut active_motion, skinned_mesh, camera_3d) in query_active_motions.iter_mut() {
         let current_motion = motion_assets.get(&active_motion.motion);
         if current_motion.is_none() {
             continue;
         }
         let current_motion = current_motion.unwrap();
 
-        let current_animation_time = current_time - active_motion.start_time;
-        let current_frame_index_exact = current_animation_time
+        let start_time = if let Some(start_time) = active_motion.start_time {
+            start_time
+        } else {
+            active_motion.start_time = Some(current_time);
+            current_time
+        };
+
+        let current_frame_index_exact = (current_time - start_time)
             * (current_motion.fps() as f64)
             * active_motion.animation_speed as f64;
         let current_frame_fract = current_frame_index_exact.fract() as f32;

@@ -1,5 +1,4 @@
 use bevy::{
-    core::Time,
     ecs::system::EntityCommands,
     hierarchy::DespawnRecursiveExt,
     math::{Quat, Vec3, Vec3Swizzles},
@@ -156,7 +155,6 @@ fn update_active_motion(
     entity_commands: &mut EntityCommands,
     active_motion: &mut Option<Mut<ActiveMotion>>,
     motion: Handle<ZmoAsset>,
-    time: &Time,
     animation_speed: f32,
     repeat: bool,
 ) {
@@ -169,11 +167,9 @@ fn update_active_motion(
     }
 
     entity_commands.insert(if repeat {
-        ActiveMotion::new_repeating(motion, time.seconds_since_startup())
-            .with_animation_speed(animation_speed)
+        ActiveMotion::new_repeating(motion).with_animation_speed(animation_speed)
     } else {
-        ActiveMotion::new_once(motion, time.seconds_since_startup())
-            .with_animation_speed(animation_speed)
+        ActiveMotion::new_once(motion).with_animation_speed(animation_speed)
     });
 }
 
@@ -204,7 +200,6 @@ pub fn command_system(
     query_move_target: Query<(&Position, &ClientEntity)>,
     query_attack_target: Query<(&Position, &HealthPoints)>,
     game_connection: Option<Res<GameConnection>>,
-    time: Res<Time>,
 ) {
     let mut rng = rand::thread_rng();
 
@@ -253,7 +248,6 @@ pub fn command_system(
                         &mut commands.entity(entity),
                         &mut active_motion,
                         motion,
-                        &time,
                         1.0,
                         true,
                     );
@@ -274,7 +268,6 @@ pub fn command_system(
                         &mut commands.entity(entity),
                         &mut active_motion,
                         motion,
-                        &time,
                         1.0,
                         true,
                     );
@@ -365,7 +358,6 @@ pub fn command_system(
                             &mut entity_commands,
                             &mut active_motion,
                             motion,
-                            &time,
                             get_move_animation_speed(move_speed),
                             true,
                         );
@@ -418,7 +410,6 @@ pub fn command_system(
                             &mut entity_commands,
                             &mut active_motion,
                             motion,
-                            &time,
                             get_attack_animation_speed(ability_values),
                             false,
                         );
@@ -437,7 +428,6 @@ pub fn command_system(
                             &mut entity_commands,
                             &mut active_motion,
                             motion,
-                            &time,
                             get_move_animation_speed(move_speed),
                             true,
                         );
@@ -461,7 +451,6 @@ pub fn command_system(
                         &mut commands.entity(entity),
                         &mut active_motion,
                         motion,
-                        &time,
                         1.0,
                         false,
                     );
@@ -484,7 +473,6 @@ pub fn command_system(
                         &mut commands.entity(entity),
                         &mut active_motion,
                         motion,
-                        &time,
                         1.0,
                         false,
                     );

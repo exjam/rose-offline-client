@@ -1,5 +1,4 @@
 use bevy::{
-    core::Time,
     math::{Quat, Vec3, Vec3A},
     prelude::{
         AssetServer, Assets, Changed, Commands, Component, Entity, GlobalTransform, Query, Res,
@@ -32,7 +31,6 @@ pub fn item_drop_model_system(
     asset_server: Res<AssetServer>,
     model_loader: Res<ModelLoader>,
     mut static_mesh_materials: ResMut<Assets<StaticMeshMaterial>>,
-    time: Res<Time>,
 ) {
     for (entity, item_drop, mut current_item_drop_model) in query.iter_mut() {
         if let Some(current_item_drop_model) = current_item_drop_model.as_mut() {
@@ -58,10 +56,7 @@ pub fn item_drop_model_system(
         let root_model_bone = item_drop_model.root_bone;
         commands
             .entity(root_model_bone)
-            .insert_bundle((ActiveMotion::new_once(
-                drop_motion,
-                time.seconds_since_startup(),
-            ),));
+            .insert_bundle((ActiveMotion::new_once(drop_motion),));
 
         commands.entity(entity).insert(item_drop_model);
     }
