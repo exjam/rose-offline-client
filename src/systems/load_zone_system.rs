@@ -1,3 +1,4 @@
+use arrayvec::ArrayVec;
 use bevy::{
     asset::LoadState,
     hierarchy::BuildChildren,
@@ -644,6 +645,7 @@ fn load_block_object(
         vec![None; zsc.materials.len()];
     let mut mesh_cache: Vec<Option<Handle<Mesh>>> = vec![None; zsc.meshes.len()];
 
+    let mut part_entities: ArrayVec<Entity, 32> = ArrayVec::new();
     let object_entity = commands
         .spawn_bundle((object_transform, GlobalTransform::default()))
         .with_children(|object_commands| {
@@ -764,6 +766,8 @@ fn load_block_object(
                 if let Some(active_motion) = active_motion {
                     part_commands.insert(active_motion);
                 }
+
+                part_entities.push(part_commands.id());
             }
         })
         .id();
@@ -800,7 +804,17 @@ fn load_block_object(
                 effect_mesh_materials,
                 effect_path.into(),
             ) {
-                commands.entity(object_entity).add_child(effect_entity);
+                if let Some(parent_part_entity) = object_effect
+                    .parent
+                    .and_then(|parent_part_index| part_entities.get(parent_part_index as usize))
+                {
+                    commands
+                        .entity(*parent_part_entity)
+                        .add_child(effect_entity);
+                } else {
+                    commands.entity(object_entity).add_child(effect_entity);
+                }
+
                 commands.entity(effect_entity).insert(effect_transform);
             }
         }

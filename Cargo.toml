@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.4"
+arrayvec = "0.7"
 bevy = { version = "0.7.0-dev", features = ["dds", "trace_tracy"] }
 bevy_egui = "0.12.1"
 bevy-inspector-egui = "0.8.2"
