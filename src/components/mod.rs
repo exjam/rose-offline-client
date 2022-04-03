@@ -23,7 +23,7 @@ pub use collision::{
 };
 pub use command::{Command, CommandAttack, CommandMove, NextCommand};
 pub use debug_render::{DebugRenderCollider, DebugRenderSkeleton};
-pub use effect::Effect;
+pub use effect::{Effect, EffectMesh, EffectParticle};
 pub use item_drop_model::ItemDropModel;
 pub use npc_model::NpcModel;
 pub use particle_sequence::{ActiveParticle, ParticleSequence};

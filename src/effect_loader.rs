@@ -13,7 +13,7 @@ use bevy::{
 use rose_file_readers::{EftFile, EftMesh, EftParticle, PtlFile, VfsIndex, VfsPath};
 
 use crate::{
-    components::{Effect, ParticleSequence},
+    components::{Effect, EffectMesh, EffectParticle, ParticleSequence},
     render::{
         particle_render_data::{ParticleRenderBillboardType, ParticleRenderData},
         EffectMeshMaterial, ParticleMaterial,
@@ -118,6 +118,7 @@ fn spawn_mesh(
             ))
             .with_children(|child_builder| {
                 child_builder.spawn_bundle((
+                    EffectMesh {},
                     asset_server.load::<Mesh, _>(eft_mesh.mesh_file.path()),
                     effect_mesh_materials.add(EffectMeshMaterial {
                         base_texture: Some(asset_server.load(eft_mesh.mesh_texture_file.path())),
@@ -197,6 +198,7 @@ fn spawn_particle(
             .with_children(|child_builder| {
                 for sequence in ptl_file.sequences {
                     child_builder.spawn_bundle((
+                        EffectParticle {},
                         ParticleRenderData::new(
                             sequence.num_particles as usize,
                             sequence.blend_op as u8,
