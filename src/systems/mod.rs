@@ -17,6 +17,7 @@ mod login_system;
 mod model_viewer_system;
 mod npc_model_system;
 mod particle_sequence_system;
+mod player_character_event_system;
 mod update_position_system;
 mod world_connection_system;
 mod zone_viewer_system;
@@ -43,6 +44,7 @@ pub use login_system::{login_state_enter_system, login_state_exit_system, login_
 pub use model_viewer_system::{model_viewer_enter_system, model_viewer_system};
 pub use npc_model_system::{npc_model_add_collider_system, npc_model_system};
 pub use particle_sequence_system::particle_sequence_system;
+pub use player_character_event_system::player_character_event_system;
 pub use update_position_system::update_position_system;
 pub use world_connection_system::world_connection_system;
 pub use zone_viewer_system::{zone_viewer_setup_system, zone_viewer_system};

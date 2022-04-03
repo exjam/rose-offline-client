@@ -35,7 +35,10 @@ mod zms_asset_loader;
 use rose_data::{CharacterMotionDatabaseOptions, NpcDatabaseOptions, ZoneId};
 use rose_file_readers::VfsIndex;
 
-use events::{ChatboxEvent, GameConnectionEvent, LoadZoneEvent, WorldConnectionEvent, ZoneEvent};
+use events::{
+    ChatboxEvent, GameConnectionEvent, LoadZoneEvent, PlayerCharacterEvent, WorldConnectionEvent,
+    ZoneEvent,
+};
 use fly_camera::FlyCameraPlugin;
 use follow_camera::FollowCameraPlugin;
 use model_loader::ModelLoader;
@@ -54,8 +57,8 @@ use systems::{
     item_drop_model_system, load_zone_system, login_connection_system, login_state_enter_system,
     login_state_exit_system, login_system, model_viewer_enter_system, model_viewer_system,
     npc_model_add_collider_system, npc_model_system, particle_sequence_system,
-    update_position_system, world_connection_system, zone_viewer_setup_system, zone_viewer_system,
-    DebugInspectorPlugin,
+    player_character_event_system, update_position_system, world_connection_system,
+    zone_viewer_setup_system, zone_viewer_system, DebugInspectorPlugin,
 };
 use ui::{
     ui_chatbox_system, ui_diagnostics_system, ui_drag_and_drop_system, ui_hotbar_system,
@@ -307,6 +310,7 @@ fn main() {
     app.insert_resource(Events::<ChatboxEvent>::default())
         .insert_resource(load_zone_events)
         .insert_resource(Events::<ZoneEvent>::default())
+        .insert_resource(Events::<PlayerCharacterEvent>::default())
         .insert_resource(Events::<GameConnectionEvent>::default())
         .insert_resource(Events::<WorldConnectionEvent>::default());
 
@@ -397,7 +401,8 @@ fn main() {
                 .with_system(ui_player_info_system.before("game_debug_ui_system"))
                 .with_system(ui_selected_target_system.before("game_debug_ui_system"))
                 .with_system(game_debug_ui_system.label("game_debug_ui_system"))
-                .with_system(game_input_system.after("game_debug_ui_system")),
+                .with_system(game_input_system.after("game_debug_ui_system"))
+                .with_system(player_character_event_system),
         );
     app.add_system_to_stage(CoreStage::PostUpdate, ui_drag_and_drop_system);
 

@@ -21,7 +21,7 @@ use crate::{
         ClientEntity, ClientEntityId, ClientEntityType, CollisionRayCastSource, Command,
         NextCommand, PlayerCharacter, Position,
     },
-    events::{ChatboxEvent, GameConnectionEvent},
+    events::{ChatboxEvent, GameConnectionEvent, PlayerCharacterEvent},
     resources::{AppState, GameConnection, GameData},
 };
 
@@ -101,6 +101,7 @@ pub fn game_connection_system(
     mut query_xp_stamina: Query<(&mut ExperiencePoints, &mut Stamina)>,
     mut query_health_points: Query<&mut HealthPoints>,
     mut game_connection_events: EventWriter<GameConnectionEvent>,
+    mut player_character_events: EventWriter<PlayerCharacterEvent>,
 ) {
     if game_connection.is_none() {
         return;
@@ -645,10 +646,8 @@ pub fn game_connection_system(
                     ));
 
                     if Some(entity) == client_entity_list.player_entity {
-                        chatbox_events.send(ChatboxEvent::System(format!(
-                            "Congratulations! You are now level {}!",
-                            message.level.level
-                        )));
+                        player_character_events
+                            .send(PlayerCharacterEvent::LevelUp(message.level.level));
                     }
                 }
             }
