@@ -26,8 +26,8 @@ pub use ability_values_system::ability_values_system;
 pub use animation_system::animation_system;
 pub use character_model_system::{character_model_add_collider_system, character_model_system};
 pub use character_select_system::{
-    character_select_enter_system, character_select_exit_system, character_select_models_system,
-    character_select_system,
+    character_select_enter_system, character_select_exit_system, character_select_input_system,
+    character_select_models_system, character_select_system,
 };
 pub use client_entity_event_system::client_entity_event_system;
 pub use collision_system::{collision_add_colliders_system, collision_system};
