@@ -292,7 +292,7 @@ pub fn particle_sequence_system(
 
         // Apply particle keyframes
         for particle_index in 0..particle_sequence.particles.len() {
-            if apply_timestep(&mut particle_sequence, particle_index, delta_time) {
+            if apply_timestep(&mut particle_sequence, particle_index, 4.8 * delta_time) {
                 let gravity = Vec3::new(
                     rng_gen_range(&mut rng, &particle_sequence.gravity_x),
                     rng_gen_range(&mut rng, &particle_sequence.gravity_y),
