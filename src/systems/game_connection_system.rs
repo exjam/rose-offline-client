@@ -5,11 +5,12 @@ use bevy::{
         GlobalTransform, Or, Query, Res, ResMut, State, Transform, Visibility, With,
     },
 };
+use bevy_rapier3d::prelude::ColliderShapeComponent;
 
 use rose_game_common::{
     components::{
         BasicStats, CharacterInfo, Equipment, ExperiencePoints, HealthPoints, Inventory, ItemDrop,
-        MoveMode, MoveSpeed, Npc, SkillList, Stamina, StatusEffects,
+        ManaPoints, MoveMode, MoveSpeed, Npc, SkillList, Stamina, StatusEffects,
     },
     messages::server::{CommandState, PickupItemDropContent, PickupItemDropError, ServerMessage},
 };
@@ -21,7 +22,7 @@ use crate::{
         PlayerCharacter, Position,
     },
     events::{ChatboxEvent, ClientEntityEvent, GameConnectionEvent},
-    resources::{AppState, ClientEntityList, GameConnection, GameData},
+    resources::{AppState, ClientEntityList, DamageDigitsSpawner, GameConnection, GameData},
 };
 
 fn get_entity_name(
@@ -62,9 +63,19 @@ pub fn game_connection_system(
     >,
     mut query_inventory: Query<(&mut Equipment, &mut Inventory)>,
     mut query_xp_stamina: Query<(&mut ExperiencePoints, &mut Stamina)>,
-    mut query_health_points: Query<&mut HealthPoints>,
+    mut query_health_points: Query<(&mut HealthPoints, Option<&ColliderShapeComponent>)>,
+    mut query_levelup: Query<(
+        &mut HealthPoints,
+        &mut ManaPoints,
+        &CharacterInfo,
+        &Equipment,
+        &BasicStats,
+        &SkillList,
+        &StatusEffects,
+    )>,
     mut game_connection_events: EventWriter<GameConnectionEvent>,
     mut client_entity_events: EventWriter<ClientEntityEvent>,
+    damage_digits_spawner: Res<DamageDigitsSpawner>,
 ) {
     if game_connection.is_none() {
         return;
@@ -484,11 +495,29 @@ pub fn game_connection_system(
             }
             Ok(ServerMessage::DamageEntity(message)) => {
                 if let Some(defender_entity) = client_entity_list.get(message.defender_entity_id) {
-                    if let Ok(mut health_points) = query_health_points.get_mut(defender_entity) {
+                    if let Ok((mut health_points, collider)) =
+                        query_health_points.get_mut(defender_entity)
+                    {
                         if health_points.hp < message.damage.amount as i32 {
                             health_points.hp = 0;
                         } else {
                             health_points.hp -= message.damage.amount as i32;
+                        }
+
+                        if let Some(damage_digits_entity) = damage_digits_spawner.spawn(
+                            &mut commands,
+                            message.damage.amount,
+                            client_entity_list
+                                .player_entity_id
+                                .map_or(false, |player_entity_id| {
+                                    message.defender_entity_id == player_entity_id
+                                }),
+                            collider
+                                .map_or(2.0, |collider| collider.compute_local_aabb().extents().y),
+                        ) {
+                            commands
+                                .entity(defender_entity)
+                                .add_child(damage_digits_entity);
                         }
                     }
 
@@ -607,6 +636,29 @@ pub fn game_connection_system(
                         message.stat_points,
                         message.skill_points,
                     ));
+
+                    // Update hp / mp to new max
+                    if let Ok((
+                        mut health_points,
+                        mut mana_points,
+                        character_info,
+                        equipment,
+                        basic_stats,
+                        skill_list,
+                        status_effects,
+                    )) = query_levelup.get_mut(entity)
+                    {
+                        let ability_values = game_data.ability_value_calculator.calculate(
+                            character_info,
+                            &message.level,
+                            equipment,
+                            basic_stats,
+                            skill_list,
+                            status_effects,
+                        );
+                        health_points.hp = ability_values.get_max_health();
+                        mana_points.mp = ability_values.get_max_mana();
+                    }
 
                     client_entity_events.send(ClientEntityEvent::LevelUp(
                         message.entity_id,

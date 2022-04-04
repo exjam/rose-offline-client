@@ -3,6 +3,7 @@ mod character_model;
 mod client_entity;
 mod collision;
 mod command;
+mod damage_digits;
 mod debug_render;
 mod effect;
 mod item_drop_model;
@@ -22,6 +23,7 @@ pub use collision::{
     COLLISION_GROUP_ZONE_TERRAIN, COLLISION_GROUP_ZONE_WATER,
 };
 pub use command::{Command, CommandAttack, CommandMove, NextCommand};
+pub use damage_digits::DamageDigits;
 pub use debug_render::{DebugRenderCollider, DebugRenderSkeleton};
 pub use effect::{Effect, EffectMesh, EffectParticle};
 pub use item_drop_model::ItemDropModel;

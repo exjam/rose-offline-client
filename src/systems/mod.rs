@@ -5,6 +5,7 @@ mod character_select_system;
 mod client_entity_event_system;
 mod collision_system;
 mod command_system;
+mod damage_digit_render_system;
 mod debug_inspector_system;
 mod debug_render_system;
 mod effect_system;
@@ -32,6 +33,7 @@ pub use character_select_system::{
 pub use client_entity_event_system::client_entity_event_system;
 pub use collision_system::{collision_add_colliders_system, collision_system};
 pub use command_system::command_system;
+pub use damage_digit_render_system::damage_digit_render_system;
 pub use debug_inspector_system::DebugInspectorPlugin;
 pub use debug_render_system::{debug_render_collider_system, debug_render_skeleton_system};
 pub use effect_system::effect_system;

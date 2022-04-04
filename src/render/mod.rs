@@ -3,6 +3,9 @@ use bevy::{
     render::{mesh::MeshVertexAttribute, render_resource::VertexFormat},
 };
 
+mod damage_digit_material;
+mod damage_digit_pipeline;
+mod damage_digit_render_data;
 mod effect_mesh_material;
 mod particle_material;
 mod particle_pipeline;
@@ -21,6 +24,8 @@ pub const MESH_ATTRIBUTE_UV_2: MeshVertexAttribute =
 pub const MESH_ATTRIBUTE_UV_3: MeshVertexAttribute =
     MeshVertexAttribute::new("Vertex_Uv4", 519697814, VertexFormat::Float32x2);
 
+pub use damage_digit_material::DamageDigitMaterial;
+pub use damage_digit_render_data::DamageDigitRenderData;
 pub use effect_mesh_material::EffectMeshMaterial;
 pub use particle_material::ParticleMaterial;
 pub use particle_render_data::{ParticleRenderBillboardType, ParticleRenderData};
@@ -29,6 +34,8 @@ pub use terrain_material::{TerrainMaterial, TERRAIN_MESH_ATTRIBUTE_TILE_INFO};
 pub use texture_array::{GpuTextureArray, TextureArray, TextureArrayBuilder};
 pub use water_mesh_material::WaterMeshMaterial;
 
+use damage_digit_material::DamageDigitMaterialPlugin;
+use damage_digit_pipeline::DamageDigitRenderPlugin;
 use effect_mesh_material::EffectMeshMaterialPlugin;
 use particle_material::ParticleMaterialPlugin;
 use particle_pipeline::ParticleRenderPlugin;
@@ -48,6 +55,8 @@ impl Plugin for RoseRenderPlugin {
             .add_plugin(StaticMeshMaterialPlugin)
             .add_plugin(WaterMeshMaterialPlugin)
             .add_plugin(ParticleMaterialPlugin)
-            .add_plugin(ParticleRenderPlugin);
+            .add_plugin(ParticleRenderPlugin)
+            .add_plugin(DamageDigitMaterialPlugin)
+            .add_plugin(DamageDigitRenderPlugin);
     }
 }

@@ -7,7 +7,7 @@ use bevy::{
     ecs::{event::Events, schedule::ShouldRun},
     log::{Level, LogSettings},
     prelude::{
-        AddAsset, App, AssetServer, Color, Commands, CoreStage, Msaa,
+        AddAsset, App, AssetServer, Assets, Color, Commands, CoreStage, Msaa,
         ParallelSystemDescriptorCoercion, PerspectiveCameraBundle, Res, ResMut, StageLabel, State,
         SystemSet, SystemStage,
     },
@@ -42,23 +42,24 @@ use events::{
 use fly_camera::FlyCameraPlugin;
 use follow_camera::FollowCameraPlugin;
 use model_loader::ModelLoader;
-use render::RoseRenderPlugin;
+use render::{DamageDigitMaterial, RoseRenderPlugin};
 use resources::{
-    run_network_thread, AppState, ClientEntityList, GameData, Icons, NetworkThread,
-    NetworkThreadMessage, ServerConfiguration,
+    run_network_thread, AppState, ClientEntityList, DamageDigitsSpawner, GameData, Icons,
+    NetworkThread, NetworkThreadMessage, ServerConfiguration,
 };
 use systems::{
     ability_values_system, animation_system, character_model_add_collider_system,
     character_model_system, character_select_enter_system, character_select_exit_system,
     character_select_input_system, character_select_models_system, character_select_system,
     client_entity_event_system, collision_add_colliders_system, collision_system, command_system,
-    debug_render_collider_system, debug_render_skeleton_system, effect_system,
-    game_connection_system, game_debug_ui_system, game_input_system, game_state_enter_system,
-    game_zone_change_system, item_drop_model_add_collider_system, item_drop_model_system,
-    load_zone_system, login_connection_system, login_state_enter_system, login_state_exit_system,
-    login_system, model_viewer_enter_system, model_viewer_system, npc_model_add_collider_system,
-    npc_model_system, particle_sequence_system, update_position_system, world_connection_system,
-    zone_viewer_setup_system, zone_viewer_system, DebugInspectorPlugin,
+    damage_digit_render_system, debug_render_collider_system, debug_render_skeleton_system,
+    effect_system, game_connection_system, game_debug_ui_system, game_input_system,
+    game_state_enter_system, game_zone_change_system, item_drop_model_add_collider_system,
+    item_drop_model_system, load_zone_system, login_connection_system, login_state_enter_system,
+    login_state_exit_system, login_system, model_viewer_enter_system, model_viewer_system,
+    npc_model_add_collider_system, npc_model_system, particle_sequence_system,
+    update_position_system, world_connection_system, zone_viewer_setup_system, zone_viewer_system,
+    DebugInspectorPlugin,
 };
 use ui::{
     ui_chatbox_system, ui_diagnostics_system, ui_drag_and_drop_system, ui_hotbar_system,
@@ -327,6 +328,7 @@ fn main() {
         .add_system(animation_system.label("animation_system"))
         .add_system(particle_sequence_system)
         .add_system(effect_system)
+        .add_system(damage_digit_render_system.after("animation_system"))
         .add_system(ui_diagnostics_system);
 
     // Run zone change system after Update, so we do can add/remove entities
@@ -438,6 +440,7 @@ fn load_game_data(
     vfs_resource: Res<VfsResource>,
     asset_server: Res<AssetServer>,
     mut egui_context: ResMut<EguiContext>,
+    mut damage_digit_materials: ResMut<Assets<DamageDigitMaterial>>,
 ) {
     let item_database = Arc::new(
         rose_data_irose::get_item_database(&vfs_resource.vfs)
@@ -521,4 +524,9 @@ fn load_game_data(
         item_pages,
         skill_pages,
     });
+
+    commands.insert_resource(DamageDigitsSpawner::load(
+        &asset_server,
+        &mut damage_digit_materials,
+    ));
 }
