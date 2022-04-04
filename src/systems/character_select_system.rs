@@ -191,13 +191,7 @@ pub fn character_select_models_system(
 
     // Ensure all models are playing correct animation
     for (entity, active_motion, character_model) in query_characters.iter() {
-        if let Some(active_motion) = active_motion {
-            if active_motion.complete {
-                commands.entity(entity).insert(ActiveMotion::new_repeating(
-                    character_model.action_motions[CharacterMotionAction::Stop1].clone(),
-                ));
-            }
-        } else {
+        if active_motion.is_none() {
             commands.entity(entity).insert(ActiveMotion::new_repeating(
                 character_model.action_motions[CharacterMotionAction::Stop1].clone(),
             ));

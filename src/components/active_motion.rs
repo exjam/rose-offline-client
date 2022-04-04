@@ -6,7 +6,6 @@ use crate::zmo_asset_loader::ZmoAsset;
 pub struct ActiveMotion {
     pub motion: Handle<ZmoAsset>,
     pub repeat_limit: Option<usize>, // If None, repeats forever
-    pub complete: bool,
     pub animation_speed: f32,
     pub start_time: Option<f64>,
 }
@@ -16,7 +15,6 @@ impl ActiveMotion {
         Self {
             motion,
             repeat_limit: None,
-            complete: false,
             animation_speed: 1.0,
             start_time: None,
         }
@@ -26,7 +24,6 @@ impl ActiveMotion {
         Self {
             motion,
             repeat_limit: Some(1),
-            complete: false,
             animation_speed: 1.0,
             start_time: None,
         }
@@ -37,7 +34,6 @@ impl ActiveMotion {
         Self {
             motion,
             repeat_limit: Some(repeat_count),
-            complete: false,
             animation_speed: 1.0,
             start_time: None,
         }

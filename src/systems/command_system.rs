@@ -220,7 +220,7 @@ pub fn command_system(
     {
         if !next_command.is_die()
             && command.requires_animation_complete()
-            && !active_motion.as_ref().map_or(true, |x| x.complete)
+            && active_motion.is_some()
         {
             // Current command still in animation
             continue;
