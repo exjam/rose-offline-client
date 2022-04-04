@@ -64,7 +64,7 @@ pub fn game_connection_system(
     mut query_xp_stamina: Query<(&mut ExperiencePoints, &mut Stamina)>,
     mut query_health_points: Query<&mut HealthPoints>,
     mut game_connection_events: EventWriter<GameConnectionEvent>,
-    mut player_character_events: EventWriter<PlayerCharacterEvent>,
+    mut client_entity_events: EventWriter<ClientEntityEvent>,
 ) {
     if game_connection.is_none() {
         return;
@@ -608,10 +608,10 @@ pub fn game_connection_system(
                         message.skill_points,
                     ));
 
-                    if Some(entity) == client_entity_list.player_entity {
-                        player_character_events
-                            .send(PlayerCharacterEvent::LevelUp(message.level.level));
-                    }
+                    client_entity_events.send(ClientEntityEvent::LevelUp(
+                        message.entity_id,
+                        message.level.level,
+                    ));
                 }
             }
             Ok(ServerMessage::UpdateSpeed(message)) => {

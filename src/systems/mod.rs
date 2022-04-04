@@ -2,6 +2,7 @@ mod ability_values_system;
 mod animation_system;
 mod character_model_system;
 mod character_select_system;
+mod client_entity_event_system;
 mod collision_system;
 mod command_system;
 mod debug_inspector_system;
@@ -17,7 +18,6 @@ mod login_system;
 mod model_viewer_system;
 mod npc_model_system;
 mod particle_sequence_system;
-mod player_character_event_system;
 mod update_position_system;
 mod world_connection_system;
 mod zone_viewer_system;
@@ -29,6 +29,7 @@ pub use character_select_system::{
     character_select_enter_system, character_select_exit_system, character_select_models_system,
     character_select_system,
 };
+pub use client_entity_event_system::client_entity_event_system;
 pub use collision_system::{collision_add_colliders_system, collision_system};
 pub use command_system::command_system;
 pub use debug_inspector_system::DebugInspectorPlugin;
@@ -44,7 +45,6 @@ pub use login_system::{login_state_enter_system, login_state_exit_system, login_
 pub use model_viewer_system::{model_viewer_enter_system, model_viewer_system};
 pub use npc_model_system::{npc_model_add_collider_system, npc_model_system};
 pub use particle_sequence_system::particle_sequence_system;
-pub use player_character_event_system::player_character_event_system;
 pub use update_position_system::update_position_system;
 pub use world_connection_system::world_connection_system;
 pub use zone_viewer_system::{zone_viewer_setup_system, zone_viewer_system};
