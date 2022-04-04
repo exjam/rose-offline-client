@@ -3,13 +3,13 @@ use std::ops::RangeInclusive;
 use bevy::{
     core::Time,
     math::{Vec3, Vec4},
-    prelude::{GlobalTransform, Query, Res},
+    prelude::{GlobalTransform, Query, Res, Transform},
 };
 use rand::Rng;
 use rose_file_readers::PtlKeyframeData;
 
 use crate::{
-    components::{ActiveParticle, ParticleSequence},
+    components::{ActiveParticle, ParticleSequence, ParticleUpdateCoords},
     render::particle_render_data::ParticleRenderData,
 };
 
@@ -327,11 +327,17 @@ pub fn particle_sequence_system(
             while particle_sequence.emit_counter > 1.0
                 && particle_sequence.particles.len() < particle_sequence.num_particles as usize
             {
-                let position = Vec3::new(
+                let mut position = Vec3::new(
                     rng_gen_range(&mut rng, &particle_sequence.emit_radius_x),
                     rng_gen_range(&mut rng, &particle_sequence.emit_radius_y),
                     rng_gen_range(&mut rng, &particle_sequence.emit_radius_z),
                 );
+                if matches!(particle_sequence.update_coords, ParticleUpdateCoords::World) {
+                    position.x += global_transform.translation.x * 100.0;
+                    position.y += global_transform.translation.z * 100.0;
+                    position.z += global_transform.translation.y * -100.0;
+                }
+
                 let life = rng_gen_range(&mut rng, &particle_sequence.particle_life);
                 let particle_index = particle_sequence.particles.len();
                 particle_sequence
@@ -347,6 +353,13 @@ pub fn particle_sequence_system(
         }
 
         // Update render data
+        let render_transform = match particle_sequence.update_coords {
+            ParticleUpdateCoords::World => Transform::default(),
+            ParticleUpdateCoords::LocalPosition => {
+                Transform::from_translation(global_transform.translation)
+            }
+            ParticleUpdateCoords::Local => (*global_transform).into(),
+        };
         let texture_atlas_total =
             particle_sequence.texture_atlas_cols * particle_sequence.texture_atlas_rows;
         let texture_atlas_uv_w = 1.0 / particle_sequence.texture_atlas_cols as f32;
@@ -363,7 +376,7 @@ pub fn particle_sequence_system(
             let texture_atlas_uv_y = texture_atlas_y as f32 * texture_atlas_uv_h;
 
             particle_render_data.add(
-                global_transform.mul_vec3(
+                render_transform.mul_vec3(
                     Vec3::new(
                         particle.position.x,
                         particle.position.z,

@@ -26,7 +26,7 @@ pub use debug_render::{DebugRenderCollider, DebugRenderSkeleton};
 pub use effect::{Effect, EffectMesh, EffectParticle};
 pub use item_drop_model::ItemDropModel;
 pub use npc_model::NpcModel;
-pub use particle_sequence::{ActiveParticle, ParticleSequence};
+pub use particle_sequence::{ActiveParticle, ParticleSequence, ParticleUpdateCoords};
 pub use player_character::PlayerCharacter;
 pub use position::Position;
 pub use selected_target::SelectedTarget;

@@ -64,6 +64,12 @@ pub struct ParticleSequenceKeyframe {
     pub data: PtlKeyframeData,
 }
 
+pub enum ParticleUpdateCoords {
+    World,
+    LocalPosition,
+    Local,
+}
+
 #[derive(Component)]
 pub struct ParticleSequence {
     pub emit_rate: RangeInclusive<f32>,
@@ -77,7 +83,7 @@ pub struct ParticleSequence {
     pub keyframes: Vec<ParticleSequenceKeyframe>,
     pub texture_atlas_cols: u32,
     pub texture_atlas_rows: u32,
-    pub inherit_transform: bool,
+    pub update_coords: ParticleUpdateCoords,
     pub num_loops: u32,
     pub num_particles: u32,
 
@@ -137,7 +143,12 @@ impl ParticleSequence {
             gravity_z: sequence.gravity_z,
             texture_atlas_cols: sequence.texture_atlas_cols,
             texture_atlas_rows: sequence.texture_atlas_rows,
-            inherit_transform: sequence.update_coords != 0,
+            update_coords: match sequence.update_coords {
+                0 => ParticleUpdateCoords::World,
+                1 => ParticleUpdateCoords::LocalPosition,
+                2 => ParticleUpdateCoords::Local,
+                _ => ParticleUpdateCoords::World,
+            },
             num_loops: sequence.num_loops,
             num_particles: sequence.num_particles,
             start_delay: 0.0,
