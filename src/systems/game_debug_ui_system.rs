@@ -31,7 +31,7 @@ pub struct GameDebugUiState {
 impl Default for GameDebugUiState {
     fn default() -> Self {
         Self {
-            show_debug_ui: true,
+            show_debug_ui: false,
             show_zone_list: false,
             show_object_inspector: false,
             selected_camera_type: DebugCameraType::Follow,

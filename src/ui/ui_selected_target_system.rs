@@ -26,7 +26,7 @@ pub fn ui_selected_target_system(
             query_target.get(player_target.entity)
         {
             egui::Window::new("Selected Target")
-                .anchor(egui::Align2::CENTER_TOP, [0.0, 30.0])
+                .anchor(egui::Align2::CENTER_TOP, [0.0, 10.0])
                 .collapsible(false)
                 .title_bar(false)
                 .show(egui_context.ctx_mut(), |ui| {

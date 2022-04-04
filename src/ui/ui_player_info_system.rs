@@ -31,7 +31,7 @@ pub fn ui_player_info_system(
     ) = query_player.single();
 
     egui::Window::new("Player Info")
-        .anchor(egui::Align2::LEFT_TOP, [10.0, 30.0])
+        .anchor(egui::Align2::LEFT_TOP, [10.0, 10.0])
         .collapsible(false)
         .title_bar(false)
         .show(egui_context.ctx_mut(), |ui| {
