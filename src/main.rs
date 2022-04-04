@@ -397,15 +397,15 @@ fn main() {
                 .with_system(ability_values_system)
                 .with_system(command_system.after("animation_system"))
                 .with_system(update_position_system)
-                .with_system(ui_chatbox_system.before("game_debug_ui_system"))
-                .with_system(ui_inventory_system.before("game_debug_ui_system"))
-                .with_system(ui_hotbar_system.before("game_debug_ui_system"))
-                .with_system(ui_skill_list_system.before("game_debug_ui_system"))
-                .with_system(ui_player_info_system.before("game_debug_ui_system"))
-                .with_system(ui_selected_target_system.before("game_debug_ui_system"))
-                .with_system(ui_window_system.before("game_debug_ui_system"))
                 .with_system(game_debug_ui_system.label("game_debug_ui_system"))
-                .with_system(game_input_system.after("game_debug_ui_system"))
+                .with_system(ui_chatbox_system.after("game_debug_ui_system"))
+                .with_system(ui_inventory_system.after("game_debug_ui_system"))
+                .with_system(ui_hotbar_system.after("game_debug_ui_system"))
+                .with_system(ui_skill_list_system.after("game_debug_ui_system"))
+                .with_system(ui_player_info_system.after("game_debug_ui_system"))
+                .with_system(ui_selected_target_system.after("game_debug_ui_system"))
+                .with_system(ui_window_system.after("game_debug_ui_system"))
+                .with_system(game_input_system)
                 .with_system(client_entity_event_system),
         );
     app.add_system_to_stage(CoreStage::PostUpdate, ui_drag_and_drop_system);
