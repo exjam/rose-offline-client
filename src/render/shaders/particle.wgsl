@@ -1,4 +1,3 @@
-// TODO: try merging this block with the binding?
 struct View {
     view_proj: mat4x4<f32>;
     world_position: vec3<f32>;
@@ -37,12 +36,12 @@ struct VertexOutput {
 [[stage(vertex)]]
 fn vs_main(model: VertexInput) -> VertexOutput {
   var vertex_positions: array<vec2<f32>, 6> = array<vec2<f32>, 6>(
-    vec2<f32>(-0.5, -0.5),
-    vec2<f32>(0.5, 0.5),
-    vec2<f32>(-0.5, 0.5),
-    vec2<f32>(-0.5, -0.5),
-    vec2<f32>(0.5, -0.5),
-    vec2<f32>(0.5, 0.5),
+    vec2<f32>(-1.0, -1.0),
+    vec2<f32>(1.0, 1.0),
+    vec2<f32>(-1.0, 1.0),
+    vec2<f32>(-1.0, -1.0),
+    vec2<f32>(1.0, -1.0),
+    vec2<f32>(1.0, 1.0),
   );
 
   let vert_idx = model.vertex_idx % 6u;
