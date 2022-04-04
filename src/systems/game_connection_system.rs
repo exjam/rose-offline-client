@@ -2,11 +2,10 @@ use bevy::{
     math::{Quat, Vec3},
     prelude::{
         BuildChildren, Commands, ComputedVisibility, DespawnRecursiveExt, Entity, EventWriter,
-        GlobalTransform, Local, Or, Query, Res, ResMut, State, Transform, Visibility, With,
+        GlobalTransform, Or, Query, Res, ResMut, State, Transform, Visibility, With,
     },
 };
 
-use rose_data::ZoneId;
 use rose_game_common::{
     components::{
         BasicStats, CharacterInfo, Equipment, ExperiencePoints, HealthPoints, Inventory, ItemDrop,
@@ -18,48 +17,12 @@ use rose_network_common::ConnectionError;
 
 use crate::{
     components::{
-        ClientEntity, ClientEntityId, ClientEntityType, CollisionRayCastSource, Command,
-        NextCommand, PlayerCharacter, Position,
+        ClientEntity, ClientEntityType, CollisionRayCastSource, Command, NextCommand,
+        PlayerCharacter, Position,
     },
-    events::{ChatboxEvent, GameConnectionEvent, PlayerCharacterEvent},
-    resources::{AppState, GameConnection, GameData},
+    events::{ChatboxEvent, ClientEntityEvent, GameConnectionEvent},
+    resources::{AppState, ClientEntityList, GameConnection, GameData},
 };
-
-pub struct ClientEntityList {
-    pub client_entities: Vec<Option<Entity>>,
-    pub player_entity: Option<Entity>,
-    pub player_entity_id: Option<ClientEntityId>,
-    pub zone_id: Option<ZoneId>,
-}
-
-impl Default for ClientEntityList {
-    fn default() -> Self {
-        Self {
-            client_entities: vec![None; 4096],
-            player_entity: None,
-            player_entity_id: None,
-            zone_id: None,
-        }
-    }
-}
-
-impl ClientEntityList {
-    pub fn add(&mut self, id: ClientEntityId, entity: Entity) {
-        self.client_entities[id.0 as usize] = Some(entity);
-    }
-
-    pub fn remove(&mut self, id: ClientEntityId) {
-        self.client_entities[id.0 as usize] = None;
-    }
-
-    pub fn clear(&mut self) {
-        self.client_entities.fill(None);
-    }
-
-    pub fn get(&self, id: ClientEntityId) -> Option<Entity> {
-        self.client_entities[id.0 as usize]
-    }
-}
 
 fn get_entity_name(
     entity: Entity,
@@ -92,7 +55,7 @@ pub fn game_connection_system(
     game_data: Res<GameData>,
     mut app_state: ResMut<State<AppState>>,
     mut chatbox_events: EventWriter<ChatboxEvent>,
-    mut client_entity_list: Local<ClientEntityList>,
+    mut client_entity_list: ResMut<ClientEntityList>,
     query_entity_name: Query<
         (Option<&CharacterInfo>, Option<&Npc>),
         Or<(With<CharacterInfo>, With<Npc>)>,

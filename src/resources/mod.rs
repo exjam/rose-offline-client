@@ -1,6 +1,7 @@
 mod account;
 mod app_state;
 mod character_list;
+mod client_entity_list;
 mod game_connection;
 mod game_data;
 mod icons;
@@ -13,6 +14,7 @@ mod world_connection;
 pub use account::Account;
 pub use app_state::AppState;
 pub use character_list::CharacterList;
+pub use client_entity_list::ClientEntityList;
 pub use game_connection::GameConnection;
 pub use game_data::GameData;
 pub use icons::Icons;

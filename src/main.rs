@@ -388,6 +388,7 @@ fn main() {
     // Game
     app.insert_resource(UiStateDragAndDrop::default())
         .insert_resource(UiStateWindows::default())
+        .insert_resource(ClientEntityList::default());
 
     app.add_system_set(SystemSet::on_enter(AppState::Game).with_system(game_state_enter_system))
         .add_system_set(
