@@ -76,15 +76,23 @@ pub fn ui_chatbox_system(
                         }
                     });
 
-                ui.text_edit_singleline(&mut ui_state_chatbox.textbox_text);
+                let response = ui.text_edit_singleline(&mut ui_state_chatbox.textbox_text);
 
                 if ui.input().key_pressed(egui::Key::Enter) {
-                    if let Some(game_connection) = game_connection.as_ref() {
-                        game_connection
-                            .client_message_tx
-                            .send(ClientMessage::Chat(ui_state_chatbox.textbox_text.clone()))
-                            .ok();
-                        ui_state_chatbox.textbox_text.clear();
+                    if response.lost_focus() {
+                        if !ui_state_chatbox.textbox_text.is_empty() {
+                            if let Some(game_connection) = game_connection.as_ref() {
+                                game_connection
+                                    .client_message_tx
+                                    .send(ClientMessage::Chat(
+                                        ui_state_chatbox.textbox_text.clone(),
+                                    ))
+                                    .ok();
+                                ui_state_chatbox.textbox_text.clear();
+                            }
+                        }
+                    } else {
+                        response.request_focus();
                     }
                 }
             });
