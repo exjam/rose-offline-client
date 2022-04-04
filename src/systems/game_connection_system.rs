@@ -6,7 +6,6 @@ use bevy::{
         Visibility, With,
     },
 };
-use bevy_rapier3d::prelude::ColliderShapeComponent;
 
 use rose_game_common::{
     components::{
@@ -20,10 +19,10 @@ use rose_network_common::ConnectionError;
 use crate::{
     components::{
         ClientEntity, ClientEntityType, CollisionRayCastSource, Command, NextCommand,
-        PlayerCharacter, Position,
+        PendingDamageList, PlayerCharacter, Position,
     },
     events::{ChatboxEvent, ClientEntityEvent, GameConnectionEvent},
-    resources::{AppState, ClientEntityList, DamageDigitsSpawner, GameConnection, GameData},
+    resources::{AppState, ClientEntityList, GameConnection, GameData},
 };
 
 fn get_entity_name(
@@ -62,9 +61,9 @@ pub fn game_connection_system(
         (Option<&CharacterInfo>, Option<&Npc>),
         Or<(With<CharacterInfo>, With<Npc>)>,
     >,
+    mut query_pending_damage_list: Query<&mut PendingDamageList>,
     mut query_set_character: QuerySet<(
         QueryState<(&mut Equipment, &mut Inventory)>,
-        QueryState<(&mut HealthPoints, Option<&ColliderShapeComponent>)>,
         QueryState<(
             &mut HealthPoints,
             &mut ManaPoints,
@@ -78,7 +77,6 @@ pub fn game_connection_system(
     mut query_xp_stamina: Query<(&mut ExperiencePoints, &mut Stamina)>,
     mut game_connection_events: EventWriter<GameConnectionEvent>,
     mut client_entity_events: EventWriter<ClientEntityEvent>,
-    damage_digits_spawner: Res<DamageDigitsSpawner>,
 ) {
     if game_connection.is_none() {
         return;
@@ -134,6 +132,7 @@ pub fn game_connection_system(
                             status_effects,
                             move_mode,
                             move_speed,
+                            PendingDamageList::default(),
                             PlayerCharacter {},
                             Transform::from_xyz(
                                 character_data.position.x / 100.0,
@@ -258,6 +257,7 @@ pub fn game_connection_system(
                         message.move_speed,
                         ability_values,
                         status_effects,
+                        PendingDamageList::default(),
                     ))
                     .insert_bundle((
                         ClientEntity::new(message.entity_id, ClientEntityType::Character),
@@ -330,6 +330,7 @@ pub fn game_connection_system(
                         ability_values,
                         move_speed,
                         status_effects,
+                        PendingDamageList::default(),
                     ))
                     .insert_bundle((
                         ClientEntity::new(message.entity_id, ClientEntityType::Npc),
@@ -406,6 +407,7 @@ pub fn game_connection_system(
                         ability_values,
                         move_speed,
                         status_effects,
+                        PendingDamageList::default(),
                     ))
                     .insert_bundle((
                         ClientEntity::new(message.entity_id, ClientEntityType::Monster),
@@ -498,38 +500,14 @@ pub fn game_connection_system(
             }
             Ok(ServerMessage::DamageEntity(message)) => {
                 if let Some(defender_entity) = client_entity_list.get(message.defender_entity_id) {
-                    if let Ok((mut health_points, collider)) =
-                        query_set_character.q1().get_mut(defender_entity)
+                    if let Ok(mut pending_damage_list) =
+                        query_pending_damage_list.get_mut(defender_entity)
                     {
-                        if health_points.hp < message.damage.amount as i32 {
-                            health_points.hp = 0;
-                        } else {
-                            health_points.hp -= message.damage.amount as i32;
-                        }
-
-                        if let Some(damage_digits_entity) = damage_digits_spawner.spawn(
-                            &mut commands,
-                            message.damage.amount,
-                            client_entity_list
-                                .player_entity_id
-                                .map_or(false, |player_entity_id| {
-                                    message.defender_entity_id == player_entity_id
-                                }),
-                            collider
-                                .map_or(2.0, |collider| collider.compute_local_aabb().extents().y),
-                        ) {
-                            commands
-                                .entity(defender_entity)
-                                .add_child(damage_digits_entity);
-                        }
-                    }
-
-                    if message.is_killed {
-                        commands
-                            .entity(defender_entity)
-                            .insert(NextCommand::with_die())
-                            .remove::<ClientEntity>();
-                        client_entity_list.remove(message.defender_entity_id);
+                        pending_damage_list.add(
+                            message.attacker_entity_id,
+                            message.damage,
+                            message.is_killed,
+                        );
                     }
                 }
 
@@ -650,7 +628,7 @@ pub fn game_connection_system(
                         basic_stats,
                         skill_list,
                         status_effects,
-                    )) = query_set_character.q2().get_mut(entity)
+                    )) = query_set_character.q1().get_mut(entity)
                     {
                         let ability_values = game_data.ability_value_calculator.calculate(
                             character_info,

@@ -8,6 +8,7 @@ pub struct ActiveMotion {
     pub repeat_limit: Option<usize>, // If None, repeats forever
     pub animation_speed: f32,
     pub start_time: Option<f64>,
+    pub previous_frame: Option<usize>,
 }
 
 impl ActiveMotion {
@@ -17,6 +18,7 @@ impl ActiveMotion {
             repeat_limit: None,
             animation_speed: 1.0,
             start_time: None,
+            previous_frame: None,
         }
     }
 
@@ -26,6 +28,7 @@ impl ActiveMotion {
             repeat_limit: Some(1),
             animation_speed: 1.0,
             start_time: None,
+            previous_frame: None,
         }
     }
 
@@ -36,6 +39,7 @@ impl ActiveMotion {
             repeat_limit: Some(repeat_count),
             animation_speed: 1.0,
             start_time: None,
+            previous_frame: None,
         }
     }
 

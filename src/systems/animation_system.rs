@@ -1,11 +1,13 @@
 use bevy::{
     core::Time,
     math::Vec3,
-    prelude::{Assets, Commands, Entity, PerspectiveProjection, Query, Res, Transform},
+    prelude::{
+        Assets, Commands, Entity, EventWriter, PerspectiveProjection, Query, Res, Transform,
+    },
     render::{camera::Camera3d, mesh::skinning::SkinnedMesh},
 };
 
-use crate::{components::ActiveMotion, zmo_asset_loader::ZmoAsset};
+use crate::{components::ActiveMotion, events::AnimationFrameEvent, zmo_asset_loader::ZmoAsset};
 
 pub fn animation_system(
     mut commands: Commands,
@@ -17,6 +19,7 @@ pub fn animation_system(
         Option<&SkinnedMesh>,
         Option<&Camera3d>,
     )>,
+    mut animation_frame_events: EventWriter<AnimationFrameEvent>,
     motion_assets: Res<Assets<ZmoAsset>>,
     time: Res<Time>,
 ) {
@@ -55,6 +58,18 @@ pub fn animation_system(
         } else {
             (current_frame_index + 1) % current_motion.num_frames()
         };
+
+        if let Some(mut previous_frame_index) = active_motion.previous_frame {
+            // Emit every frame event between previous frame and current frame
+            while previous_frame_index != current_frame_index {
+                if let Some(event_id) = current_motion.get_frame_event(previous_frame_index) {
+                    animation_frame_events.send(AnimationFrameEvent::new(entity, event_id));
+                }
+
+                previous_frame_index = (previous_frame_index + 1) % current_motion.num_frames();
+            }
+        }
+        active_motion.previous_frame = Some(current_frame_index);
 
         if let Some(skinned_mesh) = skinned_mesh {
             for (bone_id, bone_entity) in skinned_mesh.joints.iter().enumerate() {

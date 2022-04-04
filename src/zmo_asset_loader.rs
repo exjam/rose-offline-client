@@ -1,3 +1,5 @@
+use std::num::NonZeroU16;
+
 use bevy::{
     asset::{AssetLoader, BoxedFuture, LoadContext, LoadedAsset},
     math::{Quat, Vec3},
@@ -22,6 +24,7 @@ pub struct ZmoAsset {
     num_frames: usize,
     fps: usize,
     bones: Vec<ZmoAssetBone>,
+    frame_events: Vec<u16>,
 }
 
 impl ZmoAsset {
@@ -49,6 +52,12 @@ impl ZmoAsset {
         self.bones
             .get(bone_id)
             .and_then(|x| x.scale.get(frame_id).cloned())
+    }
+
+    pub fn get_frame_event(&self, frame_id: usize) -> Option<NonZeroU16> {
+        self.frame_events
+            .get(frame_id)
+            .and_then(|event_id| NonZeroU16::new(*event_id))
     }
 }
 
@@ -113,6 +122,7 @@ impl AssetLoader for ZmoAssetLoader {
                         num_frames: zmo.num_frames,
                         fps: zmo.fps,
                         bones,
+                        frame_events: zmo.frame_events,
                     }));
                     Ok(())
                 }

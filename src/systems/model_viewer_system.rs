@@ -325,8 +325,18 @@ pub fn model_viewer_system(
         animation_button("Walk", CharacterMotionAction::Walk, NpcMotionAction::Move);
         animation_button("Run", CharacterMotionAction::Run, NpcMotionAction::Run);
         animation_button(
-            "Attack",
+            "Attack 1",
             CharacterMotionAction::Attack,
+            NpcMotionAction::Attack,
+        );
+        animation_button(
+            "Attack 2",
+            CharacterMotionAction::Attack2,
+            NpcMotionAction::Attack,
+        );
+        animation_button(
+            "Attack 3",
+            CharacterMotionAction::Attack3,
             NpcMotionAction::Attack,
         );
         animation_button("Die", CharacterMotionAction::Die, NpcMotionAction::Die);
