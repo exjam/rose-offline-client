@@ -2,7 +2,8 @@ use bevy::{
     math::{Quat, Vec3},
     prelude::{
         BuildChildren, Commands, ComputedVisibility, DespawnRecursiveExt, Entity, EventWriter,
-        GlobalTransform, Or, Query, Res, ResMut, State, Transform, Visibility, With,
+        GlobalTransform, Or, Query, QuerySet, QueryState, Res, ResMut, State, Transform,
+        Visibility, With,
     },
 };
 use bevy_rapier3d::prelude::ColliderShapeComponent;
@@ -61,18 +62,20 @@ pub fn game_connection_system(
         (Option<&CharacterInfo>, Option<&Npc>),
         Or<(With<CharacterInfo>, With<Npc>)>,
     >,
-    mut query_inventory: Query<(&mut Equipment, &mut Inventory)>,
-    mut query_xp_stamina: Query<(&mut ExperiencePoints, &mut Stamina)>,
-    mut query_health_points: Query<(&mut HealthPoints, Option<&ColliderShapeComponent>)>,
-    mut query_levelup: Query<(
-        &mut HealthPoints,
-        &mut ManaPoints,
-        &CharacterInfo,
-        &Equipment,
-        &BasicStats,
-        &SkillList,
-        &StatusEffects,
+    mut query_set_character: QuerySet<(
+        QueryState<(&mut Equipment, &mut Inventory)>,
+        QueryState<(&mut HealthPoints, Option<&ColliderShapeComponent>)>,
+        QueryState<(
+            &mut HealthPoints,
+            &mut ManaPoints,
+            &CharacterInfo,
+            &Equipment,
+            &BasicStats,
+            &SkillList,
+            &StatusEffects,
+        )>,
     )>,
+    mut query_xp_stamina: Query<(&mut ExperiencePoints, &mut Stamina)>,
     mut game_connection_events: EventWriter<GameConnectionEvent>,
     mut client_entity_events: EventWriter<ClientEntityEvent>,
     damage_digits_spawner: Res<DamageDigitsSpawner>,
@@ -496,7 +499,7 @@ pub fn game_connection_system(
             Ok(ServerMessage::DamageEntity(message)) => {
                 if let Some(defender_entity) = client_entity_list.get(message.defender_entity_id) {
                     if let Ok((mut health_points, collider)) =
-                        query_health_points.get_mut(defender_entity)
+                        query_set_character.q1().get_mut(defender_entity)
                     {
                         if health_points.hp < message.damage.amount as i32 {
                             health_points.hp = 0;
@@ -594,21 +597,22 @@ pub fn game_connection_system(
             }
             Ok(ServerMessage::UpdateAmmo(entity_id, ammo_index, item)) => {
                 if let Some(entity) = client_entity_list.get(entity_id) {
-                    if let Ok((mut equipment, _)) = query_inventory.get_mut(entity) {
+                    if let Ok((mut equipment, _)) = query_set_character.q0().get_mut(entity) {
                         equipment.equipped_ammo[ammo_index] = item;
                     }
                 }
             }
             Ok(ServerMessage::UpdateEquipment(message)) => {
                 if let Some(entity) = client_entity_list.get(message.entity_id) {
-                    if let Ok((mut equipment, _)) = query_inventory.get_mut(entity) {
+                    if let Ok((mut equipment, _)) = query_set_character.q0().get_mut(entity) {
                         equipment.equipped_items[message.equipment_index] = message.item;
                     }
                 }
             }
             Ok(ServerMessage::UpdateInventory(update_items, update_money)) => {
                 if let Some(player_entity) = client_entity_list.player_entity {
-                    if let Ok((_, mut inventory)) = query_inventory.get_mut(player_entity) {
+                    if let Ok((_, mut inventory)) = query_set_character.q0().get_mut(player_entity)
+                    {
                         for (item_slot, item) in update_items {
                             if let Some(item_slot) = inventory.get_item_slot_mut(item_slot) {
                                 *item_slot = item;
@@ -623,7 +627,7 @@ pub fn game_connection_system(
             }
             Ok(ServerMessage::UpdateVehiclePart(message)) => {
                 if let Some(entity) = client_entity_list.get(message.entity_id) {
-                    if let Ok((mut equipment, _)) = query_inventory.get_mut(entity) {
+                    if let Ok((mut equipment, _)) = query_set_character.q0().get_mut(entity) {
                         equipment.equipped_vehicle[message.vehicle_part_index] = message.item;
                     }
                 }
@@ -646,7 +650,7 @@ pub fn game_connection_system(
                         basic_stats,
                         skill_list,
                         status_effects,
-                    )) = query_levelup.get_mut(entity)
+                    )) = query_set_character.q2().get_mut(entity)
                     {
                         let ability_values = game_data.ability_value_calculator.calculate(
                             character_info,
@@ -656,6 +660,7 @@ pub fn game_connection_system(
                             skill_list,
                             status_effects,
                         );
+
                         health_points.hp = ability_values.get_max_health();
                         mana_points.mp = ability_values.get_max_mana();
                     }
@@ -693,7 +698,9 @@ pub fn game_connection_system(
             Ok(ServerMessage::PickupItemDropResult(message)) => match message.result {
                 Ok(PickupItemDropContent::Item(item_slot, item)) => {
                     if let Some(player_entity) = client_entity_list.player_entity {
-                        if let Ok((_, mut inventory)) = query_inventory.get_mut(player_entity) {
+                        if let Ok((_, mut inventory)) =
+                            query_set_character.q0().get_mut(player_entity)
+                        {
                             if let Some(inventory_slot) = inventory.get_item_slot_mut(item_slot) {
                                 if let Some(item_data) =
                                     game_data.items.get_base_item(item.get_item_reference())
@@ -710,7 +717,9 @@ pub fn game_connection_system(
                 }
                 Ok(PickupItemDropContent::Money(money)) => {
                     if let Some(player_entity) = client_entity_list.player_entity {
-                        if let Ok((_, mut inventory)) = query_inventory.get_mut(player_entity) {
+                        if let Ok((_, mut inventory)) =
+                            query_set_character.q0().get_mut(player_entity)
+                        {
                             chatbox_events.send(ChatboxEvent::System(format!(
                                 "You have earned {} zuly.",
                                 money.0
