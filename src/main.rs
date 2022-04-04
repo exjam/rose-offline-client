@@ -33,7 +33,7 @@ mod zmo_asset_loader;
 mod zms_asset_loader;
 
 use rose_data::{CharacterMotionDatabaseOptions, NpcDatabaseOptions, ZoneId};
-use rose_file_readers::VfsIndex;
+use rose_file_readers::{StbFile, VfsIndex, VfsPathBuf};
 
 use events::{
     ChatboxEvent, ClientEntityEvent, GameConnectionEvent, LoadZoneEvent, WorldConnectionEvent,
@@ -44,8 +44,8 @@ use follow_camera::FollowCameraPlugin;
 use model_loader::ModelLoader;
 use render::{DamageDigitMaterial, RoseRenderPlugin};
 use resources::{
-    run_network_thread, AppState, ClientEntityList, DamageDigitsSpawner, GameData, Icons,
-    NetworkThread, NetworkThreadMessage, ServerConfiguration,
+    run_network_thread, AppState, ClientEntityList, DamageDigitsSpawner, EffectList, GameData,
+    Icons, NetworkThread, NetworkThreadMessage, ServerConfiguration,
 };
 use systems::{
     ability_values_system, animation_system, character_model_add_collider_system,
@@ -529,4 +529,22 @@ fn load_game_data(
         &asset_server,
         &mut damage_digit_materials,
     ));
+
+    let stb_effects = vfs_resource
+        .vfs
+        .read_file::<StbFile, _>("3DDATA/STB/FILE_EFFECT.STB")
+        .expect("Failed to load effect list");
+    let mut effect_list = Vec::new();
+    for row in 0..stb_effects.rows() {
+        let path = stb_effects.get(row, 1);
+        if path.is_empty() {
+            effect_list.push(None);
+        } else {
+            effect_list.push(Some(VfsPathBuf::new(path)));
+        }
+    }
+
+    commands.insert_resource(EffectList {
+        effects: effect_list,
+    });
 }

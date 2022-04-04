@@ -4,8 +4,8 @@ use bevy::{
     hierarchy::DespawnRecursiveExt,
     math::Vec3,
     prelude::{
-        Commands, Entity, GlobalTransform, PerspectiveCameraBundle, Query, Res, ResMut, Transform,
-        With,
+        AssetServer, Assets, Commands, Entity, GlobalTransform, PerspectiveCameraBundle, Query,
+        Res, ResMut, Transform, With,
     },
     render::camera::Camera3d,
 };
@@ -21,11 +21,14 @@ use rose_game_common::components::{CharacterGender, CharacterInfo, Equipment, Np
 
 use crate::{
     components::{
-        ActiveMotion, CharacterModel, DebugRenderCollider, DebugRenderSkeleton, NpcModel,
+        ActiveMotion, CharacterModel, DebugRenderCollider, DebugRenderSkeleton, Effect, NpcModel,
     },
+    effect_loader::spawn_effect,
     fly_camera::{FlyCameraBundle, FlyCameraController},
     follow_camera::FollowCameraController,
-    resources::{GameData, Icons},
+    render::{EffectMeshMaterial, ParticleMaterial},
+    resources::{EffectList, GameData, Icons},
+    VfsResource,
 };
 
 pub struct ModelViewerState {
@@ -42,6 +45,8 @@ pub struct ModelViewerState {
     characters: Vec<Entity>,
     num_characters: usize,
     max_num_characters: usize,
+
+    last_effect_entity: Option<Entity>,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -96,6 +101,8 @@ pub fn model_viewer_enter_system(
         characters: Vec::new(),
         num_characters: 0,
         max_num_characters: 500,
+
+        last_effect_entity: None,
     });
 }
 
@@ -107,11 +114,18 @@ pub fn model_viewer_system(
     mut query_npc: Query<(Entity, &mut Npc)>,
     query_character_model: Query<(Entity, &CharacterModel)>,
     query_npc_model: Query<(Entity, &NpcModel)>,
+    query_effects: Query<Entity, With<Effect>>,
     query_debug_colliders: Query<Entity, With<DebugRenderCollider>>,
     query_debug_skeletons: Query<Entity, With<DebugRenderSkeleton>>,
     game_data: Res<GameData>,
     icons: Res<Icons>,
+    effect_list: Res<EffectList>,
     mut egui_context: ResMut<EguiContext>,
+    (vfs_resource, asset_server): (Res<VfsResource>, Res<AssetServer>),
+    (mut particle_materials, mut effect_mesh_materials): (
+        ResMut<Assets<ParticleMaterial>>,
+        ResMut<Assets<EffectMeshMaterial>>,
+    ),
 ) {
     egui::Window::new("Model Viewer").show(egui_context.ctx_mut(), |ui| {
         if ui
@@ -432,6 +446,47 @@ pub fn model_viewer_system(
                             for (_, mut npc) in query_npc.iter_mut() {
                                 npc.id = npc_data.id;
                             }
+                        }
+                        ui.end_row();
+                    }
+                });
+        });
+
+    egui::Window::new("Effect List")
+        .vscroll(true)
+        .resizable(true)
+        .default_height(300.0)
+        .show(egui_context.ctx_mut(), |ui| {
+            egui::Grid::new("effect_list_grid")
+                .num_columns(3)
+                .show(ui, |ui| {
+                    ui.label("id");
+                    ui.label("path");
+                    ui.end_row();
+
+                    for (id, effect_path) in effect_list
+                        .effects
+                        .iter()
+                        .enumerate()
+                        .filter_map(|(id, x)| x.as_ref().map(|x| (id, x)))
+                    {
+                        ui.label(format!("{}", id));
+                        ui.label(effect_path.path().to_string_lossy().as_ref());
+                        if ui.button("View").clicked() {
+                            if let Some(last_effect_entity) = ui_state.last_effect_entity.take() {
+                                if query_effects.get(last_effect_entity).is_ok() {
+                                    commands.entity(last_effect_entity).despawn_recursive();
+                                }
+                            }
+
+                            ui_state.last_effect_entity = spawn_effect(
+                                &vfs_resource.vfs,
+                                &mut commands,
+                                &asset_server,
+                                &mut particle_materials,
+                                &mut effect_mesh_materials,
+                                effect_path.into(),
+                            );
                         }
                         ui.end_row();
                     }
