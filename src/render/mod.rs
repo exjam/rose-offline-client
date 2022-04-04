@@ -6,7 +6,7 @@ use bevy::{
 mod effect_mesh_material;
 mod particle_material;
 mod particle_pipeline;
-pub mod particle_render_data;
+mod particle_render_data;
 mod static_mesh_material;
 mod terrain_material;
 mod texture_array;
@@ -23,6 +23,7 @@ pub const MESH_ATTRIBUTE_UV_3: MeshVertexAttribute =
 
 pub use effect_mesh_material::EffectMeshMaterial;
 pub use particle_material::ParticleMaterial;
+pub use particle_render_data::{ParticleRenderBillboardType, ParticleRenderData};
 pub use static_mesh_material::StaticMeshMaterial;
 pub use terrain_material::{TerrainMaterial, TERRAIN_MESH_ATTRIBUTE_TILE_INFO};
 pub use texture_array::{GpuTextureArray, TextureArray, TextureArrayBuilder};

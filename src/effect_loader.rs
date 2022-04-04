@@ -15,8 +15,7 @@ use rose_file_readers::{EftFile, EftMesh, EftParticle, PtlFile, VfsIndex, VfsPat
 use crate::{
     components::{Effect, EffectMesh, EffectParticle, ParticleSequence},
     render::{
-        particle_render_data::{ParticleRenderBillboardType, ParticleRenderData},
-        EffectMeshMaterial, ParticleMaterial,
+        EffectMeshMaterial, ParticleMaterial, ParticleRenderBillboardType, ParticleRenderData,
     },
 };
 

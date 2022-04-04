@@ -10,7 +10,7 @@ use rose_file_readers::PtlKeyframeData;
 
 use crate::{
     components::{ActiveParticle, ParticleSequence, ParticleUpdateCoords},
-    render::particle_render_data::ParticleRenderData,
+    render::ParticleRenderData,
 };
 
 fn rng_gen_range<R: Rng>(rng: &mut R, range: &RangeInclusive<f32>) -> f32 {

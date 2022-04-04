@@ -5,7 +5,6 @@ use bevy::{
     reflect::TypeUuid,
     render::{
         render_asset::{PrepareAssetError, RenderAsset, RenderAssetPlugin},
-        render_resource::std140::AsStd140,
         renderer::RenderDevice,
         texture::Image,
     },
@@ -24,11 +23,6 @@ impl Plugin for ParticleMaterialPlugin {
         app.add_plugin(RenderAssetPlugin::<ParticleMaterial>::default())
             .add_asset::<ParticleMaterial>();
     }
-}
-
-#[derive(Clone, AsStd140)]
-pub struct ParticleMaterialUniformData {
-    pub flags: u32,
 }
 
 #[derive(Debug, Clone)]
