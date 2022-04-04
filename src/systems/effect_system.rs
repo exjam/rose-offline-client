@@ -3,14 +3,14 @@ use bevy::{
     prelude::{Commands, Entity, Query, With},
 };
 
-use crate::components::{Effect, EffectMesh, EffectParticle, ParticleSequence};
+use crate::components::{Effect, EffectParticle, ParticleSequence};
 
 pub fn effect_system(
     mut commands: Commands,
     query_effects: Query<(Entity, &Children), With<Effect>>,
     query_children: Query<&Children>,
     query_particle_sequence: Query<(&EffectParticle, &ParticleSequence)>,
-    query_effect_mesh: Query<&EffectMesh>,
+    // query_effect_mesh: Query<&EffectMesh>,
 ) {
     for (effect_entity, effect_children) in query_effects.iter() {
         let mut children_finished = 0;
@@ -27,9 +27,11 @@ pub fn effect_system(
                         }
                     }
 
+                    /*
                     if let Ok(_) = query_effect_mesh.get(*child) {
-                        // TODO: Check if effect mesh has complete
+                        // TODO: Check if effect mesh is finished
                     }
+                    */
                 }
             }
         }

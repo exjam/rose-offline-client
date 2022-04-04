@@ -4,8 +4,8 @@ use bevy::{
     hierarchy::DespawnRecursiveExt,
     math::Vec3,
     prelude::{
-        AssetServer, Assets, Commands, Entity, GlobalTransform, PerspectiveCameraBundle, Query,
-        Res, ResMut, Transform, With,
+        Commands, Entity, GlobalTransform, PerspectiveCameraBundle, Query, Res, ResMut, Transform,
+        With,
     },
     render::camera::Camera3d,
 };
@@ -23,12 +23,9 @@ use crate::{
     components::{
         ActiveMotion, CharacterModel, DebugRenderCollider, DebugRenderSkeleton, NpcModel,
     },
-    effect_loader::spawn_effect,
     fly_camera::{FlyCameraBundle, FlyCameraController},
     follow_camera::FollowCameraController,
-    render::{EffectMeshMaterial, ParticleMaterial},
     resources::{GameData, Icons},
-    VfsResource,
 };
 
 pub struct ModelViewerState {
@@ -52,10 +49,6 @@ pub fn model_viewer_enter_system(
     mut commands: Commands,
     query_cameras: Query<Entity, With<Camera3d>>,
     game_data: Res<GameData>,
-    vfs_resource: Res<VfsResource>,
-    asset_server: Res<AssetServer>,
-    mut effect_mesh_materials: ResMut<Assets<EffectMeshMaterial>>,
-    mut particle_materials: ResMut<Assets<ParticleMaterial>>,
 ) {
     // Reset camera
     for entity in query_cameras.iter() {
@@ -104,15 +97,6 @@ pub fn model_viewer_enter_system(
         num_characters: 0,
         max_num_characters: 500,
     });
-
-    spawn_effect(
-        &vfs_resource.vfs,
-        &mut commands,
-        &asset_server,
-        &mut particle_materials,
-        &mut effect_mesh_materials,
-        "3DDATA/EFFECT/TWIST_01.EFT".into(),
-    );
 }
 
 #[allow(clippy::too_many_arguments)]
