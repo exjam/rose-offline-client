@@ -159,6 +159,17 @@ pub fn animation_system(
                 entity_transform.rotation =
                     current_frame_rotation.lerp(next_frame_rotation, current_frame_fract);
             }
+
+            let current_frame_scale = current_motion.get_scale(0, current_frame_index);
+            let next_frame_scale = current_motion.get_scale(0, next_frame_index);
+            if let (Some(current_frame_scale), Some(next_frame_scale)) =
+                (current_frame_scale, next_frame_scale)
+            {
+                entity_transform.scale = Vec3::splat(
+                    current_frame_scale
+                        + (next_frame_scale - current_frame_scale) * current_frame_fract,
+                );
+            }
         }
     }
 }

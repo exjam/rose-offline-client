@@ -13,6 +13,7 @@ pub struct ZmoAssetLoader;
 pub struct ZmoAssetBone {
     translation: Vec<Vec3>,
     rotation: Vec<Quat>,
+    scale: Vec<f32>,
 }
 
 #[derive(Debug, Clone, TypeUuid, Inspectable)]
@@ -42,6 +43,12 @@ impl ZmoAsset {
         self.bones
             .get(bone_id)
             .and_then(|x| x.rotation.get(frame_id).cloned())
+    }
+
+    pub fn get_scale(&self, bone_id: usize, frame_id: usize) -> Option<f32> {
+        self.bones
+            .get(bone_id)
+            .and_then(|x| x.scale.get(frame_id).cloned())
     }
 }
 
@@ -95,6 +102,9 @@ impl AssetLoader for ZmoAssetLoader {
                                         )
                                     })
                                     .collect();
+                            }
+                            ZmoChannel::Scale(scales) => {
+                                bone_animation.scale = scales.clone();
                             }
                             _ => {}
                         }
