@@ -12,7 +12,7 @@ use crate::{
     components::PlayerCharacter,
     events::ChatboxEvent,
     resources::{GameConnection, GameData, Icons},
-    ui::{DragAndDropId, DragAndDropSlot, UiStateDragAndDrop},
+    ui::{DragAndDropId, DragAndDropSlot, UiStateDragAndDrop, UiStateWindows},
 };
 
 #[derive(Copy, Clone, PartialEq, Debug)]
@@ -497,6 +497,7 @@ pub fn ui_inventory_system(
     mut egui_context: ResMut<EguiContext>,
     mut ui_state_inventory: Local<UiStateInventory>,
     mut ui_state_dnd: ResMut<UiStateDragAndDrop>,
+    mut ui_state_windows: ResMut<UiStateWindows>,
     query_player: Query<(&Equipment, &Inventory), With<PlayerCharacter>>,
     game_connection: Option<Res<GameConnection>>,
     game_data: Res<GameData>,
@@ -506,6 +507,8 @@ pub fn ui_inventory_system(
     let (player_equipment, player_inventory) = query_player.single();
 
     egui::Window::new("Inventory")
+        .id(ui_state_windows.inventory_window_id)
+        .open(&mut ui_state_windows.inventory_open)
         .resizable(false)
         .show(egui_context.ctx_mut(), |ui| {
             ui.horizontal(|ui| {

@@ -7,7 +7,7 @@ use rose_game_common::components::{SkillList, SkillSlot, SKILL_PAGE_SIZE};
 use crate::{
     components::PlayerCharacter,
     resources::{GameData, Icons},
-    ui::{DragAndDropId, DragAndDropSlot, UiStateDragAndDrop},
+    ui::{DragAndDropId, DragAndDropSlot, UiStateDragAndDrop, UiStateWindows},
 };
 
 pub struct UiStateSkillList {
@@ -60,6 +60,7 @@ pub fn ui_skill_list_system(
     mut egui_context: ResMut<EguiContext>,
     mut ui_state_skill_list: Local<UiStateSkillList>,
     mut ui_state_dnd: ResMut<UiStateDragAndDrop>,
+    mut ui_state_windows: ResMut<UiStateWindows>,
     query_player: Query<&SkillList, With<PlayerCharacter>>,
     game_data: Res<GameData>,
     icons: Res<Icons>,
@@ -67,6 +68,8 @@ pub fn ui_skill_list_system(
     let player_skill_list = query_player.single();
 
     egui::Window::new("Skill List")
+        .id(ui_state_windows.skill_list_window_id)
+        .open(&mut ui_state_windows.skill_list_open)
         .resizable(true)
         .show(egui_context.ctx_mut(), |ui| {
             ui.horizontal(|ui| {

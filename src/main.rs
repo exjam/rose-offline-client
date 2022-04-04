@@ -63,7 +63,7 @@ use systems::{
 use ui::{
     ui_chatbox_system, ui_diagnostics_system, ui_drag_and_drop_system, ui_hotbar_system,
     ui_inventory_system, ui_player_info_system, ui_selected_target_system, ui_skill_list_system,
-    UiStateDragAndDrop,
+    ui_window_system, UiStateDragAndDrop, UiStateWindows,
 };
 use vfs_asset_io::VfsAssetIo;
 use zmo_asset_loader::{ZmoAsset, ZmoAssetLoader};
@@ -386,7 +386,8 @@ fn main() {
     );
 
     // Game
-    app.insert_resource(UiStateDragAndDrop::default());
+    app.insert_resource(UiStateDragAndDrop::default())
+        .insert_resource(UiStateWindows::default())
 
     app.add_system_set(SystemSet::on_enter(AppState::Game).with_system(game_state_enter_system))
         .add_system_set(
@@ -400,6 +401,7 @@ fn main() {
                 .with_system(ui_skill_list_system.before("game_debug_ui_system"))
                 .with_system(ui_player_info_system.before("game_debug_ui_system"))
                 .with_system(ui_selected_target_system.before("game_debug_ui_system"))
+                .with_system(ui_window_system.before("game_debug_ui_system"))
                 .with_system(game_debug_ui_system.label("game_debug_ui_system"))
                 .with_system(game_input_system.after("game_debug_ui_system"))
                 .with_system(player_character_event_system),
