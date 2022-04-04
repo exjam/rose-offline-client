@@ -172,9 +172,9 @@ pub fn ui_hotbar_system(
                         }
                         ui.end_row();
 
-                        for i in 0..HOTBAR_PAGE_SIZE {
+                        for i in 1..=HOTBAR_PAGE_SIZE {
                             ui.vertical_centered_justified(|ui| {
-                                ui.label(format!("F{}", i));
+                                ui.label(format!("{}", i));
                             });
                         }
                         ui.end_row();
