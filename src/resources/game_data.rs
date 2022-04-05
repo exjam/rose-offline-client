@@ -4,6 +4,7 @@ use rose_data::{
     CharacterMotionDatabase, DataDecoder, ItemDatabase, NpcDatabase, QuestDatabase, SkillDatabase,
     StatusEffectDatabase, ZoneList,
 };
+use rose_file_readers::LtbFile;
 use rose_game_common::data::AbilityValueCalculator;
 
 pub struct GameData {
@@ -16,4 +17,5 @@ pub struct GameData {
     pub skills: Arc<SkillDatabase>,
     pub status_effects: Arc<StatusEffectDatabase>,
     pub zone_list: Arc<ZoneList>,
+    pub ltb_event: LtbFile,
 }

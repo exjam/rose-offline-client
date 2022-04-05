@@ -2,13 +2,14 @@ use bevy::{
     ecs::system::EntityCommands,
     hierarchy::DespawnRecursiveExt,
     math::{Quat, Vec3, Vec3Swizzles},
-    prelude::{Commands, Entity, Handle, Mut, Query, Res, Transform},
+    prelude::{Commands, Entity, EventWriter, Handle, Mut, Query, Res, Transform},
 };
 use rand::prelude::SliceRandom;
 
 use rose_data::{CharacterMotionAction, NpcMotionAction};
+use rose_file_readers::VfsPathBuf;
 use rose_game_common::{
-    components::{AbilityValues, Destination, HealthPoints, MoveMode, MoveSpeed, Target},
+    components::{AbilityValues, Destination, HealthPoints, MoveMode, MoveSpeed, Npc, Target},
     messages::client::ClientMessage,
 };
 
@@ -17,7 +18,8 @@ use crate::{
         ActiveMotion, CharacterModel, ClientEntity, ClientEntityType, Command, CommandAttack,
         CommandMove, NextCommand, NpcModel, PlayerCharacter, Position,
     },
-    resources::GameConnection,
+    events::ConversationDialogEvent,
+    resources::{GameConnection, GameData},
     zmo_asset_loader::ZmoAsset,
 };
 
@@ -199,7 +201,10 @@ pub fn command_system(
     )>,
     query_move_target: Query<(&Position, &ClientEntity)>,
     query_attack_target: Query<(&Position, &HealthPoints)>,
+    query_npc: Query<&Npc>,
     game_connection: Option<Res<GameConnection>>,
+    game_data: Res<GameData>,
+    mut conversation_dialog_events: EventWriter<ConversationDialogEvent>,
 ) {
     let mut rng = rand::thread_rng();
 
@@ -283,6 +288,7 @@ pub fn command_system(
             }) => {
                 let mut entity_commands = commands.entity(entity);
                 let mut pickup_item_entity = None;
+                let mut talk_to_npc_entity = None;
                 let mut required_distance = None;
 
                 if let Some(target_entity) = target {
@@ -292,7 +298,10 @@ pub fn command_system(
                         *destination = target_position.position;
                         required_distance = match target_client_entity.entity_type {
                             ClientEntityType::Character => Some(CHARACTER_MOVE_TO_DISTANCE),
-                            ClientEntityType::Npc => Some(NPC_MOVE_TO_DISTANCE),
+                            ClientEntityType::Npc => {
+                                talk_to_npc_entity = Some(*target_entity);
+                                Some(NPC_MOVE_TO_DISTANCE)
+                            }
                             ClientEntityType::ItemDrop => {
                                 pickup_item_entity =
                                     Some((*target_entity, target_client_entity.id));
@@ -347,6 +356,24 @@ pub fn command_system(
                                     .send(ClientMessage::PickupItemDrop(pickup_item_entity_id))
                                     .ok();
                                 *next_command = NextCommand::with_pickup_item(pickup_item_entity);
+                            }
+                        }
+
+                        if let Some(talk_to_npc_entity) = talk_to_npc_entity {
+                            // Open dialog with npc
+                            if let Ok(npc) = query_npc.get(talk_to_npc_entity) {
+                                if npc.quest_index != 0 {
+                                    if let Some(conversation_data) =
+                                        game_data.npcs.find_conversation(npc.quest_index as usize)
+                                    {
+                                        conversation_dialog_events.send(
+                                            ConversationDialogEvent::OpenNpcDialog(
+                                                talk_to_npc_entity,
+                                                VfsPathBuf::new(&conversation_data.filename),
+                                            ),
+                                        );
+                                    }
+                                }
                             }
                         }
                     }

@@ -15,6 +15,7 @@ use bevy::{
     window::WindowDescriptor,
 };
 use bevy_egui::EguiContext;
+use scripting::RoseScriptingPlugin;
 use std::{path::Path, sync::Arc};
 
 mod components;
@@ -26,6 +27,7 @@ mod model_loader;
 mod protocol;
 mod render;
 mod resources;
+mod scripting;
 mod systems;
 mod ui;
 mod vfs_asset_io;
@@ -33,11 +35,11 @@ mod zmo_asset_loader;
 mod zms_asset_loader;
 
 use rose_data::{CharacterMotionDatabaseOptions, NpcDatabaseOptions, ZoneId};
-use rose_file_readers::{StbFile, VfsIndex, VfsPathBuf};
+use rose_file_readers::{LtbFile, StbFile, VfsIndex, VfsPathBuf};
 
 use events::{
-    AnimationFrameEvent, ChatboxEvent, ClientEntityEvent, GameConnectionEvent, LoadZoneEvent,
-    WorldConnectionEvent, ZoneEvent,
+    AnimationFrameEvent, ChatboxEvent, ClientEntityEvent, ConversationDialogEvent,
+    GameConnectionEvent, LoadZoneEvent, WorldConnectionEvent, ZoneEvent,
 };
 use fly_camera::FlyCameraPlugin;
 use follow_camera::FollowCameraPlugin;
@@ -52,14 +54,14 @@ use systems::{
     character_model_system, character_select_enter_system, character_select_exit_system,
     character_select_input_system, character_select_models_system, character_select_system,
     client_entity_event_system, collision_add_colliders_system, collision_system, command_system,
-    damage_digit_render_system, debug_render_collider_system, debug_render_skeleton_system,
-    effect_system, game_connection_system, game_debug_ui_system, game_input_system,
-    game_state_enter_system, game_zone_change_system, item_drop_model_add_collider_system,
-    item_drop_model_system, load_zone_system, login_connection_system, login_state_enter_system,
-    login_state_exit_system, login_system, model_viewer_enter_system, model_viewer_system,
-    npc_model_add_collider_system, npc_model_system, particle_sequence_system,
-    pending_damage_system, update_position_system, world_connection_system,
-    zone_viewer_setup_system, zone_viewer_system, DebugInspectorPlugin,
+    conversation_dialog_system, damage_digit_render_system, debug_render_collider_system,
+    debug_render_skeleton_system, effect_system, game_connection_system, game_debug_ui_system,
+    game_input_system, game_state_enter_system, game_zone_change_system,
+    item_drop_model_add_collider_system, item_drop_model_system, load_zone_system,
+    login_connection_system, login_state_enter_system, login_state_exit_system, login_system,
+    model_viewer_enter_system, model_viewer_system, npc_model_add_collider_system,
+    npc_model_system, particle_sequence_system, pending_damage_system, update_position_system,
+    world_connection_system, zone_viewer_setup_system, zone_viewer_system, DebugInspectorPlugin,
 };
 use ui::{
     ui_chatbox_system, ui_diagnostics_system, ui_drag_and_drop_system, ui_hotbar_system,
@@ -288,6 +290,7 @@ fn main() {
         .add_plugin(FlyCameraPlugin::default())
         .add_plugin(FollowCameraPlugin::default())
         .add_plugin(RoseRenderPlugin)
+        .add_plugin(RoseScriptingPlugin)
         .insert_resource(ServerConfiguration {
             ip,
             port,
@@ -314,7 +317,8 @@ fn main() {
         .insert_resource(Events::<ClientEntityEvent>::default())
         .insert_resource(Events::<GameConnectionEvent>::default())
         .insert_resource(Events::<WorldConnectionEvent>::default())
-        .insert_resource(Events::<AnimationFrameEvent>::default());
+        .insert_resource(Events::<AnimationFrameEvent>::default())
+        .insert_resource(Events::<ConversationDialogEvent>::default());
 
     app.add_system(character_model_system.label("character_model_system"))
         .add_system(character_model_add_collider_system.after("character_model_system"))
@@ -405,15 +409,52 @@ fn main() {
                 .with_system(ability_values_system)
                 .with_system(command_system.after("animation_system"))
                 .with_system(update_position_system)
-                .with_system(game_debug_ui_system.label("game_debug_ui_system"))
-                .with_system(ui_chatbox_system.after("game_debug_ui_system"))
-                .with_system(ui_inventory_system.after("game_debug_ui_system"))
-                .with_system(ui_hotbar_system.after("game_debug_ui_system"))
-                .with_system(ui_skill_list_system.after("game_debug_ui_system"))
-                .with_system(ui_player_info_system.after("game_debug_ui_system"))
-                .with_system(ui_selected_target_system.after("game_debug_ui_system"))
-                .with_system(ui_window_system.after("game_debug_ui_system"))
-                .with_system(game_input_system)
+                .with_system(
+                    game_debug_ui_system
+                        .label("game_debug_ui_system")
+                        .before("game_input_system"),
+                )
+                .with_system(
+                    ui_chatbox_system
+                        .after("game_debug_ui_system")
+                        .before("game_input_system"),
+                )
+                .with_system(
+                    ui_inventory_system
+                        .after("game_debug_ui_system")
+                        .before("game_input_system"),
+                )
+                .with_system(
+                    ui_hotbar_system
+                        .after("game_debug_ui_system")
+                        .before("game_input_system"),
+                )
+                .with_system(
+                    ui_skill_list_system
+                        .after("game_debug_ui_system")
+                        .before("game_input_system"),
+                )
+                .with_system(
+                    ui_player_info_system
+                        .after("game_debug_ui_system")
+                        .before("game_input_system"),
+                )
+                .with_system(
+                    ui_selected_target_system
+                        .after("game_debug_ui_system")
+                        .before("game_input_system"),
+                )
+                .with_system(
+                    ui_window_system
+                        .after("game_debug_ui_system")
+                        .before("game_input_system"),
+                )
+                .with_system(
+                    conversation_dialog_system
+                        .after("game_debug_ui_system")
+                        .before("game_input_system"),
+                )
+                .with_system(game_input_system.label("game_input_system"))
                 .with_system(client_entity_event_system),
         );
     app.add_system_to_stage(CoreStage::PostUpdate, ui_drag_and_drop_system);
@@ -497,6 +538,10 @@ fn load_game_data(
         zone_list: Arc::new(
             rose_data_irose::get_zone_list(&vfs_resource.vfs).expect("Failed to load zone list"),
         ),
+        ltb_event: vfs_resource
+            .vfs
+            .read_file::<LtbFile, _>("3DDATA/EVENT/ULNGTB_CON.LTB")
+            .expect("Failed to load event language file"),
     });
 
     commands.insert_resource(
