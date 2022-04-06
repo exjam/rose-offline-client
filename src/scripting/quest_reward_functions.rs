@@ -1,8 +1,81 @@
-use rose_data::QuestTrigger;
-use rose_file_readers::{QsdReward, QsdRewardQuestAction};
+use rose_data::{Item, QuestTrigger};
+use rose_file_readers::{QsdItemBase1000, QsdReward, QsdRewardQuestAction};
 use rose_game_common::components::ActiveQuest;
 
 use crate::scripting::{QuestFunctionContext, ScriptFunctionContext, ScriptFunctionResources};
+
+fn quest_reward_add_item(
+    script_resources: &ScriptFunctionResources,
+    script_context: &mut ScriptFunctionContext,
+    quest_context: &mut QuestFunctionContext,
+    item_base1000: QsdItemBase1000,
+    quantity: usize,
+) -> bool {
+    let item_reference = script_resources
+        .game_data
+        .data_decoder
+        .decode_item_base1000(item_base1000.get());
+    if item_reference.is_none() {
+        return false;
+    }
+    let item_reference = item_reference.unwrap();
+
+    let mut quest_state = script_context.query_quest.single_mut();
+
+    if item_reference.item_type.is_quest_item() {
+        // Add to quest items
+        if let Some(selected_quest_index) = quest_context.selected_quest_index {
+            return quest_state
+                .get_quest_mut(selected_quest_index)
+                .and_then(|active_quest| {
+                    Item::new(&item_reference, quantity as u32)
+                        .and_then(|item| active_quest.try_add_item(item).ok())
+                })
+                .is_some();
+        }
+    } else {
+        // Server is responsible for updating inventory, ignore on client
+        return true;
+    }
+
+    false
+}
+
+fn quest_reward_remove_item(
+    script_resources: &ScriptFunctionResources,
+    script_context: &mut ScriptFunctionContext,
+    quest_context: &mut QuestFunctionContext,
+    item_base1000: QsdItemBase1000,
+    quantity: usize,
+) -> bool {
+    let item_reference = script_resources
+        .game_data
+        .data_decoder
+        .decode_item_base1000(item_base1000.get());
+    if item_reference.is_none() {
+        return false;
+    }
+    let item_reference = item_reference.unwrap();
+
+    let mut quest_state = script_context.query_quest.single_mut();
+
+    if item_reference.item_type.is_quest_item() {
+        // Remove from quest items
+        if let Some(selected_quest_index) = quest_context.selected_quest_index {
+            return quest_state
+                .get_quest_mut(selected_quest_index)
+                .and_then(|active_quest| {
+                    active_quest.try_take_item(item_reference, quantity as u32)
+                })
+                .is_some();
+        }
+    } else {
+        // Server is responsible for updating inventory, ignore on client
+        return true;
+    }
+
+    false
+}
 
 fn quest_reward_select_quest(
     _script_resources: &ScriptFunctionResources,
@@ -142,6 +215,20 @@ pub fn quest_triggers_apply_rewards(
 ) -> bool {
     for reward in quest_trigger.rewards.iter() {
         let result = match *reward {
+            QsdReward::AddItem(_, item_base1000, quantity) => quest_reward_add_item(
+                script_resources,
+                script_context,
+                quest_context,
+                item_base1000,
+                quantity,
+            ),
+            QsdReward::RemoveItem(_, item_base1000, quantity) => quest_reward_remove_item(
+                script_resources,
+                script_context,
+                quest_context,
+                item_base1000,
+                quantity,
+            ),
             QsdReward::Quest(QsdRewardQuestAction::Select(quest_id)) => {
                 quest_reward_select_quest(script_resources, script_context, quest_context, quest_id)
             }
