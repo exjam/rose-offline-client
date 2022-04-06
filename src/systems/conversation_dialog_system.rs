@@ -289,7 +289,18 @@ pub fn conversation_dialog_system(
             .title_bar(true)
             .open(&mut open)
             .show(egui_context.ctx_mut(), |ui| {
+                if let Some(text_style) =
+                    ui.style_mut().text_styles.get_mut(&egui::TextStyle::Button)
+                {
+                    text_style.size = 16.0;
+                }
+                if let Some(text_style) = ui.style_mut().text_styles.get_mut(&egui::TextStyle::Body)
+                {
+                    text_style.size = 16.0;
+                }
+
                 ui.spacing_mut().item_spacing = egui::Vec2::new(10.0, 10.0);
+                ui.spacing_mut().button_padding = egui::Vec2::new(5.0, 5.0);
                 ui.label(&dialog_state.generated_dialog.message);
                 ui.separator();
 
