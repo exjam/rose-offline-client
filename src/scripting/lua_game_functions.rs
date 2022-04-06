@@ -8,18 +8,25 @@ use crate::scripting::{
         SV_BIRTH, SV_CHA, SV_CLASS, SV_CON, SV_DEX, SV_EXP, SV_FAME, SV_INT, SV_LEVEL, SV_RANK,
         SV_SEN, SV_SEX, SV_STR, SV_UNION,
     },
-    ScriptFunctionContext,
+    ScriptFunctionContext, ScriptFunctionResources,
 };
 
 pub struct LuaGameFunctions {
-    pub closures: HashMap<String, fn(&mut ScriptFunctionContext, Vec<Lua4Value>) -> Vec<Lua4Value>>,
+    pub closures: HashMap<
+        String,
+        fn(&ScriptFunctionResources, &mut ScriptFunctionContext, Vec<Lua4Value>) -> Vec<Lua4Value>,
+    >,
 }
 
 impl Default for LuaGameFunctions {
     fn default() -> Self {
         let mut closures: HashMap<
             String,
-            fn(&mut ScriptFunctionContext, Vec<Lua4Value>) -> Vec<Lua4Value>,
+            fn(
+                &ScriptFunctionResources,
+                &mut ScriptFunctionContext,
+                Vec<Lua4Value>,
+            ) -> Vec<Lua4Value>,
         > = HashMap::new();
 
         closures.insert("GF_getVariable".into(), GF_getVariable);
@@ -90,6 +97,7 @@ impl Default for LuaGameFunctions {
 
 #[allow(non_snake_case)]
 fn GF_getVariable(
+    _resources: &ScriptFunctionResources,
     context: &mut ScriptFunctionContext,
     parameters: Vec<Lua4Value>,
 ) -> Vec<Lua4Value> {

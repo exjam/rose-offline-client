@@ -14,7 +14,7 @@ use crate::{
     scripting::{
         lua4::{Lua4Function, Lua4VM, Lua4VMError, Lua4VMRustClosures, Lua4Value},
         LuaGameConstants, LuaGameFunctions, LuaQuestFunctions, LuaUserValueEntity,
-        ScriptFunctionContext,
+        ScriptFunctionContext, ScriptFunctionResources,
     },
     VfsResource,
 };
@@ -39,23 +39,32 @@ pub struct ConversationDialogState {
     pub event_object_handle: Arc<dyn std::any::Any + Send + Sync>,
 }
 
-pub struct LuaVMContext<'a, 'w, 's> {
-    pub function_context: &'a mut ScriptFunctionContext<'w, 's>,
+pub struct LuaVMContext<'a, 'w1, 's1, 'w2, 's2> {
+    pub function_context: &'a mut ScriptFunctionContext<'w1, 's1>,
+    pub function_resources: &'a ScriptFunctionResources<'w2, 's2>,
     pub game_constants: &'a LuaGameConstants,
     pub game_functions: &'a LuaGameFunctions,
     pub quest_functions: &'a LuaQuestFunctions,
 }
 
-impl<'a, 'w, 's> Lua4VMRustClosures for LuaVMContext<'a, 'w, 's> {
+impl<'a, 'w1, 's1, 'w2, 's2> Lua4VMRustClosures for LuaVMContext<'a, 'w1, 's1, 'w2, 's2> {
     fn call_rust_closure(
         &mut self,
         name: &str,
         parameters: Vec<Lua4Value>,
     ) -> Result<Vec<Lua4Value>, Lua4VMError> {
         if let Some(closure) = self.quest_functions.closures.get(name) {
-            Ok(closure(self.function_context, parameters))
+            Ok(closure(
+                self.function_resources,
+                self.function_context,
+                parameters,
+            ))
         } else if let Some(closure) = self.game_functions.closures.get(name) {
-            Ok(closure(self.function_context, parameters))
+            Ok(closure(
+                self.function_resources,
+                self.function_context,
+                parameters,
+            ))
         } else {
             Err(Lua4VMError::GlobalNotFound(name.to_string()))
         }
@@ -187,6 +196,7 @@ pub fn conversation_dialog_system(
     mut egui_context: ResMut<EguiContext>,
     mut conversation_dialog_events: EventReader<ConversationDialogEvent>,
     mut lua_function_context: ScriptFunctionContext,
+    script_function_resources: ScriptFunctionResources,
     query_player_position: Query<&Position, With<PlayerCharacter>>,
     query_position: Query<&Position>,
     lua_game_constants: Res<LuaGameConstants>,
@@ -197,6 +207,7 @@ pub fn conversation_dialog_system(
 ) {
     let mut user_context = LuaVMContext {
         function_context: &mut lua_function_context,
+        function_resources: &script_function_resources,
         game_constants: &lua_game_constants,
         game_functions: &lua_game_functions,
         quest_functions: &lua_quest_functions,

@@ -1,16 +1,28 @@
 use std::collections::HashMap;
 
-use crate::scripting::{lua4::Lua4Value, LuaUserValueEntity, ScriptFunctionContext};
+use rose_game_common::messages::client::ClientMessage;
+
+use crate::scripting::{
+    lua4::Lua4Value, quest::quest_check_condition, LuaUserValueEntity, ScriptFunctionContext,
+    ScriptFunctionResources,
+};
 
 pub struct LuaQuestFunctions {
-    pub closures: HashMap<String, fn(&mut ScriptFunctionContext, Vec<Lua4Value>) -> Vec<Lua4Value>>,
+    pub closures: HashMap<
+        String,
+        fn(&ScriptFunctionResources, &mut ScriptFunctionContext, Vec<Lua4Value>) -> Vec<Lua4Value>,
+    >,
 }
 
 impl Default for LuaQuestFunctions {
     fn default() -> Self {
         let mut closures: HashMap<
             String,
-            fn(&mut ScriptFunctionContext, Vec<Lua4Value>) -> Vec<Lua4Value>,
+            fn(
+                &ScriptFunctionResources,
+                &mut ScriptFunctionContext,
+                Vec<Lua4Value>,
+            ) -> Vec<Lua4Value>,
         > = HashMap::new();
 
         closures.insert("QF_checkQuestCondition".into(), QF_checkQuestCondition);
@@ -58,35 +70,61 @@ impl Default for LuaQuestFunctions {
 
 #[allow(non_snake_case)]
 fn QF_checkQuestCondition(
-    _context: &mut ScriptFunctionContext,
+    resources: &ScriptFunctionResources,
+    context: &mut ScriptFunctionContext,
     parameters: Vec<Lua4Value>,
 ) -> Vec<Lua4Value> {
-    if let Ok(quest_trigger_name) = parameters[0].to_string() {
-        log::warn!(
-            "TODO: Implement QF_checkQuestCondition({})",
-            quest_trigger_name
-        );
-        // TODO: Client-side check of quest condition
-    }
+    let result = if let Ok(quest_trigger_name) = parameters[0].to_string() {
+        match quest_check_condition(resources, context, &quest_trigger_name) {
+            Ok(result) => {
+                if result {
+                    1 // Success
+                } else {
+                    2 // Failed
+                }
+            }
+            Err(_) => {
+                0 // Error
+            }
+        }
+    } else {
+        0 // Error
+    };
 
-    vec![0.into()]
+    vec![result.into()]
 }
 
 #[allow(non_snake_case)]
 fn QF_doQuestTrigger(
-    _context: &mut ScriptFunctionContext,
+    resources: &ScriptFunctionResources,
+    context: &mut ScriptFunctionContext,
     parameters: Vec<Lua4Value>,
 ) -> Vec<Lua4Value> {
-    if let Ok(quest_trigger_name) = parameters[0].to_string() {
-        log::warn!("TODO: Implement QF_doQuestTrigger({})", quest_trigger_name);
-        // TODO: Client-side check of quest condition, then send quest packet to server
-    }
+    let result = if let Ok(quest_trigger_name) = parameters[0].to_string() {
+        if let Ok(true) = quest_check_condition(resources, context, &quest_trigger_name) {
+            if let Some(game_connection) = resources.game_connection.as_ref() {
+                game_connection
+                    .client_message_tx
+                    .send(ClientMessage::QuestTrigger(
+                        quest_trigger_name.as_str().into(),
+                    ))
+                    .ok();
+            }
 
-    vec![0.into()]
+            1
+        } else {
+            0
+        }
+    } else {
+        0
+    };
+
+    vec![result.into()]
 }
 
 #[allow(non_snake_case)]
 fn QF_getEventOwner(
+    _resources: &ScriptFunctionResources,
     context: &mut ScriptFunctionContext,
     parameters: Vec<Lua4Value>,
 ) -> Vec<Lua4Value> {
@@ -101,6 +139,7 @@ fn QF_getEventOwner(
 
 #[allow(non_snake_case)]
 fn QF_getUserSwitch(
+    _resources: &ScriptFunctionResources,
     context: &mut ScriptFunctionContext,
     parameters: Vec<Lua4Value>,
 ) -> Vec<Lua4Value> {
