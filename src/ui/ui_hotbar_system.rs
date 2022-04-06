@@ -100,34 +100,9 @@ fn ui_add_hotbar_slot(
             let hotbar_slot = &mut player_hotbar.pages[hotbar_index.0][hotbar_index.1];
             *hotbar_slot = Some(HotbarSlot::Skill(skill_slot));
         }
+        Some(DragAndDropId::NotDraggable) => {}
         None => {}
     }
-    /*
-    let skill = skill_list.get_skill(skill_slot);
-    let skill_data = skill
-        .as_ref()
-        .and_then(|skill| game_data.skills.get_skill(*skill));
-    let contents =
-        skill_data.and_then(|skill_data| icons.get_skill_icon(skill_data.icon_number as usize));
-    let mut dropped_item = None;
-    let response = ui.add(DragAndDropSlot::new(
-        DragAndDropId::Skill(skill_slot),
-        contents,
-        None,
-        |_| false,
-        &mut ui_state_dnd.dragged_item,
-        &mut dropped_item,
-        [40.0, 40.0],
-    ));
-
-    if response.double_clicked() {
-        // TODO: Use Skill
-    }
-
-    if let (Some(skill), Some(skill_data)) = (skill, skill_data) {
-        response.on_hover_text(format!("{}\nSkill ID: {}", skill_data.name, skill.get(),));
-    }
-    */
 }
 
 pub fn ui_hotbar_system(

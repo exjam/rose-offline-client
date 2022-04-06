@@ -4,6 +4,7 @@ use rose_game_common::components::{ItemSlot, SkillSlot};
 
 #[derive(Copy, Clone, Debug)]
 pub enum DragAndDropId {
+    NotDraggable,
     Inventory(ItemSlot),
     Skill(SkillSlot),
     Hotbar(usize, usize),
@@ -49,7 +50,7 @@ impl<'w> DragAndDropSlot<'w> {
     pub fn draw(&self, ui: &mut egui::Ui, accepts_dragged_item: bool) -> (bool, egui::Response) {
         let (rect, response) = ui.allocate_exact_size(
             self.size + egui::Vec2::splat(self.border_width * 2.0),
-            if self.contents.is_some() {
+            if self.contents.is_some() && !matches!(self.dnd_id, DragAndDropId::NotDraggable) {
                 egui::Sense::click_and_drag()
             } else {
                 egui::Sense::click()
