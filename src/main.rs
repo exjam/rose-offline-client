@@ -35,7 +35,7 @@ mod zmo_asset_loader;
 mod zms_asset_loader;
 
 use rose_data::{CharacterMotionDatabaseOptions, NpcDatabaseOptions, ZoneId};
-use rose_file_readers::{LtbFile, StbFile, VfsIndex, VfsPathBuf};
+use rose_file_readers::{LtbFile, StbFile, StlFile, StlReadOptions, VfsIndex, VfsPathBuf};
 
 use events::{
     AnimationFrameEvent, ChatboxEvent, ClientEntityEvent, ConversationDialogEvent,
@@ -66,8 +66,8 @@ use systems::{
 };
 use ui::{
     ui_chatbox_system, ui_diagnostics_system, ui_drag_and_drop_system, ui_hotbar_system,
-    ui_inventory_system, ui_player_info_system, ui_selected_target_system, ui_skill_list_system,
-    ui_window_system, UiStateDragAndDrop, UiStateWindows,
+    ui_inventory_system, ui_player_info_system, ui_quest_list_system, ui_selected_target_system,
+    ui_skill_list_system, ui_window_system, UiStateDragAndDrop, UiStateWindows,
 };
 use vfs_asset_io::VfsAssetIo;
 use zmo_asset_loader::{ZmoAsset, ZmoAssetLoader};
@@ -437,6 +437,11 @@ fn main() {
                         .before("game_input_system"),
                 )
                 .with_system(
+                    ui_quest_list_system
+                        .after("game_debug_ui_system")
+                        .before("game_input_system"),
+                )
+                .with_system(
                     ui_player_info_system
                         .after("game_debug_ui_system")
                         .before("game_input_system"),
@@ -545,6 +550,15 @@ fn load_game_data(
             .vfs
             .read_file::<LtbFile, _>("3DDATA/EVENT/ULNGTB_CON.LTB")
             .expect("Failed to load event language file"),
+        stl_quest: vfs_resource
+            .vfs
+            .read_file_with::<StlFile, _>(
+                "3DDATA/STB/LIST_QUEST_S.STL",
+                &StlReadOptions {
+                    language_filter: Some(vec![1]),
+                },
+            )
+            .expect("Failed to load quest string file"),
     });
 
     commands.insert_resource(

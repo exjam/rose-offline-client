@@ -7,6 +7,9 @@ pub struct UiStateWindows {
 
     pub skill_list_window_id: egui::Id,
     pub skill_list_open: bool,
+
+    pub quest_list_window_id: egui::Id,
+    pub quest_list_open: bool,
 }
 
 impl Default for UiStateWindows {
@@ -16,6 +19,8 @@ impl Default for UiStateWindows {
             inventory_open: false,
             skill_list_window_id: egui::Id::new("window_id_skill_list"),
             skill_list_open: false,
+            quest_list_window_id: egui::Id::new("window_id_quest_list"),
+            quest_list_open: false,
         }
     }
 }
@@ -33,6 +38,10 @@ pub fn ui_window_system(
 
         if input.consume_key(egui::Modifiers::ALT, egui::Key::S) {
             ui_state_windows.skill_list_open = !ui_state_windows.skill_list_open;
+        }
+
+        if input.consume_key(egui::Modifiers::ALT, egui::Key::Q) {
+            ui_state_windows.quest_list_open = !ui_state_windows.quest_list_open;
         }
     }
 
@@ -72,6 +81,21 @@ pub fn ui_window_system(
                     ui.ctx().move_to_top(egui::LayerId::new(
                         egui::Order::Middle,
                         ui_state_windows.skill_list_window_id,
+                    ));
+                }
+            }
+
+            if ui
+                .button("Ｑ")
+                .on_hover_text("Quest List (Alt + Q)")
+                .clicked()
+            {
+                ui_state_windows.quest_list_open = !ui_state_windows.quest_list_open;
+
+                if ui_state_windows.quest_list_open {
+                    ui.ctx().move_to_top(egui::LayerId::new(
+                        egui::Order::Middle,
+                        ui_state_windows.quest_list_window_id,
                     ));
                 }
             }
