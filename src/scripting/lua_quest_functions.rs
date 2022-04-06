@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use rose_game_common::messages::client::ClientMessage;
 
 use crate::scripting::{
-    lua4::Lua4Value, quest::quest_check_condition, LuaUserValueEntity, ScriptFunctionContext,
+    lua4::Lua4Value, quest::quest_check_conditions, LuaUserValueEntity, ScriptFunctionContext,
     ScriptFunctionResources,
 };
 
@@ -75,7 +75,7 @@ fn QF_checkQuestCondition(
     parameters: Vec<Lua4Value>,
 ) -> Vec<Lua4Value> {
     let result = if let Ok(quest_trigger_name) = parameters[0].to_string() {
-        match quest_check_condition(resources, context, &quest_trigger_name) {
+        match quest_check_conditions(resources, context, &quest_trigger_name) {
             Ok(result) => {
                 if result {
                     1 // Success
@@ -101,7 +101,7 @@ fn QF_doQuestTrigger(
     parameters: Vec<Lua4Value>,
 ) -> Vec<Lua4Value> {
     let result = if let Ok(quest_trigger_name) = parameters[0].to_string() {
-        if let Ok(true) = quest_check_condition(resources, context, &quest_trigger_name) {
+        if let Ok(true) = quest_check_conditions(resources, context, &quest_trigger_name) {
             if let Some(game_connection) = resources.game_connection.as_ref() {
                 game_connection
                     .client_message_tx

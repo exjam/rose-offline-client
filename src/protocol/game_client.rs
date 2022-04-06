@@ -1,17 +1,18 @@
 use num_traits::FromPrimitive;
+use rose_data::QuestTriggerHash;
 use std::net::SocketAddr;
 use thiserror::Error;
 use tokio::net::TcpStream;
 
 use rose_game_common::messages::{
-    client::{ChangeEquipment, ClientMessage, ConnectionRequest},
+    client::{ChangeEquipment, ClientMessage, ConnectionRequest, QuestDelete},
     server::{
         AnnounceChat, AttackEntity, CharacterData, CharacterDataItems, CharacterDataQuest,
         ConnectionRequestError, ConnectionResponse, DamageEntity, JoinZoneResponse, LocalChat,
-        MoveEntity, PickupItemDropResult, RemoveEntities, ServerMessage, ShoutChat,
-        SpawnEntityCharacter, SpawnEntityItemDrop, SpawnEntityMonster, SpawnEntityNpc,
-        StopMoveEntity, Teleport, UpdateEquipment, UpdateLevel, UpdateSpeed, UpdateVehiclePart,
-        UpdateXpStamina, Whisper,
+        MoveEntity, PickupItemDropResult, QuestDeleteResult, QuestTriggerResult, RemoveEntities,
+        ServerMessage, ShoutChat, SpawnEntityCharacter, SpawnEntityItemDrop, SpawnEntityMonster,
+        SpawnEntityNpc, StopMoveEntity, Teleport, UpdateEquipment, UpdateLevel, UpdateSpeed,
+        UpdateVehiclePart, UpdateXpStamina, Whisper,
     },
 };
 use rose_network_common::{Connection, Packet, PacketCodec};
@@ -20,13 +21,15 @@ use rose_network_irose::{
         PacketClientAttack, PacketClientChangeAmmo, PacketClientChangeEquipment,
         PacketClientChangeVehiclePart, PacketClientChat, PacketClientConnectRequest,
         PacketClientJoinZone, PacketClientMove, PacketClientPickupItemDrop,
+        PacketClientQuestRequest, PacketClientQuestRequestType,
     },
     game_server_packets::{
         ConnectResult, PacketConnectionReply, PacketServerAnnounceChat, PacketServerAttackEntity,
         PacketServerCharacterInventory, PacketServerCharacterQuestData, PacketServerDamageEntity,
         PacketServerJoinZone, PacketServerLocalChat, PacketServerMoveEntity,
-        PacketServerPickupItemDropResult, PacketServerRemoveEntities, PacketServerSelectCharacter,
-        PacketServerShoutChat, PacketServerSpawnEntityCharacter, PacketServerSpawnEntityItemDrop,
+        PacketServerPickupItemDropResult, PacketServerQuestResult, PacketServerQuestResultType,
+        PacketServerRemoveEntities, PacketServerSelectCharacter, PacketServerShoutChat,
+        PacketServerSpawnEntityCharacter, PacketServerSpawnEntityItemDrop,
         PacketServerSpawnEntityMonster, PacketServerSpawnEntityNpc, PacketServerStopMoveEntity,
         PacketServerTeleport, PacketServerUpdateAmmo, PacketServerUpdateEquipment,
         PacketServerUpdateInventory, PacketServerUpdateLevel, PacketServerUpdateSpeed,
@@ -394,7 +397,51 @@ impl GameClient {
                     }))
                     .ok();
             }
-            _ => println!("Unhandled game packet {:x}", packet.command),
+            Some(ServerPackets::QuestResult) => {
+                let message = PacketServerQuestResult::try_from(&packet)?;
+                match message.result {
+                    PacketServerQuestResultType::DeleteSuccess => {
+                        self.server_message_tx
+                            .send(ServerMessage::QuestDeleteResult(QuestDeleteResult {
+                                success: true,
+                                slot: message.slot as usize,
+                                quest_id: message.quest_id as usize,
+                            }))
+                            .ok();
+                    }
+                    PacketServerQuestResultType::DeleteFailed => {
+                        self.server_message_tx
+                            .send(ServerMessage::QuestDeleteResult(QuestDeleteResult {
+                                success: false,
+                                slot: message.slot as usize,
+                                quest_id: message.quest_id as usize,
+                            }))
+                            .ok();
+                    }
+                    PacketServerQuestResultType::TriggerSuccess => {
+                        self.server_message_tx
+                            .send(ServerMessage::QuestTriggerResult(QuestTriggerResult {
+                                success: true,
+                                trigger_hash: QuestTriggerHash {
+                                    hash: message.quest_id,
+                                },
+                            }))
+                            .ok();
+                    }
+                    PacketServerQuestResultType::TriggerFailed => {
+                        self.server_message_tx
+                            .send(ServerMessage::QuestTriggerResult(QuestTriggerResult {
+                                success: false,
+                                trigger_hash: QuestTriggerHash {
+                                    hash: message.quest_id,
+                                },
+                            }))
+                            .ok();
+                    }
+                    _ => {}
+                }
+            }
+            _ => log::info!("Unhandled game packet {:x}", packet.command),
         }
 
         Ok(())
@@ -481,8 +528,26 @@ impl GameClient {
                     }))
                     .await?
             }
+            ClientMessage::QuestDelete(QuestDelete { slot, quest_id }) => {
+                connection
+                    .write_packet(Packet::from(&PacketClientQuestRequest {
+                        request_type: PacketClientQuestRequestType::DeleteQuest,
+                        quest_slot: slot as u8,
+                        quest_id: quest_id as u32,
+                    }))
+                    .await?
+            }
+            ClientMessage::QuestTrigger(quest_id) => {
+                connection
+                    .write_packet(Packet::from(&PacketClientQuestRequest {
+                        request_type: PacketClientQuestRequestType::DoTrigger,
+                        quest_slot: 0,
+                        quest_id: quest_id.hash,
+                    }))
+                    .await?
+            }
             unimplemented => {
-                println!("Unimplemented GameClient ClientMessage {:?}", unimplemented);
+                log::warn!("Unimplemented GameClient ClientMessage {:?}", unimplemented);
             }
         }
         Ok(())

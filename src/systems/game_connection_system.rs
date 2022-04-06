@@ -10,18 +10,21 @@ use bevy::{
 use rose_game_common::{
     components::{
         BasicStats, CharacterInfo, Equipment, ExperiencePoints, HealthPoints, Inventory, ItemDrop,
-        ManaPoints, MoveMode, MoveSpeed, Npc, SkillList, Stamina, StatusEffects,
+        ManaPoints, MoveMode, MoveSpeed, Npc, QuestState, SkillList, Stamina, StatusEffects,
     },
-    messages::server::{CommandState, PickupItemDropContent, PickupItemDropError, ServerMessage},
+    messages::server::{
+        CommandState, PickupItemDropContent, PickupItemDropError, QuestDeleteResult,
+        QuestTriggerResult, ServerMessage,
+    },
 };
 use rose_network_common::ConnectionError;
 
 use crate::{
     components::{
-        ClientEntity, ClientEntityType, CollisionRayCastSource, Command, NextCommand,
-        PendingDamageList, PlayerCharacter, Position,
+        ClientEntity, ClientEntityType, CollisionRayCastSource, Command, MovementCollisionEntities,
+        NextCommand, PendingDamageList, PlayerCharacter, Position,
     },
-    events::{ChatboxEvent, ClientEntityEvent, GameConnectionEvent},
+    events::{ChatboxEvent, ClientEntityEvent, GameConnectionEvent, QuestTriggerEvent},
     resources::{AppState, ClientEntityList, GameConnection, GameData},
 };
 
@@ -74,9 +77,11 @@ pub fn game_connection_system(
             &StatusEffects,
         )>,
     )>,
+    mut query_quest_state: Query<&mut QuestState>,
     mut query_xp_stamina: Query<(&mut ExperiencePoints, &mut Stamina)>,
     mut game_connection_events: EventWriter<GameConnectionEvent>,
     mut client_entity_events: EventWriter<ClientEntityEvent>,
+    mut quest_trigger_events: EventWriter<QuestTriggerEvent>,
 ) {
     if game_connection.is_none() {
         return;
@@ -718,8 +723,30 @@ pub fn game_connection_system(
                 }
                 Err(_) => {}
             },
+            Ok(ServerMessage::QuestDeleteResult(QuestDeleteResult {
+                success,
+                slot,
+                quest_id,
+            })) => {
+                if success {
+                    let mut quest_state = query_quest_state.single_mut();
+                    if let Some(active_quest) = quest_state.active_quests[slot].as_ref() {
+                        if active_quest.quest_id == quest_id {
+                            quest_state.active_quests[slot] = None;
+                        }
+                    }
+                }
+            }
+            Ok(ServerMessage::QuestTriggerResult(QuestTriggerResult {
+                success,
+                trigger_hash,
+            })) => {
+                if success {
+                    quest_trigger_events.send(QuestTriggerEvent::ApplyRewards(trigger_hash));
+                }
+            }
             Ok(message) => {
-                log::warn!("Received unexpected game server message: {:#?}", message);
+                log::warn!("Received unimplemented game server message: {:#?}", message);
             }
             Err(crossbeam_channel::TryRecvError::Disconnected) => {
                 break Err(ConnectionError::ConnectionLost.into());
