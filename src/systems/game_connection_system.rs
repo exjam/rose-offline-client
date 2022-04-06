@@ -769,7 +769,7 @@ pub fn game_connection_system(
             }
             Ok(ServerMessage::RunNpcDeathTrigger(npc_id)) => {
                 if let Some(npc_data) = game_data.npcs.get_npc(npc_id) {
-                    quest_trigger_events.send(QuestTriggerEvent::ApplyRewards(
+                    quest_trigger_events.send(QuestTriggerEvent::DoTrigger(
                         npc_data.death_quest_trigger_name.as_str().into(),
                     ));
                 }

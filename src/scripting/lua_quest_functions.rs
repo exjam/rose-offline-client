@@ -75,7 +75,7 @@ fn QF_checkQuestCondition(
     parameters: Vec<Lua4Value>,
 ) -> Vec<Lua4Value> {
     let result = if let Ok(quest_trigger_name) = parameters[0].to_string() {
-        match quest_check_conditions(resources, context, &quest_trigger_name) {
+        match quest_check_conditions(resources, context, quest_trigger_name.as_str().into()) {
             Ok(result) => {
                 if result {
                     1 // Success
@@ -101,7 +101,9 @@ fn QF_doQuestTrigger(
     parameters: Vec<Lua4Value>,
 ) -> Vec<Lua4Value> {
     let result = if let Ok(quest_trigger_name) = parameters[0].to_string() {
-        if let Ok(true) = quest_check_conditions(resources, context, &quest_trigger_name) {
+        if let Ok(true) =
+            quest_check_conditions(resources, context, quest_trigger_name.as_str().into())
+        {
             if let Some(game_connection) = resources.game_connection.as_ref() {
                 game_connection
                     .client_message_tx

@@ -12,9 +12,12 @@ pub enum QuestError {
 pub fn quest_check_conditions(
     script_resources: &ScriptFunctionResources,
     script_context: &mut ScriptFunctionContext,
-    name: &str,
+    trigger_hash: QuestTriggerHash,
 ) -> Result<bool, QuestError> {
-    let mut trigger = script_resources.game_data.quests.get_trigger_by_name(name);
+    let mut trigger = script_resources
+        .game_data
+        .quests
+        .get_trigger_by_hash(trigger_hash);
     if trigger.is_none() {
         return Err(QuestError::TriggerNotFound);
     }
