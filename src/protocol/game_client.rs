@@ -28,8 +28,8 @@ use rose_network_irose::{
         PacketServerCharacterInventory, PacketServerCharacterQuestData, PacketServerDamageEntity,
         PacketServerJoinZone, PacketServerLocalChat, PacketServerMoveEntity,
         PacketServerPickupItemDropResult, PacketServerQuestResult, PacketServerQuestResultType,
-        PacketServerRemoveEntities, PacketServerSelectCharacter, PacketServerShoutChat,
-        PacketServerSpawnEntityCharacter, PacketServerSpawnEntityItemDrop,
+        PacketServerRemoveEntities, PacketServerRunNpcDeathTrigger, PacketServerSelectCharacter,
+        PacketServerShoutChat, PacketServerSpawnEntityCharacter, PacketServerSpawnEntityItemDrop,
         PacketServerSpawnEntityMonster, PacketServerSpawnEntityNpc, PacketServerStopMoveEntity,
         PacketServerTeleport, PacketServerUpdateAmmo, PacketServerUpdateEquipment,
         PacketServerUpdateInventory, PacketServerUpdateLevel, PacketServerUpdateSpeed,
@@ -440,6 +440,13 @@ impl GameClient {
                     }
                     _ => {}
                 }
+            }
+            Some(ServerPackets::RunNpcDeathTrigger) => {
+                let message = PacketServerRunNpcDeathTrigger::try_from(&packet)?;
+
+                self.server_message_tx
+                    .send(ServerMessage::RunNpcDeathTrigger(message.npc_id))
+                    .ok();
             }
             _ => log::info!("Unhandled game packet {:x}", packet.command),
         }

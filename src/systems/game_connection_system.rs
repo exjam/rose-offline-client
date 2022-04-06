@@ -767,6 +767,13 @@ pub fn game_connection_system(
                     quest_trigger_events.send(QuestTriggerEvent::ApplyRewards(trigger_hash));
                 }
             }
+            Ok(ServerMessage::RunNpcDeathTrigger(npc_id)) => {
+                if let Some(npc_data) = game_data.npcs.get_npc(npc_id) {
+                    quest_trigger_events.send(QuestTriggerEvent::ApplyRewards(
+                        npc_data.death_quest_trigger_name.as_str().into(),
+                    ));
+                }
+            }
             Ok(message) => {
                 log::warn!("Received unimplemented game server message: {:#?}", message);
             }
