@@ -1,7 +1,24 @@
 use rose_data::QuestTrigger;
-use rose_file_readers::QsdCondition;
+use rose_file_readers::{
+    QsdCondition, QsdConditionOperator, QsdConditionQuestItem, QsdEquipmentIndex, QsdItemBase1000,
+};
 
 use crate::scripting::{QuestFunctionContext, ScriptFunctionContext, ScriptFunctionResources};
+
+fn quest_condition_operator<T: PartialEq + PartialOrd>(
+    operator: QsdConditionOperator,
+    value_lhs: T,
+    value_rhs: T,
+) -> bool {
+    match operator {
+        QsdConditionOperator::Equals => value_lhs == value_rhs,
+        QsdConditionOperator::GreaterThan => value_lhs > value_rhs,
+        QsdConditionOperator::GreaterThanEqual => value_lhs >= value_rhs,
+        QsdConditionOperator::LessThan => value_lhs < value_rhs,
+        QsdConditionOperator::LessThanEqual => value_lhs <= value_rhs,
+        QsdConditionOperator::NotEqual => value_lhs != value_rhs,
+    }
+}
 
 fn quest_condition_check_switch(
     _script_resources: &ScriptFunctionResources,
@@ -17,6 +34,95 @@ fn quest_condition_check_switch(
     }
 
     false
+}
+
+fn quest_condition_quest_item(
+    script_resources: &ScriptFunctionResources,
+    script_context: &mut ScriptFunctionContext,
+    quest_context: &mut QuestFunctionContext,
+    item_base1000: Option<QsdItemBase1000>,
+    equipment_index: Option<QsdEquipmentIndex>,
+    required_count: u32,
+    operator: QsdConditionOperator,
+) -> bool {
+    let item_reference = item_base1000.and_then(|item_base1000| {
+        script_resources
+            .game_data
+            .data_decoder
+            .decode_item_base1000(item_base1000.get() as usize)
+    });
+
+    let equipment_index = equipment_index.and_then(|equipment_index| {
+        script_resources
+            .game_data
+            .data_decoder
+            .decode_equipment_index(equipment_index.get())
+    });
+
+    let quest_state = script_context.query_quest.single();
+    let (equipment, inventory) = script_context.query_player_items.single();
+
+    if let Some(equipment_index) = equipment_index {
+        item_reference
+            == equipment
+                .get_equipment_item(equipment_index)
+                .map(|item| item.item)
+    } else {
+        let quantity = if let Some(item_reference) = item_reference {
+            if item_reference.item_type.is_quest_item() {
+                // Check selected quest item
+                if let Some(selected_quest_index) = quest_context.selected_quest_index {
+                    quest_state
+                        .get_quest(selected_quest_index)
+                        .and_then(|active_quest| active_quest.find_item(item_reference))
+                        .map(|quest_item| quest_item.get_quantity())
+                        .unwrap_or(0)
+                } else {
+                    0
+                }
+            } else {
+                // Check inventory
+                inventory
+                    .find_item(item_reference)
+                    .and_then(|slot| inventory.get_item(slot))
+                    .map(|inventory_item| inventory_item.get_quantity())
+                    .unwrap_or(0)
+            }
+        } else {
+            0
+        };
+
+        quest_condition_operator(operator, quantity, required_count)
+    }
+}
+
+fn quest_condition_quest_items(
+    script_resources: &ScriptFunctionResources,
+    script_context: &mut ScriptFunctionContext,
+    quest_context: &mut QuestFunctionContext,
+    items: &[QsdConditionQuestItem],
+) -> bool {
+    for &QsdConditionQuestItem {
+        item,
+        equipment_index,
+        required_count,
+        operator,
+    } in items
+    {
+        if !quest_condition_quest_item(
+            script_resources,
+            script_context,
+            quest_context,
+            item,
+            equipment_index,
+            required_count,
+            operator,
+        ) {
+            return false;
+        }
+    }
+
+    true
 }
 
 fn quest_condition_select_quest(
@@ -43,6 +149,9 @@ pub fn quest_trigger_check_conditions(
 ) -> bool {
     for condition in quest_trigger.conditions.iter() {
         let result = match *condition {
+            QsdCondition::QuestItems(ref items) => {
+                quest_condition_quest_items(script_resources, script_context, quest_context, items)
+            }
             QsdCondition::QuestSwitch(switch_id, value) => quest_condition_check_switch(
                 script_resources,
                 script_context,

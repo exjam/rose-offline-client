@@ -1,10 +1,14 @@
-use bevy::{ecs::system::SystemParam, prelude::Query};
-
-use rose_game_common::components::{
-    BasicStats, CharacterInfo, ExperiencePoints, Level, QuestState, UnionMembership,
+use bevy::{
+    ecs::system::SystemParam,
+    prelude::{Query, With},
 };
 
-use crate::components::ClientEntity;
+use rose_game_common::components::{
+    BasicStats, CharacterInfo, Equipment, ExperiencePoints, Inventory, Level, QuestState,
+    UnionMembership,
+};
+
+use crate::components::{ClientEntity, PlayerCharacter};
 
 #[derive(SystemParam)]
 pub struct ScriptFunctionContext<'w, 's> {
@@ -21,4 +25,6 @@ pub struct ScriptFunctionContext<'w, 's> {
             &'static UnionMembership,
         ),
     >,
+    pub query_player_items:
+        Query<'w, 's, (&'static Equipment, &'static Inventory), With<PlayerCharacter>>,
 }
