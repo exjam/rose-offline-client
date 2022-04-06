@@ -27,6 +27,7 @@ impl Default for LuaQuestFunctions {
 
         closures.insert("QF_checkQuestCondition".into(), QF_checkQuestCondition);
         closures.insert("QF_doQuestTrigger".into(), QF_doQuestTrigger);
+        closures.insert("QF_findQuest".into(), QF_findQuest);
         closures.insert("QF_getEventOwner".into(), QF_getEventOwner);
         closures.insert("QF_getUserSwitch".into(), QF_getUserSwitch);
 
@@ -42,7 +43,6 @@ impl Default for LuaQuestFunctions {
         QF_deleteQuest
         QF_EffectCallNpc
         QF_EffectCallSelf
-        QF_findQuest
         QF_getEpisodeVAR
         QF_getJobVAR
         QF_getNpcQuestZeroVal
@@ -120,6 +120,22 @@ fn QF_doQuestTrigger(
     };
 
     vec![result.into()]
+}
+
+#[allow(non_snake_case)]
+fn QF_findQuest(
+    _resources: &ScriptFunctionResources,
+    context: &mut ScriptFunctionContext,
+    parameters: Vec<Lua4Value>,
+) -> Vec<Lua4Value> {
+    let quest_id = parameters[0].to_i32().unwrap() as usize;
+    let quest_state = context.query_quest.single();
+
+    vec![quest_state
+        .find_active_quest_index(quest_id)
+        .map(|x| x as i32)
+        .unwrap_or(-1)
+        .into()]
 }
 
 #[allow(non_snake_case)]
