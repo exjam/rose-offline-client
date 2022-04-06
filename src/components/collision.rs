@@ -1,9 +1,27 @@
-use bevy::prelude::Component;
+use bevy::prelude::{Component, Entity};
 
 #[derive(Component)]
 pub struct CollisionTriMesh {
     pub group: u32,
     pub filter: u32,
+}
+
+#[derive(Component)]
+pub struct MovementCollisionEntities {
+    pub down_ray_cast_source: Option<Entity>,
+    pub forward_ray_cast_source: Option<Entity>,
+}
+
+impl MovementCollisionEntities {
+    pub fn new(
+        down_ray_cast_source: Option<Entity>,
+        forward_ray_cast_source: Option<Entity>,
+    ) -> Self {
+        Self {
+            down_ray_cast_source,
+            forward_ray_cast_source,
+        }
+    }
 }
 
 #[derive(Component)]

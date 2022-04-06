@@ -64,6 +64,7 @@ pub fn game_connection_system(
         (Option<&CharacterInfo>, Option<&Npc>),
         Or<(With<CharacterInfo>, With<Npc>)>,
     >,
+    query_movement_collision_entities: Query<&MovementCollisionEntities>,
     mut query_pending_damage_list: Query<&mut PendingDamageList>,
     mut query_set_character: QuerySet<(
         QueryState<(&mut Equipment, &mut Inventory)>,
@@ -170,10 +171,21 @@ pub fn game_connection_system(
             }
             Ok(ServerMessage::JoinZone(message)) => {
                 if let Some(player_entity) = client_entity_list.player_entity {
+                    let down_ray_cast_source = commands
+                        .spawn_bundle((
+                            CollisionRayCastSource {},
+                            Transform::default()
+                                .with_translation(Vec3::new(0.0, 1.35, 0.0))
+                                .looking_at(-Vec3::Y, Vec3::X),
+                            GlobalTransform::default(),
+                        ))
+                        .id();
+
                     commands
                         .entity(player_entity)
                         .insert_bundle((
                             ClientEntity::new(message.entity_id, ClientEntityType::Character),
+                            MovementCollisionEntities::new(Some(down_ray_cast_source), None),
                             Command::with_stop(),
                             NextCommand::default(),
                             message.experience_points,
@@ -181,15 +193,7 @@ pub fn game_connection_system(
                             message.health_points,
                             message.mana_points,
                         ))
-                        .with_children(|child_builder| {
-                            child_builder.spawn_bundle((
-                                CollisionRayCastSource {},
-                                Transform::default()
-                                    .with_translation(Vec3::new(0.0, 1.35, 0.0))
-                                    .looking_at(-Vec3::Y, Vec3::X),
-                                GlobalTransform::default(),
-                            ));
-                        });
+                        .add_child(down_ray_cast_source);
 
                     client_entity_list.clear();
                     client_entity_list.add(message.entity_id, player_entity);
@@ -533,6 +537,23 @@ pub fn game_connection_system(
             }
             Ok(ServerMessage::Teleport(message)) => {
                 if let Some(player_entity) = client_entity_list.player_entity {
+                    // Remove colliders, we do not want to process collision until next zone has loaded
+                    if let Ok(movement_collision_entities) =
+                        query_movement_collision_entities.get(player_entity)
+                    {
+                        if let Some(down_ray_cast_source) =
+                            movement_collision_entities.down_ray_cast_source
+                        {
+                            commands.entity(down_ray_cast_source).despawn();
+                        }
+
+                        if let Some(forward_ray_cast_source) =
+                            movement_collision_entities.forward_ray_cast_source
+                        {
+                            commands.entity(forward_ray_cast_source).despawn();
+                        }
+                    }
+
                     // Update player position
                     commands
                         .entity(player_entity)
@@ -540,7 +561,8 @@ pub fn game_connection_system(
                             Position::new(Vec3::new(message.x, message.y, 0.0)),
                             Transform::from_xyz(message.x / 100.0, 100.0, -message.y / 100.0),
                         ))
-                        .remove::<ClientEntity>();
+                        .remove::<ClientEntity>()
+                        .remove::<MovementCollisionEntities>();
 
                     // Despawn all non-player entities
                     for (client_entity_id, client_entity) in

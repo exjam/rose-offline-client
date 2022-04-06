@@ -18,10 +18,10 @@ pub use active_motion::ActiveMotion;
 pub use character_model::{CharacterModel, CharacterModelPart};
 pub use client_entity::{ClientEntity, ClientEntityId, ClientEntityType};
 pub use collision::{
-    CollisionRayCastSource, CollisionTriMesh, COLLISION_FILTER_CLICKABLE,
-    COLLISION_FILTER_COLLIDABLE, COLLISION_FILTER_INSPECTABLE, COLLISION_GROUP_CHARACTER,
-    COLLISION_GROUP_ITEM_DROP, COLLISION_GROUP_NPC, COLLISION_GROUP_ZONE_OBJECT,
-    COLLISION_GROUP_ZONE_TERRAIN, COLLISION_GROUP_ZONE_WATER,
+    CollisionRayCastSource, CollisionTriMesh, MovementCollisionEntities,
+    COLLISION_FILTER_CLICKABLE, COLLISION_FILTER_COLLIDABLE, COLLISION_FILTER_INSPECTABLE,
+    COLLISION_GROUP_CHARACTER, COLLISION_GROUP_ITEM_DROP, COLLISION_GROUP_NPC,
+    COLLISION_GROUP_ZONE_OBJECT, COLLISION_GROUP_ZONE_TERRAIN, COLLISION_GROUP_ZONE_WATER,
 };
 pub use command::{Command, CommandAttack, CommandMove, NextCommand};
 pub use damage_digits::DamageDigits;
