@@ -1,5 +1,5 @@
 use num_traits::FromPrimitive;
-use rose_data::QuestTriggerHash;
+use rose_data::{QuestTriggerHash, SkillId};
 use std::net::SocketAddr;
 use thiserror::Error;
 use tokio::net::TcpStream;
@@ -7,34 +7,48 @@ use tokio::net::TcpStream;
 use rose_game_common::messages::{
     client::{ChangeEquipment, ClientMessage, ConnectionRequest, QuestDelete},
     server::{
-        AnnounceChat, AttackEntity, CharacterData, CharacterDataItems, CharacterDataQuest,
-        ConnectionRequestError, ConnectionResponse, DamageEntity, JoinZoneResponse, LocalChat,
-        MoveEntity, PickupItemDropResult, QuestDeleteResult, QuestTriggerResult, RemoveEntities,
-        ServerMessage, ShoutChat, SpawnEntityCharacter, SpawnEntityItemDrop, SpawnEntityMonster,
-        SpawnEntityNpc, StopMoveEntity, Teleport, UpdateEquipment, UpdateLevel, UpdateSpeed,
-        UpdateVehiclePart, UpdateXpStamina, Whisper,
+        AnnounceChat, ApplySkillEffect, AttackEntity, CastSkillSelf, CastSkillTargetEntity,
+        CastSkillTargetPosition, CharacterData, CharacterDataItems, CharacterDataQuest,
+        ConnectionRequestError, ConnectionResponse, DamageEntity, JoinZoneResponse,
+        LevelUpSkillResult, LocalChat, MoveEntity, PickupItemDropResult, QuestDeleteResult,
+        QuestTriggerResult, RemoveEntities, ServerMessage, ShoutChat, SpawnEntityCharacter,
+        SpawnEntityItemDrop, SpawnEntityMonster, SpawnEntityNpc, StopMoveEntity, Teleport,
+        UpdateAbilityValue, UpdateBasicStat, UpdateEquipment, UpdateLevel, UpdateSpeed,
+        UpdateStatusEffects, UpdateVehiclePart, UpdateXpStamina, UseEmote, UseItem, Whisper,
     },
 };
 use rose_network_common::{Connection, Packet, PacketCodec};
 use rose_network_irose::{
     game_client_packets::{
-        PacketClientAttack, PacketClientChangeAmmo, PacketClientChangeEquipment,
+        PacketClientAttack, PacketClientCastSkillSelf, PacketClientCastSkillTargetEntity,
+        PacketClientCastSkillTargetPosition, PacketClientChangeAmmo, PacketClientChangeEquipment,
         PacketClientChangeVehiclePart, PacketClientChat, PacketClientConnectRequest,
-        PacketClientJoinZone, PacketClientMove, PacketClientPickupItemDrop,
-        PacketClientQuestRequest, PacketClientQuestRequestType,
+        PacketClientDropItemFromInventory, PacketClientEmote, PacketClientIncreaseBasicStat,
+        PacketClientJoinZone, PacketClientLevelUpSkill, PacketClientMove,
+        PacketClientPersonalStoreListItems, PacketClientPickupItemDrop, PacketClientQuestRequest,
+        PacketClientQuestRequestType, PacketClientReviveRequest, PacketClientSetHotbarSlot,
+        PacketClientUseItem, PacketClientWarpGateRequest,
     },
     game_server_packets::{
-        ConnectResult, PacketConnectionReply, PacketServerAnnounceChat, PacketServerAttackEntity,
-        PacketServerCharacterInventory, PacketServerCharacterQuestData, PacketServerDamageEntity,
-        PacketServerJoinZone, PacketServerLocalChat, PacketServerMoveEntity,
-        PacketServerPickupItemDropResult, PacketServerQuestResult, PacketServerQuestResultType,
-        PacketServerRemoveEntities, PacketServerRunNpcDeathTrigger, PacketServerSelectCharacter,
-        PacketServerShoutChat, PacketServerSpawnEntityCharacter, PacketServerSpawnEntityItemDrop,
-        PacketServerSpawnEntityMonster, PacketServerSpawnEntityNpc, PacketServerStopMoveEntity,
-        PacketServerTeleport, PacketServerUpdateAmmo, PacketServerUpdateEquipment,
-        PacketServerUpdateInventory, PacketServerUpdateLevel, PacketServerUpdateSpeed,
-        PacketServerUpdateVehiclePart, PacketServerUpdateXpStamina, PacketServerWhisper,
-        ServerPackets,
+        ConnectResult, PacketConnectionReply, PacketServerAnnounceChat,
+        PacketServerApplySkillDamage, PacketServerApplySkillEffect, PacketServerAttackEntity,
+        PacketServerCancelCastingSkill, PacketServerCastSkillSelf,
+        PacketServerCastSkillTargetEntity, PacketServerCastSkillTargetPosition,
+        PacketServerChangeNpcId, PacketServerCharacterInventory, PacketServerCharacterQuestData,
+        PacketServerDamageEntity, PacketServerFinishCastingSkill, PacketServerJoinZone,
+        PacketServerLearnSkillResult, PacketServerLevelUpSkillResult, PacketServerLocalChat,
+        PacketServerMoveEntity, PacketServerPickupItemDropResult, PacketServerQuestResult,
+        PacketServerQuestResultType, PacketServerRemoveEntities, PacketServerRewardItems,
+        PacketServerRewardMoney, PacketServerRunNpcDeathTrigger, PacketServerSelectCharacter,
+        PacketServerSetHotbarSlot, PacketServerShoutChat, PacketServerSpawnEntityCharacter,
+        PacketServerSpawnEntityItemDrop, PacketServerSpawnEntityMonster,
+        PacketServerSpawnEntityNpc, PacketServerStartCastingSkill, PacketServerStopMoveEntity,
+        PacketServerTeleport, PacketServerUpdateAbilityValue, PacketServerUpdateAmmo,
+        PacketServerUpdateBasicStat, PacketServerUpdateEquipment, PacketServerUpdateInventory,
+        PacketServerUpdateLevel, PacketServerUpdateMoney, PacketServerUpdateSpeed,
+        PacketServerUpdateStatusEffects, PacketServerUpdateVehiclePart,
+        PacketServerUpdateXpStamina, PacketServerUseEmote, PacketServerUseItem,
+        PacketServerWhisper, ServerPackets,
     },
     ClientPacketCodec, IROSE_112_TABLE,
 };
@@ -355,6 +369,12 @@ impl GameClient {
                     ))
                     .ok();
             }
+            Some(ServerPackets::UpdateMoney) => {
+                let message = PacketServerUpdateMoney::try_from(&packet)?;
+                self.server_message_tx
+                    .send(ServerMessage::UpdateMoney(message.money))
+                    .ok();
+            }
             Some(ServerPackets::UpdateVehiclePart) => {
                 let message = PacketServerUpdateVehiclePart::try_from(&packet)?;
                 self.server_message_tx
@@ -364,6 +384,32 @@ impl GameClient {
                         item: message.item,
                     }))
                     .ok();
+            }
+            Some(ServerPackets::UpdateBasicStat) => {
+                let message = PacketServerUpdateBasicStat::try_from(&packet)?;
+                self.server_message_tx
+                    .send(ServerMessage::UpdateBasicStat(UpdateBasicStat {
+                        basic_stat_type: message.basic_stat_type,
+                        value: message.value,
+                    }))
+                    .ok();
+            }
+            Some(ServerPackets::UpdateAbilityValueRewardAdd)
+            | Some(ServerPackets::UpdateAbilityValueRewardSet) => {
+                let message = PacketServerUpdateAbilityValue::try_from(&packet)?;
+                if message.is_add {
+                    self.server_message_tx
+                        .send(ServerMessage::UpdateAbilityValue(
+                            UpdateAbilityValue::RewardAdd(message.ability_type, message.value),
+                        ))
+                        .ok();
+                } else {
+                    self.server_message_tx
+                        .send(ServerMessage::UpdateAbilityValue(
+                            UpdateAbilityValue::RewardSet(message.ability_type, message.value),
+                        ))
+                        .ok();
+                }
             }
             Some(ServerPackets::UpdateLevel) => {
                 let message = PacketServerUpdateLevel::try_from(&packet)?;
@@ -384,6 +430,17 @@ impl GameClient {
                         entity_id: message.entity_id,
                         run_speed: message.run_speed,
                         passive_attack_speed: message.passive_attack_speed,
+                    }))
+                    .ok();
+            }
+            Some(ServerPackets::UpdateStatusEffects) => {
+                let message = PacketServerUpdateStatusEffects::try_from(&packet)?;
+                self.server_message_tx
+                    .send(ServerMessage::UpdateStatusEffects(UpdateStatusEffects {
+                        entity_id: message.entity_id,
+                        status_effects: message.status_effects,
+                        updated_hp: message.updated_hp,
+                        updated_mp: message.updated_mp,
                     }))
                     .ok();
             }
@@ -446,6 +503,156 @@ impl GameClient {
 
                 self.server_message_tx
                     .send(ServerMessage::RunNpcDeathTrigger(message.npc_id))
+                    .ok();
+            }
+            Some(ServerPackets::RewardMoney) => {
+                let message = PacketServerRewardMoney::try_from(&packet)?;
+                self.server_message_tx
+                    .send(ServerMessage::RewardMoney(message.money))
+                    .ok();
+            }
+            Some(ServerPackets::RewardItems) => {
+                let message = PacketServerRewardItems::try_from(&packet)?;
+                self.server_message_tx
+                    .send(ServerMessage::RewardItems(message.items))
+                    .ok();
+            }
+            Some(ServerPackets::SetHotbarSlot) => {
+                let message = PacketServerSetHotbarSlot::try_from(&packet)?;
+                self.server_message_tx
+                    .send(ServerMessage::SetHotbarSlot(
+                        message.slot_index,
+                        message.slot,
+                    ))
+                    .ok();
+            }
+            Some(ServerPackets::LearnSkillResult) => {
+                let message = PacketServerLearnSkillResult::try_from(&packet)?;
+                self.server_message_tx
+                    .send(ServerMessage::LearnSkillResult(message.result))
+                    .ok();
+            }
+            Some(ServerPackets::LevelUpSkillResult) => {
+                let message = PacketServerLevelUpSkillResult::try_from(&packet)?;
+                self.server_message_tx
+                    .send(ServerMessage::LevelUpSkillResult(LevelUpSkillResult {
+                        result: message.result,
+                        updated_skill_points: message.updated_skill_points,
+                    }))
+                    .ok();
+            }
+            Some(ServerPackets::UseEmote) => {
+                let message = PacketServerUseEmote::try_from(&packet)?;
+                self.server_message_tx
+                    .send(ServerMessage::UseEmote(UseEmote {
+                        entity_id: message.entity_id,
+                        motion_id: message.motion_id,
+                        is_stop: message.is_stop,
+                    }))
+                    .ok();
+            }
+            Some(ServerPackets::UseItem) => {
+                let message = PacketServerUseItem::try_from(&packet)?;
+                self.server_message_tx
+                    .send(ServerMessage::UseItem(UseItem {
+                        entity_id: message.entity_id,
+                        item: message.item,
+                    }))
+                    .ok();
+            }
+            Some(ServerPackets::ChangeNpcId) => {
+                let message = PacketServerChangeNpcId::try_from(&packet)?;
+                self.server_message_tx
+                    .send(ServerMessage::ChangeNpcId(
+                        message.client_entity_id,
+                        message.npc_id,
+                    ))
+                    .ok();
+            }
+            Some(ServerPackets::CastSkillSelf) => {
+                let message = PacketServerCastSkillSelf::try_from(&packet)?;
+                self.server_message_tx
+                    .send(ServerMessage::CastSkillSelf(CastSkillSelf {
+                        entity_id: message.entity_id,
+                        skill_id: message.skill_id,
+                        cast_motion_id: message.cast_motion_id,
+                    }))
+                    .ok();
+            }
+            Some(ServerPackets::CastSkillTargetEntity) => {
+                let message = PacketServerCastSkillTargetEntity::try_from(&packet)?;
+                self.server_message_tx
+                    .send(ServerMessage::CastSkillTargetEntity(
+                        CastSkillTargetEntity {
+                            entity_id: message.entity_id,
+                            skill_id: message.skill_id,
+                            cast_motion_id: message.cast_motion_id,
+                            target_entity_id: message.target_entity_id,
+                            target_distance: message.target_distance,
+                            target_position: message.target_position,
+                        },
+                    ))
+                    .ok();
+            }
+            Some(ServerPackets::CastSkillTargetPosition) => {
+                let message = PacketServerCastSkillTargetPosition::try_from(&packet)?;
+                self.server_message_tx
+                    .send(ServerMessage::CastSkillTargetPosition(
+                        CastSkillTargetPosition {
+                            entity_id: message.entity_id,
+                            skill_id: message.skill_id,
+                            cast_motion_id: message.cast_motion_id,
+                            target_position: message.target_position,
+                        },
+                    ))
+                    .ok();
+            }
+            Some(ServerPackets::StartCastingSkill) => {
+                let message = PacketServerStartCastingSkill::try_from(&packet)?;
+                self.server_message_tx
+                    .send(ServerMessage::StartCastingSkill(message.entity_id))
+                    .ok();
+            }
+            Some(ServerPackets::CancelCastingSkill) => {
+                let message = PacketServerCancelCastingSkill::try_from(&packet)?;
+                self.server_message_tx
+                    .send(ServerMessage::CancelCastingSkill(
+                        message.entity_id,
+                        message.reason,
+                    ))
+                    .ok();
+            }
+            Some(ServerPackets::FinishCastingSkill) => {
+                let message = PacketServerFinishCastingSkill::try_from(&packet)?;
+                self.server_message_tx
+                    .send(ServerMessage::FinishCastingSkill(
+                        message.entity_id,
+                        message.skill_id,
+                    ))
+                    .ok();
+            }
+            Some(ServerPackets::ApplySkillEffect) => {
+                let message = PacketServerApplySkillEffect::try_from(&packet)?;
+                self.server_message_tx
+                    .send(ServerMessage::ApplySkillEffect(ApplySkillEffect {
+                        entity_id: message.entity_id,
+                        caster_entity_id: message.caster_entity_id,
+                        caster_intelligence: message.caster_intelligence,
+                        skill_id: message.skill_id,
+                        effect_success: message.effect_success,
+                    }))
+                    .ok();
+            }
+            Some(ServerPackets::ApplySkillDamage) => {
+                let message = PacketServerApplySkillDamage::try_from(&packet)?;
+                self.server_message_tx
+                    .send(ServerMessage::DamageEntity(DamageEntity {
+                        attacker_entity_id: message.caster_entity_id,
+                        defender_entity_id: message.entity_id,
+                        damage: message.damage,
+                        is_killed: message.is_killed,
+                        from_skill: Some((message.skill_id, message.caster_intelligence)),
+                    }))
                     .ok();
             }
             _ => log::info!("Unhandled game packet {:x}", packet.command),
@@ -550,6 +757,97 @@ impl GameClient {
                         request_type: PacketClientQuestRequestType::DoTrigger,
                         quest_slot: 0,
                         quest_id: quest_id.hash,
+                    }))
+                    .await?
+            }
+            ClientMessage::SetHotbarSlot(message) => {
+                connection
+                    .write_packet(Packet::from(&PacketClientSetHotbarSlot {
+                        slot_index: message.slot_index,
+                        slot: message.slot,
+                    }))
+                    .await?
+            }
+            ClientMessage::IncreaseBasicStat(basic_stat_type) => {
+                connection
+                    .write_packet(Packet::from(&PacketClientIncreaseBasicStat {
+                        basic_stat_type,
+                    }))
+                    .await?
+            }
+            ClientMessage::ReviveRequest(revive_request_type) => {
+                connection
+                    .write_packet(Packet::from(&PacketClientReviveRequest {
+                        revive_request_type,
+                    }))
+                    .await?
+            }
+            ClientMessage::PersonalStoreListItems(target_entity_id) => {
+                connection
+                    .write_packet(Packet::from(&PacketClientPersonalStoreListItems {
+                        target_entity_id,
+                    }))
+                    .await?
+            }
+            ClientMessage::DropItem(item_slot, quantity) => {
+                connection
+                    .write_packet(Packet::from(&PacketClientDropItemFromInventory::Item(
+                        item_slot,
+                        quantity as u32,
+                    )))
+                    .await?
+            }
+            ClientMessage::DropMoney(quantity) => {
+                connection
+                    .write_packet(Packet::from(&PacketClientDropItemFromInventory::Money(
+                        quantity as u32,
+                    )))
+                    .await?
+            }
+            ClientMessage::UseItem(item_slot, target_entity_id) => {
+                connection
+                    .write_packet(Packet::from(&PacketClientUseItem {
+                        item_slot,
+                        target_entity_id,
+                    }))
+                    .await?
+            }
+            ClientMessage::WarpGateRequest(warp_gate_id) => {
+                connection
+                    .write_packet(Packet::from(&PacketClientWarpGateRequest { warp_gate_id }))
+                    .await?
+            }
+            ClientMessage::LevelUpSkill(skill_slot) => {
+                connection
+                    .write_packet(Packet::from(&PacketClientLevelUpSkill {
+                        skill_slot,
+                        next_skill_idx: SkillId::new(1).unwrap(), // TODO: next_skill_idx
+                    }))
+                    .await?
+            }
+            ClientMessage::UseEmote(motion_id, is_stop) => {
+                connection
+                    .write_packet(Packet::from(&PacketClientEmote { motion_id, is_stop }))
+                    .await?
+            }
+            ClientMessage::CastSkillSelf(skill_slot) => {
+                connection
+                    .write_packet(Packet::from(&PacketClientCastSkillSelf { skill_slot }))
+                    .await?
+            }
+            ClientMessage::CastSkillTargetEntity(skill_slot, target_entity_id) => {
+                connection
+                    .write_packet(Packet::from(&PacketClientCastSkillTargetEntity {
+                        skill_slot,
+                        target_entity_id,
+                    }))
+                    .await?
+            }
+            ClientMessage::CastSkillTargetPosition(skill_slot, position) => {
+                connection
+                    .write_packet(Packet::from(&PacketClientCastSkillTargetPosition {
+                        skill_slot,
+                        position,
                     }))
                     .await?
             }
