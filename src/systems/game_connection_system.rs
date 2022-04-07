@@ -9,12 +9,13 @@ use bevy::{
 
 use rose_game_common::{
     components::{
-        BasicStats, CharacterInfo, Equipment, ExperiencePoints, HealthPoints, Inventory, ItemDrop,
-        ManaPoints, MoveMode, MoveSpeed, Npc, QuestState, SkillList, Stamina, StatusEffects,
+        BasicStatType, BasicStats, CharacterInfo, Equipment, ExperiencePoints, HealthPoints,
+        Hotbar, Inventory, ItemDrop, ManaPoints, MoveMode, MoveSpeed, Npc, QuestState, SkillList,
+        Stamina, StatusEffects,
     },
     messages::server::{
-        CommandState, PickupItemDropContent, PickupItemDropError, QuestDeleteResult,
-        QuestTriggerResult, ServerMessage,
+        CommandState, LearnSkillError, LevelUpSkillError, PickupItemDropContent,
+        PickupItemDropError, QuestDeleteResult, QuestTriggerResult, ServerMessage,
     },
 };
 use rose_network_common::ConnectionError;
@@ -55,17 +56,13 @@ fn get_entity_name(
 
 pub fn game_connection_system(
     mut commands: Commands,
-    game_connection: Option<Res<GameConnection>>,
-    game_data: Res<GameData>,
-    mut app_state: ResMut<State<AppState>>,
-    mut chatbox_events: EventWriter<ChatboxEvent>,
-    mut client_entity_list: ResMut<ClientEntityList>,
     query_entity_name: Query<
         (Option<&CharacterInfo>, Option<&Npc>),
         Or<(With<CharacterInfo>, With<Npc>)>,
     >,
     query_movement_collision_entities: Query<&MovementCollisionEntities>,
     mut query_pending_damage_list: Query<&mut PendingDamageList>,
+    mut query_hotbar: Query<&mut Hotbar>,
     mut query_set_character: QuerySet<(
         QueryState<(&mut Equipment, &mut Inventory)>,
         QueryState<(
@@ -73,16 +70,30 @@ pub fn game_connection_system(
             &mut ManaPoints,
             &CharacterInfo,
             &Equipment,
-            &BasicStats,
-            &SkillList,
+            &mut BasicStats,
+            &mut SkillList,
             &StatusEffects,
         )>,
     )>,
     mut query_quest_state: Query<&mut QuestState>,
     mut query_xp_stamina: Query<(&mut ExperiencePoints, &mut Stamina)>,
-    mut game_connection_events: EventWriter<GameConnectionEvent>,
-    mut client_entity_events: EventWriter<ClientEntityEvent>,
-    mut quest_trigger_events: EventWriter<QuestTriggerEvent>,
+    (mut app_state, mut client_entity_list, game_connection, game_data): (
+        ResMut<State<AppState>>,
+        ResMut<ClientEntityList>,
+        Option<Res<GameConnection>>,
+        Res<GameData>,
+    ),
+    (
+        mut chatbox_events,
+        mut game_connection_events,
+        mut client_entity_events,
+        mut quest_trigger_events,
+    ): (
+        EventWriter<ChatboxEvent>,
+        EventWriter<GameConnectionEvent>,
+        EventWriter<ClientEntityEvent>,
+        EventWriter<QuestTriggerEvent>,
+    ),
 ) {
     if game_connection.is_none() {
         return;
@@ -630,10 +641,36 @@ pub fn game_connection_system(
                     }
                 }
             }
+            Ok(ServerMessage::UpdateMoney(money)) => {
+                if let Some(player_entity) = client_entity_list.player_entity {
+                    if let Ok((_, mut inventory)) = query_set_character.q0().get_mut(player_entity)
+                    {
+                        inventory.money = money;
+                    }
+                }
+            }
             Ok(ServerMessage::UpdateVehiclePart(message)) => {
                 if let Some(entity) = client_entity_list.get(message.entity_id) {
                     if let Ok((mut equipment, _)) = query_set_character.q0().get_mut(entity) {
                         equipment.equipped_vehicle[message.vehicle_part_index] = message.item;
+                    }
+                }
+            }
+            Ok(ServerMessage::UpdateBasicStat(message)) => {
+                if let Some(player_entity) = client_entity_list.player_entity {
+                    if let Ok((_, _, _, _, mut basic_stats, _, _)) =
+                        query_set_character.q1().get_mut(player_entity)
+                    {
+                        match message.basic_stat_type {
+                            BasicStatType::Strength => basic_stats.strength = message.value,
+                            BasicStatType::Dexterity => basic_stats.dexterity = message.value,
+                            BasicStatType::Intelligence => basic_stats.intelligence = message.value,
+                            BasicStatType::Concentration => {
+                                basic_stats.concentration = message.value
+                            }
+                            BasicStatType::Charm => basic_stats.charm = message.value,
+                            BasicStatType::Sense => basic_stats.sense = message.value,
+                        }
                     }
                 }
             }
@@ -661,8 +698,8 @@ pub fn game_connection_system(
                             character_info,
                             &message.level,
                             equipment,
-                            basic_stats,
-                            skill_list,
+                            &basic_stats,
+                            &skill_list,
                             status_effects,
                         );
 
@@ -681,6 +718,14 @@ pub fn game_connection_system(
                     commands
                         .entity(entity)
                         .insert(MoveSpeed::new(message.run_speed as f32));
+                }
+            }
+            Ok(ServerMessage::UpdateStatusEffects(message)) => {
+                if let Some(entity) = client_entity_list.get(message.entity_id) {
+                    commands.entity(entity).insert(StatusEffects {
+                        active: message.status_effects,
+                        ..Default::default()
+                    });
                 }
             }
             Ok(ServerMessage::UpdateXpStamina(message)) => {
@@ -715,6 +760,7 @@ pub fn game_connection_system(
                                         item_data.name
                                     )));
                                 }
+
                                 *inventory_slot = Some(item);
                             }
                         }
@@ -745,6 +791,39 @@ pub fn game_connection_system(
                 }
                 Err(_) => {}
             },
+            Ok(ServerMessage::RewardItems(items)) => {
+                if let Some(player_entity) = client_entity_list.player_entity {
+                    if let Ok((_, mut inventory)) = query_set_character.q0().get_mut(player_entity)
+                    {
+                        for (item_slot, item) in items.into_iter() {
+                            if let Some(inventory_slot) = inventory.get_item_slot_mut(item_slot) {
+                                if let Some(item_data) = item.as_ref().and_then(|item| {
+                                    game_data.items.get_base_item(item.get_item_reference())
+                                }) {
+                                    chatbox_events.send(ChatboxEvent::System(format!(
+                                        "You have earned {}.",
+                                        item_data.name
+                                    )));
+                                }
+
+                                *inventory_slot = item;
+                            }
+                        }
+                    }
+                }
+            }
+            Ok(ServerMessage::RewardMoney(money)) => {
+                if let Some(player_entity) = client_entity_list.player_entity {
+                    if let Ok((_, mut inventory)) = query_set_character.q0().get_mut(player_entity)
+                    {
+                        chatbox_events.send(ChatboxEvent::System(format!(
+                            "You have earned {} zuly.",
+                            money.0
+                        )));
+                        inventory.try_add_money(money).ok();
+                    }
+                }
+            }
             Ok(ServerMessage::QuestDeleteResult(QuestDeleteResult {
                 success,
                 slot,
@@ -772,6 +851,108 @@ pub fn game_connection_system(
                     quest_trigger_events.send(QuestTriggerEvent::DoTrigger(
                         npc_data.death_quest_trigger_name.as_str().into(),
                     ));
+                }
+            }
+            Ok(ServerMessage::SetHotbarSlot(slot_index, slot)) => {
+                let mut hotbar = query_hotbar.single_mut();
+                hotbar.set_slot(slot_index, slot);
+            }
+            Ok(ServerMessage::LearnSkillResult(result)) => match result {
+                Ok(message) => {
+                    if let Some(player_entity) = client_entity_list.player_entity {
+                        if let Ok((_, _, _, _, _, mut skill_list, _)) =
+                            query_set_character.q1().get_mut(player_entity)
+                        {
+                            if let Some(skill_slot) = skill_list.get_slot_mut(message.skill_slot) {
+                                *skill_slot = message.skill_id;
+                            }
+
+                            commands
+                                .entity(player_entity)
+                                .insert_bundle((message.updated_skill_points,));
+                        }
+                    }
+                }
+                Err(LearnSkillError::AlreadyLearnt) => chatbox_events.send(ChatboxEvent::System(
+                    "Failed to learn skill, you already know it.".to_string(),
+                )),
+                Err(LearnSkillError::JobRequirement) => chatbox_events.send(ChatboxEvent::System(
+                    "Failed to learn skill, you do not satisfy the job requirement.".to_string(),
+                )),
+                Err(LearnSkillError::SkillRequirement) => {
+                    chatbox_events.send(ChatboxEvent::System(
+                        "Failed to learn skill, you do not satisfy the skill requirement."
+                            .to_string(),
+                    ))
+                }
+                Err(LearnSkillError::AbilityRequirement) => {
+                    chatbox_events.send(ChatboxEvent::System(
+                        "Failed to learn skill, you do not satisfy the ability requirement."
+                            .to_string(),
+                    ))
+                }
+                Err(LearnSkillError::Full) => chatbox_events.send(ChatboxEvent::System(
+                    "Failed to learn skill, you have too many skills.".to_string(),
+                )),
+                Err(LearnSkillError::InvalidSkillId) => chatbox_events.send(ChatboxEvent::System(
+                    "Failed to learn skill, invalid skill.".to_string(),
+                )),
+                Err(LearnSkillError::SkillPointRequirement) => {
+                    chatbox_events.send(ChatboxEvent::System(
+                        "Failed to learn skill, not enough skill points.".to_string(),
+                    ))
+                }
+            },
+            Ok(ServerMessage::LevelUpSkillResult(message)) => {
+                match message.result {
+                    Ok((skill_slot, skill_id)) => {
+                        if let Some(player_entity) = client_entity_list.player_entity {
+                            if let Ok((_, _, _, _, _, mut skill_list, _)) =
+                                query_set_character.q1().get_mut(player_entity)
+                            {
+                                if let Some(skill_slot) = skill_list.get_slot_mut(skill_slot) {
+                                    *skill_slot = Some(skill_id);
+                                }
+                            }
+                        }
+                    }
+                    Err(LevelUpSkillError::Failed) => chatbox_events.send(ChatboxEvent::System(
+                        "Failed to level up skill.".to_string(),
+                    )),
+                    Err(LevelUpSkillError::JobRequirement) => {
+                        chatbox_events.send(ChatboxEvent::System(
+                            "Failed to level up skill, you do not satisfy the job requirement."
+                                .to_string(),
+                        ))
+                    }
+                    Err(LevelUpSkillError::SkillRequirement) => {
+                        chatbox_events.send(ChatboxEvent::System(
+                            "Failed to level up skill, you do not satisfy the skill requirement."
+                                .to_string(),
+                        ))
+                    }
+                    Err(LevelUpSkillError::AbilityRequirement) => {
+                        chatbox_events.send(ChatboxEvent::System(
+                            "Failed to level up skill, you do not satisfy the ability requirement."
+                                .to_string(),
+                        ))
+                    }
+                    Err(LevelUpSkillError::MoneyRequirement) => {
+                        chatbox_events.send(ChatboxEvent::System(
+                            "Failed to level up skill, not enough money.".to_string(),
+                        ))
+                    }
+                    Err(LevelUpSkillError::SkillPointRequirement) => {
+                        chatbox_events.send(ChatboxEvent::System(
+                            "Failed to level up skill, not enough skill points.".to_string(),
+                        ))
+                    }
+                }
+
+                if let Some(player_entity) = client_entity_list.player_entity {
+                    commands
+                        .entity(player_entity)
+                        .insert_bundle((message.updated_skill_points,));
                 }
             }
             Ok(message) => {
