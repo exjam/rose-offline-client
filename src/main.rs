@@ -61,8 +61,8 @@ use systems::{
     game_zone_change_system, item_drop_model_add_collider_system, item_drop_model_system,
     load_zone_system, login_connection_system, login_state_enter_system, login_state_exit_system,
     login_system, model_viewer_enter_system, model_viewer_system, npc_model_add_collider_system,
-    npc_model_system, particle_sequence_system, pending_damage_system, player_command_system,
-    quest_trigger_system, update_position_system, world_connection_system,
+    npc_model_system, particle_sequence_system, passive_recovery_system, pending_damage_system,
+    player_command_system, quest_trigger_system, update_position_system, world_connection_system,
     zone_viewer_setup_system, zone_viewer_system, DebugInspectorPlugin,
 };
 use ui::{
@@ -472,6 +472,7 @@ fn main() {
                         .after("game_mouse_input_system"),
                 )
                 .with_system(client_entity_event_system)
+                .with_system(passive_recovery_system)
                 .with_system(quest_trigger_system),
         );
     app.add_system_to_stage(CoreStage::PostUpdate, ui_drag_and_drop_system);

@@ -64,6 +64,10 @@ impl Command {
         matches!(self, Command::Stop)
     }
 
+    pub fn is_sit(&self) -> bool {
+        false
+    }
+
     pub fn requires_animation_complete(&self) -> bool {
         match self {
             Command::Stop => false,

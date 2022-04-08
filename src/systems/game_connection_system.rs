@@ -23,8 +23,8 @@ use rose_network_common::ConnectionError;
 use crate::{
     components::{
         ClientEntity, ClientEntityType, CollisionRayCastSource, Command, Cooldowns,
-        MovementCollisionEntities, NextCommand, PendingDamageList, PersonalStore, PlayerCharacter,
-        Position,
+        MovementCollisionEntities, NextCommand, PassiveRecoveryTime, PendingDamageList,
+        PersonalStore, PlayerCharacter, Position,
     },
     events::{ChatboxEvent, ClientEntityEvent, GameConnectionEvent, QuestTriggerEvent},
     resources::{AppState, ClientEntityList, GameConnection, GameData},
@@ -151,6 +151,7 @@ pub fn game_connection_system(
                             move_mode,
                             move_speed,
                             Cooldowns::default(),
+                            PassiveRecoveryTime::default(),
                             PendingDamageList::default(),
                             PlayerCharacter {},
                             Transform::from_xyz(
