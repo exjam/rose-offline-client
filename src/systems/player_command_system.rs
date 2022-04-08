@@ -18,7 +18,8 @@ use crate::{
 #[allow(clippy::too_many_arguments)]
 pub fn player_command_system(
     mut player_command_events: EventReader<PlayerCommandEvent>,
-    query_client_entity: Query<(&ClientEntity, &Team)>,
+    query_client_entity: Query<&ClientEntity>,
+    query_dropped_items: Query<(&ClientEntity, &Position), With<ItemDrop>>,
     query_player: Query<
         (
             Entity,
@@ -30,7 +31,7 @@ pub fn player_command_system(
         ),
         With<PlayerCharacter>,
     >,
-    query_dropped_items: Query<(&ClientEntity, &Position), With<ItemDrop>>,
+    query_team: Query<(&ClientEntity, &Team)>,
     game_connection: Option<Res<GameConnection>>,
     game_data: Res<GameData>,
 ) {
@@ -123,7 +124,7 @@ pub fn player_command_system(
                             Some(SkillBasicCommand::Attack) => {
                                 if let Some(player_selected_target) = player_selected_target {
                                     if let Ok((target_client_entity, target_team)) =
-                                        query_client_entity.get(player_selected_target.entity)
+                                        query_team.get(player_selected_target.entity)
                                     {
                                         if target_team.id != Team::DEFAULT_NPC_TEAM_ID
                                             && target_team.id != player_team.id
@@ -216,7 +217,7 @@ pub fn player_command_system(
                 }
             }
             PlayerCommandEvent::Attack(entity) => {
-                if let Ok((target_client_entity, target_team)) = query_client_entity.get(entity) {
+                if let Ok((target_client_entity, target_team)) = query_team.get(entity) {
                     if target_team.id != Team::DEFAULT_NPC_TEAM_ID
                         && target_team.id != player_team.id
                     {
@@ -234,7 +235,7 @@ pub fn player_command_system(
             PlayerCommandEvent::Move(position, target_entity) => {
                 let target_entity_id = target_entity
                     .and_then(|target_entity| query_client_entity.get(target_entity).ok())
-                    .map(|(target_client_entity, _target_team)| target_client_entity.id);
+                    .map(|target_client_entity| target_client_entity.id);
 
                 if let Some(game_connection) = game_connection.as_ref() {
                     game_connection
