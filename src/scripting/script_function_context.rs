@@ -1,6 +1,6 @@
 use bevy::{
     ecs::system::SystemParam,
-    prelude::{Query, With},
+    prelude::{EventWriter, Query, With},
 };
 
 use rose_game_common::components::{
@@ -8,7 +8,10 @@ use rose_game_common::components::{
     UnionMembership,
 };
 
-use crate::components::{ClientEntity, PlayerCharacter};
+use crate::{
+    components::{ClientEntity, PlayerCharacter},
+    events::ChatboxEvent,
+};
 
 #[derive(SystemParam)]
 pub struct ScriptFunctionContext<'w, 's> {
@@ -27,4 +30,5 @@ pub struct ScriptFunctionContext<'w, 's> {
     >,
     pub query_player_items:
         Query<'w, 's, (&'static Equipment, &'static Inventory), With<PlayerCharacter>>,
+    pub chatbox_events: EventWriter<'w, 's, ChatboxEvent>,
 }

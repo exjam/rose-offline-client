@@ -28,34 +28,43 @@ pub fn ui_chatbox_system(
     for event in chatbox_events.iter() {
         match event {
             ChatboxEvent::Say(name, text) => {
-                ui_state_chatbox
-                    .textbox_history
-                    .push((egui::Color32::LIGHT_GRAY, format!("{}> {}", name, text)));
+                ui_state_chatbox.textbox_history.push((
+                    egui::Color32::from_rgb(255, 255, 255),
+                    format!("{}> {}", name, text),
+                ));
             }
             ChatboxEvent::Shout(name, text) => {
-                ui_state_chatbox
-                    .textbox_history
-                    .push((egui::Color32::LIGHT_BLUE, format!("{}> {}", name, text)));
+                ui_state_chatbox.textbox_history.push((
+                    egui::Color32::from_rgb(189, 250, 255),
+                    format!("{}> {}", name, text),
+                ));
             }
             ChatboxEvent::Whisper(name, text) => {
-                ui_state_chatbox
-                    .textbox_history
-                    .push((egui::Color32::LIGHT_GREEN, format!("{}> {}", name, text)));
+                ui_state_chatbox.textbox_history.push((
+                    egui::Color32::from_rgb(201, 255, 144),
+                    format!("{}> {}", name, text),
+                ));
             }
             ChatboxEvent::Announce(Some(name), text) => {
-                ui_state_chatbox
-                    .textbox_history
-                    .push((egui::Color32::LIGHT_RED, format!("{}> {}", name, text)));
+                ui_state_chatbox.textbox_history.push((
+                    egui::Color32::from_rgb(255, 188, 172),
+                    format!("{}> {}", name, text),
+                ));
             }
             ChatboxEvent::Announce(None, text) => {
                 ui_state_chatbox
                     .textbox_history
-                    .push((egui::Color32::LIGHT_RED, text.clone()));
+                    .push((egui::Color32::from_rgb(255, 188, 172), text.clone()));
             }
             ChatboxEvent::System(text) => {
                 ui_state_chatbox
                     .textbox_history
-                    .push((egui::Color32::from_rgb(255, 182, 193), text.clone()));
+                    .push((egui::Color32::from_rgb(255, 224, 229), text.clone()));
+            }
+            ChatboxEvent::Quest(text) => {
+                ui_state_chatbox
+                    .textbox_history
+                    .push((egui::Color32::from_rgb(151, 221, 241), text.clone()));
             }
         }
     }

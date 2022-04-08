@@ -2,7 +2,10 @@ use rose_data::{Item, QuestTrigger};
 use rose_file_readers::{QsdItemBase1000, QsdReward, QsdRewardQuestAction};
 use rose_game_common::components::ActiveQuest;
 
-use crate::scripting::{QuestFunctionContext, ScriptFunctionContext, ScriptFunctionResources};
+use crate::{
+    events::ChatboxEvent,
+    scripting::{QuestFunctionContext, ScriptFunctionContext, ScriptFunctionResources},
+};
 
 fn quest_reward_add_item(
     script_resources: &ScriptFunctionResources,
@@ -25,13 +28,29 @@ fn quest_reward_add_item(
     if item_reference.item_type.is_quest_item() {
         // Add to quest items
         if let Some(selected_quest_index) = quest_context.selected_quest_index {
-            return quest_state
+            if quest_state
                 .get_quest_mut(selected_quest_index)
                 .and_then(|active_quest| {
                     Item::new(&item_reference, quantity as u32)
                         .and_then(|item| active_quest.try_add_item(item).ok())
                 })
-                .is_some();
+                .is_some()
+            {
+                if let Some(item_data) = script_resources
+                    .game_data
+                    .items
+                    .get_base_item(item_reference)
+                {
+                    script_context
+                        .chatbox_events
+                        .send(ChatboxEvent::Quest(format!(
+                            "You have earned {}.",
+                            item_data.name
+                        )));
+                }
+
+                return true;
+            }
         }
     } else {
         // Server is responsible for updating inventory, ignore on client
@@ -94,7 +113,7 @@ fn quest_reward_select_quest(
 }
 
 fn quest_reward_remove_selected_quest(
-    _script_resources: &ScriptFunctionResources,
+    script_resources: &ScriptFunctionResources,
     script_context: &mut ScriptFunctionContext,
     quest_context: &mut QuestFunctionContext,
 ) -> bool {
@@ -102,6 +121,26 @@ fn quest_reward_remove_selected_quest(
 
     if let Some(quest_index) = quest_context.selected_quest_index {
         if let Some(quest_slot) = quest_state.get_quest_slot_mut(quest_index) {
+            if let Some(quest_data) = quest_slot.as_ref().and_then(|active_quest| {
+                script_resources
+                    .game_data
+                    .quests
+                    .get_quest_data(active_quest.quest_id)
+            }) {
+                if let Some(quest_name) = script_resources
+                    .game_data
+                    .stl_quest
+                    .get_text_string(1, &quest_data.string_id)
+                {
+                    script_context
+                        .chatbox_events
+                        .send(ChatboxEvent::Quest(format!(
+                            "Completed quest \"{}\".",
+                            quest_name
+                        )));
+                }
+            }
+
             *quest_slot = None;
             return true;
         }
@@ -111,7 +150,7 @@ fn quest_reward_remove_selected_quest(
 }
 
 fn quest_reward_add_quest(
-    _script_resources: &ScriptFunctionResources,
+    script_resources: &ScriptFunctionResources,
     script_context: &mut ScriptFunctionContext,
     quest_context: &mut QuestFunctionContext,
     quest_id: usize,
@@ -125,7 +164,29 @@ fn quest_reward_add_quest(
             quest_context.selected_quest_index = Some(quest_index);
         }
 
-        // TODO: Emit event that a new quest has been added
+        if let Some(quest_data) = script_resources.game_data.quests.get_quest_data(quest_id) {
+            if let (Some(quest_name), Some(quest_description)) = (
+                script_resources
+                    .game_data
+                    .stl_quest
+                    .get_text_string(1, &quest_data.string_id),
+                script_resources
+                    .game_data
+                    .stl_quest
+                    .get_comment_string(1, &quest_data.string_id),
+            ) {
+                script_context
+                    .chatbox_events
+                    .send(ChatboxEvent::Quest(format!(
+                        "Started quest \"{}\".",
+                        quest_name
+                    )));
+                script_context
+                    .chatbox_events
+                    .send(ChatboxEvent::Quest(quest_description.to_string()));
+            }
+        }
+
         return true;
     }
 
@@ -133,7 +194,7 @@ fn quest_reward_add_quest(
 }
 
 fn quest_reward_change_selected_quest_id(
-    _script_resources: &ScriptFunctionResources,
+    script_resources: &ScriptFunctionResources,
     script_context: &mut ScriptFunctionContext,
     quest_context: &mut QuestFunctionContext,
     quest_id: usize,
@@ -151,7 +212,29 @@ fn quest_reward_change_selected_quest_id(
                 );
             }
 
-            // TODO: Emit event that a new quest has been added
+            if let Some(quest_data) = script_resources.game_data.quests.get_quest_data(quest_id) {
+                if let (Some(quest_name), Some(quest_description)) = (
+                    script_resources
+                        .game_data
+                        .stl_quest
+                        .get_text_string(1, &quest_data.string_id),
+                    script_resources
+                        .game_data
+                        .stl_quest
+                        .get_comment_string(1, &quest_data.string_id),
+                ) {
+                    script_context
+                        .chatbox_events
+                        .send(ChatboxEvent::Quest(format!(
+                            "Started quest \"{}\"",
+                            quest_name
+                        )));
+                    script_context
+                        .chatbox_events
+                        .send(ChatboxEvent::Quest(quest_description.to_string()));
+                }
+            }
+
             return true;
         }
     }
