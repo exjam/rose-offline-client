@@ -1,4 +1,5 @@
 use bevy::{
+    hierarchy::DespawnRecursiveExt,
     math::{Quat, Vec3, Vec3A},
     prelude::{
         AssetServer, Assets, Changed, Commands, Component, Entity, GlobalTransform, Or, Query, Res,
@@ -21,8 +22,8 @@ use rose_game_common::components::{CharacterInfo, Equipment};
 
 use crate::{
     components::{
-        CharacterModel, CharacterModelPart, COLLISION_FILTER_CLICKABLE,
-        COLLISION_FILTER_INSPECTABLE, COLLISION_GROUP_CHARACTER,
+        CharacterModel, CharacterModelPart, PersonalStore, PersonalStoreModel,
+        COLLISION_FILTER_CLICKABLE, COLLISION_FILTER_INSPECTABLE, COLLISION_GROUP_CHARACTER,
     },
     model_loader::ModelLoader,
     render::StaticMeshMaterial,
@@ -149,17 +150,33 @@ pub fn character_model_system(
             &Equipment,
             Option<&mut CharacterModel>,
             Option<&SkinnedMesh>,
+            Option<&PersonalStore>,
+            Option<&PersonalStoreModel>,
         ),
-        Or<(Changed<CharacterInfo>, Changed<Equipment>)>,
+        Or<(
+            Changed<CharacterInfo>,
+            Changed<Equipment>,
+            Changed<PersonalStore>,
+        )>,
     >,
     asset_server: Res<AssetServer>,
     model_loader: Res<ModelLoader>,
     mut static_mesh_materials: ResMut<Assets<StaticMeshMaterial>>,
     mut skinned_mesh_inverse_bindposes_assets: ResMut<Assets<SkinnedMeshInverseBindposes>>,
 ) {
-    for (entity, character_info, equipment, mut character_model, skinned_mesh) in query.iter_mut() {
+    for (
+        entity,
+        character_info,
+        equipment,
+        mut character_model,
+        skinned_mesh,
+        personal_store,
+        personal_store_model,
+    ) in query.iter_mut()
+    {
         if let Some(character_model) = character_model.as_mut() {
-            if character_model.gender == character_info.gender {
+            // If gender has not changed, we can just update our equipment models
+            if personal_store.is_none() && character_model.gender == character_info.gender {
                 model_loader.update_character_equipment(
                     &mut commands,
                     &asset_server,
@@ -173,7 +190,7 @@ pub fn character_model_system(
                 continue;
             }
 
-            // If character gender changed, we must destroy the previous model and create a new one
+            // Destroy the previous model
             for (_, (_, part_entities)) in character_model.model_parts.iter() {
                 for part_entity in part_entities.iter() {
                     commands.entity(*part_entity).despawn();
@@ -185,19 +202,58 @@ pub fn character_model_system(
                     commands.entity(*joint).despawn();
                 }
             }
+
+            if personal_store.is_some() {
+                commands
+                    .entity(entity)
+                    .remove::<CharacterModel>()
+                    .remove::<SkinnedMesh>();
+            }
         }
 
-        let (character_model, skinned_mesh) = model_loader.spawn_character_model(
-            &mut commands,
-            &asset_server,
-            &mut static_mesh_materials,
-            &mut skinned_mesh_inverse_bindposes_assets,
-            entity,
-            character_info,
-            equipment,
-        );
-        commands
-            .entity(entity)
-            .insert_bundle((character_model, skinned_mesh));
+        if let Some(personal_store) = personal_store {
+            if let Some(personal_store_model) = personal_store_model {
+                // If the skin has changed, despawn it and spawn a new one
+                if personal_store_model.skin == personal_store.skin {
+                    continue;
+                }
+
+                commands
+                    .entity(personal_store_model.model)
+                    .despawn_recursive();
+            }
+
+            // Spawn new personal store model
+            let personal_store_model = model_loader.spawn_personal_store_model(
+                &mut commands,
+                &asset_server,
+                &mut static_mesh_materials,
+                entity,
+                personal_store.skin,
+            );
+            commands.entity(entity).insert(personal_store_model);
+        } else {
+            if let Some(personal_store_model) = personal_store_model {
+                // Despawn personal store model
+                commands
+                    .entity(personal_store_model.model)
+                    .despawn_recursive();
+                commands.entity(entity).remove::<PersonalStoreModel>();
+            }
+
+            // Spawn new character model
+            let (character_model, skinned_mesh) = model_loader.spawn_character_model(
+                &mut commands,
+                &asset_server,
+                &mut static_mesh_materials,
+                &mut skinned_mesh_inverse_bindposes_assets,
+                entity,
+                character_info,
+                equipment,
+            );
+            commands
+                .entity(entity)
+                .insert_bundle((character_model, skinned_mesh));
+        }
     }
 }

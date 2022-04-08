@@ -23,7 +23,7 @@ use rose_network_common::ConnectionError;
 use crate::{
     components::{
         ClientEntity, ClientEntityType, CollisionRayCastSource, Command, MovementCollisionEntities,
-        NextCommand, PendingDamageList, PlayerCharacter, Position,
+        NextCommand, PendingDamageList, PersonalStore, PlayerCharacter, Position,
     },
     events::{ChatboxEvent, ClientEntityEvent, GameConnectionEvent, QuestTriggerEvent},
     resources::{AppState, ClientEntityList, GameConnection, GameData},
@@ -258,11 +258,6 @@ pub fn game_connection_system(
                 ability_values.attack_speed += message.passive_attack_speed;
                 ability_values.passive_attack_speed = message.passive_attack_speed;
 
-                /*
-                TODO:
-                pub personal_store_info: Option<(i32, String)>,
-                 */
-
                 let entity = commands
                     .spawn_bundle((
                         Command::with_stop(),
@@ -300,6 +295,12 @@ pub fn game_connection_system(
                         ));
                     })
                     .id();
+
+                if let Some((skin, title)) = message.personal_store_info {
+                    commands
+                        .entity(entity)
+                        .insert(PersonalStore::new(title, skin as usize));
+                }
 
                 client_entity_list.add(message.entity_id, entity);
             }

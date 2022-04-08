@@ -18,7 +18,7 @@ use rose_game_common::components::{
 };
 
 use crate::{
-    components::{CharacterModel, CharacterModelPart, ItemDropModel, NpcModel},
+    components::{CharacterModel, CharacterModelPart, ItemDropModel, NpcModel, PersonalStoreModel},
     effect_loader::spawn_effect,
     render::{EffectMeshMaterial, ParticleMaterial, StaticMeshMaterial},
     zmo_asset_loader::ZmoAsset,
@@ -274,6 +274,37 @@ impl ModelLoader {
             },
             skinned_mesh,
         ))
+    }
+
+    pub fn spawn_personal_store_model(
+        &self,
+        commands: &mut Commands,
+        asset_server: &AssetServer,
+        static_mesh_materials: &mut Assets<StaticMeshMaterial>,
+        model_entity: Entity,
+        skin: usize,
+    ) -> PersonalStoreModel {
+        let root_bone = commands
+            .spawn_bundle((Transform::default(), GlobalTransform::default()))
+            .id();
+        commands.entity(model_entity).add_child(root_bone);
+
+        spawn_model(
+            commands,
+            asset_server,
+            static_mesh_materials,
+            root_bone,
+            &self.field_item,
+            260 + skin,
+            None,
+            None,
+            0,
+        );
+
+        PersonalStoreModel {
+            skin,
+            model: root_bone,
+        }
     }
 
     pub fn spawn_item_drop_model(
