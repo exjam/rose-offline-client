@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use bevy::{
     math::Vec3Swizzles,
     prelude::{Entity, EventReader, Query, Res, With},
@@ -10,7 +12,7 @@ use rose_game_common::{
 };
 
 use crate::{
-    components::{ClientEntity, PlayerCharacter, Position, SelectedTarget},
+    components::{ClientEntity, Cooldowns, PlayerCharacter, Position, SelectedTarget},
     events::PlayerCommandEvent,
     resources::{GameConnection, GameData},
 };
@@ -18,11 +20,10 @@ use crate::{
 #[allow(clippy::too_many_arguments)]
 pub fn player_command_system(
     mut player_command_events: EventReader<PlayerCommandEvent>,
-    query_client_entity: Query<&ClientEntity>,
-    query_dropped_items: Query<(&ClientEntity, &Position), With<ItemDrop>>,
-    query_player: Query<
+    mut query_player: Query<
         (
             Entity,
+            &mut Cooldowns,
             &Hotbar,
             &Position,
             &SkillList,
@@ -31,16 +32,19 @@ pub fn player_command_system(
         ),
         With<PlayerCharacter>,
     >,
+    query_client_entity: Query<&ClientEntity>,
+    query_dropped_items: Query<(&ClientEntity, &Position), With<ItemDrop>>,
     query_team: Query<(&ClientEntity, &Team)>,
     game_connection: Option<Res<GameConnection>>,
     game_data: Res<GameData>,
 ) {
-    let query_player_result = query_player.get_single();
+    let query_player_result = query_player.get_single_mut();
     if query_player_result.is_err() {
         return;
     }
     let (
         _player_entity,
+        mut player_cooldowns,
         player_hotbar,
         player_position,
         player_skill_list,
@@ -73,6 +77,12 @@ pub fn player_command_system(
                     .get_skill(skill_slot)
                     .and_then(|skill_id| game_data.skills.get_skill(skill_id))
                 {
+                    if player_cooldowns.has_global_cooldown() {
+                        continue;
+                    }
+
+                    player_cooldowns.set_global_cooldown(Duration::from_millis(250));
+
                     match skill_data.skill_type {
                         SkillType::BasicAction => match &skill_data.basic_command {
                             Some(SkillBasicCommand::Sit) => {

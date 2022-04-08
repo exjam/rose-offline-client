@@ -4,13 +4,13 @@ use bevy::{
 };
 use bevy_egui::{egui, EguiContext};
 
-use rose_data::Item;
+use rose_data::{Item, SkillCooldown};
 use rose_game_common::components::{
     Equipment, Hotbar, HotbarSlot, Inventory, SkillList, HOTBAR_NUM_PAGES, HOTBAR_PAGE_SIZE,
 };
 
 use crate::{
-    components::PlayerCharacter,
+    components::{Cooldowns, PlayerCharacter},
     events::PlayerCommandEvent,
     resources::{GameData, Icons},
     ui::{DragAndDropId, DragAndDropSlot, UiStateDragAndDrop},
@@ -34,6 +34,7 @@ fn ui_add_hotbar_slot(
     ui: &mut egui::Ui,
     hotbar_index: (usize, usize),
     player_hotbar: &mut Mut<Hotbar>,
+    player_cooldowns: &Cooldowns,
     player_equipment: &Equipment,
     player_inventory: &Inventory,
     player_skill_list: &SkillList,
@@ -44,7 +45,7 @@ fn ui_add_hotbar_slot(
     player_command_events: &mut EventWriter<PlayerCommandEvent>,
 ) {
     let hotbar_slot = player_hotbar.pages[hotbar_index.0][hotbar_index.1].as_ref();
-    let (contents, quantity) = match hotbar_slot {
+    let (contents, quantity, cooldown_percent) = match hotbar_slot {
         Some(HotbarSlot::Skill(skill_slot)) => {
             let skill = player_skill_list.get_skill(*skill_slot);
             let skill_data = skill
@@ -54,6 +55,14 @@ fn ui_add_hotbar_slot(
                 skill_data
                     .and_then(|skill_data| icons.get_skill_icon(skill_data.icon_number as usize)),
                 None,
+                skill_data.and_then(|skill_data| match &skill_data.cooldown {
+                    SkillCooldown::Skill(_) => {
+                        player_cooldowns.get_skill_cooldown_percent(skill_data.id)
+                    }
+                    SkillCooldown::Group(group, _) => {
+                        player_cooldowns.get_skill_group_cooldown_percent(*group)
+                    }
+                }),
             )
         }
         Some(HotbarSlot::Inventory(item_slot)) => {
@@ -67,9 +76,10 @@ fn ui_add_hotbar_slot(
                     Some(Item::Stackable(stackable_item)) => Some(stackable_item.quantity as usize),
                     _ => None,
                 },
+                None, // TODO: Some items have cooldowns
             )
         }
-        _ => (None, None),
+        _ => (None, None, None),
     };
 
     let mut dropped_item = None;
@@ -77,7 +87,7 @@ fn ui_add_hotbar_slot(
         DragAndDropId::Hotbar(hotbar_index.0, hotbar_index.1),
         contents,
         quantity,
-        None,
+        cooldown_percent,
         hotbar_drag_accepts,
         &mut ui_state_dnd.dragged_item,
         &mut dropped_item,
@@ -120,7 +130,7 @@ pub fn ui_hotbar_system(
     mut ui_state_hot_bar: Local<UiStateHotBar>,
     mut ui_state_dnd: ResMut<UiStateDragAndDrop>,
     mut query_player: Query<
-        (&mut Hotbar, &Equipment, &Inventory, &SkillList),
+        (&mut Hotbar, &Cooldowns, &Equipment, &Inventory, &SkillList),
         With<PlayerCharacter>,
     >,
     mut player_command_events: EventWriter<PlayerCommandEvent>,
@@ -128,8 +138,13 @@ pub fn ui_hotbar_system(
     game_data: Res<GameData>,
     icons: Res<Icons>,
 ) {
-    let (mut player_hotbar, player_equipment, player_inventory, player_skill_list) =
-        query_player.single_mut();
+    let (
+        mut player_hotbar,
+        player_cooldowns,
+        player_equipment,
+        player_inventory,
+        player_skill_list,
+    ) = query_player.single_mut();
 
     let use_hotbar_index = if !egui_context.ctx_mut().wants_keyboard_input() {
         if keyboard_input.pressed(KeyCode::F1) {
@@ -173,6 +188,7 @@ pub fn ui_hotbar_system(
                                 ui,
                                 hotbar_index,
                                 &mut player_hotbar,
+                                player_cooldowns,
                                 player_equipment,
                                 player_inventory,
                                 player_skill_list,

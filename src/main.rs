@@ -55,12 +55,12 @@ use systems::{
     character_model_system, character_select_enter_system, character_select_exit_system,
     character_select_input_system, character_select_models_system, character_select_system,
     client_entity_event_system, collision_add_colliders_system, collision_system, command_system,
-    conversation_dialog_system, damage_digit_render_system, debug_render_collider_system,
-    debug_render_skeleton_system, effect_system, game_connection_system, game_debug_ui_system,
-    game_mouse_input_system, game_state_enter_system, game_zone_change_system,
-    item_drop_model_add_collider_system, item_drop_model_system, load_zone_system,
-    login_connection_system, login_state_enter_system, login_state_exit_system, login_system,
-    model_viewer_enter_system, model_viewer_system, npc_model_add_collider_system,
+    conversation_dialog_system, cooldown_system, damage_digit_render_system,
+    debug_render_collider_system, debug_render_skeleton_system, effect_system,
+    game_connection_system, game_debug_ui_system, game_mouse_input_system, game_state_enter_system,
+    game_zone_change_system, item_drop_model_add_collider_system, item_drop_model_system,
+    load_zone_system, login_connection_system, login_state_enter_system, login_state_exit_system,
+    login_system, model_viewer_enter_system, model_viewer_system, npc_model_add_collider_system,
     npc_model_system, particle_sequence_system, pending_damage_system, player_command_system,
     quest_trigger_system, update_position_system, world_connection_system,
     zone_viewer_setup_system, zone_viewer_system, DebugInspectorPlugin,
@@ -430,6 +430,7 @@ fn main() {
                 )
                 .with_system(
                     ui_hotbar_system
+                        .label("ui_hotbar_system")
                         .after("game_debug_ui_system")
                         .before("game_mouse_input_system"),
                 )
@@ -464,7 +465,12 @@ fn main() {
                         .before("game_mouse_input_system"),
                 )
                 .with_system(game_mouse_input_system.label("game_mouse_input_system"))
-                .with_system(player_command_system.after("game_mouse_input_system"))
+                .with_system(cooldown_system.before("ui_hotbar_system"))
+                .with_system(
+                    player_command_system
+                        .after("cooldown_system")
+                        .after("game_mouse_input_system"),
+                )
                 .with_system(client_entity_event_system)
                 .with_system(quest_trigger_system),
         );
