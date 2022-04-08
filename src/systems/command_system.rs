@@ -295,7 +295,6 @@ pub fn command_system(
                     if let Ok((target_position, target_client_entity)) =
                         query_move_target.get(*target_entity)
                     {
-                        *destination = target_position.position;
                         required_distance = match target_client_entity.entity_type {
                             ClientEntityType::Character => Some(CHARACTER_MOVE_TO_DISTANCE),
                             ClientEntityType::Npc => {
@@ -309,6 +308,17 @@ pub fn command_system(
                             }
                             _ => None,
                         };
+
+                        if let Some(required_distance) = required_distance {
+                            let offset = (target_position.position.xy() - position.position.xy())
+                                .normalize()
+                                * required_distance;
+                            destination.x = target_position.position.x - offset.x;
+                            destination.y = target_position.position.y - offset.y;
+                            destination.z = target_position.position.z;
+                        } else {
+                            *destination = target_position.position;
+                        }
                     } else {
                         *target = None;
                         entity_commands.remove::<Target>();
