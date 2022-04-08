@@ -77,6 +77,7 @@ fn ui_add_hotbar_slot(
         DragAndDropId::Hotbar(hotbar_index.0, hotbar_index.1),
         contents,
         quantity,
+        None,
         hotbar_drag_accepts,
         &mut ui_state_dnd.dragged_item,
         &mut dropped_item,

@@ -15,6 +15,7 @@ pub struct DragAndDropSlot<'a> {
     size: egui::Vec2,
     border_width: f32,
     contents: Option<(egui::TextureId, egui::Rect)>,
+    cooldown_percent: Option<f32>,
     quantity: Option<usize>,
     quantity_margin: f32,
     accepts: fn(&DragAndDropId) -> bool,
@@ -27,6 +28,7 @@ impl<'a> DragAndDropSlot<'a> {
         dnd_id: DragAndDropId,
         contents: Option<(egui::TextureId, egui::Rect)>,
         quantity: Option<usize>,
+        cooldown_percent: Option<f32>,
         accepts: fn(&DragAndDropId) -> bool,
         dragged_item: &'a mut Option<DragAndDropId>,
         dropped_item: &'a mut Option<DragAndDropId>,
@@ -37,6 +39,7 @@ impl<'a> DragAndDropSlot<'a> {
             size: size.into(),
             border_width: 1.0,
             contents,
+            cooldown_percent,
             quantity,
             quantity_margin: 2.0,
             accepts,
@@ -44,6 +47,86 @@ impl<'a> DragAndDropSlot<'a> {
             dropped_item: Some(dropped_item),
         }
     }
+}
+
+fn generate_cooldown_mesh(cooldown: f32, content_rect: egui::Rect) -> egui::epaint::Mesh {
+    use egui::epaint::*;
+
+    let segment_size = Vec2::new(content_rect.width() / 2.0, content_rect.height() / 2.0);
+    let mut mesh = Mesh::default();
+
+    let add_vert = |mesh: &mut Mesh, x, y| {
+        let pos = mesh.vertices.len();
+        mesh.vertices.push(Vertex {
+            pos: Pos2::new(x, y),
+            uv: WHITE_UV,
+            color: Color32::from_rgba_unmultiplied(50, 50, 50, 150),
+        });
+        pos as u32
+    };
+
+    /*
+     * 2 1+9 8
+     * 3  0  7
+     * 4  5  6
+     */
+    add_vert(
+        &mut mesh,
+        content_rect.min.x + segment_size.x,
+        content_rect.min.y + segment_size.y,
+    );
+    add_vert(
+        &mut mesh,
+        content_rect.min.x + segment_size.x,
+        content_rect.min.y,
+    );
+    add_vert(&mut mesh, content_rect.min.x, content_rect.min.y);
+    add_vert(
+        &mut mesh,
+        content_rect.min.x,
+        content_rect.min.y + segment_size.y,
+    );
+    add_vert(&mut mesh, content_rect.min.x, content_rect.max.y);
+    add_vert(
+        &mut mesh,
+        content_rect.min.x + segment_size.x,
+        content_rect.max.y,
+    );
+    add_vert(&mut mesh, content_rect.max.x, content_rect.max.y);
+    add_vert(
+        &mut mesh,
+        content_rect.max.x,
+        content_rect.min.y + segment_size.y,
+    );
+    add_vert(&mut mesh, content_rect.max.x, content_rect.min.y);
+    add_vert(
+        &mut mesh,
+        content_rect.min.x + segment_size.x,
+        content_rect.min.y,
+    );
+
+    let segments = cooldown / 0.125f32;
+    let num_segments = segments.trunc() as u32;
+    for segment_id in 0..num_segments {
+        mesh.add_triangle(0, segment_id + 1, segment_id + 2);
+    }
+
+    let fract_segments = segments.fract();
+    if fract_segments > 0.0 {
+        if let (Some(vert_1), Some(vert_2)) = (
+            mesh.vertices.get(num_segments as usize + 1).map(|x| x.pos),
+            mesh.vertices.get(num_segments as usize + 2).map(|x| x.pos),
+        ) {
+            let vertex_id = add_vert(
+                &mut mesh,
+                (vert_2.x - vert_1.x) * fract_segments + vert_1.x,
+                (vert_2.y - vert_1.y) * fract_segments + vert_1.y,
+            );
+            mesh.add_triangle(0, num_segments + 1, vertex_id);
+        }
+    }
+
+    mesh
 }
 
 impl<'w> DragAndDropSlot<'w> {
@@ -96,6 +179,13 @@ impl<'w> DragAndDropSlot<'w> {
                 let mut mesh = Mesh::with_texture(texture_id);
                 mesh.add_rect_with_uv(content_rect, uv, egui::Color32::WHITE);
                 ui.painter().add(Shape::mesh(mesh));
+
+                if let Some(cooldown_percent) = self.cooldown_percent {
+                    ui.painter().add(Shape::mesh(generate_cooldown_mesh(
+                        cooldown_percent,
+                        content_rect,
+                    )));
+                }
 
                 if let Some(quantity) = self.quantity {
                     let text_galley = ui.fonts().layout_no_wrap(

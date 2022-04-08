@@ -43,6 +43,7 @@ fn ui_add_skill_list_slot(
         DragAndDropId::Skill(skill_slot),
         contents,
         None,
+        None,
         |_| false,
         &mut ui_state_dnd.dragged_item,
         &mut dropped_item,

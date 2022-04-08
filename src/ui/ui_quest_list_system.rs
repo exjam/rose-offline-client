@@ -39,6 +39,7 @@ fn ui_add_quest_item_slot(
         DragAndDropId::NotDraggable,
         contents,
         quantity,
+        None,
         |_| false,
         &mut dragged_item,
         &mut dropped_item,

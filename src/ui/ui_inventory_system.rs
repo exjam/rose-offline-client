@@ -191,6 +191,7 @@ fn ui_add_inventory_slot(
             Some(Item::Stackable(stackable_item)) => Some(stackable_item.quantity as usize),
             _ => None,
         },
+        None,
         drag_accepts,
         &mut ui_state_dnd.dragged_item,
         &mut dropped_item,
