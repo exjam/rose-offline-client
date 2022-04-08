@@ -1,4 +1,4 @@
-use bevy::prelude::{Local, Query, Res, ResMut, With};
+use bevy::prelude::{EventWriter, Local, Query, Res, ResMut, With};
 use bevy_egui::{egui, EguiContext};
 
 use rose_data::SkillPageType;
@@ -6,6 +6,7 @@ use rose_game_common::components::{SkillList, SkillSlot, SKILL_PAGE_SIZE};
 
 use crate::{
     components::PlayerCharacter,
+    events::PlayerCommandEvent,
     resources::{GameData, Icons},
     ui::{DragAndDropId, DragAndDropSlot, UiStateDragAndDrop, UiStateWindows},
 };
@@ -29,6 +30,7 @@ fn ui_add_skill_list_slot(
     game_data: &GameData,
     icons: &Icons,
     ui_state_dnd: &mut UiStateDragAndDrop,
+    player_command_events: &mut EventWriter<PlayerCommandEvent>,
 ) {
     let skill = skill_list.get_skill(skill_slot);
     let skill_data = skill
@@ -48,7 +50,7 @@ fn ui_add_skill_list_slot(
     ));
 
     if response.double_clicked() {
-        // TODO: Use Skill
+        player_command_events.send(PlayerCommandEvent::UseSkill(skill_slot));
     }
 
     if let (Some(skill), Some(skill_data)) = (skill, skill_data) {
@@ -61,6 +63,7 @@ pub fn ui_skill_list_system(
     mut ui_state_skill_list: Local<UiStateSkillList>,
     mut ui_state_dnd: ResMut<UiStateDragAndDrop>,
     mut ui_state_windows: ResMut<UiStateWindows>,
+    mut player_command_events: EventWriter<PlayerCommandEvent>,
     query_player: Query<&SkillList, With<PlayerCharacter>>,
     game_data: Res<GameData>,
     icons: Res<Icons>,
@@ -108,6 +111,7 @@ pub fn ui_skill_list_system(
                                     &game_data,
                                     &icons,
                                     &mut ui_state_dnd,
+                                    &mut player_command_events,
                                 );
 
                                 let skill = player_skill_list.get_skill(skill_slot);

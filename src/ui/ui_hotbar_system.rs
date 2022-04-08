@@ -1,4 +1,7 @@
-use bevy::prelude::{Local, Mut, Query, Res, ResMut, With};
+use bevy::{
+    input::Input,
+    prelude::{EventWriter, KeyCode, Local, Mut, Query, Res, ResMut, With},
+};
 use bevy_egui::{egui, EguiContext};
 
 use rose_data::Item;
@@ -8,6 +11,7 @@ use rose_game_common::components::{
 
 use crate::{
     components::PlayerCharacter,
+    events::PlayerCommandEvent,
     resources::{GameData, Icons},
     ui::{DragAndDropId, DragAndDropSlot, UiStateDragAndDrop},
 };
@@ -36,6 +40,8 @@ fn ui_add_hotbar_slot(
     game_data: &GameData,
     icons: &Icons,
     ui_state_dnd: &mut UiStateDragAndDrop,
+    use_slot: bool,
+    player_command_events: &mut EventWriter<PlayerCommandEvent>,
 ) {
     let hotbar_slot = player_hotbar.pages[hotbar_index.0][hotbar_index.1].as_ref();
     let (contents, quantity) = match hotbar_slot {
@@ -77,8 +83,11 @@ fn ui_add_hotbar_slot(
         [40.0, 40.0],
     ));
 
-    if response.double_clicked() {
-        // TODO: Use hot bar
+    if use_slot || response.double_clicked() {
+        player_command_events.send(PlayerCommandEvent::UseHotbar(
+            hotbar_index.0,
+            hotbar_index.1,
+        ));
     }
 
     // TODO: Send to server
@@ -113,11 +122,37 @@ pub fn ui_hotbar_system(
         (&mut Hotbar, &Equipment, &Inventory, &SkillList),
         With<PlayerCharacter>,
     >,
+    mut player_command_events: EventWriter<PlayerCommandEvent>,
+    keyboard_input: Res<Input<KeyCode>>,
     game_data: Res<GameData>,
     icons: Res<Icons>,
 ) {
     let (mut player_hotbar, player_equipment, player_inventory, player_skill_list) =
         query_player.single_mut();
+
+    let use_hotbar_index = if !egui_context.ctx_mut().wants_keyboard_input() {
+        if keyboard_input.pressed(KeyCode::F1) {
+            Some(0)
+        } else if keyboard_input.pressed(KeyCode::F2) {
+            Some(1)
+        } else if keyboard_input.pressed(KeyCode::F3) {
+            Some(2)
+        } else if keyboard_input.pressed(KeyCode::F4) {
+            Some(3)
+        } else if keyboard_input.pressed(KeyCode::F5) {
+            Some(4)
+        } else if keyboard_input.pressed(KeyCode::F6) {
+            Some(5)
+        } else if keyboard_input.pressed(KeyCode::F7) {
+            Some(6)
+        } else if keyboard_input.pressed(KeyCode::F8) {
+            Some(7)
+        } else {
+            None
+        }
+    } else {
+        None
+    };
 
     egui::Window::new("Hot Bar")
         .title_bar(false)
@@ -143,6 +178,8 @@ pub fn ui_hotbar_system(
                                 &game_data,
                                 &icons,
                                 &mut ui_state_dnd,
+                                use_hotbar_index.map_or(false, |use_index| use_index == i),
+                                &mut player_command_events,
                             );
                         }
                         ui.end_row();

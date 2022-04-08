@@ -39,7 +39,8 @@ use rose_file_readers::{LtbFile, StbFile, StlFile, StlReadOptions, VfsIndex, Vfs
 
 use events::{
     AnimationFrameEvent, ChatboxEvent, ClientEntityEvent, ConversationDialogEvent,
-    GameConnectionEvent, LoadZoneEvent, QuestTriggerEvent, WorldConnectionEvent, ZoneEvent,
+    GameConnectionEvent, LoadZoneEvent, PlayerCommandEvent, QuestTriggerEvent,
+    WorldConnectionEvent, ZoneEvent,
 };
 use fly_camera::FlyCameraPlugin;
 use follow_camera::FollowCameraPlugin;
@@ -56,13 +57,13 @@ use systems::{
     client_entity_event_system, collision_add_colliders_system, collision_system, command_system,
     conversation_dialog_system, damage_digit_render_system, debug_render_collider_system,
     debug_render_skeleton_system, effect_system, game_connection_system, game_debug_ui_system,
-    game_input_system, game_state_enter_system, game_zone_change_system,
+    game_mouse_input_system, game_state_enter_system, game_zone_change_system,
     item_drop_model_add_collider_system, item_drop_model_system, load_zone_system,
     login_connection_system, login_state_enter_system, login_state_exit_system, login_system,
     model_viewer_enter_system, model_viewer_system, npc_model_add_collider_system,
-    npc_model_system, particle_sequence_system, pending_damage_system, quest_trigger_system,
-    update_position_system, world_connection_system, zone_viewer_setup_system, zone_viewer_system,
-    DebugInspectorPlugin,
+    npc_model_system, particle_sequence_system, pending_damage_system, player_command_system,
+    quest_trigger_system, update_position_system, world_connection_system,
+    zone_viewer_setup_system, zone_viewer_system, DebugInspectorPlugin,
 };
 use ui::{
     ui_chatbox_system, ui_diagnostics_system, ui_drag_and_drop_system, ui_hotbar_system,
@@ -320,6 +321,7 @@ fn main() {
         .insert_resource(Events::<WorldConnectionEvent>::default())
         .insert_resource(Events::<AnimationFrameEvent>::default())
         .insert_resource(Events::<ConversationDialogEvent>::default())
+        .insert_resource(Events::<PlayerCommandEvent>::default())
         .insert_resource(Events::<QuestTriggerEvent>::default());
 
     app.add_system(character_model_system.label("character_model_system"))
@@ -414,54 +416,55 @@ fn main() {
                 .with_system(
                     game_debug_ui_system
                         .label("game_debug_ui_system")
-                        .before("game_input_system"),
+                        .before("game_mouse_input_system"),
                 )
                 .with_system(
                     ui_chatbox_system
                         .after("game_debug_ui_system")
-                        .before("game_input_system"),
+                        .before("game_mouse_input_system"),
                 )
                 .with_system(
                     ui_inventory_system
                         .after("game_debug_ui_system")
-                        .before("game_input_system"),
+                        .before("game_mouse_input_system"),
                 )
                 .with_system(
                     ui_hotbar_system
                         .after("game_debug_ui_system")
-                        .before("game_input_system"),
+                        .before("game_mouse_input_system"),
                 )
                 .with_system(
                     ui_skill_list_system
                         .after("game_debug_ui_system")
-                        .before("game_input_system"),
+                        .before("game_mouse_input_system"),
                 )
                 .with_system(
                     ui_quest_list_system
                         .after("game_debug_ui_system")
-                        .before("game_input_system"),
+                        .before("game_mouse_input_system"),
                 )
                 .with_system(
                     ui_player_info_system
                         .after("game_debug_ui_system")
-                        .before("game_input_system"),
+                        .before("game_mouse_input_system"),
                 )
                 .with_system(
                     ui_selected_target_system
                         .after("game_debug_ui_system")
-                        .before("game_input_system"),
+                        .before("game_mouse_input_system"),
                 )
                 .with_system(
                     ui_window_system
                         .after("game_debug_ui_system")
-                        .before("game_input_system"),
+                        .before("game_mouse_input_system"),
                 )
                 .with_system(
                     conversation_dialog_system
                         .after("game_debug_ui_system")
-                        .before("game_input_system"),
+                        .before("game_mouse_input_system"),
                 )
-                .with_system(game_input_system.label("game_input_system"))
+                .with_system(game_mouse_input_system.label("game_mouse_input_system"))
+                .with_system(player_command_system.after("game_mouse_input_system"))
                 .with_system(client_entity_event_system)
                 .with_system(quest_trigger_system),
         );
