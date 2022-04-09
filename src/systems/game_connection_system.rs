@@ -11,7 +11,7 @@ use rose_game_common::{
     components::{
         BasicStatType, BasicStats, CharacterInfo, Equipment, ExperiencePoints, HealthPoints,
         Hotbar, Inventory, ItemDrop, ManaPoints, MoveMode, MoveSpeed, Npc, QuestState, SkillList,
-        Stamina, StatusEffects,
+        Stamina, StatPoints, StatusEffects,
     },
     messages::server::{
         CommandState, LearnSkillError, LevelUpSkillError, PickupItemDropContent,
@@ -72,6 +72,7 @@ pub fn game_connection_system(
             &CharacterInfo,
             &Equipment,
             &mut BasicStats,
+            &mut StatPoints,
             &mut SkillList,
             &StatusEffects,
         )>,
@@ -678,9 +679,24 @@ pub fn game_connection_system(
             }
             Ok(ServerMessage::UpdateBasicStat(message)) => {
                 if let Some(player_entity) = client_entity_list.player_entity {
-                    if let Ok((_, _, _, _, mut basic_stats, _, _)) =
+                    if let Ok((_, _, _, _, mut basic_stats, mut stat_points, _, _)) =
                         query_set_character.q1().get_mut(player_entity)
                     {
+                        // Update stat points if this was a user requested stat increase
+                        let current_value = basic_stats.get(message.basic_stat_type);
+                        if message.value == current_value + 1 {
+                            if let Some(cost) = game_data
+                                .ability_value_calculator
+                                .calculate_basic_stat_increase_cost(
+                                    &basic_stats,
+                                    message.basic_stat_type,
+                                )
+                            {
+                                stat_points.points -= stat_points.points.min(cost);
+                            }
+                        }
+
+                        // Update stats
                         match message.basic_stat_type {
                             BasicStatType::Strength => basic_stats.strength = message.value,
                             BasicStatType::Dexterity => basic_stats.dexterity = message.value,
@@ -710,6 +726,7 @@ pub fn game_connection_system(
                         character_info,
                         equipment,
                         basic_stats,
+                        _,
                         skill_list,
                         status_effects,
                     )) = query_set_character.q1().get_mut(entity)
@@ -880,7 +897,7 @@ pub fn game_connection_system(
             Ok(ServerMessage::LearnSkillResult(result)) => match result {
                 Ok(message) => {
                     if let Some(player_entity) = client_entity_list.player_entity {
-                        if let Ok((_, _, _, _, _, mut skill_list, _)) =
+                        if let Ok((_, _, _, _, _, _, mut skill_list, _)) =
                             query_set_character.q1().get_mut(player_entity)
                         {
                             if let Some(skill_slot) = skill_list.get_slot_mut(message.skill_slot) {
@@ -927,7 +944,7 @@ pub fn game_connection_system(
                 match message.result {
                     Ok((skill_slot, skill_id)) => {
                         if let Some(player_entity) = client_entity_list.player_entity {
-                            if let Ok((_, _, _, _, _, mut skill_list, _)) =
+                            if let Ok((_, _, _, _, _, _, mut skill_list, _)) =
                                 query_set_character.q1().get_mut(player_entity)
                             {
                                 if let Some(skill_slot) = skill_list.get_slot_mut(skill_slot) {
