@@ -16,7 +16,7 @@ use rose_game_common::{
 use crate::{
     components::{
         ActiveMotion, CharacterModel, ClientEntity, ClientEntityType, Command, CommandAttack,
-        CommandEmote, CommandMove, NextCommand, NpcModel, PlayerCharacter, Position,
+        CommandEmote, CommandMove, CommandSit, NextCommand, NpcModel, PlayerCharacter, Position,
     },
     events::ConversationDialogEvent,
     resources::{GameConnection, GameData},
@@ -109,6 +109,51 @@ fn get_move_animation(
 
         if npc_model.action_motions[action].is_strong() {
             Some(npc_model.action_motions[action].clone())
+        } else {
+            None
+        }
+    } else {
+        None
+    }
+}
+
+fn get_sitting_animation(
+    character_model: Option<&CharacterModel>,
+    _npc_model: Option<&NpcModel>,
+) -> Option<Handle<ZmoAsset>> {
+    if let Some(character_model) = character_model {
+        if character_model.action_motions[CharacterMotionAction::Sitting].is_strong() {
+            Some(character_model.action_motions[CharacterMotionAction::Sitting].clone())
+        } else {
+            None
+        }
+    } else {
+        None
+    }
+}
+
+fn get_sit_animation(
+    character_model: Option<&CharacterModel>,
+    _npc_model: Option<&NpcModel>,
+) -> Option<Handle<ZmoAsset>> {
+    if let Some(character_model) = character_model {
+        if character_model.action_motions[CharacterMotionAction::Sit].is_strong() {
+            Some(character_model.action_motions[CharacterMotionAction::Sit].clone())
+        } else {
+            None
+        }
+    } else {
+        None
+    }
+}
+
+fn get_standing_animation(
+    character_model: Option<&CharacterModel>,
+    _npc_model: Option<&NpcModel>,
+) -> Option<Handle<ZmoAsset>> {
+    if let Some(character_model) = character_model {
+        if character_model.action_motions[CharacterMotionAction::Standup].is_strong() {
+            Some(character_model.action_motions[CharacterMotionAction::Standup].clone())
         } else {
             None
         }
@@ -224,7 +269,7 @@ pub fn command_system(
         mut transform,
     ) in query.iter_mut()
     {
-        let requires_animation_complete = if matches!(*command, Command::Emote(_)) {
+        let requires_animation_complete = if command.is_emote() {
             // Emote has an animation, but can be interrupted by any other command
             !next_command.is_some()
         } else {
@@ -247,10 +292,31 @@ pub fn command_system(
             continue;
         }
 
+        // If sitting animation has complete, set current command to Sit
+        if command.is_sitting() {
+            if let Some(motion) = get_sit_animation(character_model, npc_model) {
+                update_active_motion(
+                    &mut commands.entity(entity),
+                    &mut active_motion,
+                    motion,
+                    1.0,
+                    true,
+                );
+            }
+
+            *command = Command::with_sit();
+        }
+
         if next_command.is_none() {
             if !command.is_stop() {
-                // Set current command to stop
-                *next_command = NextCommand::with_stop();
+                // If we have completed current command, and there is no next command, then clear current.
+                // This does not apply for some commands which must be manually completed, such as Sit
+                // where you need to stand after.
+                if !command.is_manual_complete() {
+                    *next_command = NextCommand::with_stop();
+                } else {
+                    continue;
+                }
             } else {
                 // Nothing to do, ensure we are using correct idle animation
                 if let Some(motion) = get_stop_animation(character_model, npc_model) {
@@ -264,6 +330,22 @@ pub fn command_system(
                 }
                 continue;
             }
+        }
+
+        if command.is_sit() {
+            // If current command is sit, we must stand before performing NextCommand
+            if let Some(motion) = get_standing_animation(character_model, npc_model) {
+                update_active_motion(
+                    &mut commands.entity(entity),
+                    &mut active_motion,
+                    motion,
+                    1.0,
+                    false,
+                );
+            }
+
+            *command = Command::with_standing();
+            continue;
         }
 
         match (*next_command).as_mut().unwrap() {
@@ -543,6 +625,36 @@ pub fn command_system(
                 }
 
                 *command = Command::with_emote(motion_id, is_stop);
+                *next_command = NextCommand::default();
+                commands
+                    .entity(entity)
+                    .remove::<Destination>()
+                    .remove::<Target>();
+            }
+            Command::Sit(CommandSit::Sitting) => {
+                if let Some(motion) = get_sitting_animation(character_model, npc_model) {
+                    update_active_motion(
+                        &mut commands.entity(entity),
+                        &mut active_motion,
+                        motion,
+                        1.0,
+                        false,
+                    );
+                }
+
+                *command = Command::with_sitting();
+                *next_command = NextCommand::default();
+                commands
+                    .entity(entity)
+                    .remove::<Destination>()
+                    .remove::<Target>();
+            }
+            Command::Sit(CommandSit::Standing) => {
+                // The transition from Sit to Standing happens above
+                *next_command = NextCommand::default();
+            }
+            Command::Sit(CommandSit::Sit) => {
+                // The transition from Sitting to Sit happens above
                 *next_command = NextCommand::default();
             }
         }

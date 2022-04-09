@@ -78,6 +78,7 @@ pub fn game_connection_system(
     )>,
     mut query_quest_state: Query<&mut QuestState>,
     mut query_xp_stamina: Query<(&mut ExperiencePoints, &mut Stamina)>,
+    mut query_command: Query<(&Command, &mut NextCommand)>,
     (mut app_state, mut client_entity_list, game_connection, game_data): (
         ResMut<State<AppState>>,
         ResMut<ClientEntityList>,
@@ -491,26 +492,41 @@ pub fn game_connection_system(
                     let target_entity = message
                         .target_entity_id
                         .and_then(|id| client_entity_list.get(id));
-
-                    commands.entity(entity).insert(NextCommand::with_move(
+                    let new_command = NextCommand::with_move(
                         Vec3::new(message.x, message.y, message.z as f32),
                         target_entity,
                         message.move_mode,
-                    ));
+                    );
+
+                    if let Ok((_, mut next_command)) = query_command.get_mut(entity) {
+                        *next_command = new_command;
+                    } else {
+                        commands.entity(entity).insert(new_command);
+                    }
                 }
             }
             Ok(ServerMessage::StopMoveEntity(message)) => {
                 if let Some(entity) = client_entity_list.get(message.entity_id) {
                     // TODO: Apply the stop entity message.xyz ?
-                    commands.entity(entity).insert(NextCommand::with_stop());
+                    let new_command = NextCommand::with_stop();
+
+                    if let Ok((_, mut next_command)) = query_command.get_mut(entity) {
+                        *next_command = new_command;
+                    } else {
+                        commands.entity(entity).insert(new_command);
+                    }
                 }
             }
             Ok(ServerMessage::AttackEntity(message)) => {
                 if let Some(entity) = client_entity_list.get(message.entity_id) {
                     if let Some(target_entity) = client_entity_list.get(message.target_entity_id) {
-                        commands
-                            .entity(entity)
-                            .insert(NextCommand::with_attack(target_entity));
+                        let new_command = NextCommand::with_attack(target_entity);
+
+                        if let Ok((_, mut next_command)) = query_command.get_mut(entity) {
+                            *next_command = new_command;
+                        } else {
+                            commands.entity(entity).insert(new_command);
+                        }
                     }
                 }
             }
@@ -961,9 +977,29 @@ pub fn game_connection_system(
             }
             Ok(ServerMessage::UseEmote(message)) => {
                 if let Some(entity) = client_entity_list.get(message.entity_id) {
-                    commands
-                        .entity(entity)
-                        .insert(NextCommand::with_emote(message.motion_id, message.is_stop));
+                    let new_command = NextCommand::with_emote(message.motion_id, message.is_stop);
+
+                    if let Ok((_, mut next_command)) = query_command.get_mut(entity) {
+                        *next_command = new_command;
+                    } else {
+                        commands.entity(entity).insert(new_command);
+                    }
+                }
+            }
+            Ok(ServerMessage::SitToggle(entity_id)) => {
+                if let Some(entity) = client_entity_list.get(entity_id) {
+                    if let Ok((command, mut next_command)) = query_command.get_mut(entity) {
+                        if matches!(command, Command::Sit(_)) {
+                            // If next command is already set then the command system will make the
+                            // entity stand up before performing next command. So we only need to
+                            // explicitly start to stand up if next command is not set.
+                            if next_command.is_none() {
+                                *next_command = NextCommand::with_standing();
+                            }
+                        } else {
+                            *next_command = NextCommand::with_sitting();
+                        }
+                    }
                 }
             }
             Ok(message) => {
