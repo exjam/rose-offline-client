@@ -959,6 +959,13 @@ pub fn game_connection_system(
                         .insert_bundle((message.updated_skill_points,));
                 }
             }
+            Ok(ServerMessage::UseEmote(message)) => {
+                if let Some(entity) = client_entity_list.get(message.entity_id) {
+                    commands
+                        .entity(entity)
+                        .insert(NextCommand::with_emote(message.motion_id, message.is_stop));
+                }
+            }
             Ok(message) => {
                 log::warn!("Received unimplemented game server message: {:#?}", message);
             }

@@ -2,7 +2,7 @@ use bevy::{
     ecs::system::EntityCommands,
     hierarchy::DespawnRecursiveExt,
     math::{Quat, Vec3, Vec3Swizzles},
-    prelude::{Commands, Entity, EventWriter, Handle, Mut, Query, Res, Transform},
+    prelude::{AssetServer, Commands, Entity, EventWriter, Handle, Mut, Query, Res, Transform},
 };
 use rand::prelude::SliceRandom;
 
@@ -16,7 +16,7 @@ use rose_game_common::{
 use crate::{
     components::{
         ActiveMotion, CharacterModel, ClientEntity, ClientEntityType, Command, CommandAttack,
-        CommandMove, NextCommand, NpcModel, PlayerCharacter, Position,
+        CommandEmote, CommandMove, NextCommand, NpcModel, PlayerCharacter, Position,
     },
     events::ConversationDialogEvent,
     resources::{GameConnection, GameData},
@@ -202,6 +202,7 @@ pub fn command_system(
     query_move_target: Query<(&Position, &ClientEntity)>,
     query_attack_target: Query<(&Position, &HealthPoints)>,
     query_npc: Query<&Npc>,
+    asset_server: Res<AssetServer>,
     game_connection: Option<Res<GameConnection>>,
     game_data: Res<GameData>,
     mut conversation_dialog_events: EventWriter<ConversationDialogEvent>,
@@ -223,10 +224,14 @@ pub fn command_system(
         mut transform,
     ) in query.iter_mut()
     {
-        if !next_command.is_die()
-            && command.requires_animation_complete()
-            && active_motion.is_some()
-        {
+        let requires_animation_complete = if matches!(*command, Command::Emote(_)) {
+            // Emote has an animation, but can be interrupted by any other command
+            !next_command.is_some()
+        } else {
+            command.requires_animation_complete()
+        };
+
+        if !next_command.is_die() && requires_animation_complete && active_motion.is_some() {
             // Current command still in animation
             continue;
         }
@@ -516,6 +521,28 @@ pub fn command_system(
                 }
 
                 *command = Command::with_pickup_item(item_entity);
+                *next_command = NextCommand::default();
+            }
+            &mut Command::Emote(CommandEmote { motion_id, is_stop }) => {
+                let motion_data = if let Some(npc_model) = npc_model {
+                    game_data.npcs.get_npc_motion(npc_model.npc_id, motion_id)
+                } else {
+                    game_data
+                        .character_motion_database
+                        .find_first_character_motion(motion_id)
+                };
+
+                if let Some(motion_data) = motion_data {
+                    update_active_motion(
+                        &mut commands.entity(entity),
+                        &mut active_motion,
+                        asset_server.load(&motion_data.path),
+                        1.0,
+                        false,
+                    );
+                }
+
+                *command = Command::with_emote(motion_id, is_stop);
                 *next_command = NextCommand::default();
             }
         }

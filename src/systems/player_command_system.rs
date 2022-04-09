@@ -152,10 +152,18 @@ pub fn player_command_system(
                                     }
                                 }
                             }
+                            Some(SkillBasicCommand::Jump) | Some(SkillBasicCommand::AirJump) => {
+                                if let Some(action_motion_id) = skill_data.action_motion_id {
+                                    if let Some(game_connection) = game_connection.as_ref() {
+                                        game_connection
+                                            .client_message_tx
+                                            .send(ClientMessage::UseEmote(action_motion_id, true))
+                                            .ok();
+                                    }
+                                }
+                            }
                             /*
                             Some(SkillBasicCommand::AutoTarget) => {}
-                            Some(SkillBasicCommand::Jump) => {}
-                            Some(SkillBasicCommand::AirJump) => {}
                             Some(SkillBasicCommand::DriveVehicle) => {}
                             Some(SkillBasicCommand::AddFriend) => {}
                             Some(SkillBasicCommand::PartyInvite) => {}

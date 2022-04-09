@@ -2,6 +2,7 @@ use bevy::{
     math::Vec3,
     prelude::{Component, Entity},
 };
+use rose_data::MotionId;
 use std::ops::{Deref, DerefMut};
 
 use rose_game_common::components::MoveMode;
@@ -18,6 +19,12 @@ pub struct CommandAttack {
     pub target: Entity,
 }
 
+#[derive(Clone, Debug)]
+pub struct CommandEmote {
+    pub motion_id: MotionId,
+    pub is_stop: bool,
+}
+
 #[derive(Component, Clone, Debug)]
 pub enum Command {
     Stop,
@@ -25,6 +32,7 @@ pub enum Command {
     Attack(CommandAttack),
     Die,
     PickupItem(Entity),
+    Emote(CommandEmote),
 }
 
 impl Command {
@@ -38,6 +46,10 @@ impl Command {
 
     pub fn with_attack(target: Entity) -> Self {
         Self::Attack(CommandAttack { target })
+    }
+
+    pub fn with_emote(motion_id: MotionId, is_stop: bool) -> Self {
+        Self::Emote(CommandEmote { motion_id, is_stop })
     }
 
     pub fn with_pickup_item(target: Entity) -> Self {
@@ -75,6 +87,7 @@ impl Command {
             Command::Attack(_) => true,
             Command::Die => true,
             Command::PickupItem(_) => true,
+            Command::Emote(_) => true,
         }
     }
 }
@@ -117,6 +130,10 @@ impl NextCommand {
             target,
             move_mode,
         })))
+    }
+
+    pub fn with_emote(motion_id: MotionId, is_stop: bool) -> Self {
+        Self(Some(Command::Emote(CommandEmote { motion_id, is_stop })))
     }
 
     pub fn with_attack(target: Entity) -> Self {

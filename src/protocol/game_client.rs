@@ -4,17 +4,21 @@ use std::net::SocketAddr;
 use thiserror::Error;
 use tokio::net::TcpStream;
 
-use rose_game_common::messages::{
-    client::{ChangeEquipment, ClientMessage, ConnectionRequest, QuestDelete},
-    server::{
-        AnnounceChat, ApplySkillEffect, AttackEntity, CastSkillSelf, CastSkillTargetEntity,
-        CastSkillTargetPosition, CharacterData, CharacterDataItems, CharacterDataQuest,
-        ConnectionRequestError, ConnectionResponse, DamageEntity, JoinZoneResponse,
-        LevelUpSkillResult, LocalChat, MoveEntity, PickupItemDropResult, QuestDeleteResult,
-        QuestTriggerResult, RemoveEntities, ServerMessage, ShoutChat, SpawnEntityCharacter,
-        SpawnEntityItemDrop, SpawnEntityMonster, SpawnEntityNpc, StopMoveEntity, Teleport,
-        UpdateAbilityValue, UpdateBasicStat, UpdateEquipment, UpdateLevel, UpdateSpeed,
-        UpdateStatusEffects, UpdateVehiclePart, UpdateXpStamina, UseEmote, UseItem, Whisper,
+use rose_game_common::{
+    components::MoveMode,
+    messages::{
+        client::{ChangeEquipment, ClientMessage, ConnectionRequest, QuestDelete},
+        server::{
+            self, AnnounceChat, ApplySkillEffect, AttackEntity, CastSkillSelf,
+            CastSkillTargetEntity, CastSkillTargetPosition, CharacterData, CharacterDataItems,
+            CharacterDataQuest, ConnectionRequestError, ConnectionResponse, DamageEntity,
+            JoinZoneResponse, LevelUpSkillResult, LocalChat, MoveEntity, PickupItemDropResult,
+            QuestDeleteResult, QuestTriggerResult, RemoveEntities, ServerMessage, ShoutChat,
+            SpawnEntityCharacter, SpawnEntityItemDrop, SpawnEntityMonster, SpawnEntityNpc,
+            StopMoveEntity, Teleport, UpdateAbilityValue, UpdateBasicStat, UpdateEquipment,
+            UpdateLevel, UpdateSpeed, UpdateStatusEffects, UpdateVehiclePart, UpdateXpStamina,
+            UseEmote, UseItem, Whisper,
+        },
     },
 };
 use rose_network_common::{Connection, Packet, PacketCodec};
@@ -24,10 +28,10 @@ use rose_network_irose::{
         PacketClientCastSkillTargetPosition, PacketClientChangeAmmo, PacketClientChangeEquipment,
         PacketClientChangeVehiclePart, PacketClientChat, PacketClientConnectRequest,
         PacketClientDropItemFromInventory, PacketClientEmote, PacketClientIncreaseBasicStat,
-        PacketClientJoinZone, PacketClientLevelUpSkill, PacketClientMove,
-        PacketClientPersonalStoreListItems, PacketClientPickupItemDrop, PacketClientQuestRequest,
-        PacketClientQuestRequestType, PacketClientReviveRequest, PacketClientSetHotbarSlot,
-        PacketClientUseItem, PacketClientWarpGateRequest,
+        PacketClientJoinZone, PacketClientLevelUpSkill, PacketClientMove, PacketClientMoveToggle,
+        PacketClientMoveToggleType, PacketClientPersonalStoreListItems, PacketClientPickupItemDrop,
+        PacketClientQuestRequest, PacketClientQuestRequestType, PacketClientReviveRequest,
+        PacketClientSetHotbarSlot, PacketClientUseItem, PacketClientWarpGateRequest,
     },
     game_server_packets::{
         ConnectResult, PacketConnectionReply, PacketServerAnnounceChat,
@@ -37,16 +41,16 @@ use rose_network_irose::{
         PacketServerChangeNpcId, PacketServerCharacterInventory, PacketServerCharacterQuestData,
         PacketServerDamageEntity, PacketServerFinishCastingSkill, PacketServerJoinZone,
         PacketServerLearnSkillResult, PacketServerLevelUpSkillResult, PacketServerLocalChat,
-        PacketServerMoveEntity, PacketServerPickupItemDropResult, PacketServerQuestResult,
-        PacketServerQuestResultType, PacketServerRemoveEntities, PacketServerRewardItems,
-        PacketServerRewardMoney, PacketServerRunNpcDeathTrigger, PacketServerSelectCharacter,
-        PacketServerSetHotbarSlot, PacketServerShoutChat, PacketServerSpawnEntityCharacter,
-        PacketServerSpawnEntityItemDrop, PacketServerSpawnEntityMonster,
-        PacketServerSpawnEntityNpc, PacketServerStartCastingSkill, PacketServerStopMoveEntity,
-        PacketServerTeleport, PacketServerUpdateAbilityValue, PacketServerUpdateAmmo,
-        PacketServerUpdateBasicStat, PacketServerUpdateEquipment, PacketServerUpdateInventory,
-        PacketServerUpdateLevel, PacketServerUpdateMoney, PacketServerUpdateSpeed,
-        PacketServerUpdateStatusEffects, PacketServerUpdateVehiclePart,
+        PacketServerMoveEntity, PacketServerMoveToggle, PacketServerMoveToggleType,
+        PacketServerPickupItemDropResult, PacketServerQuestResult, PacketServerQuestResultType,
+        PacketServerRemoveEntities, PacketServerRewardItems, PacketServerRewardMoney,
+        PacketServerRunNpcDeathTrigger, PacketServerSelectCharacter, PacketServerSetHotbarSlot,
+        PacketServerShoutChat, PacketServerSpawnEntityCharacter, PacketServerSpawnEntityItemDrop,
+        PacketServerSpawnEntityMonster, PacketServerSpawnEntityNpc, PacketServerStartCastingSkill,
+        PacketServerStopMoveEntity, PacketServerTeleport, PacketServerUpdateAbilityValue,
+        PacketServerUpdateAmmo, PacketServerUpdateBasicStat, PacketServerUpdateEquipment,
+        PacketServerUpdateInventory, PacketServerUpdateLevel, PacketServerUpdateMoney,
+        PacketServerUpdateSpeed, PacketServerUpdateStatusEffects, PacketServerUpdateVehiclePart,
         PacketServerUpdateXpStamina, PacketServerUseEmote, PacketServerUseItem,
         PacketServerWhisper, ServerPackets,
     },
@@ -655,6 +659,43 @@ impl GameClient {
                     }))
                     .ok();
             }
+            Some(ServerPackets::MoveToggle) => {
+                let message = PacketServerMoveToggle::try_from(&packet)?;
+                match message.move_toggle_type {
+                    PacketServerMoveToggleType::Walk => {
+                        self.server_message_tx
+                            .send(ServerMessage::MoveToggle(server::MoveToggle {
+                                entity_id: message.entity_id,
+                                move_mode: MoveMode::Walk,
+                                run_speed: message.run_speed,
+                            }))
+                            .ok();
+                    }
+                    PacketServerMoveToggleType::Run => {
+                        self.server_message_tx
+                            .send(ServerMessage::MoveToggle(server::MoveToggle {
+                                entity_id: message.entity_id,
+                                move_mode: MoveMode::Run,
+                                run_speed: message.run_speed,
+                            }))
+                            .ok();
+                    }
+                    PacketServerMoveToggleType::Drive => {
+                        self.server_message_tx
+                            .send(ServerMessage::MoveToggle(server::MoveToggle {
+                                entity_id: message.entity_id,
+                                move_mode: MoveMode::Drive,
+                                run_speed: message.run_speed,
+                            }))
+                            .ok();
+                    }
+                    PacketServerMoveToggleType::Sit => {
+                        self.server_message_tx
+                            .send(ServerMessage::SitToggle(message.entity_id))
+                            .ok();
+                    }
+                }
+            }
             _ => log::info!("Unhandled game packet {:x}", packet.command),
         }
 
@@ -848,6 +889,27 @@ impl GameClient {
                     .write_packet(Packet::from(&PacketClientCastSkillTargetPosition {
                         skill_slot,
                         position,
+                    }))
+                    .await?
+            }
+            ClientMessage::RunToggle => {
+                connection
+                    .write_packet(Packet::from(&PacketClientMoveToggle {
+                        toggle_type: PacketClientMoveToggleType::Run,
+                    }))
+                    .await?
+            }
+            ClientMessage::SitToggle => {
+                connection
+                    .write_packet(Packet::from(&PacketClientMoveToggle {
+                        toggle_type: PacketClientMoveToggleType::Sit,
+                    }))
+                    .await?
+            }
+            ClientMessage::DriveToggle => {
+                connection
+                    .write_packet(Packet::from(&PacketClientMoveToggle {
+                        toggle_type: PacketClientMoveToggleType::Drive,
                     }))
                     .await?
             }
