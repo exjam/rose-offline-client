@@ -66,9 +66,10 @@ use systems::{
     zone_viewer_setup_system, zone_viewer_system, DebugInspectorPlugin,
 };
 use ui::{
-    ui_chatbox_system, ui_diagnostics_system, ui_drag_and_drop_system, ui_hotbar_system,
-    ui_inventory_system, ui_player_info_system, ui_quest_list_system, ui_selected_target_system,
-    ui_skill_list_system, ui_window_system, UiStateDragAndDrop, UiStateWindows,
+    ui_character_info_system, ui_chatbox_system, ui_diagnostics_system, ui_drag_and_drop_system,
+    ui_hotbar_system, ui_inventory_system, ui_player_info_system, ui_quest_list_system,
+    ui_selected_target_system, ui_skill_list_system, ui_window_system, UiStateDragAndDrop,
+    UiStateWindows,
 };
 use vfs_asset_io::VfsAssetIo;
 use zmo_asset_loader::{ZmoAsset, ZmoAssetLoader};
@@ -420,6 +421,11 @@ fn main() {
                 )
                 .with_system(
                     ui_chatbox_system
+                        .after("game_debug_ui_system")
+                        .before("game_mouse_input_system"),
+                )
+                .with_system(
+                    ui_character_info_system
                         .after("game_debug_ui_system")
                         .before("game_mouse_input_system"),
                 )

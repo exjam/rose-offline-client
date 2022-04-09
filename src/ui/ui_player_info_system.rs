@@ -74,7 +74,7 @@ pub fn ui_player_info_system(
                     });
                     ui.end_row();
 
-                    ui.label("XP");
+                    ui.label("EXP");
                     ui.scope(|ui| {
                         let need_xp = game_data
                             .ability_value_calculator

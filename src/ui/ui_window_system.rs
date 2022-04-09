@@ -2,6 +2,9 @@ use bevy::prelude::ResMut;
 use bevy_egui::{egui, EguiContext};
 
 pub struct UiStateWindows {
+    pub character_info_window_id: egui::Id,
+    pub character_info_open: bool,
+
     pub inventory_window_id: egui::Id,
     pub inventory_open: bool,
 
@@ -15,6 +18,8 @@ pub struct UiStateWindows {
 impl Default for UiStateWindows {
     fn default() -> Self {
         Self {
+            character_info_window_id: egui::Id::new("window_id_character_info"),
+            character_info_open: false,
             inventory_window_id: egui::Id::new("window_id_inventory"),
             inventory_open: false,
             skill_list_window_id: egui::Id::new("window_id_skill_list"),
@@ -31,6 +36,10 @@ pub fn ui_window_system(
 ) {
     if !egui_context.ctx_mut().wants_keyboard_input() {
         let mut input = egui_context.ctx_mut().input_mut();
+
+        if input.consume_key(egui::Modifiers::ALT, egui::Key::A) {
+            ui_state_windows.character_info_open = !ui_state_windows.character_info_open;
+        }
 
         if input.consume_key(egui::Modifiers::ALT, egui::Key::I) {
             ui_state_windows.inventory_open = !ui_state_windows.inventory_open;
