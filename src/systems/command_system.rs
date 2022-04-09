@@ -376,13 +376,12 @@ pub fn command_system(
                 let mut entity_commands = commands.entity(entity);
                 let mut pickup_item_entity = None;
                 let mut talk_to_npc_entity = None;
-                let mut required_distance = None;
 
                 if let Some(target_entity) = target {
                     if let Ok((target_position, target_client_entity)) =
                         query_move_target.get(*target_entity)
                     {
-                        required_distance = match target_client_entity.entity_type {
+                        let required_distance = match target_client_entity.entity_type {
                             ClientEntityType::Character => Some(CHARACTER_MOVE_TO_DISTANCE),
                             ClientEntityType::Npc => {
                                 talk_to_npc_entity = Some(*target_entity);
@@ -438,7 +437,7 @@ pub fn command_system(
                 }
 
                 let distance = position.position.xy().distance(destination.xy());
-                if distance < required_distance.unwrap_or(0.1) {
+                if distance < 0.1 {
                     // Reached destination, stop moving
                     *next_command = NextCommand::with_stop();
 
