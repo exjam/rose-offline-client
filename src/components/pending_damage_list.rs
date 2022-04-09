@@ -6,6 +6,7 @@ pub struct PendingDamage {
     pub attacker: ClientEntityId,
     pub damage: Damage,
     pub is_kill: bool,
+    pub is_immediate: bool,
 }
 
 #[derive(Component)]
@@ -22,12 +23,13 @@ impl Default for PendingDamageList {
 }
 
 impl PendingDamageList {
-    pub fn add(&mut self, attacker: ClientEntityId, damage: Damage, is_kill: bool) {
+    pub fn add(&mut self, attacker: ClientEntityId, damage: Damage, is_kill: bool, is_immediate: bool) {
         self.pending_damage.push(PendingDamage {
             age: 0.0,
             attacker,
             damage,
             is_kill,
+            is_immediate,
         });
     }
 }

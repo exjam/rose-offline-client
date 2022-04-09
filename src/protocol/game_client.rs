@@ -283,6 +283,7 @@ impl GameClient {
                         defender_entity_id: message.defender_entity_id,
                         damage: message.damage,
                         is_killed: message.is_killed,
+                        is_immediate: message.is_immediate,
                         from_skill: None,
                     }))
                     .ok();
@@ -655,6 +656,7 @@ impl GameClient {
                         defender_entity_id: message.entity_id,
                         damage: message.damage,
                         is_killed: message.is_killed,
+                        is_immediate: message.is_immediate,
                         from_skill: Some((message.skill_id, message.caster_intelligence)),
                     }))
                     .ok();

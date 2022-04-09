@@ -548,6 +548,7 @@ pub fn game_connection_system(
                             message.attacker_entity_id,
                             message.damage,
                             message.is_killed,
+                            message.is_immediate,
                         );
                     }
                 }
