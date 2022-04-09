@@ -384,24 +384,38 @@ pub fn command_system(
                         let required_distance = match target_client_entity.entity_type {
                             ClientEntityType::Character => Some(CHARACTER_MOVE_TO_DISTANCE),
                             ClientEntityType::Npc => {
-                                talk_to_npc_entity = Some(*target_entity);
+                                talk_to_npc_entity =
+                                    Some((*target_entity, target_position.position));
                                 Some(NPC_MOVE_TO_DISTANCE)
                             }
                             ClientEntityType::ItemDrop => {
-                                pickup_item_entity =
-                                    Some((*target_entity, target_client_entity.id));
+                                pickup_item_entity = Some((
+                                    *target_entity,
+                                    target_client_entity.id,
+                                    target_position.position,
+                                ));
                                 Some(ITEM_DROP_MOVE_TO_DISTANCE)
                             }
                             _ => None,
                         };
 
                         if let Some(required_distance) = required_distance {
-                            let offset = (target_position.position.xy() - position.position.xy())
+                            let distance = position
+                                .position
+                                .xy()
+                                .distance(target_position.position.xy());
+                            if distance < required_distance {
+                                // We are already within required distance, so no need to move further
+                                *destination = position.position;
+                            } else {
+                                let offset = (target_position.position.xy()
+                                    - position.position.xy())
                                 .normalize()
-                                * required_distance;
-                            destination.x = target_position.position.x - offset.x;
-                            destination.y = target_position.position.y - offset.y;
-                            destination.z = target_position.position.z;
+                                    * required_distance;
+                                destination.x = target_position.position.x - offset.x;
+                                destination.y = target_position.position.y - offset.y;
+                                destination.z = target_position.position.z;
+                            }
                         } else {
                             *destination = target_position.position;
                         }
@@ -443,9 +457,21 @@ pub fn command_system(
 
                     // If the player has moved to an item, pick it up
                     if player_character.is_some() {
-                        if let Some((pickup_item_entity, pickup_item_entity_id)) =
-                            pickup_item_entity
+                        if let Some((
+                            pickup_item_entity,
+                            pickup_item_entity_id,
+                            pickup_item_position,
+                        )) = pickup_item_entity
                         {
+                            // Update rotation to face item
+                            let dx = pickup_item_position.x - position.position.x;
+                            let dy = pickup_item_position.y - position.position.y;
+                            transform.rotation = Quat::from_axis_angle(
+                                Vec3::Y,
+                                dy.atan2(dx) + std::f32::consts::PI / 2.0,
+                            );
+
+                            // Ask the server to pick up the item
                             if let Some(game_connection) = game_connection.as_ref() {
                                 game_connection
                                     .client_message_tx
@@ -455,7 +481,16 @@ pub fn command_system(
                             }
                         }
 
-                        if let Some(talk_to_npc_entity) = talk_to_npc_entity {
+                        if let Some((talk_to_npc_entity, talk_to_npc_position)) = talk_to_npc_entity
+                        {
+                            // Update rotation to face NPC
+                            let dx = talk_to_npc_position.x - position.position.x;
+                            let dy = talk_to_npc_position.y - position.position.y;
+                            transform.rotation = Quat::from_axis_angle(
+                                Vec3::Y,
+                                dy.atan2(dx) + std::f32::consts::PI / 2.0,
+                            );
+
                             // Open dialog with npc
                             if let Ok(npc) = query_npc.get(talk_to_npc_entity) {
                                 if npc.quest_index != 0 {
