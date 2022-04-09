@@ -604,9 +604,13 @@ fn load_game_data(
         skill_pages.push((image_handle, texture_id));
     }
 
+    let window_icons_image = asset_server.load("3DDATA/CONTROL/RES/UI21.DDS");
+    let window_icons_texture_id = egui_context.add_image(window_icons_image.clone_weak());
+
     commands.insert_resource(Icons {
         item_pages,
         skill_pages,
+        window_icons_image: (window_icons_image, window_icons_texture_id),
     });
 
     commands.insert_resource(DamageDigitsSpawner::load(
