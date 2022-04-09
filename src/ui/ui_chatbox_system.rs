@@ -79,6 +79,7 @@ pub fn ui_chatbox_system(
                 egui::ScrollArea::vertical()
                     .max_height(250.0)
                     .auto_shrink([false; 2])
+                    .stick_to_bottom()
                     .show(ui, |ui| {
                         for (colour, text) in ui_state_chatbox.textbox_history.iter() {
                             ui.colored_label(*colour, text);
