@@ -76,15 +76,27 @@ pub fn ui_chatbox_system(
         .frame(egui::Frame::window(&chatbox_style))
         .show(egui_context.ctx_mut(), |ui| {
             ui.with_layout(egui::Layout::top_down_justified(egui::Align::LEFT), |ui| {
+                let text_style = egui::TextStyle::Body;
+                let row_height = ui.text_style_height(&text_style);
+
                 egui::ScrollArea::vertical()
                     .max_height(250.0)
                     .auto_shrink([false; 2])
                     .stick_to_bottom()
-                    .show(ui, |ui| {
-                        for (colour, text) in ui_state_chatbox.textbox_history.iter() {
-                            ui.colored_label(*colour, text);
-                        }
-                    });
+                    .show_rows(
+                        ui,
+                        row_height,
+                        ui_state_chatbox.textbox_history.len(),
+                        |ui, row_range| {
+                            for row in row_range {
+                                if let Some((colour, text)) =
+                                    ui_state_chatbox.textbox_history.get(row)
+                                {
+                                    ui.colored_label(*colour, text);
+                                }
+                            }
+                        },
+                    );
 
                 let response = ui.text_edit_singleline(&mut ui_state_chatbox.textbox_text);
 
