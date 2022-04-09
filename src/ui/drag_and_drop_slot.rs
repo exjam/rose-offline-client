@@ -105,7 +105,17 @@ fn generate_cooldown_mesh(cooldown: f32, content_rect: egui::Rect) -> egui::epai
         content_rect.min.y,
     );
 
-    let segments = cooldown / 0.125f32;
+    /*
+     * Triangles:
+     * _______
+     * |\ | /|
+     * |_\|/_|
+     * | /|\ |
+     * |/ | \|
+     * -------
+     */ 
+    const TRIANGLES_COUNT: f32 = 8.0;
+    let segments = cooldown * TRIANGLES_COUNT;
     let num_segments = segments.trunc() as u32;
     for segment_id in 0..num_segments {
         mesh.add_triangle(0, segment_id + 1, segment_id + 2);
