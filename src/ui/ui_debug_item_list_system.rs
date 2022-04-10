@@ -6,7 +6,7 @@ use rose_game_common::{components::Equipment, messages::client::ClientMessage};
 
 use crate::{
     resources::{AppState, GameConnection, GameData, Icons},
-    ui::{UiStateDebugWindows, ui_add_item_tooltip},
+    ui::{ui_add_item_tooltip, UiStateDebugWindows},
 };
 
 pub struct UiStateDebugItemList {
