@@ -113,6 +113,11 @@ fn main() {
                 .takes_value(true),
         )
         .arg(
+            clap::Arg::new("zone-viewer")
+                .long("zone-viewer")
+                .help("Run zone viewer"),
+        )
+        .arg(
             clap::Arg::new("model-viewer")
                 .long("model-viewer")
                 .help("Run model viewer"),
@@ -202,11 +207,13 @@ fn main() {
         .value_of("zone")
         .and_then(|str| str.parse::<u16>().ok())
         .and_then(ZoneId::new)
-        .unwrap_or_else(|| ZoneId::new(2).unwrap());
+        .unwrap_or_else(|| ZoneId::new(1).unwrap());
     if matches.is_present("game") {
         app_state = AppState::GameLogin;
     } else if matches.is_present("model-viewer") {
         app_state = AppState::ModelViewer;
+    } else if matches.is_present("zone-viewer") {
+        app_state = AppState::ZoneViewer;
     }
 
     let mut data_idx_path = matches.value_of("data-idx").map(Path::new);
