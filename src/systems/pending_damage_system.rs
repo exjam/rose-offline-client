@@ -142,7 +142,10 @@ pub fn pending_damage_system(
             pending_damage.age += delta_time;
 
             let attacker_entity = client_entity_list.get(pending_damage.attacker);
-            if pending_damage.is_immediate || pending_damage.age > MAX_DAMAGE_AGE || attacker_entity.is_none() {
+            if pending_damage.is_immediate
+                || pending_damage.age > MAX_DAMAGE_AGE
+                || attacker_entity.is_none()
+            {
                 let pending_damage = pending_damage_list.pending_damage.remove(i);
                 apply_damage(
                     &mut commands,
