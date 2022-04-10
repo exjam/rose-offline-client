@@ -61,4 +61,4 @@ pub use player_command_system::player_command_system;
 pub use quest_trigger_system::quest_trigger_system;
 pub use update_position_system::update_position_system;
 pub use world_connection_system::world_connection_system;
-pub use zone_viewer_system::{zone_viewer_setup_system, zone_viewer_system};
+pub use zone_viewer_system::zone_viewer_enter_system;

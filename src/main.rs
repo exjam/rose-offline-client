@@ -64,14 +64,15 @@ use systems::{
     login_system, model_viewer_enter_system, model_viewer_system, npc_model_add_collider_system,
     npc_model_system, particle_sequence_system, passive_recovery_system, pending_damage_system,
     player_command_system, quest_trigger_system, update_position_system, world_connection_system,
-    zone_viewer_setup_system, zone_viewer_system, DebugInspectorPlugin,
+    zone_viewer_enter_system, DebugInspectorPlugin,
 };
 use ui::{
-    ui_character_info_system, ui_chatbox_system, ui_debug_entity_inspector_system,
-    ui_debug_menu_system, ui_debug_zone_list_system, ui_diagnostics_system,
-    ui_drag_and_drop_system, ui_hotbar_system, ui_inventory_system, ui_player_info_system,
-    ui_quest_list_system, ui_selected_target_system, ui_skill_list_system, ui_window_system,
-    UiStateDebugWindows, UiStateDragAndDrop, UiStateWindows,
+    ui_character_info_system, ui_chatbox_system, ui_debug_camera_info_system,
+    ui_debug_entity_inspector_system, ui_debug_menu_system, ui_debug_npc_list_system,
+    ui_debug_zone_list_system, ui_diagnostics_system, ui_drag_and_drop_system, ui_hotbar_system,
+    ui_inventory_system, ui_player_info_system, ui_quest_list_system, ui_selected_target_system,
+    ui_skill_list_system, ui_window_system, UiStateDebugWindows, UiStateDragAndDrop,
+    UiStateWindows,
 };
 use vfs_asset_io::VfsAssetIo;
 use zmo_asset_loader::{ZmoAsset, ZmoAssetLoader};
@@ -356,6 +357,8 @@ fn main() {
         .add_system(ui_diagnostics_system)
         .add_system(ui_debug_menu_system.before("ui_system"))
         .add_system(ui_debug_zone_list_system.label("ui_system"))
+        .add_system(ui_debug_npc_list_system.label("ui_system"))
+        .add_system(ui_debug_camera_info_system.label("ui_system"))
         .add_system(
             ui_debug_entity_inspector_system
                 .exclusive_system()
@@ -373,9 +376,8 @@ fn main() {
 
     // Zone Viewer
     app.add_system_set(
-        SystemSet::on_enter(AppState::ZoneViewer).with_system(zone_viewer_setup_system),
-    )
-    .add_system_set(SystemSet::on_update(AppState::ZoneViewer).with_system(zone_viewer_system));
+        SystemSet::on_enter(AppState::ZoneViewer).with_system(zone_viewer_enter_system),
+    );
 
     // Model Viewer, we avoid deleting any entities during CoreStage::Update by using a custom
     // stage which runs after Update. We cannot run before Update because the on_enter system

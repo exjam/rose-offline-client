@@ -28,6 +28,7 @@ use crate::{
     follow_camera::FollowCameraController,
     render::{EffectMeshMaterial, ParticleMaterial},
     resources::{EffectList, GameData, Icons},
+    ui::UiStateDebugWindows,
     VfsResource,
 };
 
@@ -54,6 +55,7 @@ pub fn model_viewer_enter_system(
     mut commands: Commands,
     query_cameras: Query<Entity, With<Camera3d>>,
     game_data: Res<GameData>,
+    mut ui_state_debug_windows: ResMut<UiStateDebugWindows>,
 ) {
     // Reset camera
     for entity in query_cameras.iter() {
@@ -104,6 +106,10 @@ pub fn model_viewer_enter_system(
 
         last_effect_entity: None,
     });
+
+    // Open relevant debug windows
+    ui_state_debug_windows.debug_ui_open = true;
+    ui_state_debug_windows.npc_list_open = true;
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -111,7 +117,7 @@ pub fn model_viewer_system(
     mut commands: Commands,
     mut ui_state: ResMut<ModelViewerState>,
     mut query_character: Query<(Entity, &mut Equipment)>,
-    mut query_npc: Query<(Entity, &mut Npc)>,
+    query_npc: Query<(Entity, &Npc)>,
     query_character_model: Query<(Entity, &CharacterModel)>,
     query_npc_model: Query<(Entity, &NpcModel)>,
     query_effects: Query<Entity, With<Effect>>,
@@ -433,31 +439,6 @@ pub fn model_viewer_system(
                                 ui.end_row();
                             }
                         }
-                    }
-                });
-        });
-
-    egui::Window::new("NPC List")
-        .vscroll(true)
-        .resizable(true)
-        .default_height(300.0)
-        .show(egui_context.ctx_mut(), |ui| {
-            egui::Grid::new("npc_list_grid")
-                .num_columns(3)
-                .show(ui, |ui| {
-                    ui.label("id");
-                    ui.label("name");
-                    ui.end_row();
-
-                    for npc_data in game_data.npcs.iter() {
-                        ui.label(format!("{}", npc_data.id.get()));
-                        ui.label(&npc_data.name);
-                        if ui.button("View").clicked() {
-                            for (_, mut npc) in query_npc.iter_mut() {
-                                npc.id = npc_data.id;
-                            }
-                        }
-                        ui.end_row();
                     }
                 });
         });
