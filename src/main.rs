@@ -57,7 +57,7 @@ use systems::{
     client_entity_event_system, collision_add_colliders_system, collision_system, command_system,
     conversation_dialog_system, cooldown_system, damage_digit_render_system,
     debug_render_collider_system, debug_render_skeleton_system, effect_system,
-    game_connection_system, game_debug_ui_system, game_mouse_input_system, game_state_enter_system,
+    game_connection_system, game_mouse_input_system, game_state_enter_system,
     game_zone_change_system, item_drop_model_add_collider_system, item_drop_model_system,
     load_zone_system, login_connection_system, login_state_enter_system, login_state_exit_system,
     login_system, model_viewer_enter_system, model_viewer_system, npc_model_add_collider_system,
@@ -66,10 +66,10 @@ use systems::{
     zone_viewer_setup_system, zone_viewer_system, DebugInspectorPlugin,
 };
 use ui::{
-    ui_character_info_system, ui_chatbox_system, ui_diagnostics_system, ui_drag_and_drop_system,
-    ui_hotbar_system, ui_inventory_system, ui_player_info_system, ui_quest_list_system,
-    ui_selected_target_system, ui_skill_list_system, ui_window_system, UiStateDragAndDrop,
-    UiStateWindows,
+    ui_character_info_system, ui_chatbox_system, ui_debug_menu_system, ui_debug_zone_list_system,
+    ui_diagnostics_system, ui_drag_and_drop_system, ui_hotbar_system, ui_inventory_system,
+    ui_player_info_system, ui_quest_list_system, ui_selected_target_system, ui_skill_list_system,
+    ui_window_system, UiStateDebugWindows, UiStateDragAndDrop, UiStateWindows,
 };
 use vfs_asset_io::VfsAssetIo;
 use zmo_asset_loader::{ZmoAsset, ZmoAssetLoader};
@@ -406,6 +406,7 @@ fn main() {
     // Game
     app.insert_resource(UiStateDragAndDrop::default())
         .insert_resource(UiStateWindows::default())
+        .insert_resource(UiStateDebugWindows::default())
         .insert_resource(ClientEntityList::default());
 
     app.add_system_set(SystemSet::on_enter(AppState::Game).with_system(game_state_enter_system))
@@ -415,59 +416,64 @@ fn main() {
                 .with_system(command_system.after("animation_system"))
                 .with_system(update_position_system)
                 .with_system(
-                    game_debug_ui_system
-                        .label("game_debug_ui_system")
+                    ui_debug_menu_system
+                        .label("ui_debug_menu_system")
+                        .before("game_mouse_input_system"),
+                )
+                .with_system(
+                    ui_debug_zone_list_system
+                        .after("ui_debug_menu_system")
                         .before("game_mouse_input_system"),
                 )
                 .with_system(
                     ui_chatbox_system
-                        .after("game_debug_ui_system")
+                        .after("ui_debug_menu_system")
                         .before("game_mouse_input_system"),
                 )
                 .with_system(
                     ui_character_info_system
-                        .after("game_debug_ui_system")
+                        .after("ui_debug_menu_system")
                         .before("game_mouse_input_system"),
                 )
                 .with_system(
                     ui_inventory_system
-                        .after("game_debug_ui_system")
+                        .after("ui_debug_menu_system")
                         .before("game_mouse_input_system"),
                 )
                 .with_system(
                     ui_hotbar_system
                         .label("ui_hotbar_system")
-                        .after("game_debug_ui_system")
+                        .after("ui_debug_menu_system")
                         .before("game_mouse_input_system"),
                 )
                 .with_system(
                     ui_skill_list_system
-                        .after("game_debug_ui_system")
+                        .after("ui_debug_menu_system")
                         .before("game_mouse_input_system"),
                 )
                 .with_system(
                     ui_quest_list_system
-                        .after("game_debug_ui_system")
+                        .after("ui_debug_menu_system")
                         .before("game_mouse_input_system"),
                 )
                 .with_system(
                     ui_player_info_system
-                        .after("game_debug_ui_system")
+                        .after("ui_debug_menu_system")
                         .before("game_mouse_input_system"),
                 )
                 .with_system(
                     ui_selected_target_system
-                        .after("game_debug_ui_system")
+                        .after("ui_debug_menu_system")
                         .before("game_mouse_input_system"),
                 )
                 .with_system(
                     ui_window_system
-                        .after("game_debug_ui_system")
+                        .after("ui_debug_menu_system")
                         .before("game_mouse_input_system"),
                 )
                 .with_system(
                     conversation_dialog_system
-                        .after("game_debug_ui_system")
+                        .after("ui_debug_menu_system")
                         .before("game_mouse_input_system"),
                 )
                 .with_system(game_mouse_input_system.label("game_mouse_input_system"))
