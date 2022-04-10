@@ -7,7 +7,8 @@ use bevy::{
     ecs::{event::Events, schedule::ShouldRun},
     log::{Level, LogSettings},
     prelude::{
-        AddAsset, App, AssetServer, Assets, Color, Commands, CoreStage, Msaa,
+        AddAsset, App, AssetServer, Assets, Color, Commands, CoreStage,
+        ExclusiveSystemDescriptorCoercion, IntoExclusiveSystem, Msaa,
         ParallelSystemDescriptorCoercion, PerspectiveCameraBundle, Res, ResMut, StageLabel, State,
         SystemSet, SystemStage,
     },
@@ -66,10 +67,11 @@ use systems::{
     zone_viewer_setup_system, zone_viewer_system, DebugInspectorPlugin,
 };
 use ui::{
-    ui_character_info_system, ui_chatbox_system, ui_debug_menu_system, ui_debug_zone_list_system,
-    ui_diagnostics_system, ui_drag_and_drop_system, ui_hotbar_system, ui_inventory_system,
-    ui_player_info_system, ui_quest_list_system, ui_selected_target_system, ui_skill_list_system,
-    ui_window_system, UiStateDebugWindows, UiStateDragAndDrop, UiStateWindows,
+    ui_character_info_system, ui_chatbox_system, ui_debug_entity_inspector_system,
+    ui_debug_menu_system, ui_debug_zone_list_system, ui_diagnostics_system,
+    ui_drag_and_drop_system, ui_hotbar_system, ui_inventory_system, ui_player_info_system,
+    ui_quest_list_system, ui_selected_target_system, ui_skill_list_system, ui_window_system,
+    UiStateDebugWindows, UiStateDragAndDrop, UiStateWindows,
 };
 use vfs_asset_io::VfsAssetIo;
 use zmo_asset_loader::{ZmoAsset, ZmoAssetLoader};
@@ -344,7 +346,14 @@ fn main() {
                 .after("animation_system"),
         )
         .add_system(damage_digit_render_system.after("pending_damage_system"))
-        .add_system(ui_diagnostics_system);
+        .add_system(ui_diagnostics_system)
+        .add_system(ui_debug_menu_system.before("ui_system"))
+        .add_system(ui_debug_zone_list_system.label("ui_system"))
+        .add_system(
+            ui_debug_entity_inspector_system
+                .exclusive_system()
+                .label("ui_system"),
+        );
 
     // Run zone change system after Update, so we do can add/remove entities
     app.add_stage_after(
@@ -415,81 +424,30 @@ fn main() {
                 .with_system(ability_values_system)
                 .with_system(command_system.after("animation_system"))
                 .with_system(update_position_system)
+                .with_system(client_entity_event_system)
+                .with_system(passive_recovery_system)
+                .with_system(quest_trigger_system)
+                .with_system(cooldown_system.label("cooldown_system").before("ui_system"))
                 .with_system(
-                    ui_debug_menu_system
-                        .label("ui_debug_menu_system")
-                        .before("game_mouse_input_system"),
-                )
-                .with_system(
-                    ui_debug_zone_list_system
-                        .after("ui_debug_menu_system")
-                        .before("game_mouse_input_system"),
-                )
-                .with_system(
-                    ui_chatbox_system
-                        .after("ui_debug_menu_system")
-                        .before("game_mouse_input_system"),
-                )
-                .with_system(
-                    ui_character_info_system
-                        .after("ui_debug_menu_system")
-                        .before("game_mouse_input_system"),
-                )
-                .with_system(
-                    ui_inventory_system
-                        .after("ui_debug_menu_system")
-                        .before("game_mouse_input_system"),
-                )
-                .with_system(
-                    ui_hotbar_system
-                        .label("ui_hotbar_system")
-                        .after("ui_debug_menu_system")
-                        .before("game_mouse_input_system"),
-                )
-                .with_system(
-                    ui_skill_list_system
-                        .after("ui_debug_menu_system")
-                        .before("game_mouse_input_system"),
-                )
-                .with_system(
-                    ui_quest_list_system
-                        .after("ui_debug_menu_system")
-                        .before("game_mouse_input_system"),
-                )
-                .with_system(
-                    ui_player_info_system
-                        .after("ui_debug_menu_system")
-                        .before("game_mouse_input_system"),
-                )
-                .with_system(
-                    ui_selected_target_system
-                        .after("ui_debug_menu_system")
-                        .before("game_mouse_input_system"),
-                )
-                .with_system(
-                    ui_window_system
-                        .after("ui_debug_menu_system")
-                        .before("game_mouse_input_system"),
-                )
-                .with_system(
-                    conversation_dialog_system
-                        .after("ui_debug_menu_system")
-                        .before("game_mouse_input_system"),
-                )
-                .with_system(game_mouse_input_system.label("game_mouse_input_system"))
-                .with_system(
-                    cooldown_system
-                        .label("cooldown_system")
-                        .before("ui_hotbar_system"),
+                    game_mouse_input_system
+                        .label("game_mouse_input_system")
+                        .after("ui_system"),
                 )
                 .with_system(
                     player_command_system
                         .after("cooldown_system")
                         .after("game_mouse_input_system"),
                 )
-                .with_system(client_entity_event_system)
-                .with_system(passive_recovery_system)
-                .with_system(quest_trigger_system),
+                .with_system(ui_chatbox_system.label("ui_system"))
+                .with_system(ui_character_info_system.label("ui_system"))
+                .with_system(ui_inventory_system.label("ui_system"))
+                .with_system(ui_hotbar_system.label("ui_system"))
+                .with_system(ui_skill_list_system.label("ui_system"))
+                .with_system(ui_quest_list_system.label("ui_system"))
+                .with_system(ui_player_info_system.label("ui_system"))
+                .with_system(ui_selected_target_system.label("ui_system"))
+                .with_system(ui_window_system.label("ui_system"))
+                .with_system(conversation_dialog_system.label("ui_system")),
         );
     app.add_system_to_stage(CoreStage::PostUpdate, ui_drag_and_drop_system);
 

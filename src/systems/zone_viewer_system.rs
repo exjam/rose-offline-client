@@ -10,7 +10,7 @@ use bevy_egui::{egui, EguiContext};
 
 use crate::{
     components::ActiveMotion,
-    events::{DebugInspectorEvent, LoadZoneEvent},
+    events::LoadZoneEvent,
     fly_camera::{FlyCameraBundle, FlyCameraController},
     follow_camera::FollowCameraController,
     resources::GameData,
@@ -31,7 +31,6 @@ impl Default for ZoneViewerUiState {
 pub fn zone_viewer_setup_system(
     mut commands: Commands,
     query_cameras: Query<Entity, With<Camera3d>>,
-    mut debug_inspector_events: EventWriter<DebugInspectorEvent>,
 ) {
     // Reset camera
     for entity in query_cameras.iter() {
@@ -46,8 +45,6 @@ pub fn zone_viewer_setup_system(
                 Vec3::new(5200.0, 0.0, -5200.0),
             ));
     }
-
-    debug_inspector_events.send(DebugInspectorEvent::Show);
 }
 
 #[allow(clippy::too_many_arguments)]

@@ -1,18 +1,13 @@
 use bevy::{
-    ecs::event::Events,
     input::Input,
     prelude::{
-        App, Camera, Entity, EventReader, GlobalTransform, Handle, MouseButton, Plugin, Query, Res,
-        ResMut, With,
+        App, Camera, GlobalTransform, Handle, MouseButton, Plugin, Query, Res, ResMut, With,
     },
     render::camera::Camera3d,
     window::Windows,
 };
 use bevy_egui::EguiContext;
-use bevy_inspector_egui::{
-    plugin::InspectorWindows, Inspectable, InspectableRegistry, InspectorPlugin,
-    WorldInspectorParams,
-};
+use bevy_inspector_egui::{InspectableRegistry, WorldInspectorParams};
 use bevy_rapier3d::{
     physics::{
         IntoEntity, QueryPipelineColliderComponentsQuery, QueryPipelineColliderComponentsSet,
@@ -21,8 +16,7 @@ use bevy_rapier3d::{
 };
 
 use crate::{
-    components::COLLISION_FILTER_INSPECTABLE, events::DebugInspectorEvent,
-    render::StaticMeshMaterial,
+    components::COLLISION_FILTER_INSPECTABLE, render::StaticMeshMaterial, resources::DebugInspector,
 };
 
 use super::{
@@ -34,30 +28,16 @@ use super::{
     ZoneObject,
 };
 
-#[derive(Inspectable, Default)]
-pub struct DebugInspectorState {
-    #[inspectable(label = "Picking")]
-    pub enable_picking: bool,
-
-    #[inspectable(label = "Entity")]
-    pub entity: Option<Entity>,
-}
-
 pub struct DebugInspectorPlugin;
 
 impl Plugin for DebugInspectorPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugin(InspectorPlugin::<DebugInspectorState>::new())
-            .insert_resource(Events::<DebugInspectorEvent>::default())
-            .add_system(debug_inspector_picking_system)
-            .add_system(debug_inspector_control_system);
+        app.insert_resource(DebugInspector::default())
+            .add_system(debug_inspector_picking_system);
 
-        let mut inspector_windows = app.world.resource_mut::<InspectorWindows>();
-        let mut window_data = inspector_windows.window_data_mut::<DebugInspectorState>();
-        window_data.visible = false;
-        window_data.name = "Entity Inspector".to_string();
-
-        let mut inspectable_registry = app.world.resource_mut::<InspectableRegistry>();
+        let mut inspectable_registry = app
+            .world
+            .get_resource_or_insert_with(InspectableRegistry::default);
         inspectable_registry.register::<StaticMeshMaterial>();
         inspectable_registry.register::<Handle<StaticMeshMaterial>>();
         inspectable_registry.register::<ZoneObject>();
@@ -86,47 +66,18 @@ impl Plugin for DebugInspectorPlugin {
     }
 }
 
-fn debug_inspector_control_system(
-    mut events: EventReader<DebugInspectorEvent>,
-    mut inspect_entity: ResMut<DebugInspectorState>,
-    mut inspector_windows: ResMut<InspectorWindows>,
-) {
-    for event in events.iter() {
-        match event {
-            DebugInspectorEvent::Show => {
-                inspector_windows
-                    .window_data_mut::<DebugInspectorState>()
-                    .visible = true;
-            }
-            DebugInspectorEvent::Hide => {
-                inspector_windows
-                    .window_data_mut::<DebugInspectorState>()
-                    .visible = false;
-            }
-            &DebugInspectorEvent::InspectEntity(entity) => {
-                inspect_entity.entity = Some(entity);
-            }
-        }
-    }
-}
-
 #[allow(clippy::too_many_arguments)]
 fn debug_inspector_picking_system(
+    mut debug_inspector_state: ResMut<DebugInspector>,
+    mut egui_ctx: ResMut<EguiContext>,
+    query_camera: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
     mouse_button_input: Res<Input<MouseButton>>,
     windows: Res<Windows>,
-    query_camera: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
-    query_pipeline: Res<QueryPipeline>,
     colliders: QueryPipelineColliderComponentsQuery,
-    mut inspect_entity: ResMut<DebugInspectorState>,
-    inspector_windows: Res<InspectorWindows>,
-    mut egui_ctx: ResMut<EguiContext>,
+    query_pipeline: Res<QueryPipeline>,
 ) {
-    if !inspector_windows
-        .window_data::<DebugInspectorState>()
-        .visible
-        || !inspect_entity.enable_picking
-    {
-        // Inspector not open
+    if !debug_inspector_state.enable_picking {
+        // Picking disabled
         return;
     }
 
@@ -138,7 +89,7 @@ fn debug_inspector_picking_system(
     }
     let cursor_position = cursor_position.unwrap();
 
-    if mouse_button_input.just_pressed(MouseButton::Left) {
+    if mouse_button_input.just_pressed(MouseButton::Middle) {
         for (camera, camera_transform) in query_camera.iter() {
             if let Some(ray) =
                 ray_from_screenspace(cursor_position, &windows, camera, camera_transform)
@@ -153,7 +104,7 @@ fn debug_inspector_picking_system(
                 );
 
                 if let Some((hit_object, _distance)) = hit {
-                    inspect_entity.entity = Some(hit_object.0.entity());
+                    debug_inspector_state.entity = Some(hit_object.0.entity());
                 }
             }
         }

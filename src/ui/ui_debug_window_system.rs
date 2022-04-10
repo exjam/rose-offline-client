@@ -1,15 +1,17 @@
 use bevy::{
     input::Input,
     math::Vec3,
-    prelude::{Commands, Entity, EventWriter, KeyCode, Local, Query, Res, ResMut, With},
+    prelude::{Commands, Entity, KeyCode, Local, Query, Res, ResMut, With},
     render::camera::Camera3d,
 };
 use bevy_egui::{egui, EguiContext};
 use rose_game_common::messages::client::ClientMessage;
 
 use crate::{
-    components::PlayerCharacter, events::DebugInspectorEvent, fly_camera::FlyCameraController,
-    follow_camera::FollowCameraController, resources::GameConnection,
+    components::PlayerCharacter,
+    fly_camera::FlyCameraController,
+    follow_camera::FollowCameraController,
+    resources::{DebugInspector, GameConnection},
 };
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -47,7 +49,7 @@ pub fn ui_debug_menu_system(
     query_player: Query<Entity, With<PlayerCharacter>>,
     game_connection: Option<Res<GameConnection>>,
     keyboard: Res<Input<KeyCode>>,
-    mut debug_inspector_events: EventWriter<DebugInspectorEvent>,
+    mut debug_inspector: ResMut<DebugInspector>,
 ) {
     if keyboard.pressed(KeyCode::LControl) && keyboard.just_pressed(KeyCode::D) {
         ui_state_debug_windows.debug_ui_open = !ui_state_debug_windows.debug_ui_open;
@@ -58,16 +60,20 @@ pub fn ui_debug_menu_system(
     }
 
     let ctx = &*egui_context.ctx_mut();
-    egui::TopBottomPanel::top("game_debug_ui_top_panel").show(ctx, |ui| {
+    egui::TopBottomPanel::top("ui_debug_menu").show(ctx, |ui| {
         egui::menu::bar(ui, |ui| {
+            let player_entity = query_player.get_single().ok();
+
             ui.menu_button("Camera", |ui| {
                 let previous_camera_type = ui_state_debug_menu.selected_camera_type;
 
-                ui.selectable_value(
-                    &mut ui_state_debug_menu.selected_camera_type,
-                    DebugCameraType::Follow,
-                    "Follow",
-                );
+                if player_entity.is_some() {
+                    ui.selectable_value(
+                        &mut ui_state_debug_menu.selected_camera_type,
+                        DebugCameraType::Follow,
+                        "Follow",
+                    );
+                }
 
                 ui.selectable_value(
                     &mut ui_state_debug_menu.selected_camera_type,
@@ -79,14 +85,16 @@ pub fn ui_debug_menu_system(
                     for camera_entity in query_cameras.iter() {
                         match ui_state_debug_menu.selected_camera_type {
                             DebugCameraType::Follow => {
-                                commands
-                                    .entity(camera_entity)
-                                    .remove::<FlyCameraController>()
-                                    .insert(FollowCameraController {
-                                        follow_entity: query_player.get_single().ok(),
-                                        follow_offset: Vec3::new(0.0, 1.7, 0.0),
-                                        ..Default::default()
-                                    });
+                                if let Some(player_entity) = player_entity {
+                                    commands
+                                        .entity(camera_entity)
+                                        .remove::<FlyCameraController>()
+                                        .insert(FollowCameraController {
+                                            follow_entity: Some(player_entity),
+                                            follow_offset: Vec3::new(0.0, 1.7, 0.0),
+                                            ..Default::default()
+                                        });
+                                }
                             }
                             DebugCameraType::Free => {
                                 commands
@@ -111,27 +119,23 @@ pub fn ui_debug_menu_system(
             });
 
             ui.menu_button("View", |ui| {
-                ui.selectable_value(
-                    &mut ui_state_debug_windows.zone_list_open,
-                    true,
-                    "Zone List",
-                );
+                ui.checkbox(&mut ui_state_debug_windows.zone_list_open, "Zone List");
 
                 if ui
-                    .selectable_label(
-                        ui_state_debug_windows.object_inspector_open,
+                    .checkbox(
+                        &mut ui_state_debug_windows.object_inspector_open,
                         "Object Inspector",
                     )
                     .clicked()
                 {
-                    ui_state_debug_windows.object_inspector_open =
-                        !ui_state_debug_windows.object_inspector_open;
                     if ui_state_debug_windows.object_inspector_open {
-                        debug_inspector_events.send(DebugInspectorEvent::Show);
-                        debug_inspector_events
-                            .send(DebugInspectorEvent::InspectEntity(query_player.single()));
+                        debug_inspector.enable_picking = true;
+
+                        if let Some(player_entity) = player_entity {
+                            debug_inspector.entity = Some(player_entity);
+                        }
                     } else {
-                        debug_inspector_events.send(DebugInspectorEvent::Hide);
+                        debug_inspector.enable_picking = false;
                     }
                 }
             });

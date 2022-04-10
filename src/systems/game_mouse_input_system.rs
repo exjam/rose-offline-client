@@ -20,10 +20,7 @@ use rose_game_common::components::{ItemDrop, Team};
 use crate::{
     components::{PlayerCharacter, Position, SelectedTarget, COLLISION_FILTER_CLICKABLE},
     events::PlayerCommandEvent,
-    systems::{
-        collision_system::ray_from_screenspace, debug_inspector_system::DebugInspectorState,
-        ZoneObject,
-    },
+    systems::{collision_system::ray_from_screenspace, ZoneObject},
 };
 
 #[allow(clippy::too_many_arguments)]
@@ -35,7 +32,6 @@ pub fn game_mouse_input_system(
     query_pipeline: Res<QueryPipeline>,
     colliders: QueryPipelineColliderComponentsQuery,
     mut egui_ctx: ResMut<EguiContext>,
-    debug_inspector_state: Res<DebugInspectorState>,
     query_hit_entity: Query<(
         Option<&Team>,
         Option<&Position>,
@@ -55,11 +51,6 @@ pub fn game_mouse_input_system(
 
     if egui_ctx.ctx_mut().wants_pointer_input() {
         // Mouse is over UI
-        return;
-    }
-
-    if debug_inspector_state.enable_picking {
-        // We are currently picking in debug inspector
         return;
     }
 
