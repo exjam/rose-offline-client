@@ -1,9 +1,8 @@
 use bevy::{
     math::Vec3,
-    prelude::{Camera, Commands, Entity, PerspectiveCameraBundle, Query, ResMut, Transform, With},
+    prelude::{Commands, Entity, PerspectiveCameraBundle, Query, ResMut, With},
     render::camera::Camera3d,
 };
-use bevy_egui::{egui, EguiContext};
 
 use crate::{
     components::ActiveMotion,
@@ -12,7 +11,7 @@ use crate::{
     ui::UiStateDebugWindows,
 };
 
-pub fn zone_viewer_setup_system(
+pub fn zone_viewer_enter_system(
     mut commands: Commands,
     query_cameras: Query<Entity, With<Camera3d>>,
     mut ui_state_debug_windows: ResMut<UiStateDebugWindows>,
@@ -31,19 +30,8 @@ pub fn zone_viewer_setup_system(
             ));
     }
 
-    // Open zone list debug window
+    // Open relevant debug windows
+    ui_state_debug_windows.camera_info_open = true;
     ui_state_debug_windows.debug_ui_open = true;
     ui_state_debug_windows.zone_list_open = true;
-}
-
-#[allow(clippy::too_many_arguments)]
-pub fn zone_viewer_system(
-    mut egui_context: ResMut<EguiContext>,
-    camera_query: Query<&Transform, With<Camera>>,
-) {
-    egui::Window::new("Camera").show(egui_context.ctx_mut(), |ui| {
-        let transform = camera_query.single();
-        ui.label(format!("Translation: {}", transform.translation));
-        ui.label(format!("Forward: {}", transform.forward()));
-    });
 }

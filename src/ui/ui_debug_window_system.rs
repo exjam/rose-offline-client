@@ -17,7 +17,7 @@ use crate::{
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum DebugCameraType {
     Follow,
-    Free,
+    Fly,
 }
 
 impl Default for DebugCameraType {
@@ -30,6 +30,7 @@ impl Default for DebugCameraType {
 pub struct UiStateDebugWindows {
     pub debug_ui_open: bool,
 
+    pub camera_info_open: bool,
     pub object_inspector_open: bool,
     pub zone_list_open: bool,
 }
@@ -77,8 +78,8 @@ pub fn ui_debug_menu_system(
 
                 ui.selectable_value(
                     &mut ui_state_debug_menu.selected_camera_type,
-                    DebugCameraType::Free,
-                    "Free",
+                    DebugCameraType::Fly,
+                    "Fly",
                 );
 
                 if ui_state_debug_menu.selected_camera_type != previous_camera_type {
@@ -96,7 +97,7 @@ pub fn ui_debug_menu_system(
                                         });
                                 }
                             }
-                            DebugCameraType::Free => {
+                            DebugCameraType::Fly => {
                                 commands
                                     .entity(camera_entity)
                                     .remove::<FollowCameraController>()
@@ -138,6 +139,8 @@ pub fn ui_debug_menu_system(
                         debug_inspector.enable_picking = false;
                     }
                 }
+
+                ui.checkbox(&mut ui_state_debug_windows.camera_info_open, "Camera Info");
             });
         });
     });
