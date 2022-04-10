@@ -477,7 +477,11 @@ fn main() {
                         .before("game_mouse_input_system"),
                 )
                 .with_system(game_mouse_input_system.label("game_mouse_input_system"))
-                .with_system(cooldown_system.before("ui_hotbar_system"))
+                .with_system(
+                    cooldown_system
+                        .label("cooldown_system")
+                        .before("ui_hotbar_system"),
+                )
                 .with_system(
                     player_command_system
                         .after("cooldown_system")
