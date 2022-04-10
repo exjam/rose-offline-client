@@ -13,7 +13,10 @@ use crate::{
     components::{Cooldowns, PlayerCharacter},
     events::PlayerCommandEvent,
     resources::{GameData, Icons},
-    ui::{DragAndDropId, DragAndDropSlot, UiStateDragAndDrop},
+    ui::{
+        ui_add_item_tooltip, ui_add_skill_tooltip, DragAndDropId, DragAndDropSlot,
+        UiStateDragAndDrop,
+    },
 };
 
 use super::ui_inventory_system::GetItem;
@@ -100,6 +103,20 @@ fn ui_add_hotbar_slot(
             hotbar_index.1,
         ));
     }
+
+    response.on_hover_ui(|ui| match hotbar_slot {
+        Some(HotbarSlot::Inventory(item_slot)) => {
+            if let Some(item) = (player_equipment, player_inventory).get_item(*item_slot) {
+                ui_add_item_tooltip(ui, game_data, &item);
+            }
+        }
+        Some(HotbarSlot::Skill(skill_slot)) => {
+            if let Some(skill) = player_skill_list.get_skill(*skill_slot) {
+                ui_add_skill_tooltip(ui, game_data, skill);
+            }
+        }
+        _ => {}
+    });
 
     // TODO: Send to server
     match dropped_item {

@@ -8,7 +8,9 @@ use crate::{
     components::PlayerCharacter,
     events::PlayerCommandEvent,
     resources::{GameData, Icons},
-    ui::{DragAndDropId, DragAndDropSlot, UiStateDragAndDrop, UiStateWindows},
+    ui::{
+        ui_add_skill_tooltip, DragAndDropId, DragAndDropSlot, UiStateDragAndDrop, UiStateWindows,
+    },
 };
 
 pub struct UiStateSkillList {
@@ -54,8 +56,10 @@ fn ui_add_skill_list_slot(
         player_command_events.send(PlayerCommandEvent::UseSkill(skill_slot));
     }
 
-    if let (Some(skill), Some(skill_data)) = (skill, skill_data) {
-        response.on_hover_text(format!("{}\nSkill ID: {}", skill_data.name, skill.get(),));
+    if let Some(skill_id) = skill {
+        response.on_hover_ui(|ui| {
+            ui_add_skill_tooltip(ui, game_data, skill_id);
+        });
     }
 }
 

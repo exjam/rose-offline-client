@@ -6,10 +6,8 @@ use rose_game_common::components::QuestState;
 use crate::{
     components::PlayerCharacter,
     resources::{GameData, Icons},
-    ui::UiStateWindows,
+    ui::{ui_add_item_tooltip, DragAndDropId, DragAndDropSlot, UiStateWindows},
 };
-
-use super::{DragAndDropId, DragAndDropSlot};
 
 fn ui_add_quest_item_slot(
     ui: &mut egui::Ui,
@@ -46,13 +44,10 @@ fn ui_add_quest_item_slot(
         [40.0, 40.0],
     ));
 
-    if let (Some(item), Some(item_data)) = (item, item_data) {
-        response.on_hover_text(format!(
-            "{}\nItem Type: {:?} Item ID: {}",
-            item_data.name,
-            item.get_item_type(),
-            item.get_item_number()
-        ));
+    if let Some(item) = item {
+        response.on_hover_ui(|ui| {
+            ui_add_item_tooltip(ui, game_data, item);
+        });
     }
 }
 

@@ -12,7 +12,7 @@ use crate::{
     components::PlayerCharacter,
     events::ChatboxEvent,
     resources::{GameConnection, GameData, Icons},
-    ui::{DragAndDropId, DragAndDropSlot, UiStateDragAndDrop, UiStateWindows},
+    ui::{ui_add_item_tooltip, DragAndDropId, DragAndDropSlot, UiStateDragAndDrop, UiStateWindows},
 };
 
 #[derive(Copy, Clone, PartialEq, Debug)]
@@ -234,7 +234,7 @@ fn ui_add_inventory_slot(
         }
     }
 
-    if let (Some(item), Some(item_data)) = (item, item_data) {
+    if let Some(item) = item {
         let response = response.context_menu(|ui| {
             if matches!(
                 inventory_slot,
@@ -279,12 +279,9 @@ fn ui_add_inventory_slot(
             }
         });
 
-        response.on_hover_text(format!(
-            "{}\nItem Type: {:?} Item ID: {}",
-            item_data.name,
-            item.get_item_type(),
-            item.get_item_number()
-        ));
+        response.on_hover_ui(|ui| {
+            ui_add_item_tooltip(ui, game_data, &item);
+        });
     }
 
     if let Some(DragAndDropId::Inventory(dropped_inventory_slot)) = dropped_item {
