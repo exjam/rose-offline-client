@@ -1,9 +1,10 @@
-use bevy::prelude::{Res, ResMut};
+use bevy::prelude::{EventWriter, Res, ResMut, State};
 use bevy_egui::{egui, EguiContext};
 use rose_game_common::messages::client::ClientMessage;
 
 use crate::{
-    resources::{GameConnection, GameData},
+    events::LoadZoneEvent,
+    resources::{AppState, GameConnection, GameData},
     ui::UiStateDebugWindows,
 };
 
@@ -11,6 +12,8 @@ use crate::{
 pub fn ui_debug_zone_list_system(
     mut egui_context: ResMut<EguiContext>,
     mut ui_state_debug_windows: ResMut<UiStateDebugWindows>,
+    mut load_zone_events: EventWriter<LoadZoneEvent>,
+    app_state: Res<State<AppState>>,
     game_connection: Option<Res<GameConnection>>,
     game_data: Res<GameData>,
 ) {
@@ -35,14 +38,29 @@ pub fn ui_debug_zone_list_system(
                     for zone in game_data.zone_list.iter() {
                         ui.label(format!("{}", zone.id.get()));
                         ui.label(&zone.name);
-                        if ui.button("Teleport").clicked() {
-                            if let Some(game_connection) = game_connection.as_ref() {
-                                game_connection
-                                    .client_message_tx
-                                    .send(ClientMessage::Chat(format!("/mm {}", zone.id.get())))
-                                    .ok();
+
+                        match app_state.current() {
+                            AppState::Game => {
+                                if ui.button("Teleport").clicked() {
+                                    if let Some(game_connection) = game_connection.as_ref() {
+                                        game_connection
+                                            .client_message_tx
+                                            .send(ClientMessage::Chat(format!(
+                                                "/mm {}",
+                                                zone.id.get()
+                                            )))
+                                            .ok();
+                                    }
+                                }
                             }
+                            AppState::ZoneViewer => {
+                                if ui.button("Load").clicked() {
+                                    load_zone_events.send(LoadZoneEvent::new(zone.id));
+                                }
+                            }
+                            _ => {}
                         }
+
                         ui.end_row();
                     }
                 });
