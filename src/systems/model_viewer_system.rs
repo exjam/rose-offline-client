@@ -14,8 +14,7 @@ use enum_map::{enum_map, EnumMap};
 use rand::prelude::SliceRandom;
 
 use rose_data::{
-    CharacterMotionAction, EquipmentIndex, EquipmentItem, ItemReference, ItemType, NpcMotionAction,
-    ZoneId,
+    CharacterMotionAction, EquipmentIndex, EquipmentItem, ItemReference, NpcMotionAction, ZoneId,
 };
 use rose_game_common::components::{CharacterGender, CharacterInfo, Equipment, Npc};
 
@@ -27,7 +26,7 @@ use crate::{
     fly_camera::{FlyCameraBundle, FlyCameraController},
     follow_camera::FollowCameraController,
     render::{EffectMeshMaterial, ParticleMaterial},
-    resources::{EffectList, GameData, Icons},
+    resources::{EffectList, GameData},
     ui::UiStateDebugWindows,
     VfsResource,
 };
@@ -36,7 +35,6 @@ pub struct ModelViewerState {
     debug_skeletons: bool,
     debug_colliders: bool,
 
-    item_list_type: ItemType,
     valid_items: EnumMap<EquipmentIndex, Vec<ItemReference>>,
 
     npcs: Vec<Entity>,
@@ -91,7 +89,6 @@ pub fn model_viewer_enter_system(
         debug_skeletons: false,
         debug_colliders: false,
 
-        item_list_type: ItemType::Weapon,
         valid_items: enum_map! {
             equipment_index => get_valid_items(equipment_index.into()),
         },
@@ -110,21 +107,21 @@ pub fn model_viewer_enter_system(
     // Open relevant debug windows
     ui_state_debug_windows.debug_ui_open = true;
     ui_state_debug_windows.npc_list_open = true;
+    ui_state_debug_windows.item_list_open = true;
 }
 
 #[allow(clippy::too_many_arguments)]
 pub fn model_viewer_system(
     mut commands: Commands,
     mut ui_state: ResMut<ModelViewerState>,
-    mut query_character: Query<(Entity, &mut Equipment)>,
-    query_npc: Query<(Entity, &Npc)>,
+    query_character: Query<Entity, With<CharacterInfo>>,
+    query_npc: Query<Entity, With<Npc>>,
     query_character_model: Query<(Entity, &CharacterModel)>,
     query_npc_model: Query<(Entity, &NpcModel)>,
     query_effects: Query<Entity, With<Effect>>,
     query_debug_colliders: Query<Entity, With<DebugRenderCollider>>,
     query_debug_skeletons: Query<Entity, With<DebugRenderSkeleton>>,
     game_data: Res<GameData>,
-    icons: Res<Icons>,
     effect_list: Res<EffectList>,
     mut egui_context: ResMut<EguiContext>,
     (vfs_resource, asset_server): (Res<VfsResource>, Res<AssetServer>),
@@ -139,13 +136,13 @@ pub fn model_viewer_system(
             .clicked()
         {
             if ui_state.debug_colliders {
-                for (entity, _) in query_character.iter() {
+                for entity in query_character.iter() {
                     commands
                         .entity(entity)
                         .insert(DebugRenderCollider::default());
                 }
 
-                for (entity, _) in query_npc.iter() {
+                for entity in query_npc.iter() {
                     commands
                         .entity(entity)
                         .insert(DebugRenderCollider::default());
@@ -162,13 +159,13 @@ pub fn model_viewer_system(
             .clicked()
         {
             if ui_state.debug_skeletons {
-                for (entity, _) in query_character.iter() {
+                for entity in query_character.iter() {
                     commands
                         .entity(entity)
                         .insert(DebugRenderSkeleton::default());
                 }
 
-                for (entity, _) in query_npc.iter() {
+                for entity in query_npc.iter() {
                     commands
                         .entity(entity)
                         .insert(DebugRenderSkeleton::default());
@@ -347,101 +344,6 @@ pub fn model_viewer_system(
         );
         animation_button("Die", CharacterMotionAction::Die, NpcMotionAction::Die);
     });
-
-    egui::Window::new("Item List")
-        .vscroll(true)
-        .resizable(true)
-        .default_height(300.0)
-        .show(egui_context.ctx_mut(), |ui| {
-            ui.horizontal(|ui| {
-                ui.selectable_value(&mut ui_state.item_list_type, ItemType::Face, "Face");
-                ui.selectable_value(&mut ui_state.item_list_type, ItemType::Head, "Head");
-                ui.selectable_value(&mut ui_state.item_list_type, ItemType::Body, "Body");
-                ui.selectable_value(&mut ui_state.item_list_type, ItemType::Hands, "Hands");
-                ui.selectable_value(&mut ui_state.item_list_type, ItemType::Feet, "Feet");
-                ui.selectable_value(&mut ui_state.item_list_type, ItemType::Back, "Back");
-                ui.selectable_value(&mut ui_state.item_list_type, ItemType::Weapon, "Weapon");
-                ui.selectable_value(
-                    &mut ui_state.item_list_type,
-                    ItemType::SubWeapon,
-                    "SubWeapon",
-                );
-            });
-            ui.horizontal(|ui| {
-                ui.selectable_value(
-                    &mut ui_state.item_list_type,
-                    ItemType::Jewellery,
-                    "Jewellery",
-                );
-                ui.selectable_value(
-                    &mut ui_state.item_list_type,
-                    ItemType::Consumable,
-                    "Consumable",
-                );
-                ui.selectable_value(&mut ui_state.item_list_type, ItemType::Gem, "Gem");
-                ui.selectable_value(&mut ui_state.item_list_type, ItemType::Material, "Material");
-                ui.selectable_value(&mut ui_state.item_list_type, ItemType::Quest, "Quest");
-                ui.selectable_value(&mut ui_state.item_list_type, ItemType::Vehicle, "Vehicle");
-            });
-
-            egui::Grid::new("item_list_grid")
-                .num_columns(3)
-                .show(ui, |ui| {
-                    ui.label("icon");
-                    ui.label("id");
-                    ui.label("name");
-                    ui.end_row();
-
-                    let equipment_index = ui_state.item_list_type.try_into().ok();
-
-                    if ui_state.item_list_type.is_equipment_item() {
-                        ui.label(" ");
-                        ui.label("0");
-                        ui.label("None");
-                        if ui.button("Equip").clicked() {
-                            if let Some(equipment_index) = equipment_index {
-                                for (_, mut equipment) in query_character.iter_mut() {
-                                    equipment.equipped_items[equipment_index] = None;
-                                }
-                            }
-                        }
-                        ui.end_row();
-                    }
-
-                    for item_reference in game_data.items.iter_items(ui_state.item_list_type) {
-                        if let Some(item_data) = game_data.items.get_base_item(item_reference) {
-                            if !item_data.name.is_empty() {
-                                if let Some((icon_texture_id, icon_uv)) =
-                                    icons.get_item_icon(item_data.icon_index as usize)
-                                {
-                                    ui.add(
-                                        egui::Image::new(icon_texture_id, [40.0, 40.0]).uv(icon_uv),
-                                    );
-                                } else {
-                                    ui.label(" ");
-                                }
-                                ui.label(format!("{}", item_reference.item_number));
-                                ui.label(&item_data.name);
-
-                                if let Some(equipment_index) = equipment_index {
-                                    if ui.button("Equip").clicked() {
-                                        for (_, mut equipment) in query_character.iter_mut() {
-                                            equipment.equipped_items[equipment_index] =
-                                                Some(EquipmentItem::new(&item_reference).unwrap());
-
-                                            if item_data.class.is_two_handed_weapon() {
-                                                equipment.equipped_items
-                                                    [EquipmentIndex::WeaponLeft] = None;
-                                            }
-                                        }
-                                    }
-                                }
-                                ui.end_row();
-                            }
-                        }
-                    }
-                });
-        });
 
     egui::Window::new("Effect List")
         .vscroll(true)
