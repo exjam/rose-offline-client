@@ -26,7 +26,7 @@ use crate::{
     fly_camera::{FlyCameraBundle, FlyCameraController},
     follow_camera::FollowCameraController,
     render::{EffectMeshMaterial, ParticleMaterial},
-    resources::{EffectList, GameData},
+    resources::GameData,
     ui::UiStateDebugWindows,
     VfsResource,
 };
@@ -122,7 +122,6 @@ pub fn model_viewer_system(
     query_debug_colliders: Query<Entity, With<DebugRenderCollider>>,
     query_debug_skeletons: Query<Entity, With<DebugRenderSkeleton>>,
     game_data: Res<GameData>,
-    effect_list: Res<EffectList>,
     mut egui_context: ResMut<EguiContext>,
     (vfs_resource, asset_server): (Res<VfsResource>, Res<AssetServer>),
     (mut particle_materials, mut effect_mesh_materials): (
@@ -357,13 +356,8 @@ pub fn model_viewer_system(
                     ui.label("path");
                     ui.end_row();
 
-                    for (id, effect_path) in effect_list
-                        .effects
-                        .iter()
-                        .enumerate()
-                        .filter_map(|(id, x)| x.as_ref().map(|x| (id, x)))
-                    {
-                        ui.label(format!("{}", id));
+                    for (id, effect_path) in game_data.effect_database.iter() {
+                        ui.label(format!("{}", id.get()));
                         ui.label(effect_path.path().to_string_lossy().as_ref());
                         if ui.button("View").clicked() {
                             if let Some(last_effect_entity) = ui_state.last_effect_entity.take() {

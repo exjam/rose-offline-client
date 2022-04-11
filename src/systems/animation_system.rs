@@ -7,7 +7,10 @@ use bevy::{
     render::{camera::Camera3d, mesh::skinning::SkinnedMesh},
 };
 
-use crate::{components::ActiveMotion, events::AnimationFrameEvent, zmo_asset_loader::ZmoAsset};
+use crate::{
+    components::ActiveMotion, events::AnimationFrameEvent, resources::GameData,
+    zmo_asset_loader::ZmoAsset,
+};
 
 pub fn animation_system(
     mut commands: Commands,
@@ -20,6 +23,7 @@ pub fn animation_system(
         Option<&Camera3d>,
     )>,
     mut animation_frame_events: EventWriter<AnimationFrameEvent>,
+    game_data: Res<GameData>,
     motion_assets: Res<Assets<ZmoAsset>>,
     time: Res<Time>,
 ) {
@@ -63,7 +67,13 @@ pub fn animation_system(
             // Emit every frame event between previous frame and current frame
             while previous_frame_index != current_frame_index {
                 if let Some(event_id) = current_motion.get_frame_event(previous_frame_index) {
-                    animation_frame_events.send(AnimationFrameEvent::new(entity, event_id));
+                    if let Some(flags) =
+                        game_data.animation_event_flags.get(event_id.get() as usize)
+                    {
+                        if !flags.is_empty() {
+                            animation_frame_events.send(AnimationFrameEvent::new(entity, *flags));
+                        }
+                    }
                 }
 
                 previous_frame_index = (previous_frame_index + 1) % current_motion.num_frames();

@@ -11,7 +11,7 @@ use crate::{
     effect_loader::spawn_effect,
     events::{ChatboxEvent, ClientEntityEvent},
     render::{EffectMeshMaterial, ParticleMaterial},
-    resources::{ClientEntityList, EffectList, GameData},
+    resources::{ClientEntityList, GameData},
     VfsResource,
 };
 
@@ -22,7 +22,6 @@ pub fn client_entity_event_system(
     query_player: Query<Entity, With<PlayerCharacter>>,
     asset_server: Res<AssetServer>,
     client_entity_list: Res<ClientEntityList>,
-    effect_list: Res<EffectList>,
     game_data: Res<GameData>,
     vfs_resource: Res<VfsResource>,
     mut effect_mesh_materials: ResMut<Assets<EffectMeshMaterial>>,
@@ -63,10 +62,8 @@ pub fn client_entity_event_system(
                         game_data.items.get_consumable_item(item.item_number)
                     {
                         if let Some(effect_id) = consumable_item_data.effect_id {
-                            if let Some(effect_path) = effect_list
-                                .effects
-                                .get(effect_id.get())
-                                .and_then(|x| x.as_ref())
+                            if let Some(effect_path) =
+                                game_data.effect_database.get_effect(effect_id)
                             {
                                 if let Some(effect_entity) = spawn_effect(
                                     &vfs_resource.vfs,
