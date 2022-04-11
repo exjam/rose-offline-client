@@ -2,15 +2,17 @@ use bevy::prelude::{EventWriter, Local, Query, Res, ResMut, With};
 use bevy_egui::{egui, EguiContext};
 use enum_map::{enum_map, EnumMap};
 
-use rose_data::{AmmoIndex, EquipmentIndex, Item, ItemClass, ItemType, VehiclePartIndex};
+use rose_data::{
+    AmmoIndex, EquipmentIndex, Item, ItemClass, ItemType, StatusEffectType, VehiclePartIndex,
+};
 use rose_game_common::{
     components::{Equipment, Inventory, InventoryPageType, ItemSlot, INVENTORY_PAGE_SIZE},
     messages::client::{ChangeEquipment, ClientMessage},
 };
 
 use crate::{
-    components::PlayerCharacter,
-    events::ChatboxEvent,
+    components::{ConsumableCooldownGroup, Cooldowns, PlayerCharacter},
+    events::{ChatboxEvent, PlayerCommandEvent},
     resources::{GameConnection, GameData, Icons},
     ui::{ui_add_item_tooltip, DragAndDropId, DragAndDropSlot, UiStateDragAndDrop, UiStateWindows},
 };
@@ -158,12 +160,14 @@ fn ui_add_inventory_slot(
     inventory_slot: ItemSlot,
     equipment: &Equipment,
     inventory: &Inventory,
+    cooldowns: &Cooldowns,
     game_connection: Option<&Res<GameConnection>>,
     game_data: &GameData,
     icons: &Icons,
     ui_state_inventory: &mut UiStateInventory,
     ui_state_dnd: &mut UiStateDragAndDrop,
     chatbox_events: &mut EventWriter<ChatboxEvent>,
+    player_command_events: &mut EventWriter<PlayerCommandEvent>,
 ) {
     let drag_accepts = match inventory_slot {
         ItemSlot::Inventory(page_type, _) => match page_type {
@@ -183,6 +187,46 @@ fn ui_add_inventory_slot(
         .and_then(|item| game_data.items.get_base_item(item.get_item_reference()));
     let contents =
         item_data.and_then(|item_data| icons.get_item_icon(item_data.icon_index as usize));
+
+    let mut cooldown_percent = None;
+    if let Some(item) = item.as_ref() {
+        if item.get_item_type() == ItemType::Consumable {
+            if let Some(consumable_item_data) =
+                game_data.items.get_consumable_item(item.get_item_number())
+            {
+                if matches!(consumable_item_data.item_data.class, ItemClass::MagicItem) {
+                    cooldown_percent = cooldowns
+                        .get_consumable_cooldown_percent(ConsumableCooldownGroup::MagicItem);
+                } else if let Some(status_effect) = consumable_item_data
+                    .apply_status_effect
+                    .and_then(|(status_effect_id, _)| {
+                        game_data.status_effects.get_status_effect(status_effect_id)
+                    })
+                {
+                    match status_effect.status_effect_type {
+                        StatusEffectType::IncreaseHp => {
+                            cooldown_percent = cooldowns.get_consumable_cooldown_percent(
+                                ConsumableCooldownGroup::HealthRecovery,
+                            )
+                        }
+                        StatusEffectType::IncreaseMp => {
+                            cooldown_percent = cooldowns.get_consumable_cooldown_percent(
+                                ConsumableCooldownGroup::ManaRecovery,
+                            )
+                        }
+                        _ => {
+                            cooldown_percent = cooldowns
+                                .get_consumable_cooldown_percent(ConsumableCooldownGroup::Others)
+                        }
+                    }
+                } else {
+                    cooldown_percent =
+                        cooldowns.get_consumable_cooldown_percent(ConsumableCooldownGroup::Others);
+                }
+            }
+        }
+    }
+
     let mut dropped_item = None;
     let response = ui.add(DragAndDropSlot::new(
         DragAndDropId::Inventory(inventory_slot),
@@ -191,7 +235,7 @@ fn ui_add_inventory_slot(
             Some(Item::Stackable(stackable_item)) => Some(stackable_item.quantity as usize),
             _ => None,
         },
-        None,
+        cooldown_percent,
         drag_accepts,
         &mut ui_state_dnd.dragged_item,
         &mut dropped_item,
@@ -459,10 +503,7 @@ fn ui_add_inventory_slot(
     }
 
     if let Some(use_inventory_slot) = use_inventory_slot {
-        chatbox_events.send(ChatboxEvent::System(format!(
-            "TODO: Use item {:?}",
-            use_inventory_slot
-        )));
+        player_command_events.send(PlayerCommandEvent::UseItem(use_inventory_slot));
     }
 
     if let Some(drop_inventory_slot) = drop_inventory_slot {
@@ -496,13 +537,14 @@ pub fn ui_inventory_system(
     mut ui_state_inventory: Local<UiStateInventory>,
     mut ui_state_dnd: ResMut<UiStateDragAndDrop>,
     mut ui_state_windows: ResMut<UiStateWindows>,
-    query_player: Query<(&Equipment, &Inventory), With<PlayerCharacter>>,
+    query_player: Query<(&Equipment, &Inventory, &Cooldowns), With<PlayerCharacter>>,
     game_connection: Option<Res<GameConnection>>,
     game_data: Res<GameData>,
     icons: Res<Icons>,
     mut chatbox_events: EventWriter<ChatboxEvent>,
+    mut player_command_events: EventWriter<PlayerCommandEvent>,
 ) {
-    let (player_equipment, player_inventory) = query_player.single();
+    let (player_equipment, player_inventory, player_cooldowns) = query_player.single();
 
     egui::Window::new("Inventory")
         .id(ui_state_windows.inventory_window_id)
@@ -539,12 +581,14 @@ pub fn ui_inventory_system(
                                     item_slot,
                                     player_equipment,
                                     player_inventory,
+                                    player_cooldowns,
                                     game_connection.as_ref(),
                                     &game_data,
                                     &icons,
                                     &mut ui_state_inventory,
                                     &mut ui_state_dnd,
                                     &mut chatbox_events,
+                                    &mut player_command_events,
                                 );
                             } else {
                                 ui.label("");
@@ -602,12 +646,14 @@ pub fn ui_inventory_system(
                                 inventory_slot,
                                 player_equipment,
                                 player_inventory,
+                                player_cooldowns,
                                 game_connection.as_ref(),
                                 &game_data,
                                 &icons,
                                 &mut ui_state_inventory,
                                 &mut ui_state_dnd,
                                 &mut chatbox_events,
+                                &mut player_command_events,
                             );
                         }
 

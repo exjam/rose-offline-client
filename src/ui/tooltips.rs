@@ -20,11 +20,11 @@ fn add_equipment_item_name(
 ) {
     if equipment_item.grade > 0 {
         ui.colored_label(
-            get_item_name_color(&item_data),
+            get_item_name_color(item_data),
             format!("{} ({})", &item_data.name, equipment_item.grade),
         );
     } else {
-        ui.colored_label(get_item_name_color(&item_data), &item_data.name);
+        ui.colored_label(get_item_name_color(item_data), &item_data.name);
     }
 }
 
@@ -33,7 +33,7 @@ fn add_stackable_item_name(
     _stackable_item: &StackableItem,
     item_data: &BaseItemData,
 ) {
-    ui.colored_label(get_item_name_color(&item_data), &item_data.name);
+    ui.colored_label(get_item_name_color(item_data), &item_data.name);
 }
 
 fn add_equipment_item_life_durability(ui: &mut egui::Ui, equipment_item: &EquipmentItem) {

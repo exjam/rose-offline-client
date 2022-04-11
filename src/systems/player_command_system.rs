@@ -2,18 +2,20 @@ use std::time::Duration;
 
 use bevy::{
     math::Vec3Swizzles,
-    prelude::{Entity, EventReader, Query, Res, With},
+    prelude::{Entity, EventReader, EventWriter, Query, Res, With},
 };
 
-use rose_data::{SkillBasicCommand, SkillType};
+use rose_data::{ItemClass, ItemType, SkillBasicCommand, SkillType};
 use rose_game_common::{
-    components::{Hotbar, HotbarSlot, ItemDrop, SkillList, Team},
+    components::{Hotbar, HotbarSlot, Inventory, ItemDrop, SkillList, Team},
     messages::client::{Attack, ClientMessage, Move},
 };
 
 use crate::{
-    components::{ClientEntity, Cooldowns, PlayerCharacter, Position, SelectedTarget},
-    events::PlayerCommandEvent,
+    components::{
+        ClientEntity, ConsumableCooldownGroup, Cooldowns, PlayerCharacter, Position, SelectedTarget,
+    },
+    events::{ChatboxEvent, PlayerCommandEvent},
     resources::{GameConnection, GameData},
 };
 
@@ -25,6 +27,7 @@ pub fn player_command_system(
             Entity,
             &mut Cooldowns,
             &Hotbar,
+            &Inventory,
             &Position,
             &SkillList,
             &Team,
@@ -35,6 +38,7 @@ pub fn player_command_system(
     query_client_entity: Query<&ClientEntity>,
     query_dropped_items: Query<(&ClientEntity, &Position), With<ItemDrop>>,
     query_team: Query<(&ClientEntity, &Team)>,
+    mut chatbox_events: EventWriter<ChatboxEvent>,
     game_connection: Option<Res<GameConnection>>,
     game_data: Res<GameData>,
 ) {
@@ -46,13 +50,16 @@ pub fn player_command_system(
         _player_entity,
         mut player_cooldowns,
         player_hotbar,
+        player_inventory,
         player_position,
         player_skill_list,
         player_team,
         player_selected_target,
     ) = query_player_result.unwrap();
 
-    for mut event in player_command_events.iter().cloned() {
+    for event in player_command_events.iter() {
+        let mut event = event.clone();
+
         if let PlayerCommandEvent::UseHotbar(page, index) = event {
             if let Some(hotbar_slot) = player_hotbar
                 .pages
@@ -63,6 +70,9 @@ pub fn player_command_system(
                 match hotbar_slot {
                     HotbarSlot::Skill(skill_slot) => {
                         event = PlayerCommandEvent::UseSkill(*skill_slot);
+                    }
+                    HotbarSlot::Inventory(item_slot) => {
+                        event = PlayerCommandEvent::UseItem(*item_slot);
                     }
                     unimplemented => {
                         log::warn!("Unimplemented use hotbar slot {:?}", unimplemented);
@@ -77,7 +87,9 @@ pub fn player_command_system(
                     .get_skill(skill_slot)
                     .and_then(|skill_id| game_data.skills.get_skill(skill_id))
                 {
+                    // TODO: Check skill cooldown
                     if player_cooldowns.has_global_cooldown() {
+                        chatbox_events.send(ChatboxEvent::System("Waiting...".to_string()));
                         continue;
                     }
 
@@ -231,6 +243,98 @@ pub fn player_command_system(
 
                         SkillType::Passive => {} // Do nothing for passive skills
                         SkillType::Warp => {} // Warp skill is only used on items, so we should never hit it here
+                    }
+                }
+            }
+            PlayerCommandEvent::UseItem(item_slot) => {
+                if let Some(item) = player_inventory.get_item(item_slot) {
+                    if item.get_item_type() == ItemType::Consumable {
+                        let consumable_item_data =
+                            game_data.items.get_consumable_item(item.get_item_number());
+                        let mut use_item_target = None;
+
+                        if let Some(consumable_item_data) = consumable_item_data {
+                            let cooldown_group = ConsumableCooldownGroup::from_item(
+                                &item.get_item_reference(),
+                                &game_data,
+                            );
+                            let cooldown_duration = match cooldown_group {
+                                Some(ConsumableCooldownGroup::MagicItem) => {
+                                    Some(Duration::from_millis(3000))
+                                }
+                                Some(_) => Some(Duration::from_millis(500)),
+                                None => todo!(),
+                            };
+
+                            // TODO: If item is a repair item, we need to handle this client side
+                            if matches!(consumable_item_data.item_data.class, ItemClass::RepairTool)
+                            {
+                                log::info!("TODO: Implement using ItemClass::RepairTool");
+                                continue;
+                            }
+
+                            if matches!(
+                                consumable_item_data.item_data.class,
+                                ItemClass::QuestScroll
+                            ) {
+                                // TODO: This should open a dialog
+                                log::info!("TODO: Implement using ItemClass::QuestScroll");
+                                continue;
+                            }
+
+                            // Check if item is on cooldown
+                            if cooldown_group
+                                .and_then(|cooldown_group| {
+                                    player_cooldowns.get_consumable_cooldown_percent(cooldown_group)
+                                })
+                                .is_some()
+                            {
+                                chatbox_events.send(ChatboxEvent::System("Waiting...".to_string()));
+                                continue;
+                            }
+
+                            // Check if consumable requires a target
+                            if matches!(consumable_item_data.item_data.class, ItemClass::MagicItem)
+                            {
+                                if let Some(skill_data) = consumable_item_data
+                                    .use_skill_id
+                                    .and_then(|skill_id| game_data.skills.get_skill(skill_id))
+                                {
+                                    if matches!(
+                                        skill_data.skill_type,
+                                        SkillType::FireBullet
+                                            | SkillType::TargetBoundDuration
+                                            | SkillType::TargetBound
+                                            | SkillType::TargetStateDuration
+                                    ) {
+                                        if let Some(player_selected_target) = player_selected_target
+                                        {
+                                            if let Ok((target_client_entity, _)) =
+                                                query_team.get(player_selected_target.entity)
+                                            {
+                                                use_item_target = Some(target_client_entity.id);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            if let (Some(cooldown_group), Some(cooldown_duration)) =
+                                (cooldown_group, cooldown_duration)
+                            {
+                                player_cooldowns
+                                    .set_consumable_cooldown(cooldown_group, cooldown_duration);
+                            }
+
+                            if let Some(game_connection) = game_connection.as_ref() {
+                                game_connection
+                                    .client_message_tx
+                                    .send(ClientMessage::UseItem(item_slot, use_item_target))
+                                    .ok();
+                            }
+                        }
+                    } else if item.get_item_type().is_equipment_item() {
+                        // TODO: Equip item
                     }
                 }
             }

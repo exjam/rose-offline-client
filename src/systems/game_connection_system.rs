@@ -7,6 +7,7 @@ use bevy::{
     },
 };
 
+use rose_data::ItemSlotBehaviour;
 use rose_game_common::{
     components::{
         BasicStatType, BasicStats, CharacterInfo, Equipment, ExperiencePoints, HealthPoints,
@@ -663,6 +664,17 @@ pub fn game_connection_system(
                     }
                 }
             }
+            Ok(ServerMessage::UseInventoryItem(message)) => {
+                if let Some(player_entity) = client_entity_list.player_entity {
+                    if let Ok((_, mut inventory)) = query_set_character.q0().get_mut(player_entity)
+                    {
+                        if let Some(item_slot) = inventory.get_item_slot_mut(message.inventory_slot)
+                        {
+                            item_slot.try_take_quantity(1);
+                        }
+                    }
+                }
+            }
             Ok(ServerMessage::UpdateMoney(money)) => {
                 if let Some(player_entity) = client_entity_list.player_entity {
                     if let Ok((_, mut inventory)) = query_set_character.q0().get_mut(player_entity)
@@ -1019,6 +1031,10 @@ pub fn game_connection_system(
                         }
                     }
                 }
+            }
+            Ok(ServerMessage::UseItem(message)) => {
+                client_entity_events
+                    .send(ClientEntityEvent::UseItem(message.entity_id, message.item));
             }
             Ok(message) => {
                 log::warn!("Received unimplemented game server message: {:#?}", message);

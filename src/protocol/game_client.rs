@@ -17,7 +17,7 @@ use rose_game_common::{
             SpawnEntityCharacter, SpawnEntityItemDrop, SpawnEntityMonster, SpawnEntityNpc,
             StopMoveEntity, Teleport, UpdateAbilityValue, UpdateBasicStat, UpdateEquipment,
             UpdateLevel, UpdateSpeed, UpdateStatusEffects, UpdateVehiclePart, UpdateXpStamina,
-            UseEmote, UseItem, Whisper,
+            UseEmote, UseInventoryItem, UseItem, Whisper,
         },
     },
 };
@@ -558,12 +558,22 @@ impl GameClient {
             }
             Some(ServerPackets::UseItem) => {
                 let message = PacketServerUseItem::try_from(&packet)?;
-                self.server_message_tx
-                    .send(ServerMessage::UseItem(UseItem {
-                        entity_id: message.entity_id,
-                        item: message.item,
-                    }))
-                    .ok();
+                if let Some(inventory_slot) = message.inventory_slot {
+                    self.server_message_tx
+                        .send(ServerMessage::UseInventoryItem(UseInventoryItem {
+                            entity_id: message.entity_id,
+                            item: message.item,
+                            inventory_slot,
+                        }))
+                        .ok();
+                } else {
+                    self.server_message_tx
+                        .send(ServerMessage::UseItem(UseItem {
+                            entity_id: message.entity_id,
+                            item: message.item,
+                        }))
+                        .ok();
+                }
             }
             Some(ServerPackets::ChangeNpcId) => {
                 let message = PacketServerChangeNpcId::try_from(&packet)?;

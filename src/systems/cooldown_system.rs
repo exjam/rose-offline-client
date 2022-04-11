@@ -36,5 +36,15 @@ pub fn cooldown_system(mut query_cooldowns: Query<&mut Cooldowns>, time: Res<Tim
                 }
             }
         }
+
+        for (_, cooldown) in cooldowns.consumable_items.iter_mut() {
+            if let Some((current, _)) = cooldown.as_mut() {
+                if delta < *current {
+                    *current -= delta;
+                } else {
+                    *cooldown = None;
+                }
+            }
+        }
     }
 }

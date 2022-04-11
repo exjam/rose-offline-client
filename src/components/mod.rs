@@ -27,7 +27,7 @@ pub use collision::{
     COLLISION_GROUP_ZONE_OBJECT, COLLISION_GROUP_ZONE_TERRAIN, COLLISION_GROUP_ZONE_WATER,
 };
 pub use command::{Command, CommandAttack, CommandEmote, CommandMove, CommandSit, NextCommand};
-pub use cooldowns::Cooldowns;
+pub use cooldowns::{ConsumableCooldownGroup, Cooldowns};
 pub use damage_digits::DamageDigits;
 pub use debug_render::{DebugRenderCollider, DebugRenderSkeleton};
 pub use effect::{Effect, EffectMesh, EffectParticle};

@@ -10,7 +10,7 @@ use rose_game_common::components::{
 };
 
 use crate::{
-    components::{Cooldowns, PlayerCharacter},
+    components::{ConsumableCooldownGroup, Cooldowns, PlayerCharacter},
     events::PlayerCommandEvent,
     resources::{GameData, Icons},
     ui::{
@@ -75,11 +75,15 @@ fn ui_add_hotbar_slot(
                 .and_then(|item| game_data.items.get_base_item(item.get_item_reference()));
             (
                 item_data.and_then(|item_data| icons.get_item_icon(item_data.icon_index as usize)),
-                match item {
+                match item.as_ref() {
                     Some(Item::Stackable(stackable_item)) => Some(stackable_item.quantity as usize),
                     _ => None,
                 },
-                None, // TODO: Some items have cooldowns
+                item.as_ref()
+                    .and_then(|item| {
+                        ConsumableCooldownGroup::from_item(&item.get_item_reference(), game_data)
+                    })
+                    .and_then(|group| player_cooldowns.get_consumable_cooldown_percent(group)),
             )
         }
         _ => (None, None, None),
@@ -164,21 +168,21 @@ pub fn ui_hotbar_system(
     ) = query_player.single_mut();
 
     let use_hotbar_index = if !egui_context.ctx_mut().wants_keyboard_input() {
-        if keyboard_input.pressed(KeyCode::F1) {
+        if keyboard_input.just_pressed(KeyCode::F1) {
             Some(0)
-        } else if keyboard_input.pressed(KeyCode::F2) {
+        } else if keyboard_input.just_pressed(KeyCode::F2) {
             Some(1)
-        } else if keyboard_input.pressed(KeyCode::F3) {
+        } else if keyboard_input.just_pressed(KeyCode::F3) {
             Some(2)
-        } else if keyboard_input.pressed(KeyCode::F4) {
+        } else if keyboard_input.just_pressed(KeyCode::F4) {
             Some(3)
-        } else if keyboard_input.pressed(KeyCode::F5) {
+        } else if keyboard_input.just_pressed(KeyCode::F5) {
             Some(4)
-        } else if keyboard_input.pressed(KeyCode::F6) {
+        } else if keyboard_input.just_pressed(KeyCode::F6) {
             Some(5)
-        } else if keyboard_input.pressed(KeyCode::F7) {
+        } else if keyboard_input.just_pressed(KeyCode::F7) {
             Some(6)
-        } else if keyboard_input.pressed(KeyCode::F8) {
+        } else if keyboard_input.just_pressed(KeyCode::F8) {
             Some(7)
         } else {
             None
