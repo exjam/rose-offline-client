@@ -14,9 +14,17 @@ use crate::{
 };
 
 fn rng_gen_range<R: Rng>(rng: &mut R, range: &RangeInclusive<f32>) -> f32 {
-    let start = range.start();
-    let end = range.end();
-    rng.gen_range(0.0..=1.0) * (end - start) + start
+    // This function is intentionally written this way to match the
+    // original ROSE engine code to behave the same when fmin > fmax
+    let fmin = *range.start();
+    let fmax = *range.end();
+
+    if fmin == fmax {
+        return fmin;
+    }
+
+    let frandom = rng.gen_range(0.0..=1.0);
+    (frandom * (fmax - fmin).abs()) + fmin
 }
 
 fn apply_timestep(
