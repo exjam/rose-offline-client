@@ -684,16 +684,11 @@ fn spawn_model(
             skinned: zsc_material.is_skin,
             ..Default::default()
         });
-        let part_transform = Transform::default().with_scale(Vec3::new(
-            object_part.scale.x,
-            object_part.scale.z,
-            object_part.scale.y,
-        ));
 
         let mut entity_commands = commands.spawn_bundle((
             mesh,
             material,
-            part_transform,
+            Transform::default(),
             GlobalTransform::default(),
             Visibility::default(),
             ComputedVisibility::default(),
