@@ -122,24 +122,33 @@ fn ui_add_hotbar_slot(
         _ => {}
     });
 
-    // TODO: Send to server
     match dropped_item {
         Some(DragAndDropId::Hotbar(page, index)) => {
             if page != hotbar_index.0 || index != hotbar_index.1 {
                 let slot_a = player_hotbar.pages[hotbar_index.0][hotbar_index.1].take();
                 let slot_b = player_hotbar.pages[page][index].take();
 
-                player_hotbar.pages[page][index] = slot_a;
-                player_hotbar.pages[hotbar_index.0][hotbar_index.1] = slot_b;
+                player_command_events.send(PlayerCommandEvent::SetHotbar(page, index, slot_a));
+                player_command_events.send(PlayerCommandEvent::SetHotbar(
+                    hotbar_index.0,
+                    hotbar_index.1,
+                    slot_b,
+                ));
             }
         }
         Some(DragAndDropId::Inventory(item_slot)) => {
-            let hotbar_slot = &mut player_hotbar.pages[hotbar_index.0][hotbar_index.1];
-            *hotbar_slot = Some(HotbarSlot::Inventory(item_slot));
+            player_command_events.send(PlayerCommandEvent::SetHotbar(
+                hotbar_index.0,
+                hotbar_index.1,
+                Some(HotbarSlot::Inventory(item_slot)),
+            ));
         }
         Some(DragAndDropId::Skill(skill_slot)) => {
-            let hotbar_slot = &mut player_hotbar.pages[hotbar_index.0][hotbar_index.1];
-            *hotbar_slot = Some(HotbarSlot::Skill(skill_slot));
+            player_command_events.send(PlayerCommandEvent::SetHotbar(
+                hotbar_index.0,
+                hotbar_index.1,
+                Some(HotbarSlot::Skill(skill_slot)),
+            ));
         }
         Some(DragAndDropId::NotDraggable) => {}
         None => {}

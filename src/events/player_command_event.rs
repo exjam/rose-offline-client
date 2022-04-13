@@ -1,6 +1,6 @@
 use bevy::prelude::Entity;
 
-use rose_game_common::components::{ItemSlot, SkillSlot};
+use rose_game_common::components::{HotbarSlot, ItemSlot, SkillSlot};
 
 use crate::components::Position;
 
@@ -9,6 +9,7 @@ pub enum PlayerCommandEvent {
     UseSkill(SkillSlot),
     UseItem(ItemSlot),
     UseHotbar(usize, usize),
+    SetHotbar(usize, usize, Option<HotbarSlot>),
     Attack(Entity),
     Move(Position, Option<Entity>),
 }

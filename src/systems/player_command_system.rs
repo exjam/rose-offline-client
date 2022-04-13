@@ -8,7 +8,7 @@ use bevy::{
 use rose_data::{ItemClass, ItemType, SkillBasicCommand, SkillType};
 use rose_game_common::{
     components::{Hotbar, HotbarSlot, Inventory, ItemDrop, SkillList, Team},
-    messages::client::{Attack, ClientMessage, Move},
+    messages::client::{Attack, ClientMessage, Move, SetHotbarSlot},
 };
 
 use crate::{
@@ -26,7 +26,7 @@ pub fn player_command_system(
         (
             Entity,
             &mut Cooldowns,
-            &Hotbar,
+            &mut Hotbar,
             &Inventory,
             &Position,
             &SkillList,
@@ -49,7 +49,7 @@ pub fn player_command_system(
     let (
         _player_entity,
         mut player_cooldowns,
-        player_hotbar,
+        mut player_hotbar,
         player_inventory,
         player_position,
         player_skill_list,
@@ -369,6 +369,23 @@ pub fn player_command_system(
                             x: position.position.x,
                             y: position.position.y,
                             z: position.position.z as u16,
+                        }))
+                        .ok();
+                }
+            }
+            PlayerCommandEvent::SetHotbar(page, page_index, hotbar_slot) => {
+                if let Some(hotbar_page) = player_hotbar.pages.get_mut(page) {
+                    if let Some(hotbar_page_slot) = hotbar_page.get_mut(page_index) {
+                        *hotbar_page_slot = hotbar_slot.clone();
+                    }
+                }
+
+                if let Some(game_connection) = game_connection.as_ref() {
+                    game_connection
+                        .client_message_tx
+                        .send(ClientMessage::SetHotbarSlot(SetHotbarSlot {
+                            slot_index: page * player_hotbar.pages[0].len() + page_index,
+                            slot: hotbar_slot,
                         }))
                         .ok();
                 }
