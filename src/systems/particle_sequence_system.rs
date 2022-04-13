@@ -342,8 +342,8 @@ pub fn particle_sequence_system(
                 );
                 if matches!(particle_sequence.update_coords, ParticleUpdateCoords::World) {
                     position.x += global_transform.translation.x * 100.0;
-                    position.y += global_transform.translation.z * 100.0;
-                    position.z += global_transform.translation.y * -100.0;
+                    position.y += global_transform.translation.z * -100.0;
+                    position.z += global_transform.translation.y * 100.0;
                 }
 
                 let life = rng_gen_range(&mut rng, &particle_sequence.particle_life);
