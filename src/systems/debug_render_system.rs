@@ -16,7 +16,9 @@ use crate::components::{DebugRenderCollider, DebugRenderSkeleton};
 #[derive(Component)]
 pub struct DebugRenderSkeletonData {
     polyline_entity: Entity,
+    polyline_entity_up: Entity,
     polyline: Handle<Polyline>,
+    polyline_up: Handle<Polyline>,
 }
 
 #[derive(Component)]
@@ -226,13 +228,33 @@ pub fn debug_render_skeleton_system(
                     }
                 }
             }
+            if let Some(polyline) = polylines.get_mut(debug_skeleton.polyline_up.clone()) {
+                polyline.vertices.clear();
+
+                for bone_entity in skinned_mesh.joints.iter() {
+                    if let Ok((transform, _)) = query_bone.get(*bone_entity) {
+                        polyline.vertices.push(transform.translation);
+                        polyline.vertices.push(
+                            transform.translation
+                                + transform.rotation.mul_vec3(Vec3::new(0.0, 0.2, 0.0)),
+                        );
+                        polyline
+                            .vertices
+                            .push(Vec3::new(f32::NAN, f32::NAN, f32::NAN));
+                    }
+                }
+            }
 
             commands
                 .entity(debug_skeleton.polyline_entity)
                 .insert(transform);
+            commands
+                .entity(debug_skeleton.polyline_entity_up)
+                .insert(transform);
         } else {
             // Add a new debug skeleton
             let mut polyline_vertices = Vec::new();
+            let mut polyline_vertices_up = Vec::new();
             for bone_entity in skinned_mesh.joints.iter() {
                 if let Ok((transform, parent)) = query_bone.get(*bone_entity) {
                     if let Some((parent_transform, _)) =
@@ -241,6 +263,13 @@ pub fn debug_render_skeleton_system(
                         polyline_vertices.push(transform.translation);
                         polyline_vertices.push(parent_transform.translation);
                         polyline_vertices.push(Vec3::new(f32::NAN, f32::NAN, f32::NAN));
+
+                        polyline_vertices_up.push(transform.translation);
+                        polyline_vertices_up.push(
+                            transform.translation
+                                + transform.rotation.mul_vec3(Vec3::new(0.0, 0.2, 0.0)),
+                        );
+                        polyline_vertices_up.push(Vec3::new(f32::NAN, f32::NAN, f32::NAN));
                     }
                 }
             }
@@ -262,13 +291,33 @@ pub fn debug_render_skeleton_system(
                 })
                 .id();
 
+            let polyline_up = polylines.add(Polyline {
+                vertices: polyline_vertices_up,
+            });
+            let polyline_entity_up = commands
+                .spawn_bundle(PolylineBundle {
+                    polyline: polyline_up.clone(),
+                    material: polyline_materials.add(PolylineMaterial {
+                        width: 4.0,
+                        color: *COLOR_LIST.choose(&mut rng).unwrap(),
+                        perspective: false,
+                        depth_test: false,
+                    }),
+                    transform,
+                    ..Default::default()
+                })
+                .id();
+
             commands
                 .entity(entity)
                 .insert(DebugRenderSkeletonData {
                     polyline_entity,
+                    polyline_entity_up,
                     polyline,
+                    polyline_up,
                 })
-                .add_child(polyline_entity);
+                .add_child(polyline_entity)
+                .add_child(polyline_entity_up);
         }
     }
 
