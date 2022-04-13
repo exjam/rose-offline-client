@@ -70,6 +70,7 @@ struct ParticlePipeline {
     view_layout: BindGroupLayout,
     particle_layout: BindGroupLayout,
     material_layout: BindGroupLayout,
+    sampler: Sampler,
 }
 
 impl FromWorld for ParticlePipeline {
@@ -168,6 +169,13 @@ impl FromWorld for ParticlePipeline {
             view_layout,
             particle_layout,
             material_layout,
+            sampler: render_device.create_sampler(&SamplerDescriptor {
+                address_mode_u: AddressMode::Repeat,
+                address_mode_v: AddressMode::Repeat,
+                mag_filter: FilterMode::Linear,
+                min_filter: FilterMode::Linear,
+                ..Default::default()
+            }),
         }
     }
 }
@@ -648,7 +656,7 @@ fn queue_particles(
                             },
                             BindGroupEntry {
                                 binding: 1,
-                                resource: BindingResource::Sampler(&gpu_image.sampler),
+                                resource: BindingResource::Sampler(&particle_pipeline.sampler),
                             },
                         ],
                         label: Some("particle_material_bind_group"),
