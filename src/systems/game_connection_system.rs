@@ -11,8 +11,8 @@ use rose_data::ItemSlotBehaviour;
 use rose_game_common::{
     components::{
         BasicStatType, BasicStats, CharacterInfo, Equipment, ExperiencePoints, HealthPoints,
-        Hotbar, Inventory, ItemDrop, ManaPoints, MoveMode, MoveSpeed, Npc, QuestState, SkillList,
-        Stamina, StatPoints, StatusEffects,
+        Hotbar, Inventory, ItemDrop, Level, ManaPoints, MoveMode, MoveSpeed, Npc, QuestState,
+        SkillList, Stamina, StatPoints, StatusEffects,
     },
     messages::server::{
         CommandState, LearnSkillError, LevelUpSkillError, PickupItemDropContent,
@@ -23,9 +23,10 @@ use rose_network_common::ConnectionError;
 
 use crate::{
     components::{
-        ClientEntity, ClientEntityType, CollisionRayCastSource, Command, Cooldowns,
-        MovementCollisionEntities, NextCommand, PassiveRecoveryTime, PendingDamageList,
-        PersonalStore, PlayerCharacter, Position,
+        ClientEntity, ClientEntityType, CollisionRayCastSource, Command, CommandCastSkillTarget,
+        Cooldowns, MovementCollisionEntities, NextCommand, PassiveRecoveryTime, PendingDamageList,
+        PendingSkillEffectList, PendingSkillTargetList, PersonalStore, PlayerCharacter, Position,
+        VisibleStatusEffects,
     },
     events::{ChatboxEvent, ClientEntityEvent, GameConnectionEvent, QuestTriggerEvent},
     resources::{AppState, ClientEntityList, GameConnection, GameData},
@@ -64,6 +65,8 @@ pub fn game_connection_system(
     >,
     query_movement_collision_entities: Query<&MovementCollisionEntities>,
     mut query_pending_damage_list: Query<&mut PendingDamageList>,
+    mut query_pending_skill_effect_list: Query<&mut PendingSkillEffectList>,
+    mut query_pending_skill_target_list: Query<&mut PendingSkillTargetList>,
     mut query_hotbar: Query<&mut Hotbar>,
     mut query_set_character: QuerySet<(
         QueryState<(&mut Equipment, &mut Inventory)>,
@@ -80,7 +83,7 @@ pub fn game_connection_system(
     )>,
     mut query_quest_state: Query<&mut QuestState>,
     mut query_xp_stamina: Query<(&mut ExperiencePoints, &mut Stamina)>,
-    mut query_command: Query<(&Command, &mut NextCommand)>,
+    mut query_command: Query<(&mut Command, &mut NextCommand)>,
     (mut app_state, mut client_entity_list, game_connection, game_data): (
         ResMut<State<AppState>>,
         ResMut<ClientEntityList>,
@@ -145,6 +148,7 @@ pub fn game_connection_system(
                             character_data.union_membership,
                             character_data.stamina,
                             Position::new(character_data.position),
+                            PendingSkillEffectList::default(),
                         ))
                         .insert_bundle((
                             Command::with_stop(),
@@ -155,6 +159,7 @@ pub fn game_connection_system(
                             move_speed,
                             Cooldowns::default(),
                             PassiveRecoveryTime::default(),
+                            PendingSkillTargetList::default(),
                             PendingDamageList::default(),
                             PlayerCharacter {},
                             Transform::from_xyz(
@@ -166,6 +171,7 @@ pub fn game_connection_system(
                             Visibility::default(),
                             ComputedVisibility::default(),
                         ))
+                        .insert(VisibleStatusEffects::default())
                         .id(),
                 );
 
@@ -279,6 +285,8 @@ pub fn game_connection_system(
                         ability_values,
                         status_effects,
                         PendingDamageList::default(),
+                        PendingSkillEffectList::default(),
+                        PendingSkillTargetList::default(),
                     ))
                     .insert_bundle((
                         ClientEntity::new(message.entity_id, ClientEntityType::Character),
@@ -290,6 +298,7 @@ pub fn game_connection_system(
                         GlobalTransform::default(),
                         Visibility::default(),
                         ComputedVisibility::default(),
+                        VisibleStatusEffects::default(),
                     ))
                     .with_children(|child_builder| {
                         child_builder.spawn_bundle((
@@ -324,6 +333,7 @@ pub fn game_connection_system(
                     MoveMode::Run => MoveSpeed::new(ability_values.get_run_speed()),
                     MoveMode::Drive => MoveSpeed::new(ability_values.get_drive_speed()),
                 };
+                let level = Level::new(ability_values.get_level() as u32);
                 let target_entity = message
                     .target_entity_id
                     .and_then(|id| client_entity_list.get(id));
@@ -355,9 +365,13 @@ pub fn game_connection_system(
                         message.move_mode,
                         Position::new(message.position),
                         ability_values,
+                        level,
                         move_speed,
                         status_effects,
                         PendingDamageList::default(),
+                        PendingSkillEffectList::default(),
+                        PendingSkillTargetList::default(),
+                        VisibleStatusEffects::default(),
                     ))
                     .insert_bundle((
                         ClientEntity::new(message.entity_id, ClientEntityType::Npc),
@@ -401,6 +415,7 @@ pub fn game_connection_system(
                     MoveMode::Run => MoveSpeed::new(ability_values.get_run_speed()),
                     MoveMode::Drive => MoveSpeed::new(ability_values.get_drive_speed()),
                 };
+                let level = Level::new(ability_values.get_level() as u32);
                 let target_entity = message
                     .target_entity_id
                     .and_then(|id| client_entity_list.get(id));
@@ -432,9 +447,13 @@ pub fn game_connection_system(
                         message.move_mode,
                         Position::new(message.position),
                         ability_values,
+                        level,
                         move_speed,
                         status_effects,
                         PendingDamageList::default(),
+                        PendingSkillEffectList::default(),
+                        PendingSkillTargetList::default(),
+                        VisibleStatusEffects::default(),
                     ))
                     .insert_bundle((
                         ClientEntity::new(message.entity_id, ClientEntityType::Monster),
@@ -1019,7 +1038,7 @@ pub fn game_connection_system(
             Ok(ServerMessage::SitToggle(entity_id)) => {
                 if let Some(entity) = client_entity_list.get(entity_id) {
                     if let Ok((command, mut next_command)) = query_command.get_mut(entity) {
-                        if matches!(command, Command::Sit(_)) {
+                        if matches!(*command, Command::Sit(_)) {
                             // If next command is already set then the command system will make the
                             // entity stand up before performing next command. So we only need to
                             // explicitly start to stand up if next command is not set.
@@ -1035,6 +1054,103 @@ pub fn game_connection_system(
             Ok(ServerMessage::UseItem(message)) => {
                 client_entity_events
                     .send(ClientEntityEvent::UseItem(message.entity_id, message.item));
+            }
+            Ok(ServerMessage::CastSkillSelf(message)) => {
+                if let Some(entity) = client_entity_list.get(message.entity_id) {
+                    let new_command = NextCommand::with_cast_skill(
+                        message.skill_id,
+                        None,
+                        message.cast_motion_id,
+                        None,
+                        None,
+                    );
+
+                    if let Ok((_, mut next_command)) = query_command.get_mut(entity) {
+                        *next_command = new_command;
+                    } else {
+                        commands.entity(entity).insert(new_command);
+                    }
+                }
+            }
+            Ok(ServerMessage::CastSkillTargetEntity(message)) => {
+                if let Some(entity) = client_entity_list.get(message.entity_id) {
+                    if let Some(target_entity) = client_entity_list.get(message.target_entity_id) {
+                        let new_command = NextCommand::with_cast_skill(
+                            message.skill_id,
+                            Some(CommandCastSkillTarget::Entity(target_entity)),
+                            message.cast_motion_id,
+                            None,
+                            None,
+                        );
+
+                        if let Ok((_, mut next_command)) = query_command.get_mut(entity) {
+                            *next_command = new_command;
+                        } else {
+                            commands.entity(entity).insert(new_command);
+                        }
+                    }
+                }
+            }
+            Ok(ServerMessage::CastSkillTargetPosition(message)) => {
+                if let Some(entity) = client_entity_list.get(message.entity_id) {
+                    let new_command = NextCommand::with_cast_skill(
+                        message.skill_id,
+                        Some(CommandCastSkillTarget::Position(message.target_position)),
+                        message.cast_motion_id,
+                        None,
+                        None,
+                    );
+
+                    if let Ok((_, mut next_command)) = query_command.get_mut(entity) {
+                        *next_command = new_command;
+                    } else {
+                        commands.entity(entity).insert(new_command);
+                    }
+                }
+            }
+            Ok(ServerMessage::CancelCastingSkill(entity_id, _)) => {
+                if let Some(entity) = client_entity_list.get(entity_id) {
+                    if let Ok((mut command, _)) = query_command.get_mut(entity) {
+                        if let Command::CastSkill(_) = command.as_mut() {
+                            *command = Command::with_stop();
+                        }
+                    }
+                }
+            }
+            Ok(ServerMessage::FinishCastingSkill(entity_id, skill_id)) => {
+                if let Some(entity) = client_entity_list.get(entity_id) {
+                    if let Ok((mut command, _)) = query_command.get_mut(entity) {
+                        if let Command::CastSkill(command_cast_skill) = command.as_mut() {
+                            if command_cast_skill.skill_id == skill_id {
+                                command_cast_skill.ready_action = true;
+                            }
+                        }
+                    }
+                }
+            }
+            Ok(ServerMessage::ApplySkillEffect(message)) => {
+                if let Some(defender_entity) = client_entity_list.get(message.entity_id) {
+                    let caster_entity = client_entity_list.get(message.caster_entity_id);
+
+                    if let Ok(mut pending_skill_effect_list) =
+                        query_pending_skill_effect_list.get_mut(defender_entity)
+                    {
+                        pending_skill_effect_list.add_effect(
+                            message.skill_id,
+                            caster_entity,
+                            message.caster_intelligence,
+                            message.effect_success,
+                        );
+                    }
+
+                    if let Some(caster_entity) = caster_entity {
+                        if let Ok(mut pending_skill_target_list) =
+                            query_pending_skill_target_list.get_mut(caster_entity)
+                        {
+                            pending_skill_target_list.add_target(message.skill_id, defender_entity);
+                        }
+                    }
+                }
             }
             Ok(message) => {
                 log::warn!("Received unimplemented game server message: {:#?}", message);

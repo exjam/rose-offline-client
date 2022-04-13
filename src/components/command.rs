@@ -1,8 +1,8 @@
 use bevy::{
-    math::Vec3,
+    math::{Vec2, Vec3},
     prelude::{Component, Entity},
 };
-use rose_data::MotionId;
+use rose_data::{MotionId, SkillId};
 use std::ops::{Deref, DerefMut};
 
 use rose_game_common::components::MoveMode;
@@ -32,6 +32,31 @@ pub enum CommandSit {
     Standing,
 }
 
+#[derive(Copy, Clone, Debug)]
+pub enum CommandCastSkillTarget {
+    Entity(Entity),
+    Position(Vec2),
+}
+
+#[derive(Copy, Clone, Debug)]
+pub enum CommandCastSkillState {
+    Starting,
+    Casting,
+    CastingRepeat,
+    Action,
+}
+
+#[derive(Clone, Debug)]
+pub struct CommandCastSkill {
+    pub skill_id: SkillId,
+    pub skill_target: Option<CommandCastSkillTarget>,
+    pub action_motion_id: Option<MotionId>,
+    pub cast_motion_id: Option<MotionId>,
+    pub cast_repeat_motion_id: Option<MotionId>,
+    pub cast_skill_state: CommandCastSkillState,
+    pub ready_action: bool,
+}
+
 #[derive(Component, Clone, Debug)]
 pub enum Command {
     Stop,
@@ -41,6 +66,7 @@ pub enum Command {
     PickupItem(Entity),
     Emote(CommandEmote),
     Sit(CommandSit),
+    CastSkill(CommandCastSkill),
 }
 
 impl Command {
@@ -54,6 +80,25 @@ impl Command {
 
     pub fn with_attack(target: Entity) -> Self {
         Self::Attack(CommandAttack { target })
+    }
+
+    pub fn with_cast_skill(
+        skill_id: SkillId,
+        skill_target: Option<CommandCastSkillTarget>,
+        cast_motion_id: Option<MotionId>,
+        cast_repeat_motion_id: Option<MotionId>,
+        action_motion_id: Option<MotionId>,
+        cast_skill_state: CommandCastSkillState,
+    ) -> Self {
+        Self::CastSkill(CommandCastSkill {
+            skill_id,
+            skill_target,
+            cast_motion_id,
+            cast_repeat_motion_id,
+            action_motion_id,
+            cast_skill_state,
+            ready_action: false,
+        })
     }
 
     pub fn with_emote(motion_id: MotionId, is_stop: bool) -> Self {
@@ -109,7 +154,7 @@ impl Command {
     }
 
     pub fn is_manual_complete(&self) -> bool {
-        matches!(self, Command::Sit(_)) // | Command::PersonalStore
+        matches!(self, Command::Sit(_) | Command::CastSkill(_)) // | Command::PersonalStore
     }
 
     pub fn requires_animation_complete(&self) -> bool {
@@ -123,6 +168,10 @@ impl Command {
             Command::Sit(CommandSit::Sitting) => true,
             Command::Sit(CommandSit::Sit) => false,
             Command::Sit(CommandSit::Standing) => true,
+            Command::CastSkill(cast_skill) => !matches!(
+                cast_skill.cast_skill_state,
+                CommandCastSkillState::CastingRepeat
+            ),
         }
     }
 }
@@ -143,16 +192,34 @@ impl NextCommand {
         matches!(self.0, Some(Command::Die))
     }
 
+    pub fn with_attack(target: Entity) -> Self {
+        Self(Some(Command::Attack(CommandAttack { target })))
+    }
+
+    pub fn with_cast_skill(
+        skill_id: SkillId,
+        skill_target: Option<CommandCastSkillTarget>,
+        cast_motion_id: Option<MotionId>,
+        cast_repeat_motion_id: Option<MotionId>,
+        action_motion_id: Option<MotionId>,
+    ) -> Self {
+        Self(Some(Command::CastSkill(CommandCastSkill {
+            skill_id,
+            skill_target,
+            cast_motion_id,
+            cast_repeat_motion_id,
+            action_motion_id,
+            cast_skill_state: CommandCastSkillState::Starting,
+            ready_action: false,
+        })))
+    }
+
     pub fn with_die() -> Self {
         Self(Some(Command::Die))
     }
 
-    pub fn with_stop() -> Self {
-        Self(Some(Command::Stop))
-    }
-
-    pub fn with_pickup_item(target: Entity) -> Self {
-        Self(Some(Command::PickupItem(target)))
+    pub fn with_emote(motion_id: MotionId, is_stop: bool) -> Self {
+        Self(Some(Command::Emote(CommandEmote { motion_id, is_stop })))
     }
 
     pub fn with_move(
@@ -167,12 +234,8 @@ impl NextCommand {
         })))
     }
 
-    pub fn with_emote(motion_id: MotionId, is_stop: bool) -> Self {
-        Self(Some(Command::Emote(CommandEmote { motion_id, is_stop })))
-    }
-
-    pub fn with_attack(target: Entity) -> Self {
-        Self(Some(Command::Attack(CommandAttack { target })))
+    pub fn with_pickup_item(target: Entity) -> Self {
+        Self(Some(Command::PickupItem(target)))
     }
 
     pub fn with_sitting() -> Self {
@@ -181,6 +244,10 @@ impl NextCommand {
 
     pub fn with_standing() -> Self {
         Self(Some(Command::Sit(CommandSit::Standing)))
+    }
+
+    pub fn with_stop() -> Self {
+        Self(Some(Command::Stop))
     }
 }
 

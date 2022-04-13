@@ -6,10 +6,11 @@ use bevy::{
     prelude::{GlobalTransform, Query, Res, Transform},
 };
 use rand::Rng;
-use rose_file_readers::PtlKeyframeData;
+
+use rose_file_readers::{PtlKeyframeData, PtlUpdateCoords};
 
 use crate::{
-    components::{ActiveParticle, ParticleSequence, ParticleUpdateCoords},
+    components::{ActiveParticle, ParticleSequence},
     render::ParticleRenderData,
 };
 
@@ -340,7 +341,7 @@ pub fn particle_sequence_system(
                     rng_gen_range(&mut rng, &particle_sequence.emit_radius_y),
                     rng_gen_range(&mut rng, &particle_sequence.emit_radius_z),
                 );
-                if matches!(particle_sequence.update_coords, ParticleUpdateCoords::World) {
+                if matches!(particle_sequence.update_coords, PtlUpdateCoords::World) {
                     position.x += global_transform.translation.x * 100.0;
                     position.y += global_transform.translation.z * -100.0;
                     position.z += global_transform.translation.y * 100.0;
@@ -362,11 +363,11 @@ pub fn particle_sequence_system(
 
         // Update render data
         let render_transform = match particle_sequence.update_coords {
-            ParticleUpdateCoords::World => Transform::default(),
-            ParticleUpdateCoords::LocalPosition => {
+            PtlUpdateCoords::World => Transform::default(),
+            PtlUpdateCoords::LocalPosition => {
                 Transform::from_translation(global_transform.translation)
             }
-            ParticleUpdateCoords::Local => (*global_transform).into(),
+            PtlUpdateCoords::Local => (*global_transform).into(),
         };
         let texture_atlas_total =
             particle_sequence.texture_atlas_cols * particle_sequence.texture_atlas_rows;

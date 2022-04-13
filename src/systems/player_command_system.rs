@@ -213,10 +213,12 @@ pub fn player_command_system(
                         | SkillType::SelfStateDuration
                         | SkillType::SummonPet
                         | SkillType::SelfDamage => {
-                            log::warn!(
-                                "Unimplemented self skill type: {:?}",
-                                skill_data.skill_type
-                            );
+                            if let Some(game_connection) = game_connection.as_ref() {
+                                game_connection
+                                    .client_message_tx
+                                    .send(ClientMessage::CastSkillSelf(skill_slot))
+                                    .ok();
+                            }
                         }
 
                         SkillType::AreaTarget => {

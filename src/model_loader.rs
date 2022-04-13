@@ -215,6 +215,7 @@ impl ModelLoader {
                         particle_materials,
                         effect_mesh_materials,
                         effect_path.into(),
+                        false,
                     ) {
                         commands.entity(*dummy_bone_entity).add_child(effect_entity);
                         model_parts.push(effect_entity);

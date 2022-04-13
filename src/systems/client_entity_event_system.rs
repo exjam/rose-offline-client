@@ -47,6 +47,7 @@ pub fn client_entity_event_system(
                         &mut particle_materials,
                         &mut effect_mesh_materials,
                         "3DDATA/EFFECT/LEVELUP_01.EFT".into(),
+                        false,
                     ) {
                         commands.entity(entity).add_child(effect_entity);
                     }
@@ -72,6 +73,7 @@ pub fn client_entity_event_system(
                                     &mut particle_materials,
                                     &mut effect_mesh_materials,
                                     effect_path.into(),
+                                    false,
                                 ) {
                                     commands.entity(entity).add_child(effect_entity);
                                 }

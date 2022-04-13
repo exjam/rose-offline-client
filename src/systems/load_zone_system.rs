@@ -803,6 +803,7 @@ fn load_block_object(
                 particle_materials,
                 effect_mesh_materials,
                 effect_path.into(),
+                false,
             ) {
                 if let Some(parent_part_entity) = object_effect
                     .parent

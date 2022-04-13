@@ -373,6 +373,7 @@ pub fn model_viewer_system(
                                 &mut particle_materials,
                                 &mut effect_mesh_materials,
                                 effect_path.into(),
+                                false,
                             );
                         }
                         ui.end_row();

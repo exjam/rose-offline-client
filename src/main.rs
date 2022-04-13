@@ -53,18 +53,19 @@ use resources::{
     NetworkThread, NetworkThreadMessage, ServerConfiguration,
 };
 use systems::{
-    ability_values_system, animation_system, character_model_add_collider_system,
-    character_model_system, character_select_enter_system, character_select_exit_system,
-    character_select_input_system, character_select_models_system, character_select_system,
-    client_entity_event_system, collision_add_colliders_system, collision_system, command_system,
-    conversation_dialog_system, cooldown_system, damage_digit_render_system,
-    debug_render_collider_system, debug_render_skeleton_system, effect_system,
-    game_connection_system, game_mouse_input_system, game_state_enter_system,
+    ability_values_system, animation_effect_system, animation_system,
+    character_model_add_collider_system, character_model_system, character_select_enter_system,
+    character_select_exit_system, character_select_input_system, character_select_models_system,
+    character_select_system, client_entity_event_system, collision_add_colliders_system,
+    collision_system, command_system, conversation_dialog_system, cooldown_system,
+    damage_digit_render_system, debug_render_collider_system, debug_render_skeleton_system,
+    effect_system, game_connection_system, game_mouse_input_system, game_state_enter_system,
     game_zone_change_system, item_drop_model_add_collider_system, item_drop_model_system,
     load_zone_system, login_connection_system, login_state_enter_system, login_state_exit_system,
     login_system, model_viewer_enter_system, model_viewer_system, npc_model_add_collider_system,
     npc_model_system, particle_sequence_system, passive_recovery_system, pending_damage_system,
-    player_command_system, quest_trigger_system, update_position_system, world_connection_system,
+    pending_skill_effect_system, player_command_system, quest_trigger_system,
+    update_position_system, visible_status_effects_system, world_connection_system,
     zone_viewer_enter_system, DebugInspectorPlugin,
 };
 use ui::{
@@ -350,11 +351,14 @@ fn main() {
         .add_system(particle_sequence_system)
         .add_system(effect_system)
         .add_system(
-            pending_damage_system
-                .label("pending_damage_system")
+            animation_effect_system
+                .label("animation_effect_system")
                 .after("animation_system"),
         )
+        .add_system(pending_damage_system.after("animation_effect_system"))
+        .add_system(pending_skill_effect_system.after("animation_effect_system"))
         .add_system(damage_digit_render_system.after("pending_damage_system"))
+        .add_system(visible_status_effects_system)
         .add_system(ui_diagnostics_system)
         .add_system(ui_debug_menu_system.before("ui_system"))
         .add_system(ui_debug_zone_list_system.label("ui_system"))

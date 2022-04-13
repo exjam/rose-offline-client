@@ -26,6 +26,7 @@ pub fn spawn_effect(
     particle_materials: &mut Assets<ParticleMaterial>,
     effect_mesh_materials: &mut Assets<EffectMeshMaterial>,
     effect_path: VfsPath,
+    manual_despawn: bool,
 ) -> Option<Entity> {
     let eft_file = vfs.read_file::<EftFile, _>(effect_path).ok()?;
 
@@ -55,12 +56,13 @@ pub fn spawn_effect(
 
     let root_entity = commands
         .spawn_bundle((
-            Effect::default(),
+            Effect::new(manual_despawn),
             Transform::default(),
             GlobalTransform::default(),
         ))
         .push_children(&child_entities)
         .id();
+
     Some(root_entity)
 }
 

@@ -6,7 +6,7 @@ use bevy::{
 };
 use rand::prelude::SliceRandom;
 
-use rose_data::{CharacterMotionAction, NpcMotionAction};
+use rose_data::{CharacterMotionAction, NpcMotionAction, SkillActionMode};
 use rose_file_readers::VfsPathBuf;
 use rose_game_common::{
     components::{AbilityValues, Destination, HealthPoints, MoveMode, MoveSpeed, Npc, Target},
@@ -16,7 +16,8 @@ use rose_game_common::{
 use crate::{
     components::{
         ActiveMotion, CharacterModel, ClientEntity, ClientEntityType, Command, CommandAttack,
-        CommandEmote, CommandMove, CommandSit, NextCommand, NpcModel, PlayerCharacter, Position,
+        CommandCastSkill, CommandCastSkillState, CommandCastSkillTarget, CommandEmote, CommandMove,
+        CommandSit, NextCommand, NpcModel, PlayerCharacter, Position,
     },
     events::ConversationDialogEvent,
     resources::{GameConnection, GameData},
@@ -305,6 +306,76 @@ pub fn command_system(
             }
 
             *command = Command::with_sit();
+        }
+
+        // Handle skill casting transitions
+        if let Command::CastSkill(CommandCastSkill {
+            cast_skill_state,
+            ready_action,
+            action_motion_id,
+            cast_repeat_motion_id,
+            ..
+        }) = command.as_mut()
+        {
+            if *ready_action
+                && matches!(
+                    *cast_skill_state,
+                    CommandCastSkillState::Casting | CommandCastSkillState::CastingRepeat
+                )
+            {
+                if let Some(action_motion_id) = action_motion_id {
+                    let motion_data = if let Some(npc_model) = npc_model {
+                        game_data
+                            .npcs
+                            .get_npc_motion(npc_model.npc_id, *action_motion_id)
+                    } else {
+                        game_data
+                            .character_motion_database
+                            .find_first_character_motion(*action_motion_id)
+                    };
+
+                    if let Some(motion_data) = motion_data {
+                        update_active_motion(
+                            &mut commands.entity(entity),
+                            &mut active_motion,
+                            asset_server.load(&motion_data.path),
+                            1.0,
+                            false,
+                        );
+                    }
+                }
+
+                *cast_skill_state = CommandCastSkillState::Action;
+            } else if !*ready_action && matches!(*cast_skill_state, CommandCastSkillState::Casting)
+            {
+                if let Some(cast_repeat_motion_id) = cast_repeat_motion_id {
+                    let motion_data = if let Some(npc_model) = npc_model {
+                        game_data
+                            .npcs
+                            .get_npc_motion(npc_model.npc_id, *cast_repeat_motion_id)
+                    } else {
+                        game_data
+                            .character_motion_database
+                            .find_first_character_motion(*cast_repeat_motion_id)
+                    };
+
+                    if let Some(motion_data) = motion_data {
+                        update_active_motion(
+                            &mut commands.entity(entity),
+                            &mut active_motion,
+                            asset_server.load(&motion_data.path),
+                            1.0,
+                            true,
+                        );
+                    }
+                }
+
+                *cast_skill_state = CommandCastSkillState::CastingRepeat;
+            } else if matches!(cast_skill_state, CommandCastSkillState::Action)
+                && next_command.is_none()
+            {
+                *next_command = NextCommand::with_stop();
+            }
         }
 
         if next_command.is_none() {
@@ -690,6 +761,139 @@ pub fn command_system(
             Command::Sit(CommandSit::Sit) => {
                 // The transition from Sitting to Sit happens above
                 *next_command = NextCommand::default();
+            }
+            &mut Command::CastSkill(CommandCastSkill {
+                skill_id,
+                skill_target,
+                cast_motion_id,
+                action_motion_id,
+                ..
+            }) => {
+                if let Some(skill_data) = game_data.skills.get_skill(skill_id) {
+                    let (target_position, target_entity) = match skill_target {
+                        Some(CommandCastSkillTarget::Entity(target_entity)) => {
+                            let query_result = query_attack_target.get(target_entity);
+                            if query_result.is_err() {
+                                // Invalid target, stop casting skill
+                                *next_command = NextCommand::with_stop();
+                                continue;
+                            }
+                            (Some(query_result.unwrap().0.position), Some(target_entity))
+                        }
+                        Some(CommandCastSkillTarget::Position(target_position)) => (
+                            Some(Vec3::new(target_position.x, target_position.y, 0.0)),
+                            None,
+                        ),
+                        None => (None, None),
+                    };
+
+                    let cast_range = if skill_data.cast_range > 0 {
+                        skill_data.cast_range as f32
+                    } else {
+                        ability_values.get_attack_range() as f32
+                    };
+
+                    let in_range = target_position
+                        .map(|target_position| {
+                            position.position.xy().distance(target_position.xy())
+                                < cast_range as f32
+                        })
+                        .unwrap_or(true);
+                    if in_range {
+                        let motion_data =
+                            cast_motion_id
+                                .or(skill_data.casting_motion_id)
+                                .and_then(|motion_id| {
+                                    if let Some(npc_model) = npc_model {
+                                        game_data.npcs.get_npc_motion(npc_model.npc_id, motion_id)
+                                    } else {
+                                        game_data
+                                            .character_motion_database
+                                            .find_first_character_motion(motion_id)
+                                    }
+                                });
+
+                        if let Some(motion_data) = motion_data {
+                            update_active_motion(
+                                &mut commands.entity(entity),
+                                &mut active_motion,
+                                asset_server.load(&motion_data.path),
+                                skill_data.casting_motion_speed,
+                                false,
+                            );
+                        }
+
+                        // Update next command
+                        match skill_data.action_mode {
+                            SkillActionMode::Stop => *next_command = NextCommand::default(),
+                            SkillActionMode::Attack => {
+                                *next_command = target_entity
+                                    .map_or_else(NextCommand::default, |target| {
+                                        NextCommand::with_attack(target)
+                                    });
+                            }
+                            SkillActionMode::Restore => match *command {
+                                Command::Stop
+                                | Command::Move(_)
+                                | Command::Attack(_) => {
+                                    *next_command =
+                                        NextCommand::new(Some(command.clone()));
+                                }
+                                Command::Die
+                                | Command::Emote(_)
+                                | Command::PickupItem(_)
+                                // TODO: | Command::PersonalStore
+                                | Command::Sit(_)
+                                | Command::CastSkill(_) => {
+                                    *next_command = NextCommand::default()
+                                }
+                            },
+                        }
+
+                        // Set current command to cast skill
+                        *command = Command::with_cast_skill(
+                            skill_id,
+                            skill_target,
+                            cast_motion_id.or(skill_data.casting_motion_id),
+                            skill_data.casting_repeat_motion_id,
+                            action_motion_id.or(skill_data.action_motion_id),
+                            CommandCastSkillState::Casting,
+                        );
+
+                        // Remove our destination component, as we have reached it!
+                        commands.entity(entity).remove::<Destination>();
+                    } else {
+                        let mut entity_commands = commands.entity(entity);
+                        let target_position = target_position.unwrap();
+
+                        // Not in range, move towards target
+                        let motion = get_move_animation(move_mode, character_model, npc_model);
+                        if let Some(motion) = motion {
+                            update_active_motion(
+                                &mut entity_commands,
+                                &mut active_motion,
+                                motion,
+                                get_move_animation_speed(move_speed),
+                                false,
+                            );
+                            *command = Command::with_move(
+                                target_position,
+                                target_entity,
+                                Some(MoveMode::Run),
+                            );
+                            entity_commands.insert(Destination::new(target_position));
+
+                            if let Some(target_entity) = target_entity {
+                                entity_commands.insert(Target::new(target_entity));
+                            }
+                        } else {
+                            // No move animation, stop attack
+                            *next_command = NextCommand::default();
+                        }
+                    }
+                } else {
+                    *next_command = NextCommand::default();
+                }
             }
         }
     }
