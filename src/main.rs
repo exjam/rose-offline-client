@@ -19,6 +19,7 @@ use bevy_egui::EguiContext;
 use scripting::RoseScriptingPlugin;
 use std::{path::Path, sync::Arc};
 
+mod bundles;
 mod components;
 mod effect_loader;
 mod events;
