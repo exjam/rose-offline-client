@@ -7,8 +7,8 @@ use bevy::{
     },
     render::mesh::skinning::SkinnedMesh,
 };
-use rose_data::{AnimationEventFlags, SkillData, SkillType};
-use rose_game_common::components::{MoveSpeed, Target};
+use rose_data::{AnimationEventFlags, EquipmentIndex, SkillData, SkillType};
+use rose_game_common::components::{Equipment, MoveSpeed, Npc, Target};
 
 use crate::{
     components::{CharacterModel, Command, CommandCastSkillTarget, NpcModel, Projectile},
@@ -24,6 +24,8 @@ pub fn animation_effect_system(
     mut animation_frame_events: EventReader<AnimationFrameEvent>,
     query_command: Query<&Command>,
     query_skeleton: Query<(&SkinnedMesh, Option<&CharacterModel>, Option<&NpcModel>)>,
+    query_equipment: Query<&Equipment>,
+    query_npc: Query<&Npc>,
     query_transform: Query<&GlobalTransform>,
     game_data: Res<GameData>,
     asset_server: Res<AssetServer>,
@@ -35,6 +37,60 @@ pub fn animation_effect_system(
     for event in animation_frame_events.iter() {
         if client_entity_list.player_entity == Some(event.entity) {
             log::trace!(target: "animation", "Player animation event flags: {:?}", event.flags);
+        }
+
+        if event
+            .flags
+            .contains(AnimationEventFlags::EFFECT_WEAPON_ATTACK_HIT)
+        {
+            if let Ok(Command::Attack(command_attack)) = query_command.get(event.entity) {
+                let weapon_hit_effect_path = query_equipment
+                    .get(event.entity)
+                    .ok()
+                    .and_then(|equipment| {
+                        game_data.items.get_weapon_item(
+                            equipment
+                                .get_equipment_item(EquipmentIndex::WeaponRight)
+                                .map(|weapon| weapon.item.item_number)
+                                .unwrap_or(0),
+                        )
+                    })
+                    .and_then(|weapon_item_data| weapon_item_data.effect_id)
+                    .or_else(|| {
+                        query_npc
+                            .get(event.entity)
+                            .ok()
+                            .and_then(|npc| game_data.npcs.get_npc(npc.id))
+                            .and_then(|npc_data| npc_data.hand_hit_effect_id)
+                    })
+                    .and_then(|effect_id| game_data.effect_database.get_effect(effect_id))
+                    .and_then(|effect_data| effect_data.hit_normal)
+                    .and_then(|hit_effect_file_id| {
+                        game_data
+                            .effect_database
+                            .get_effect_file(hit_effect_file_id)
+                    });
+
+                if let Some(effect_file_path) = weapon_hit_effect_path {
+                    if let Ok(target_transform) = query_transform.get(command_attack.target) {
+                        if let Some(effect_entity) = spawn_effect(
+                            &vfs_resource.vfs,
+                            &mut commands,
+                            &asset_server,
+                            &mut particle_materials,
+                            &mut effect_mesh_materials,
+                            effect_file_path.into(),
+                            false,
+                        ) {
+                            commands
+                                .entity(effect_entity)
+                                .insert(Transform::from_translation(
+                                    target_transform.translation + Vec3::new(0.0, 0.5, 0.0),
+                                ));
+                        }
+                    }
+                }
+            }
         }
 
         if event
