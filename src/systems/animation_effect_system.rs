@@ -76,9 +76,10 @@ pub fn animation_effect_system(
                                             ) {
                                                 commands
                                                     .spawn_bundle((
-                                                        Projectile {
-                                                            source: event.entity,
-                                                        },
+                                                        Projectile::new(
+                                                            event.entity,
+                                                            skill_data.hit_effect_file_id,
+                                                        ),
                                                         Target::new(target_entity),
                                                         MoveSpeed::new(
                                                             effect_data.bullet_speed / 100.0,
