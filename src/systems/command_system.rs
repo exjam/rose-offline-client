@@ -800,6 +800,16 @@ pub fn command_system(
                         })
                         .unwrap_or(true);
                     if in_range {
+                        // Update rotation to face target
+                        if let Some(target_position) = target_position.as_ref() {
+                            let dx = target_position.x - position.position.x;
+                            let dy = target_position.y - position.position.y;
+                            transform.rotation = Quat::from_axis_angle(
+                                Vec3::Y,
+                                dy.atan2(dx) + std::f32::consts::PI / 2.0,
+                            );
+                        }
+
                         let motion_data =
                             cast_motion_id
                                 .or(skill_data.casting_motion_id)
