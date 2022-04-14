@@ -16,6 +16,7 @@ mod pending_skill_effect_list;
 mod personal_store;
 mod player_character;
 mod position;
+mod projectile;
 mod selected_target;
 mod visible_status_effects;
 
@@ -47,5 +48,6 @@ pub use pending_skill_effect_list::{
 pub use personal_store::{PersonalStore, PersonalStoreModel};
 pub use player_character::PlayerCharacter;
 pub use position::Position;
+pub use projectile::Projectile;
 pub use selected_target::SelectedTarget;
 pub use visible_status_effects::VisibleStatusEffects;

@@ -64,7 +64,7 @@ use systems::{
     load_zone_system, login_connection_system, login_state_enter_system, login_state_exit_system,
     login_system, model_viewer_enter_system, model_viewer_system, npc_model_add_collider_system,
     npc_model_system, particle_sequence_system, passive_recovery_system, pending_damage_system,
-    pending_skill_effect_system, player_command_system, quest_trigger_system,
+    pending_skill_effect_system, player_command_system, projectile_system, quest_trigger_system,
     update_position_system, visible_status_effects_system, world_connection_system,
     zone_viewer_enter_system, DebugInspectorPlugin,
 };
@@ -355,8 +355,13 @@ fn main() {
                 .label("animation_effect_system")
                 .after("animation_system"),
         )
-        .add_system(pending_damage_system.after("animation_effect_system"))
+        .add_system(
+            pending_damage_system
+                .label("pending_damage_system")
+                .after("animation_effect_system"),
+        )
         .add_system(pending_skill_effect_system.after("animation_effect_system"))
+        .add_system(projectile_system.after("animation_effect_system"))
         .add_system(damage_digit_render_system.after("pending_damage_system"))
         .add_system(visible_status_effects_system)
         .add_system(ui_diagnostics_system)

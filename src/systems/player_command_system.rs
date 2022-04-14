@@ -237,10 +237,24 @@ pub fn player_command_system(
                         | SkillType::Resurrection
                         | SkillType::EnforceBullet
                         | SkillType::FireBullet => {
-                            log::warn!(
-                                "Unimplemented target entity skill type: {:?}",
-                                skill_data.skill_type
-                            );
+                            // TODO: Check target team
+                            if let Some((target_client_entity, _)) = player_selected_target
+                                .and_then(|target| query_team.get(target.entity).ok())
+                            {
+                                if let Some(game_connection) = game_connection.as_ref() {
+                                    game_connection
+                                        .client_message_tx
+                                        .send(ClientMessage::CastSkillTargetEntity(
+                                            skill_slot,
+                                            target_client_entity.id,
+                                        ))
+                                        .ok();
+                                }
+                            } else {
+                                chatbox_events
+                                    .send(ChatboxEvent::System("Invalid target".to_string()));
+                                continue;
+                            }
                         }
 
                         SkillType::Passive => {} // Do nothing for passive skills
@@ -309,13 +323,18 @@ pub fn player_command_system(
                                             | SkillType::TargetBound
                                             | SkillType::TargetStateDuration
                                     ) {
-                                        if let Some(player_selected_target) = player_selected_target
+                                        if let Some((target_client_entity, _)) =
+                                            player_selected_target.and_then(|target| {
+                                                query_team.get(target.entity).ok()
+                                            })
                                         {
-                                            if let Ok((target_client_entity, _)) =
-                                                query_team.get(player_selected_target.entity)
-                                            {
-                                                use_item_target = Some(target_client_entity.id);
-                                            }
+                                            // TODO: Check target team
+                                            use_item_target = Some(target_client_entity.id);
+                                        } else {
+                                            chatbox_events.send(ChatboxEvent::System(
+                                                "Invalid target".to_string(),
+                                            ));
+                                            continue;
                                         }
                                     }
                                 }

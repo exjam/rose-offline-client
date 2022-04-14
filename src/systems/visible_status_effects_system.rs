@@ -46,9 +46,12 @@ pub fn visible_status_effects_system(
                     .status_effects
                     .get_status_effect(active_status_effect.id)
                 {
-                    if let Some(effect_path) = status_effect_data
-                        .effect_id
-                        .and_then(|effect_id| game_data.effect_database.get_effect(effect_id))
+                    if let Some(effect_path) =
+                        status_effect_data
+                            .effect_file_id
+                            .and_then(|effect_file_id| {
+                                game_data.effect_database.get_effect_file(effect_file_id)
+                            })
                     {
                         if let Some(effect_entity) = spawn_effect(
                             &vfs_resource.vfs,

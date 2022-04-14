@@ -356,9 +356,10 @@ pub fn model_viewer_system(
                     ui.label("path");
                     ui.end_row();
 
-                    for (id, effect_path) in game_data.effect_database.iter() {
-                        ui.label(format!("{}", id.get()));
-                        ui.label(effect_path.path().to_string_lossy().as_ref());
+                    for (effect_file_id, effect_file_path) in game_data.effect_database.iter_files()
+                    {
+                        ui.label(format!("{}", effect_file_id.get()));
+                        ui.label(effect_file_path.path().to_string_lossy().as_ref());
                         if ui.button("View").clicked() {
                             if let Some(last_effect_entity) = ui_state.last_effect_entity.take() {
                                 if query_effects.get(last_effect_entity).is_ok() {
@@ -372,7 +373,7 @@ pub fn model_viewer_system(
                                 &asset_server,
                                 &mut particle_materials,
                                 &mut effect_mesh_materials,
-                                effect_path.into(),
+                                effect_file_path.into(),
                                 false,
                             );
                         }

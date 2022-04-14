@@ -62,9 +62,9 @@ pub fn client_entity_event_system(
                     if let Some(consumable_item_data) =
                         game_data.items.get_consumable_item(item.item_number)
                     {
-                        if let Some(effect_id) = consumable_item_data.effect_id {
+                        if let Some(effect_file_id) = consumable_item_data.effect_file_id {
                             if let Some(effect_path) =
-                                game_data.effect_database.get_effect(effect_id)
+                                game_data.effect_database.get_effect_file(effect_file_id)
                             {
                                 if let Some(effect_entity) = spawn_effect(
                                     &vfs_resource.vfs,
