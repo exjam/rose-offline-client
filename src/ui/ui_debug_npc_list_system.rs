@@ -58,7 +58,9 @@ pub fn ui_debug_npc_list_system(
                     .show(ui, |ui| {
                         ui.label("Spawn Count:");
                         ui.add(
-                            egui::DragValue::new(&mut ui_state_debug_npc_list.spawn_count).speed(1),
+                            egui::DragValue::new(&mut ui_state_debug_npc_list.spawn_count)
+                                .speed(1)
+                                .clamp_range(1..=1000),
                         );
                         ui.end_row();
 
