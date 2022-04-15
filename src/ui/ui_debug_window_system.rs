@@ -34,6 +34,7 @@ pub struct UiStateDebugWindows {
     pub item_list_open: bool,
     pub npc_list_open: bool,
     pub object_inspector_open: bool,
+    pub skill_list_open: bool,
     pub zone_list_open: bool,
 }
 
@@ -125,6 +126,7 @@ pub fn ui_debug_menu_system(
                 ui.checkbox(&mut ui_state_debug_windows.zone_list_open, "Zone List");
                 ui.checkbox(&mut ui_state_debug_windows.item_list_open, "Item List");
                 ui.checkbox(&mut ui_state_debug_windows.npc_list_open, "NPC List");
+                ui.checkbox(&mut ui_state_debug_windows.skill_list_open, "Skill List");
 
                 if ui
                     .checkbox(

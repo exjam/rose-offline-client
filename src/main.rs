@@ -71,10 +71,10 @@ use systems::{
 use ui::{
     ui_character_info_system, ui_chatbox_system, ui_debug_camera_info_system,
     ui_debug_entity_inspector_system, ui_debug_item_list_system, ui_debug_menu_system,
-    ui_debug_npc_list_system, ui_debug_zone_list_system, ui_diagnostics_system,
-    ui_drag_and_drop_system, ui_hotbar_system, ui_inventory_system, ui_player_info_system,
-    ui_quest_list_system, ui_selected_target_system, ui_skill_list_system, ui_window_system,
-    UiStateDebugWindows, UiStateDragAndDrop, UiStateWindows,
+    ui_debug_npc_list_system, ui_debug_skill_list_system, ui_debug_zone_list_system,
+    ui_diagnostics_system, ui_drag_and_drop_system, ui_hotbar_system, ui_inventory_system,
+    ui_player_info_system, ui_quest_list_system, ui_selected_target_system, ui_skill_list_system,
+    ui_window_system, UiStateDebugWindows, UiStateDragAndDrop, UiStateWindows,
 };
 use vfs_asset_io::VfsAssetIo;
 use zmo_asset_loader::{ZmoAsset, ZmoAssetLoader};
@@ -376,6 +376,7 @@ fn main() {
         .add_system(ui_debug_zone_list_system.label("ui_system"))
         .add_system(ui_debug_item_list_system.label("ui_system"))
         .add_system(ui_debug_npc_list_system.label("ui_system"))
+        .add_system(ui_debug_skill_list_system.label("ui_system"))
         .add_system(ui_debug_camera_info_system.label("ui_system"))
         .add_system(
             ui_debug_entity_inspector_system
