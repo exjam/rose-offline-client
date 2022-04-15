@@ -52,7 +52,7 @@ pub fn spawn_effect_system(
                         &mut particle_materials,
                         &mut effect_mesh_materials,
                         effect_file_path,
-                        false,
+                        spawn_effect_data.manual_despawn,
                         Some(*effect_entity),
                     );
                 }
@@ -68,7 +68,7 @@ pub fn spawn_effect_system(
                             &mut particle_materials,
                             &mut effect_mesh_materials,
                             effect_file_path,
-                            false,
+                            spawn_effect_data.manual_despawn,
                             None,
                         ) {
                             commands
@@ -90,7 +90,7 @@ pub fn spawn_effect_system(
                         &mut particle_materials,
                         &mut effect_mesh_materials,
                         effect_file_path,
-                        false,
+                        spawn_effect_data.manual_despawn,
                         None,
                     ) {
                         commands.entity(*on_entity).add_child(effect_entity);
@@ -125,7 +125,7 @@ pub fn spawn_effect_system(
                             &mut particle_materials,
                             &mut effect_mesh_materials,
                             effect_file_path,
-                            false,
+                            spawn_effect_data.manual_despawn,
                             None,
                         ) {
                             commands.entity(dummy_entity).add_child(effect_entity);
@@ -143,7 +143,7 @@ pub fn spawn_effect_system(
                         &mut particle_materials,
                         &mut effect_mesh_materials,
                         effect_file_path,
-                        false,
+                        spawn_effect_data.manual_despawn,
                         None,
                     ) {
                         commands.entity(effect_entity).insert(*transform);
