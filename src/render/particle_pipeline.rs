@@ -377,7 +377,7 @@ fn compute_particles_aabb(
 }
 
 struct ExtractedParticleRenderData {
-    material: Handle<ParticleMaterial>,
+    texture: Handle<Image>,
     material_key: ParticlePipelineKey,
 
     positions: Vec<Vec4>,
@@ -420,7 +420,7 @@ fn extract_particles(
             extracted_particles
                 .particles
                 .push(ExtractedParticleRenderData {
-                    material: material_handle.clone_weak(),
+                    texture: material.texture.clone_weak(),
                     material_key: ParticlePipelineKey::from_billboard(particles.billboard_type)
                         | ParticlePipelineKey::from_blend(
                             particles.blend_op,
@@ -492,31 +492,33 @@ fn prepare_particles(
     particle_meta.colors.reserve(total_count, &render_device);
     particle_meta.textures.reserve(total_count, &render_device);
 
-    extracted_particles
-        .particles
-        .sort_by(|a, b| (a.material_key, &a.material).cmp(&(b.material_key, &b.material)));
+    extracted_particles.particles.sort_by(|a, b| {
+        a.texture
+            .cmp(&b.texture)
+            .then(a.material_key.cmp(&b.material_key))
+    });
 
     let mut start: u32 = 0;
     let mut end: u32 = 0;
-    let mut current_batch: Option<(ParticlePipelineKey, Handle<ParticleMaterial>)> = None;
+    let mut current_batch: Option<(ParticlePipelineKey, Handle<Image>)> = None;
     for particle in extracted_particles.particles.iter() {
         if start != end {
-            if let Some((current_batch_key, current_batch_material)) = &current_batch {
+            if let Some((current_batch_key, current_batch_texture)) = &current_batch {
                 if current_batch_key != &particle.material_key
-                    || current_batch_material != &particle.material
+                    || current_batch_texture != &particle.texture
                 {
-                    let (current_batch_key, current_batch_material) = current_batch.take().unwrap();
+                    let (current_batch_key, current_batch_texture) = current_batch.take().unwrap();
                     commands.spawn_bundle((ParticleBatch {
                         range: start..end,
-                        handle: current_batch_material,
+                        handle: current_batch_texture,
                         material_key: current_batch_key,
                     },));
-                    current_batch = Some((particle.material_key, particle.material.clone_weak()));
+                    current_batch = Some((particle.material_key, particle.texture.clone_weak()));
                     start = end;
                 }
             }
         } else {
-            current_batch = Some((particle.material_key, particle.material.clone_weak()));
+            current_batch = Some((particle.material_key, particle.texture.clone_weak()));
         }
 
         batch_copy(&particle.positions, &mut particle_meta.positions);
@@ -567,13 +569,13 @@ fn bind_buffer<T: Pod>(buffer: &BufferVec<T>, count: u64) -> BindingResource {
 #[derive(Component)]
 struct ParticleBatch {
     range: Range<u32>,
-    handle: Handle<ParticleMaterial>,
+    handle: Handle<Image>,
     material_key: ParticlePipelineKey,
 }
 
 #[derive(Default)]
 struct MaterialBindGroups {
-    values: HashMap<Handle<ParticleMaterial>, BindGroup>,
+    values: HashMap<Handle<Image>, BindGroup>,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -588,7 +590,6 @@ fn queue_particles(
     mut pipelines: ResMut<SpecializedRenderPipelines<ParticlePipeline>>,
     mut pipeline_cache: ResMut<PipelineCache>,
     particle_batches: Query<(Entity, &ParticleBatch)>,
-    render_materials: Res<RenderAssets<ParticleMaterial>>,
     gpu_images: Res<RenderAssets<Image>>,
     msaa: Res<Msaa>,
 ) {
@@ -610,7 +611,7 @@ fn queue_particles(
         });
     }
 
-    // TODO(james7132): Find a way to cache this.
+    // TODO: Can we cache this?
     particle_meta.particle_bind_group =
         Some(render_device.create_bind_group(&BindGroupDescriptor {
             entries: &[
@@ -639,13 +640,10 @@ fn queue_particles(
         .read()
         .get_id::<DrawParticle>()
         .unwrap();
+
     for mut transparent_phase in views.iter_mut() {
         for (entity, batch) in particle_batches.iter() {
-            let gpu_material = render_materials
-                .get(&batch.handle)
-                .expect("Failed to get ParticleMaterial PreparedAsset");
-
-            if let Some(gpu_image) = gpu_images.get(&gpu_material.texture) {
+            if let Some(gpu_image) = gpu_images.get(&batch.handle) {
                 material_bind_groups.values.insert(
                     batch.handle.clone_weak(),
                     render_device.create_bind_group(&BindGroupDescriptor {
@@ -666,8 +664,7 @@ fn queue_particles(
             }
 
             transparent_phase.add(Transparent3d {
-                // TODO(james7132): properly compute this
-                distance: 10.0,
+                distance: 10.0, // TODO: Do we need to fix this ?
                 pipeline: pipelines.specialize(
                     &mut pipeline_cache,
                     &particle_pipeline,
