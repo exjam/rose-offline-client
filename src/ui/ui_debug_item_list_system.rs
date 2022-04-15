@@ -12,6 +12,7 @@ use crate::{
 pub struct UiStateDebugItemList {
     item_list_type: ItemType,
     item_name_filter: String,
+    spawn_quantity: usize,
 }
 
 impl Default for UiStateDebugItemList {
@@ -19,6 +20,7 @@ impl Default for UiStateDebugItemList {
         Self {
             item_list_type: ItemType::Face,
             item_name_filter: String::new(),
+            spawn_quantity: 1,
         }
     }
 }
@@ -42,10 +44,21 @@ pub fn ui_debug_item_list_system(
         .default_height(300.0)
         .open(&mut ui_state_debug_windows.item_list_open)
         .show(egui_context.ctx_mut(), |ui| {
-            ui.horizontal(|ui| {
-                ui.label("Item Name Filter: ");
-                ui.text_edit_singleline(&mut ui_state_debug_item_list.item_name_filter);
-            });
+            egui::Grid::new("item_list_controls_grid")
+                .num_columns(2)
+                .show(ui, |ui| {
+                    ui.label("Spawn Quantity:");
+                    ui.add(
+                        egui::DragValue::new(&mut ui_state_debug_item_list.spawn_quantity)
+                            .speed(1)
+                            .clamp_range(1..=999),
+                    );
+                    ui.end_row();
+
+                    ui.label("Item Name Filter:");
+                    ui.text_edit_singleline(&mut ui_state_debug_item_list.item_name_filter);
+                    ui.end_row();
+                });
 
             ui.horizontal(|ui| {
                 ui.selectable_value(
@@ -205,9 +218,11 @@ pub fn ui_debug_item_list_system(
                                                         game_connection
                                                             .client_message_tx
                                                             .send(ClientMessage::Chat(format!(
-                                                                "/item {} {}",
+                                                                "/item {} {} {}",
                                                                 item_type,
                                                                 item_reference.item_number,
+                                                                ui_state_debug_item_list
+                                                                    .spawn_quantity,
                                                             )))
                                                             .ok();
                                                     }
