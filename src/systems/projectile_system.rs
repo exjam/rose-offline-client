@@ -2,27 +2,21 @@ use bevy::{
     core::Time,
     hierarchy::DespawnRecursiveExt,
     math::{Quat, Vec3},
-    prelude::{AssetServer, Assets, Commands, Entity, Query, Res, ResMut, Transform},
+    prelude::{Commands, Entity, EventWriter, Query, Res, Transform},
 };
+
 use rose_game_common::components::{MoveSpeed, Target};
 
 use crate::{
     components::Projectile,
-    effect_loader::spawn_effect,
-    render::{EffectMeshMaterial, ParticleMaterial},
-    resources::GameData,
-    VfsResource,
+    events::{SpawnEffectData, SpawnEffectEvent},
 };
 
 pub fn projectile_system(
     mut commands: Commands,
+    mut spawn_effect_events: EventWriter<SpawnEffectEvent>,
     query_bullets: Query<(Entity, &Projectile, &MoveSpeed, &Transform, &Target)>,
     query_target: Query<&Transform>,
-    asset_server: Res<AssetServer>,
-    vfs_resource: Res<VfsResource>,
-    mut effect_mesh_materials: ResMut<Assets<EffectMeshMaterial>>,
-    mut particle_materials: ResMut<Assets<ParticleMaterial>>,
-    game_data: Res<GameData>,
     time: Res<Time>,
 ) {
     for (entity, projectile, move_speed, transform, target) in query_bullets.iter() {
@@ -34,24 +28,11 @@ pub fn projectile_system(
 
             if move_distance + 0.1 >= distance {
                 // Reached target, play on hit effect
-                if let Some(effect_file_path) =
-                    projectile.hit_effect_file_id.and_then(|effect_file_id| {
-                        game_data.effect_database.get_effect_file(effect_file_id)
-                    })
-                {
-                    if let Some(effect_entity) = spawn_effect(
-                        &vfs_resource.vfs,
-                        &mut commands,
-                        &asset_server,
-                        &mut particle_materials,
-                        &mut effect_mesh_materials,
-                        effect_file_path.into(),
-                        false,
-                    ) {
-                        commands
-                            .entity(effect_entity)
-                            .insert(Transform::from_translation(target_position));
-                    }
+                if let Some(hit_effect_file_id) = projectile.hit_effect_file_id {
+                    spawn_effect_events.send(SpawnEffectEvent::AtEntity(
+                        target.entity,
+                        SpawnEffectData::with_file_id(hit_effect_file_id),
+                    ));
                 }
 
                 // TODO: Do pending damage / skill effect here

@@ -27,6 +27,7 @@ pub fn spawn_effect(
     effect_mesh_materials: &mut Assets<EffectMeshMaterial>,
     effect_path: VfsPath,
     manual_despawn: bool,
+    effect_entity: Option<Entity>,
 ) -> Option<Entity> {
     let eft_file = vfs.read_file::<EftFile, _>(effect_path).ok()?;
 
@@ -53,17 +54,26 @@ pub fn spawn_effect(
 
     // TODO: eft_file.sound_file
     // TODO: eft_file.sound_repeat_count
+    if let Some(effect_entity) = effect_entity {
+        commands
+            .entity(effect_entity)
+            .insert_bundle((Effect::new(manual_despawn),))
+            .push_children(&child_entities);
+        Some(effect_entity)
+    } else {
+        let root_entity = commands
+            .spawn_bundle((
+                Effect::new(manual_despawn),
+                Transform::default(),
+                GlobalTransform::default(),
+                Visibility::default(),
+                ComputedVisibility::default(),
+            ))
+            .push_children(&child_entities)
+            .id();
 
-    let root_entity = commands
-        .spawn_bundle((
-            Effect::new(manual_despawn),
-            Transform::default(),
-            GlobalTransform::default(),
-        ))
-        .push_children(&child_entities)
-        .id();
-
-    Some(root_entity)
+        Some(root_entity)
+    }
 }
 
 fn decode_blend_op(value: u32) -> BlendOperation {

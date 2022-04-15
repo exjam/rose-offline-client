@@ -4,8 +4,8 @@ use bevy::{
     hierarchy::DespawnRecursiveExt,
     math::Vec3,
     prelude::{
-        AssetServer, Assets, Commands, Entity, GlobalTransform, PerspectiveCameraBundle, Query,
-        Res, ResMut, Transform, With,
+        Commands, ComputedVisibility, Entity, EventWriter, GlobalTransform,
+        PerspectiveCameraBundle, Query, Res, ResMut, Transform, Visibility, With,
     },
     render::camera::Camera3d,
 };
@@ -22,13 +22,11 @@ use crate::{
     components::{
         ActiveMotion, CharacterModel, DebugRenderCollider, DebugRenderSkeleton, Effect, NpcModel,
     },
-    effect_loader::spawn_effect,
+    events::{SpawnEffectData, SpawnEffectEvent},
     fly_camera::{FlyCameraBundle, FlyCameraController},
     follow_camera::FollowCameraController,
-    render::{EffectMeshMaterial, ParticleMaterial},
     resources::GameData,
     ui::UiStateDebugWindows,
-    VfsResource,
 };
 
 pub struct ModelViewerState {
@@ -114,6 +112,7 @@ pub fn model_viewer_enter_system(
 pub fn model_viewer_system(
     mut commands: Commands,
     mut ui_state: ResMut<ModelViewerState>,
+    mut spawn_effect_events: EventWriter<SpawnEffectEvent>,
     query_character: Query<Entity, With<CharacterInfo>>,
     query_npc: Query<Entity, With<Npc>>,
     query_character_model: Query<(Entity, &CharacterModel)>,
@@ -123,11 +122,6 @@ pub fn model_viewer_system(
     query_debug_skeletons: Query<Entity, With<DebugRenderSkeleton>>,
     game_data: Res<GameData>,
     mut egui_context: ResMut<EguiContext>,
-    (vfs_resource, asset_server): (Res<VfsResource>, Res<AssetServer>),
-    (mut particle_materials, mut effect_mesh_materials): (
-        ResMut<Assets<ParticleMaterial>>,
-        ResMut<Assets<EffectMeshMaterial>>,
-    ),
 ) {
     egui::Window::new("Model Viewer").show(egui_context.ctx_mut(), |ui| {
         if ui
@@ -367,15 +361,22 @@ pub fn model_viewer_system(
                                 }
                             }
 
-                            ui_state.last_effect_entity = spawn_effect(
-                                &vfs_resource.vfs,
-                                &mut commands,
-                                &asset_server,
-                                &mut particle_materials,
-                                &mut effect_mesh_materials,
-                                effect_file_path.into(),
-                                false,
-                            );
+                            let effect_entity = commands
+                                .spawn_bundle((
+                                    Transform::default(),
+                                    GlobalTransform::default(),
+                                    Visibility::default(),
+                                    ComputedVisibility::default(),
+                                ))
+                                .id();
+
+                            spawn_effect_events.send(SpawnEffectEvent::InEntity(
+                                effect_entity,
+                                SpawnEffectData::with_path(effect_file_path.clone())
+                                    .manual_despawn(true),
+                            ));
+
+                            ui_state.last_effect_entity = Some(effect_entity);
                         }
                         ui.end_row();
                     }

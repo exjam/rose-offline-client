@@ -1,38 +1,29 @@
 use bevy::{
-    hierarchy::BuildChildren,
     math::Vec3,
     prelude::{
-        AssetServer, Assets, Commands, ComputedVisibility, Entity, EventReader, GlobalTransform,
-        Query, Res, ResMut, Transform, Visibility,
+        Commands, ComputedVisibility, Entity, EventReader, EventWriter, GlobalTransform, Query,
+        Res, Transform, Visibility,
     },
-    render::mesh::skinning::SkinnedMesh,
 };
 use rose_data::{AnimationEventFlags, EquipmentIndex, SkillData, SkillType};
 use rose_game_common::components::{Equipment, MoveSpeed, Npc, Target};
 
 use crate::{
-    components::{CharacterModel, Command, CommandCastSkillTarget, NpcModel, Projectile},
-    effect_loader::spawn_effect,
-    events::AnimationFrameEvent,
-    render::{EffectMeshMaterial, ParticleMaterial},
+    components::{Command, CommandCastSkillTarget, Projectile},
+    events::{AnimationFrameEvent, SpawnEffectData, SpawnEffectEvent},
     resources::{ClientEntityList, GameData},
-    VfsResource,
 };
 
 pub fn animation_effect_system(
     mut commands: Commands,
     mut animation_frame_events: EventReader<AnimationFrameEvent>,
+    mut spawn_effect_events: EventWriter<SpawnEffectEvent>,
     query_command: Query<&Command>,
-    query_skeleton: Query<(&SkinnedMesh, Option<&CharacterModel>, Option<&NpcModel>)>,
     query_equipment: Query<&Equipment>,
     query_npc: Query<&Npc>,
     query_transform: Query<&GlobalTransform>,
     game_data: Res<GameData>,
-    asset_server: Res<AssetServer>,
     client_entity_list: Res<ClientEntityList>,
-    vfs_resource: Res<VfsResource>,
-    mut effect_mesh_materials: ResMut<Assets<EffectMeshMaterial>>,
-    mut particle_materials: ResMut<Assets<ParticleMaterial>>,
 ) {
     for event in animation_frame_events.iter() {
         if client_entity_list.player_entity == Some(event.entity) {
@@ -44,7 +35,7 @@ pub fn animation_effect_system(
             .contains(AnimationEventFlags::EFFECT_WEAPON_ATTACK_HIT)
         {
             if let Ok(Command::Attack(command_attack)) = query_command.get(event.entity) {
-                let weapon_hit_effect_path = query_equipment
+                let hit_effect_file_id = query_equipment
                     .get(event.entity)
                     .ok()
                     .and_then(|equipment| {
@@ -64,31 +55,13 @@ pub fn animation_effect_system(
                             .and_then(|npc_data| npc_data.hand_hit_effect_id)
                     })
                     .and_then(|effect_id| game_data.effect_database.get_effect(effect_id))
-                    .and_then(|effect_data| effect_data.hit_normal)
-                    .and_then(|hit_effect_file_id| {
-                        game_data
-                            .effect_database
-                            .get_effect_file(hit_effect_file_id)
-                    });
+                    .and_then(|effect_data| effect_data.hit_normal);
 
-                if let Some(effect_file_path) = weapon_hit_effect_path {
-                    if let Ok(target_transform) = query_transform.get(command_attack.target) {
-                        if let Some(effect_entity) = spawn_effect(
-                            &vfs_resource.vfs,
-                            &mut commands,
-                            &asset_server,
-                            &mut particle_materials,
-                            &mut effect_mesh_materials,
-                            effect_file_path.into(),
-                            false,
-                        ) {
-                            commands
-                                .entity(effect_entity)
-                                .insert(Transform::from_translation(
-                                    target_transform.translation + Vec3::new(0.0, 0.5, 0.0),
-                                ));
-                        }
-                    }
+                if let Some(hit_effect_file_id) = hit_effect_file_id {
+                    spawn_effect_events.send(SpawnEffectEvent::AtEntity(
+                        command_attack.target,
+                        SpawnEffectData::with_file_id(hit_effect_file_id),
+                    ));
                 }
             }
         }
@@ -112,44 +85,36 @@ pub fn animation_effect_system(
                                         .bullet_effect_id
                                         .and_then(|id| game_data.effect_database.get_effect(id))
                                     {
-                                        // TODO: effect_data.bullet_move_type;
-
-                                        if let Some(effect_file_path) =
-                                            effect_data.bullet_normal.and_then(|effect_file_id| {
-                                                game_data
-                                                    .effect_database
-                                                    .get_effect_file(effect_file_id)
-                                            })
+                                        if let Some(projectile_effect_file_id) =
+                                            effect_data.bullet_normal
                                         {
-                                            if let Some(effect_entity) = spawn_effect(
-                                                &vfs_resource.vfs,
-                                                &mut commands,
-                                                &asset_server,
-                                                &mut particle_materials,
-                                                &mut effect_mesh_materials,
-                                                effect_file_path.into(),
-                                                false,
-                                            ) {
-                                                commands
-                                                    .spawn_bundle((
-                                                        Projectile::new(
-                                                            event.entity,
-                                                            skill_data.hit_effect_file_id,
-                                                        ),
-                                                        Target::new(target_entity),
-                                                        MoveSpeed::new(
-                                                            effect_data.bullet_speed / 100.0,
-                                                        ),
-                                                        Transform::from_translation(
-                                                            source_transform.translation
-                                                                + Vec3::new(0.0, 0.5, 0.0),
-                                                        ),
-                                                        GlobalTransform::default(),
-                                                        Visibility::default(),
-                                                        ComputedVisibility::default(),
-                                                    ))
-                                                    .add_child(effect_entity);
-                                            }
+                                            // TODO: effect_data.bullet_move_type;
+                                            let projectile_entity = commands
+                                                .spawn_bundle((
+                                                    Projectile::new(
+                                                        event.entity,
+                                                        skill_data.hit_effect_file_id,
+                                                    ),
+                                                    Target::new(target_entity),
+                                                    MoveSpeed::new(
+                                                        effect_data.bullet_speed / 100.0,
+                                                    ),
+                                                    Transform::from_translation(
+                                                        source_transform.translation
+                                                            + Vec3::new(0.0, 0.5, 0.0),
+                                                    ),
+                                                    GlobalTransform::default(),
+                                                    Visibility::default(),
+                                                    ComputedVisibility::default(),
+                                                ))
+                                                .id();
+
+                                            spawn_effect_events.send(SpawnEffectEvent::OnEntity(
+                                                projectile_entity,
+                                                SpawnEffectData::with_file_id(
+                                                    projectile_effect_file_id,
+                                                ),
+                                            ));
                                         }
                                     }
                                 }
@@ -170,18 +135,7 @@ pub fn animation_effect_system(
         {
             if let Ok(Command::CastSkill(command_cast_skill)) = query_command.get(event.entity) {
                 if let Some(skill_data) = game_data.skills.get_skill(command_cast_skill.skill_id) {
-                    show_casting_effect(
-                        &mut commands,
-                        &asset_server,
-                        &mut particle_materials,
-                        &mut effect_mesh_materials,
-                        &game_data,
-                        &vfs_resource,
-                        event.entity,
-                        skill_data,
-                        0,
-                        &query_skeleton,
-                    );
+                    show_casting_effect(event.entity, skill_data, 0, &mut spawn_effect_events);
                 }
             }
         }
@@ -192,18 +146,7 @@ pub fn animation_effect_system(
         {
             if let Ok(Command::CastSkill(command_cast_skill)) = query_command.get(event.entity) {
                 if let Some(skill_data) = game_data.skills.get_skill(command_cast_skill.skill_id) {
-                    show_casting_effect(
-                        &mut commands,
-                        &asset_server,
-                        &mut particle_materials,
-                        &mut effect_mesh_materials,
-                        &game_data,
-                        &vfs_resource,
-                        event.entity,
-                        skill_data,
-                        1,
-                        &query_skeleton,
-                    );
+                    show_casting_effect(event.entity, skill_data, 1, &mut spawn_effect_events);
                 }
             }
         }
@@ -214,18 +157,7 @@ pub fn animation_effect_system(
         {
             if let Ok(Command::CastSkill(command_cast_skill)) = query_command.get(event.entity) {
                 if let Some(skill_data) = game_data.skills.get_skill(command_cast_skill.skill_id) {
-                    show_casting_effect(
-                        &mut commands,
-                        &asset_server,
-                        &mut particle_materials,
-                        &mut effect_mesh_materials,
-                        &game_data,
-                        &vfs_resource,
-                        event.entity,
-                        skill_data,
-                        2,
-                        &query_skeleton,
-                    );
+                    show_casting_effect(event.entity, skill_data, 2, &mut spawn_effect_events);
                 }
             }
         }
@@ -236,18 +168,7 @@ pub fn animation_effect_system(
         {
             if let Ok(Command::CastSkill(command_cast_skill)) = query_command.get(event.entity) {
                 if let Some(skill_data) = game_data.skills.get_skill(command_cast_skill.skill_id) {
-                    show_casting_effect(
-                        &mut commands,
-                        &asset_server,
-                        &mut particle_materials,
-                        &mut effect_mesh_materials,
-                        &game_data,
-                        &vfs_resource,
-                        event.entity,
-                        skill_data,
-                        3,
-                        &query_skeleton,
-                    );
+                    show_casting_effect(event.entity, skill_data, 3, &mut spawn_effect_events);
                 }
             }
         }
@@ -255,54 +176,27 @@ pub fn animation_effect_system(
 }
 
 fn show_casting_effect(
-    commands: &mut Commands,
-    asset_server: &AssetServer,
-    particle_materials: &mut Assets<ParticleMaterial>,
-    effect_mesh_materials: &mut Assets<EffectMeshMaterial>,
-    game_data: &GameData,
-    vfs_resource: &VfsResource,
     entity: Entity,
     skill_data: &SkillData,
     casting_effect_index: usize,
-    query_skeleton: &Query<(&SkinnedMesh, Option<&CharacterModel>, Option<&NpcModel>)>,
-) -> Option<()> {
-    let casting_effect = skill_data
+    spawn_effect_events: &mut EventWriter<SpawnEffectEvent>,
+) {
+    if let Some(casting_effect) = skill_data
         .casting_effects
         .get(casting_effect_index)
-        .and_then(|x| x.as_ref())?;
-    let effect_path = game_data
-        .effect_database
-        .get_effect_file(casting_effect.effect_file_id)?;
-
-    if let Some(effect_entity) = spawn_effect(
-        &vfs_resource.vfs,
-        commands,
-        asset_server,
-        particle_materials,
-        effect_mesh_materials,
-        effect_path.into(),
-        false,
-    ) {
-        let mut link_entity = entity;
-
-        if let Some(effect_dummy_bone_id) = casting_effect.effect_dummy_bone_id {
-            if let Ok((skinned_mesh, character_model, npc_model)) = query_skeleton.get(entity) {
-                if let Some(dummy_bone_offset) = character_model
-                    .map(|character_model| character_model.dummy_bone_offset)
-                    .or_else(|| npc_model.map(|npc_model| npc_model.dummy_bone_offset))
-                {
-                    if let Some(joint) = skinned_mesh
-                        .joints
-                        .get(dummy_bone_offset + effect_dummy_bone_id)
-                    {
-                        link_entity = *joint;
-                    }
-                }
-            }
+        .and_then(|x| x.as_ref())
+    {
+        if let Some(dummy_bone_id) = casting_effect.effect_dummy_bone_id {
+            spawn_effect_events.send(SpawnEffectEvent::OnDummyBone(
+                entity,
+                dummy_bone_id,
+                SpawnEffectData::with_file_id(casting_effect.effect_file_id),
+            ));
+        } else {
+            spawn_effect_events.send(SpawnEffectEvent::OnEntity(
+                entity,
+                SpawnEffectData::with_file_id(casting_effect.effect_file_id),
+            ));
         }
-
-        commands.entity(link_entity).add_child(effect_entity);
     }
-
-    None
 }

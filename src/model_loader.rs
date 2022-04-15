@@ -216,6 +216,7 @@ impl ModelLoader {
                         effect_mesh_materials,
                         effect_path.into(),
                         false,
+                        None,
                     ) {
                         commands.entity(*dummy_bone_entity).add_child(effect_entity);
                         model_parts.push(effect_entity);

@@ -50,4 +50,4 @@ pub use player_character::PlayerCharacter;
 pub use position::Position;
 pub use projectile::Projectile;
 pub use selected_target::SelectedTarget;
-pub use visible_status_effects::VisibleStatusEffects;
+pub use visible_status_effects::{VisibleStatusEffect, VisibleStatusEffects};

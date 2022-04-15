@@ -1,15 +1,16 @@
 use bevy::{
     hierarchy::{BuildChildren, DespawnRecursiveExt},
-    prelude::{AssetServer, Assets, Changed, Commands, Entity, Query, Res, ResMut},
+    prelude::{
+        Changed, Commands, ComputedVisibility, Entity, EventWriter, GlobalTransform, Query, Res,
+        Transform, Visibility,
+    },
 };
 use rose_game_common::components::StatusEffects;
 
 use crate::{
-    components::VisibleStatusEffects,
-    effect_loader::spawn_effect,
-    render::{EffectMeshMaterial, ParticleMaterial},
+    components::{VisibleStatusEffect, VisibleStatusEffects},
+    events::{SpawnEffectData, SpawnEffectEvent},
     resources::GameData,
-    VfsResource,
 };
 
 pub fn visible_status_effects_system(
@@ -18,11 +19,8 @@ pub fn visible_status_effects_system(
         (Entity, &StatusEffects, &mut VisibleStatusEffects),
         Changed<StatusEffects>,
     >,
+    mut spawn_effect_events: EventWriter<SpawnEffectEvent>,
     game_data: Res<GameData>,
-    vfs_resource: Res<VfsResource>,
-    asset_server: Res<AssetServer>,
-    mut particle_materials: ResMut<Assets<ParticleMaterial>>,
-    mut effect_mesh_materials: ResMut<Assets<EffectMeshMaterial>>,
 ) {
     for (entity, status_effects, mut visible_status_effects) in query_status_effects.iter_mut() {
         for (effect_type, active_status_effect) in status_effects.active.iter() {
@@ -46,25 +44,26 @@ pub fn visible_status_effects_system(
                     .status_effects
                     .get_status_effect(active_status_effect.id)
                 {
-                    if let Some(effect_path) =
-                        status_effect_data
-                            .effect_file_id
-                            .and_then(|effect_file_id| {
-                                game_data.effect_database.get_effect_file(effect_file_id)
-                            })
-                    {
-                        if let Some(effect_entity) = spawn_effect(
-                            &vfs_resource.vfs,
-                            &mut commands,
-                            &asset_server,
-                            particle_materials.as_mut(),
-                            effect_mesh_materials.as_mut(),
-                            effect_path.into(),
-                            true,
-                        ) {
-                            commands.entity(entity).add_child(effect_entity);
-                            *visible_status_effect = Some((active_status_effect.id, effect_entity));
-                        }
+                    if let Some(effect_file_id) = status_effect_data.effect_file_id {
+                        let effect_entity = commands
+                            .spawn_bundle((
+                                VisibleStatusEffect {
+                                    status_effect_type: effect_type,
+                                },
+                                Transform::default(),
+                                GlobalTransform::default(),
+                                Visibility::default(),
+                                ComputedVisibility::default(),
+                            ))
+                            .id();
+
+                        spawn_effect_events.send(SpawnEffectEvent::InEntity(
+                            effect_entity,
+                            SpawnEffectData::with_file_id(effect_file_id).manual_despawn(true),
+                        ));
+
+                        commands.entity(entity).add_child(effect_entity);
+                        *visible_status_effect = Some((active_status_effect.id, effect_entity));
                     }
                 }
             } else if let Some((_, visible_status_effect_entity)) = visible_status_effect.take() {

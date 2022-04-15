@@ -1,31 +1,21 @@
-use bevy::{
-    hierarchy::BuildChildren,
-    prelude::{
-        AssetServer, Assets, Commands, Entity, EventReader, EventWriter, Query, Res, ResMut, With,
-    },
-};
+use bevy::prelude::{Entity, EventReader, EventWriter, Query, Res, With};
+
 use rose_data::ItemType;
+use rose_file_readers::VfsPathBuf;
 
 use crate::{
     components::PlayerCharacter,
-    effect_loader::spawn_effect,
-    events::{ChatboxEvent, ClientEntityEvent},
-    render::{EffectMeshMaterial, ParticleMaterial},
+    events::{ChatboxEvent, ClientEntityEvent, SpawnEffectData, SpawnEffectEvent},
     resources::{ClientEntityList, GameData},
-    VfsResource,
 };
 
 pub fn client_entity_event_system(
-    mut commands: Commands,
     mut client_entity_events: EventReader<ClientEntityEvent>,
     mut chatbox_events: EventWriter<ChatboxEvent>,
+    mut spawn_effect_events: EventWriter<SpawnEffectEvent>,
     query_player: Query<Entity, With<PlayerCharacter>>,
-    asset_server: Res<AssetServer>,
     client_entity_list: Res<ClientEntityList>,
     game_data: Res<GameData>,
-    vfs_resource: Res<VfsResource>,
-    mut effect_mesh_materials: ResMut<Assets<EffectMeshMaterial>>,
-    mut particle_materials: ResMut<Assets<ParticleMaterial>>,
 ) {
     let player_entity = query_player.single();
 
@@ -40,17 +30,10 @@ pub fn client_entity_event_system(
                         )));
                     }
 
-                    if let Some(effect_entity) = spawn_effect(
-                        &vfs_resource.vfs,
-                        &mut commands,
-                        &asset_server,
-                        &mut particle_materials,
-                        &mut effect_mesh_materials,
-                        "3DDATA/EFFECT/LEVELUP_01.EFT".into(),
-                        false,
-                    ) {
-                        commands.entity(entity).add_child(effect_entity);
-                    }
+                    spawn_effect_events.send(SpawnEffectEvent::OnEntity(
+                        entity,
+                        SpawnEffectData::with_path(VfsPathBuf::new("3DDATA/EFFECT/LEVELUP_01.EFT")),
+                    ));
                 }
             }
             ClientEntityEvent::UseItem(client_entity_id, item) => {
@@ -63,21 +46,10 @@ pub fn client_entity_event_system(
                         game_data.items.get_consumable_item(item.item_number)
                     {
                         if let Some(effect_file_id) = consumable_item_data.effect_file_id {
-                            if let Some(effect_path) =
-                                game_data.effect_database.get_effect_file(effect_file_id)
-                            {
-                                if let Some(effect_entity) = spawn_effect(
-                                    &vfs_resource.vfs,
-                                    &mut commands,
-                                    &asset_server,
-                                    &mut particle_materials,
-                                    &mut effect_mesh_materials,
-                                    effect_path.into(),
-                                    false,
-                                ) {
-                                    commands.entity(entity).add_child(effect_entity);
-                                }
-                            }
+                            spawn_effect_events.send(SpawnEffectEvent::OnEntity(
+                                entity,
+                                SpawnEffectData::with_file_id(effect_file_id),
+                            ));
                         }
                     }
                 }

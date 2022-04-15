@@ -41,7 +41,7 @@ use rose_file_readers::{LtbFile, StlFile, StlReadOptions, VfsIndex};
 
 use events::{
     AnimationFrameEvent, ChatboxEvent, ClientEntityEvent, ConversationDialogEvent,
-    GameConnectionEvent, LoadZoneEvent, PlayerCommandEvent, QuestTriggerEvent,
+    GameConnectionEvent, LoadZoneEvent, PlayerCommandEvent, QuestTriggerEvent, SpawnEffectEvent,
     WorldConnectionEvent, ZoneEvent,
 };
 use fly_camera::FlyCameraPlugin;
@@ -65,8 +65,8 @@ use systems::{
     login_system, model_viewer_enter_system, model_viewer_system, npc_model_add_collider_system,
     npc_model_system, particle_sequence_system, passive_recovery_system, pending_damage_system,
     pending_skill_effect_system, player_command_system, projectile_system, quest_trigger_system,
-    update_position_system, visible_status_effects_system, world_connection_system,
-    zone_viewer_enter_system, DebugInspectorPlugin,
+    spawn_effect_system, update_position_system, visible_status_effects_system,
+    world_connection_system, zone_viewer_enter_system, DebugInspectorPlugin,
 };
 use ui::{
     ui_character_info_system, ui_chatbox_system, ui_debug_camera_info_system,
@@ -335,7 +335,8 @@ fn main() {
         .insert_resource(Events::<AnimationFrameEvent>::default())
         .insert_resource(Events::<ConversationDialogEvent>::default())
         .insert_resource(Events::<PlayerCommandEvent>::default())
-        .insert_resource(Events::<QuestTriggerEvent>::default());
+        .insert_resource(Events::<QuestTriggerEvent>::default())
+        .insert_resource(Events::<SpawnEffectEvent>::default());
 
     app.add_system(character_model_system.label("character_model_system"))
         .add_system(character_model_add_collider_system.after("character_model_system"))
@@ -353,7 +354,8 @@ fn main() {
         .add_system(
             animation_effect_system
                 .label("animation_effect_system")
-                .after("animation_system"),
+                .after("animation_system")
+                .before("spawn_effect_system"),
         )
         .add_system(
             pending_damage_system
@@ -361,9 +363,14 @@ fn main() {
                 .after("animation_effect_system"),
         )
         .add_system(pending_skill_effect_system.after("animation_effect_system"))
-        .add_system(projectile_system.after("animation_effect_system"))
+        .add_system(
+            projectile_system
+                .after("animation_effect_system")
+                .before("spawn_effect_system"),
+        )
         .add_system(damage_digit_render_system.after("pending_damage_system"))
-        .add_system(visible_status_effects_system)
+        .add_system(visible_status_effects_system.before("spawn_effect_system"))
+        .add_system(spawn_effect_system.label("spawn_effect_system"))
         .add_system(ui_diagnostics_system)
         .add_system(ui_debug_menu_system.before("ui_system"))
         .add_system(ui_debug_zone_list_system.label("ui_system"))
