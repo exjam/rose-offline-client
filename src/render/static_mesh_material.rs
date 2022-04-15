@@ -289,6 +289,7 @@ impl SpecializedMaterial for StaticMeshMaterial {
     }
 
     fn specialize(
+        _pipeline: &MaterialPipeline<Self>,
         descriptor: &mut RenderPipelineDescriptor,
         key: Self::Key,
         layout: &MeshVertexBufferLayout,

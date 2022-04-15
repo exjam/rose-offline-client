@@ -214,6 +214,7 @@ impl SpecializedMaterial for EffectMeshMaterial {
     }
 
     fn specialize(
+        _pipeline: &MaterialPipeline<Self>,
         descriptor: &mut RenderPipelineDescriptor,
         key: Self::Key,
         layout: &MeshVertexBufferLayout,

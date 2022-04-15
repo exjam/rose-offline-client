@@ -1,11 +1,16 @@
+use std::marker::PhantomData;
+
 use bevy::{
-    asset::{AssetServer, Handle},
+    asset::Handle,
     core::Time,
     core_pipeline::Transparent3d,
-    ecs::system::{lifetimeless::SRes, SystemParamItem},
+    ecs::system::{
+        lifetimeless::{Read, SQuery, SRes},
+        SystemParamItem,
+    },
     pbr::{
-        DrawMesh, Material, MeshPipeline, MeshPipelineKey, MeshUniform, SetMaterialBindGroup,
-        SetMeshBindGroup, SetMeshViewBindGroup,
+        DrawMesh, MeshPipeline, MeshPipelineKey, MeshUniform, SetMeshBindGroup,
+        SetMeshViewBindGroup,
     },
     prelude::{
         error, AddAsset, App, Assets, Commands, Entity, FromWorld, HandleUntyped, Mesh, Msaa,
@@ -65,7 +70,7 @@ impl Plugin for WaterMeshMaterialPlugin {
             .add_plugin(RenderAssetPlugin::<WaterMeshMaterial>::default());
         if let Ok(render_app) = app.get_sub_app_mut(RenderApp) {
             render_app
-                .add_render_command::<Transparent3d, DrawWaterMaterial<WaterMeshMaterial>>()
+                .add_render_command::<Transparent3d, DrawWaterMaterial>()
                 .insert_resource(TimeMeta {
                     buffer,
                     bind_group: None,
@@ -171,16 +176,43 @@ impl SpecializedMeshPipeline for WaterMeshMaterialPipeline {
             self.time_uniform_layout.clone(),
         ]);
 
-        WaterMeshMaterial::specialize(&mut descriptor, layout)?;
+        let vertex_layout = layout.get_layout(&[
+            Mesh::ATTRIBUTE_POSITION.at_shader_location(0),
+            Mesh::ATTRIBUTE_UV_0.at_shader_location(1),
+        ])?;
+        descriptor.vertex.buffers = vec![vertex_layout];
+
         Ok(descriptor)
     }
 }
 
 impl FromWorld for WaterMeshMaterialPipeline {
     fn from_world(world: &mut World) -> Self {
-        let asset_server = world.resource::<AssetServer>();
         let render_device = world.resource::<RenderDevice>();
-        let material_layout = WaterMeshMaterial::bind_group_layout(render_device);
+        let material_layout = render_device.create_bind_group_layout(&BindGroupLayoutDescriptor {
+            entries: &[
+                // Water Texture Array
+                BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: ShaderStages::FRAGMENT,
+                    ty: BindingType::Texture {
+                        multisampled: false,
+                        sample_type: TextureSampleType::Float { filterable: true },
+                        view_dimension: TextureViewDimension::D2Array,
+                    },
+                    count: None,
+                },
+                // Water Texture Sampler
+                BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: ShaderStages::FRAGMENT,
+                    ty: BindingType::Sampler(SamplerBindingType::Filtering),
+                    count: None,
+                },
+            ],
+            label: Some("water_mesh_material_layout"),
+        });
+
         let time_uniform_layout =
             render_device.create_bind_group_layout(&BindGroupLayoutDescriptor {
                 label: Some("time bind group"),
@@ -200,8 +232,8 @@ impl FromWorld for WaterMeshMaterialPipeline {
             mesh_pipeline: world.resource::<MeshPipeline>().clone(),
             material_layout,
             time_uniform_layout,
-            vertex_shader: WaterMeshMaterial::vertex_shader(asset_server),
-            fragment_shader: WaterMeshMaterial::fragment_shader(asset_server),
+            vertex_shader: Some(WATER_MESH_MATERIAL_SHADER_HANDLE.typed()),
+            fragment_shader: Some(WATER_MESH_MATERIAL_SHADER_HANDLE.typed()),
             sampler: render_device.create_sampler(&SamplerDescriptor {
                 address_mode_u: AddressMode::Repeat,
                 address_mode_v: AddressMode::Repeat,
@@ -277,58 +309,22 @@ impl RenderAsset for WaterMeshMaterial {
     }
 }
 
-impl Material for WaterMeshMaterial {
-    fn specialize(
-        descriptor: &mut RenderPipelineDescriptor,
-        layout: &MeshVertexBufferLayout,
-    ) -> Result<(), SpecializedMeshPipelineError> {
-        let vertex_layout = layout.get_layout(&[
-            Mesh::ATTRIBUTE_POSITION.at_shader_location(0),
-            Mesh::ATTRIBUTE_UV_0.at_shader_location(1),
-        ])?;
-        descriptor.vertex.buffers = vec![vertex_layout];
-        Ok(())
-    }
-
-    fn vertex_shader(_asset_server: &AssetServer) -> Option<Handle<Shader>> {
-        Some(WATER_MESH_MATERIAL_SHADER_HANDLE.typed())
-    }
-
-    fn fragment_shader(_asset_server: &AssetServer) -> Option<Handle<Shader>> {
-        Some(WATER_MESH_MATERIAL_SHADER_HANDLE.typed())
-    }
-
-    #[inline]
-    fn bind_group(render_asset: &<Self as RenderAsset>::PreparedAsset) -> &BindGroup {
-        &render_asset.bind_group
-    }
-
-    fn bind_group_layout(
-        render_device: &RenderDevice,
-    ) -> bevy::render::render_resource::BindGroupLayout {
-        render_device.create_bind_group_layout(&BindGroupLayoutDescriptor {
-            entries: &[
-                // Water Texture Array
-                BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: ShaderStages::FRAGMENT,
-                    ty: BindingType::Texture {
-                        multisampled: false,
-                        sample_type: TextureSampleType::Float { filterable: true },
-                        view_dimension: TextureViewDimension::D2Array,
-                    },
-                    count: None,
-                },
-                // Water Texture Sampler
-                BindGroupLayoutEntry {
-                    binding: 1,
-                    visibility: ShaderStages::FRAGMENT,
-                    ty: BindingType::Sampler(SamplerBindingType::Filtering),
-                    count: None,
-                },
-            ],
-            label: Some("water_mesh_material_layout"),
-        })
+pub struct SetWaterMaterialBindGroup<const I: usize>(PhantomData<WaterMeshMaterial>);
+impl<const I: usize> EntityRenderCommand for SetWaterMaterialBindGroup<I> {
+    type Param = (
+        SRes<RenderAssets<WaterMeshMaterial>>,
+        SQuery<Read<Handle<WaterMeshMaterial>>>,
+    );
+    fn render<'w>(
+        _view: Entity,
+        item: Entity,
+        (materials, query): SystemParamItem<'w, '_, Self::Param>,
+        pass: &mut TrackedRenderPass<'w>,
+    ) -> RenderCommandResult {
+        let material_handle = query.get(item).unwrap();
+        let material = materials.into_inner().get(material_handle).unwrap();
+        pass.set_bind_group(I, &material.bind_group, &[]);
+        RenderCommandResult::Success
     }
 }
 
@@ -349,10 +345,10 @@ impl<const I: usize> EntityRenderCommand for SetTimeBindGroup<I> {
     }
 }
 
-type DrawWaterMaterial<M> = (
+type DrawWaterMaterial = (
     SetItemPipeline,
     SetMeshViewBindGroup<0>,
-    SetMaterialBindGroup<M, 1>,
+    SetWaterMaterialBindGroup<1>,
     SetMeshBindGroup<2>,
     SetTimeBindGroup<3>,
     DrawMesh,
@@ -375,7 +371,7 @@ fn queue_water_mesh_material_meshes(
 ) {
     let draw_transparent = transparent_draw_functions
         .read()
-        .get_id::<DrawWaterMaterial<WaterMeshMaterial>>()
+        .get_id::<DrawWaterMaterial>()
         .unwrap();
 
     for (view, visible_entities, mut transparent_phase) in views.iter_mut() {

@@ -148,6 +148,7 @@ impl SpecializedMaterial for TerrainMaterial {
     }
 
     fn specialize(
+        _pipeline: &MaterialPipeline<Self>,
         descriptor: &mut RenderPipelineDescriptor,
         _key: Self::Key,
         layout: &MeshVertexBufferLayout,

@@ -9,7 +9,7 @@ arrayvec = "0.7"
 bevy = { version = "0.7.0-dev", features = ["dds"] }
 bevy_egui = "0.12.1"
 bevy-inspector-egui = "0.8.2"
-bevy_rapier3d = "0.12"
+bevy_rapier3d = "0.12.1"
 bevy_polyline = "0.1"
 bitflags = "1.2"
 bytemuck = { version = "1.7.0", features = ["derive"] }
@@ -35,13 +35,13 @@ rose-network-common = { git = "https://github.com/exjam/rose-offline", rev = "b5
 rose-network-irose = { git = "https://github.com/exjam/rose-offline", rev = "b577b80d82889fc024e1ac8ac60891a0828aee03" }
 
 [patch.crates-io]
-bevy = { git = "https://github.com/exjam/bevy", rev = "75cef1bc833ba746702b08ebf9221749656d7b83" }
-bevy_ecs = { git = "https://github.com/exjam/bevy", rev = "75cef1bc833ba746702b08ebf9221749656d7b83" }
-bevy_math = { git = "https://github.com/exjam/bevy", rev = "75cef1bc833ba746702b08ebf9221749656d7b83" }
+bevy = { git = "https://github.com/exjam/bevy", rev = "20e5f3a1e664537f1fbb06a852f8c34a8d9ce510" }
+bevy_ecs = { git = "https://github.com/exjam/bevy", rev = "20e5f3a1e664537f1fbb06a852f8c34a8d9ce510" }
+bevy_math = { git = "https://github.com/exjam/bevy", rev = "20e5f3a1e664537f1fbb06a852f8c34a8d9ce510" }
 bevy_polyline = { git = "https://github.com/exjam/bevy_polyline", rev = "04876f83d2bee2f4369d17dcdaf47a508d8ff47d" }
 bevy_egui = { git = "https://github.com/exjam/bevy_egui", rev = "4f7e7c28f34f25ca1fba45b1e6715c8a052eddc7" }
 bevy-inspector-egui = { git = "https://github.com/exjam/bevy-inspector-egui", rev = "73d1f24dd9aaae7c2da4063efafbd8ffd3f531ed" }
-bevy_rapier3d = { git = "https://github.com/exjam/bevy_rapier", rev = "70dc968f4cfeebf0dc68c3185f4f876f607d35b6" }
+bevy_rapier3d = { git = "https://github.com/exjam/bevy_rapier", rev = "2016e45cfa58c8e51600d4bd6ac02b660d862bfe" }
 smooth-bevy-cameras = { git = "https://github.com/exjam/smooth-bevy-cameras", rev = "29bb4884f5e29f49cb599a21a0e9bc684a326402" }
 image = { git = "https://github.com/image-rs/image", branch = "version-0.23" }
 
