@@ -69,7 +69,7 @@ pub fn npc_model_system(
             }
         }
 
-        if let Some((npc_model, skinned_mesh)) = model_loader.spawn_npc_model(
+        if let Some((npc_model, skinned_mesh, dummy_bone_offset)) = model_loader.spawn_npc_model(
             &mut commands,
             &asset_server,
             &mut effect_mesh_materials,
@@ -85,16 +85,18 @@ pub fn npc_model_system(
                 *transform
             };
 
-            commands
-                .entity(entity)
-                .insert_bundle((npc_model, skinned_mesh, transform));
+            commands.entity(entity).insert_bundle((
+                npc_model,
+                skinned_mesh,
+                dummy_bone_offset,
+                transform,
+            ));
         } else {
             commands
                 .entity(entity)
                 .insert(NpcModel {
                     npc_id: npc.id,
                     model_parts: Vec::new(),
-                    dummy_bone_offset: 0,
                     action_motions: EnumMap::default(),
                 })
                 .remove::<SkinnedMesh>();

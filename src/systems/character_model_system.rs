@@ -22,7 +22,7 @@ use rose_game_common::components::{CharacterInfo, Equipment};
 
 use crate::{
     components::{
-        CharacterModel, CharacterModelPart, PersonalStore, PersonalStoreModel,
+        CharacterModel, CharacterModelPart, DummyBoneOffset, PersonalStore, PersonalStoreModel,
         COLLISION_FILTER_CLICKABLE, COLLISION_FILTER_INSPECTABLE, COLLISION_GROUP_CHARACTER,
     },
     model_loader::ModelLoader,
@@ -149,6 +149,7 @@ pub fn character_model_system(
             &CharacterInfo,
             &Equipment,
             Option<&mut CharacterModel>,
+            Option<&DummyBoneOffset>,
             Option<&SkinnedMesh>,
             Option<&PersonalStore>,
             Option<&PersonalStoreModel>,
@@ -169,6 +170,7 @@ pub fn character_model_system(
         character_info,
         equipment,
         mut character_model,
+        dummy_bone_offset,
         skinned_mesh,
         personal_store,
         personal_store_model,
@@ -185,6 +187,7 @@ pub fn character_model_system(
                     character_info,
                     equipment,
                     character_model,
+                    dummy_bone_offset.as_ref().unwrap(),
                     skinned_mesh.as_ref().unwrap(),
                 );
                 continue;
@@ -242,18 +245,21 @@ pub fn character_model_system(
             }
 
             // Spawn new character model
-            let (character_model, skinned_mesh) = model_loader.spawn_character_model(
-                &mut commands,
-                &asset_server,
-                &mut static_mesh_materials,
-                &mut skinned_mesh_inverse_bindposes_assets,
-                entity,
-                character_info,
-                equipment,
-            );
-            commands
-                .entity(entity)
-                .insert_bundle((character_model, skinned_mesh));
+            let (character_model, skinned_mesh, dummy_bone_offset) = model_loader
+                .spawn_character_model(
+                    &mut commands,
+                    &asset_server,
+                    &mut static_mesh_materials,
+                    &mut skinned_mesh_inverse_bindposes_assets,
+                    entity,
+                    character_info,
+                    equipment,
+                );
+            commands.entity(entity).insert_bundle((
+                character_model,
+                skinned_mesh,
+                dummy_bone_offset,
+            ));
         }
     }
 }

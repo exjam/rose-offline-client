@@ -9,7 +9,7 @@ use bevy::{
 use rose_game_common::components::{Destination, Target};
 
 use crate::{
-    components::{CharacterModel, NpcModel, Projectile},
+    components::{DummyBoneOffset, Projectile},
     events::{SpawnEffectData, SpawnEffectEvent, SpawnProjectileEvent, SpawnProjectileTarget},
 };
 
@@ -17,23 +17,19 @@ pub fn spawn_projectile_system(
     mut commands: Commands,
     mut events: EventReader<SpawnProjectileEvent>,
     query_transform: Query<&GlobalTransform>,
-    query_skeleton: Query<(&SkinnedMesh, Option<&CharacterModel>, Option<&NpcModel>)>,
+    query_skeleton: Query<(&SkinnedMesh, &DummyBoneOffset)>,
     mut spawn_effect_events: EventWriter<SpawnEffectEvent>,
 ) {
     for event in events.iter() {
         let mut source_global_transform = None;
 
         if let Some(dummy_bone_id) = event.source_dummy_bone_id {
-            if let Ok((skinned_mesh, character_model, npc_model)) = query_skeleton.get(event.source)
-            {
-                if let Some(dummy_bone_offset) = character_model
-                    .map(|character_model| character_model.dummy_bone_offset)
-                    .or_else(|| npc_model.map(|npc_model| npc_model.dummy_bone_offset))
+            if let Ok((skinned_mesh, dummy_bone_offset)) = query_skeleton.get(event.source) {
+                if let Some(joint) = skinned_mesh
+                    .joints
+                    .get(dummy_bone_offset.index + dummy_bone_id)
                 {
-                    if let Some(joint) = skinned_mesh.joints.get(dummy_bone_offset + dummy_bone_id)
-                    {
-                        source_global_transform = query_transform.get(*joint).ok();
-                    }
+                    source_global_transform = query_transform.get(*joint).ok();
                 }
             }
         }

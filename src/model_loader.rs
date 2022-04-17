@@ -18,7 +18,10 @@ use rose_game_common::components::{
 };
 
 use crate::{
-    components::{CharacterModel, CharacterModelPart, ItemDropModel, NpcModel, PersonalStoreModel},
+    components::{
+        CharacterModel, CharacterModelPart, DummyBoneOffset, ItemDropModel, NpcModel,
+        PersonalStoreModel,
+    },
     effect_loader::spawn_effect,
     render::{EffectMeshMaterial, ParticleMaterial, StaticMeshMaterial},
     zmo_asset_loader::ZmoAsset,
@@ -165,7 +168,7 @@ impl ModelLoader {
         skinned_mesh_inverse_bindposes_assets: &mut Assets<SkinnedMeshInverseBindposes>,
         model_entity: Entity,
         npc_id: NpcId,
-    ) -> Option<(NpcModel, SkinnedMesh)> {
+    ) -> Option<(NpcModel, SkinnedMesh, DummyBoneOffset)> {
         let npc_model_data = self.npc_chr.npcs.get(&npc_id.get())?;
         let (skinned_mesh, dummy_bone_offset) = if let Some(skeleton) = self
             .npc_chr
@@ -271,10 +274,10 @@ impl ModelLoader {
             NpcModel {
                 npc_id,
                 model_parts,
-                dummy_bone_offset,
                 action_motions,
             },
             skinned_mesh,
+            DummyBoneOffset::new(dummy_bone_offset),
         ))
     }
 
@@ -419,7 +422,7 @@ impl ModelLoader {
         model_entity: Entity,
         character_info: &CharacterInfo,
         equipment: &Equipment,
-    ) -> (CharacterModel, SkinnedMesh) {
+    ) -> (CharacterModel, SkinnedMesh, DummyBoneOffset) {
         let skeleton = self.get_skeleton(character_info.gender);
         let dummy_bone_offset = skeleton.bones.len();
         let skinned_mesh = spawn_skeleton(
@@ -461,7 +464,6 @@ impl ModelLoader {
             CharacterModel {
                 gender: character_info.gender,
                 model_parts,
-                dummy_bone_offset,
                 action_motions: self.load_character_action_motions(
                     asset_server,
                     character_info,
@@ -469,6 +471,7 @@ impl ModelLoader {
                 ),
             },
             skinned_mesh,
+            DummyBoneOffset::new(dummy_bone_offset),
         )
     }
 
@@ -482,6 +485,7 @@ impl ModelLoader {
         character_info: &CharacterInfo,
         equipment: &Equipment,
         character_model: &mut CharacterModel,
+        dummy_bone_offset: &DummyBoneOffset,
         skinned_mesh: &SkinnedMesh,
     ) {
         let weapon_model_id =
@@ -522,8 +526,8 @@ impl ModelLoader {
                         self.get_model_list(character_info.gender, model_part),
                         model_id,
                         Some(skinned_mesh),
-                        model_part.default_bone_id(character_model.dummy_bone_offset),
-                        character_model.dummy_bone_offset,
+                        model_part.default_bone_id(dummy_bone_offset.index),
+                        dummy_bone_offset.index,
                     );
                 } else {
                     character_model.model_parts[model_part].0 = model_id;

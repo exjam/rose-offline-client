@@ -8,7 +8,7 @@ use bevy::{
 use rose_file_readers::VfsPath;
 
 use crate::{
-    components::{CharacterModel, NpcModel},
+    components::DummyBoneOffset,
     effect_loader::spawn_effect,
     events::{SpawnEffect, SpawnEffectData, SpawnEffectEvent},
     render::{EffectMeshMaterial, ParticleMaterial},
@@ -33,7 +33,7 @@ pub fn spawn_effect_system(
     mut commands: Commands,
     mut events: EventReader<SpawnEffectEvent>,
     query_transform: Query<&GlobalTransform>,
-    query_skeleton: Query<(&SkinnedMesh, Option<&CharacterModel>, Option<&NpcModel>)>,
+    query_skeleton: Query<(&SkinnedMesh, &DummyBoneOffset)>,
     game_data: Res<GameData>,
     asset_server: Res<AssetServer>,
     vfs_resource: Res<VfsResource>,
@@ -100,18 +100,13 @@ pub fn spawn_effect_system(
             SpawnEffectEvent::OnDummyBone(skeleton_entity, dummy_bone_id, spawn_effect_data) => {
                 let mut dummy_entity = *skeleton_entity;
 
-                if let Ok((skinned_mesh, character_model, npc_model)) =
-                    query_skeleton.get(*skeleton_entity)
+                if let Ok((skinned_mesh, dummy_bone_offset)) = query_skeleton.get(*skeleton_entity)
                 {
-                    if let Some(dummy_bone_offset) = character_model
-                        .map(|character_model| character_model.dummy_bone_offset)
-                        .or_else(|| npc_model.map(|npc_model| npc_model.dummy_bone_offset))
+                    if let Some(joint) = skinned_mesh
+                        .joints
+                        .get(dummy_bone_offset.index + dummy_bone_id)
                     {
-                        if let Some(joint) =
-                            skinned_mesh.joints.get(dummy_bone_offset + dummy_bone_id)
-                        {
-                            dummy_entity = *joint;
-                        }
+                        dummy_entity = *joint;
                     }
                 }
 

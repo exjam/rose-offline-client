@@ -6,6 +6,7 @@ mod command;
 mod cooldowns;
 mod damage_digits;
 mod debug_render;
+mod dummy_bone_offset;
 mod effect;
 mod item_drop_model;
 mod npc_model;
@@ -36,6 +37,7 @@ pub use command::{
 pub use cooldowns::{ConsumableCooldownGroup, Cooldowns};
 pub use damage_digits::DamageDigits;
 pub use debug_render::{DebugRenderCollider, DebugRenderSkeleton};
+pub use dummy_bone_offset::DummyBoneOffset;
 pub use effect::{Effect, EffectMesh, EffectParticle};
 pub use item_drop_model::ItemDropModel;
 pub use npc_model::NpcModel;

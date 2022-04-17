@@ -24,6 +24,5 @@ pub enum CharacterModelPart {
 pub struct CharacterModel {
     pub gender: CharacterGender,
     pub model_parts: EnumMap<CharacterModelPart, (usize, Vec<Entity>)>,
-    pub dummy_bone_offset: usize,
     pub action_motions: EnumMap<CharacterMotionAction, Handle<ZmoAsset>>,
 }

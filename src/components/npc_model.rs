@@ -9,6 +9,5 @@ use crate::zmo_asset_loader::ZmoAsset;
 pub struct NpcModel {
     pub npc_id: NpcId,
     pub model_parts: Vec<Entity>,
-    pub dummy_bone_offset: usize,
     pub action_motions: EnumMap<NpcMotionAction, Handle<ZmoAsset>>,
 }
