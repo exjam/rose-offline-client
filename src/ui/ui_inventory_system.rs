@@ -431,7 +431,10 @@ fn ui_add_inventory_slot(
                 if let Some(game_connection) = game_connection {
                     game_connection
                         .client_message_tx
-                        .send(ClientMessage::ChangeAmmo(ammo_index, None))
+                        .send(ClientMessage::ChangeAmmo(
+                            ammo_index,
+                            Some(equip_inventory_slot),
+                        ))
                         .ok();
                 }
             }
@@ -462,7 +465,10 @@ fn ui_add_inventory_slot(
                 if let Some(game_connection) = game_connection {
                     game_connection
                         .client_message_tx
-                        .send(ClientMessage::ChangeVehiclePart(vehicle_part_index, None))
+                        .send(ClientMessage::ChangeVehiclePart(
+                            vehicle_part_index,
+                            Some(equip_inventory_slot),
+                        ))
                         .ok();
                 }
             }
