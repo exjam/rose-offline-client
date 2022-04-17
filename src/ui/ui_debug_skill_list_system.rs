@@ -71,6 +71,7 @@ pub fn ui_debug_skill_list_system(
                                 }
                                 ui.label(format!("{}", skill_data.id.get()));
                                 ui.label(&skill_data.name);
+                                ui.label(format!("{:?}", skill_data.skill_type));
 
                                 if matches!(app_state.current(), AppState::Game)
                                     && ui.button("Learn").clicked()
