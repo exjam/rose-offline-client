@@ -7,6 +7,7 @@ pub struct Projectile {
     pub source: Entity,
     pub hit_effect_file_id: Option<EffectFileId>,
     pub move_type: EffectBulletMoveType,
+    pub parabola_velocity: Option<f32>,
 }
 
 impl Projectile {
@@ -19,6 +20,7 @@ impl Projectile {
             move_type,
             source,
             hit_effect_file_id,
+            parabola_velocity: None,
         }
     }
 }

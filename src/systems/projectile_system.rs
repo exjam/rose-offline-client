@@ -3,45 +3,74 @@ use bevy::{
     hierarchy::DespawnRecursiveExt,
     math::{Quat, Vec3},
     prelude::{Commands, Entity, EventWriter, GlobalTransform, Query, Res, Transform},
+    render::mesh::skinning::SkinnedMesh,
 };
 
+use rose_data::EffectBulletMoveType;
 use rose_game_common::components::{Destination, MoveSpeed, Target};
 
 use crate::{
-    components::Projectile,
+    components::{DummyBoneOffset, Projectile},
     events::{SpawnEffectData, SpawnEffectEvent},
 };
 
 pub fn projectile_system(
     mut commands: Commands,
     mut spawn_effect_events: EventWriter<SpawnEffectEvent>,
-    query_bullets: Query<(
+    mut query_bullets: Query<(
         Entity,
-        &Projectile,
+        &mut Projectile,
         &MoveSpeed,
         &Transform,
         Option<&Target>,
         Option<&Destination>,
     )>,
-    query_target: Query<&GlobalTransform>,
+    query_global_transform: Query<&GlobalTransform>,
+    query_skeleton: Query<(&SkinnedMesh, &DummyBoneOffset)>,
     time: Res<Time>,
 ) {
-    for (entity, projectile, move_speed, transform, target, destination) in query_bullets.iter() {
-        let target_translation = if let Some(target_transform) =
-            target.and_then(|target| query_target.get(target.entity).ok())
-        {
-            target_transform.translation
+    for (entity, mut projectile, move_speed, transform, target, destination) in
+        query_bullets.iter_mut()
+    {
+        let target_translation = if let Some(target) = target {
+            query_skeleton
+                .get(target.entity)
+                .ok()
+                .and_then(|(skinned_mesh, dummy_bone_offset)| {
+                    Some(if dummy_bone_offset.index > 0 {
+                        skinned_mesh.joints.last().copied().unwrap_or(target.entity)
+                    } else {
+                        target.entity
+                    })
+                })
+                .and_then(|target_entity| query_global_transform.get(target_entity).ok())
+                .map(|transform| transform.translation)
         } else if let Some(target_position) = destination.map(|destination| destination.position) {
-            target_position
+            Some(target_position)
         } else {
+            None
+        };
+
+        if target_translation.is_none() {
             // Cannot find target, despawn projectile
             commands.entity(entity).despawn_recursive();
             continue;
         };
+        let mut target_translation = target_translation.unwrap();
+        target_translation.y += 0.5;
 
         let distance = transform.translation.distance(target_translation);
         let direction = target_translation - transform.translation;
         let move_distance = move_speed.speed * time.delta_seconds();
+
+        if matches!(projectile.move_type, EffectBulletMoveType::Parabola) {
+            if let Some(parabola_velocity) = projectile.parabola_velocity.as_mut() {
+                *parabola_velocity -= 0.98 * time.delta_seconds();
+            } else {
+                let travel_time = distance / move_speed.speed;
+                projectile.parabola_velocity = Some(travel_time * 0.98);
+            }
+        }
 
         if move_distance + 0.1 >= distance {
             // Reached target, play on hit effect
@@ -64,6 +93,11 @@ pub fn projectile_system(
             Vec3::Y,
             direction.z.atan2(direction.x) + std::f32::consts::PI / 2.0,
         );
+
+        if let Some(parabola_velocity) = projectile.parabola_velocity.as_ref() {
+            transform.translation.y += parabola_velocity;
+        }
+
         commands.entity(entity).insert(transform);
     }
 }
