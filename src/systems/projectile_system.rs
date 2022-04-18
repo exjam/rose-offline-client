@@ -11,12 +11,13 @@ use rose_game_common::components::{Destination, MoveSpeed, Target};
 
 use crate::{
     components::{DummyBoneOffset, Projectile},
-    events::{SpawnEffectData, SpawnEffectEvent},
+    events::{HitEvent, SpawnEffectData, SpawnEffectEvent},
 };
 
 pub fn projectile_system(
     mut commands: Commands,
     mut spawn_effect_events: EventWriter<SpawnEffectEvent>,
+    mut hit_events: EventWriter<HitEvent>,
     mut query_bullets: Query<(
         Entity,
         &mut Projectile,
@@ -79,7 +80,10 @@ pub fn projectile_system(
                 ));
             }
 
-            // TODO: Do pending damage / skill effect here
+            if let Some(target) = target {
+                hit_events.send(HitEvent::new(projectile.source, target.entity));
+            }
+
             commands.entity(entity).despawn_recursive();
             continue;
         }

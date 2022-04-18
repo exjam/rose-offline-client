@@ -41,8 +41,8 @@ use rose_file_readers::{LtbFile, StlFile, StlReadOptions, VfsIndex};
 
 use events::{
     AnimationFrameEvent, ChatboxEvent, ClientEntityEvent, ConversationDialogEvent,
-    GameConnectionEvent, LoadZoneEvent, PlayerCommandEvent, QuestTriggerEvent, SpawnEffectEvent,
-    SpawnProjectileEvent, WorldConnectionEvent, ZoneEvent,
+    GameConnectionEvent, HitEvent, LoadZoneEvent, PlayerCommandEvent, QuestTriggerEvent,
+    SpawnEffectEvent, SpawnProjectileEvent, WorldConnectionEvent, ZoneEvent,
 };
 use fly_camera::FlyCameraPlugin;
 use follow_camera::FollowCameraPlugin;
@@ -338,7 +338,8 @@ fn main() {
         .insert_resource(Events::<PlayerCommandEvent>::default())
         .insert_resource(Events::<QuestTriggerEvent>::default())
         .insert_resource(Events::<SpawnEffectEvent>::default())
-        .insert_resource(Events::<SpawnProjectileEvent>::default());
+        .insert_resource(Events::<SpawnProjectileEvent>::default())
+        .insert_resource(Events::<HitEvent>::default());
 
     app.add_system(character_model_system)
         .add_system(character_model_add_collider_system.after(character_model_system))

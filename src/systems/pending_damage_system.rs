@@ -5,16 +5,11 @@ use bevy::{
 };
 use bevy_rapier3d::prelude::ColliderShapeComponent;
 
-use rose_data::AnimationEventFlags;
-use rose_game_common::{
-    components::{HealthPoints, Target},
-    data::Damage,
-    messages::ClientEntityId,
-};
+use rose_game_common::{components::HealthPoints, data::Damage, messages::ClientEntityId};
 
 use crate::{
     components::{ClientEntity, NextCommand, PendingDamageList},
-    events::AnimationFrameEvent,
+    events::HitEvent,
     resources::{ClientEntityList, DamageDigitsSpawner},
 };
 
@@ -25,7 +20,7 @@ fn apply_damage(
     commands: &mut Commands,
     _attacker_entity: Option<Entity>,
     defender_entity: Entity,
-    defender_entity_id: ClientEntityId,
+    defender_client_entity_id: ClientEntityId,
     defender_health_points: &mut HealthPoints,
     defender_collider: Option<&ColliderShapeComponent>,
     damage: Damage,
@@ -57,7 +52,7 @@ fn apply_damage(
             .entity(defender_entity)
             .insert(NextCommand::with_die())
             .remove::<ClientEntity>();
-        client_entity_list.remove(defender_entity_id);
+        client_entity_list.remove(defender_client_entity_id);
     }
 }
 
@@ -70,68 +65,56 @@ pub fn pending_damage_system(
         &mut HealthPoints,
         Option<&ColliderShapeComponent>,
     )>,
-    query_target: Query<&Target>,
-    mut animation_frame_events: EventReader<AnimationFrameEvent>,
+    mut hit_events: EventReader<HitEvent>,
     time: Res<Time>,
     mut client_entity_list: ResMut<ClientEntityList>,
     damage_digits_spawner: Res<DamageDigitsSpawner>,
 ) {
     let delta_time = time.delta_seconds();
 
-    for event in animation_frame_events.iter() {
-        if !event
-            .flags
-            .contains(AnimationEventFlags::APPLY_PENDING_DAMAGE)
+    for event in hit_events.iter() {
+        let mut damage = Damage {
+            amount: 0,
+            is_critical: false,
+            apply_hit_stun: false,
+        };
+
+        if let Ok((
+            _,
+            mut pending_damage_list,
+            defender_client_entity,
+            mut defender_health_points,
+            defender_collider,
+        )) = query_defender.get_mut(event.defender)
         {
-            continue;
-        }
-
-        if let Ok(target) = query_target.get(event.entity) {
-            let attacker_entity = event.entity;
-            let defender_entity = target.entity;
-            let mut damage = Damage {
-                amount: 0,
-                is_critical: false,
-                apply_hit_stun: false,
-            };
-
-            if let Ok((
-                _,
-                mut pending_damage_list,
-                defender_client_entity,
-                mut defender_health_points,
-                defender_collider,
-            )) = query_defender.get_mut(defender_entity)
-            {
-                let mut i = 0;
-                let mut is_killed = false;
-                while i < pending_damage_list.pending_damage.len() {
-                    if client_entity_list.get(pending_damage_list.pending_damage[i].attacker)
-                        == Some(attacker_entity)
-                    {
-                        let pending_damage = pending_damage_list.pending_damage.remove(i);
-                        damage.amount += pending_damage.damage.amount;
-                        damage.is_critical |= pending_damage.damage.is_critical;
-                        damage.apply_hit_stun |= pending_damage.damage.apply_hit_stun;
-                        is_killed |= pending_damage.is_kill;
-                    } else {
-                        i += 1;
-                    }
+            let mut i = 0;
+            let mut is_killed = false;
+            while i < pending_damage_list.pending_damage.len() {
+                if client_entity_list.get(pending_damage_list.pending_damage[i].attacker)
+                    == Some(event.attacker)
+                {
+                    let pending_damage = pending_damage_list.pending_damage.remove(i);
+                    damage.amount += pending_damage.damage.amount;
+                    damage.is_critical |= pending_damage.damage.is_critical;
+                    damage.apply_hit_stun |= pending_damage.damage.apply_hit_stun;
+                    is_killed |= pending_damage.is_kill;
+                } else {
+                    i += 1;
                 }
-
-                apply_damage(
-                    &mut commands,
-                    Some(attacker_entity),
-                    defender_entity,
-                    defender_client_entity.id,
-                    defender_health_points.as_mut(),
-                    defender_collider,
-                    damage,
-                    is_killed,
-                    &damage_digits_spawner,
-                    &mut client_entity_list,
-                );
             }
+
+            apply_damage(
+                &mut commands,
+                Some(event.attacker),
+                event.defender,
+                defender_client_entity.id,
+                defender_health_points.as_mut(),
+                defender_collider,
+                damage,
+                is_killed,
+                &damage_digits_spawner,
+                &mut client_entity_list,
+            );
         }
     }
 

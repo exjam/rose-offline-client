@@ -9,7 +9,7 @@ use rose_game_common::components::{Equipment, MoveSpeed, Npc};
 use crate::{
     components::{Command, CommandCastSkillTarget},
     events::{
-        AnimationFrameEvent, SpawnEffectData, SpawnEffectEvent, SpawnProjectileEvent,
+        AnimationFrameEvent, HitEvent, SpawnEffectData, SpawnEffectEvent, SpawnProjectileEvent,
         SpawnProjectileTarget,
     },
     resources::{ClientEntityList, GameData},
@@ -19,6 +19,7 @@ pub fn animation_effect_system(
     mut animation_frame_events: EventReader<AnimationFrameEvent>,
     mut spawn_effect_events: EventWriter<SpawnEffectEvent>,
     mut spawn_projectile_events: EventWriter<SpawnProjectileEvent>,
+    mut hit_events: EventWriter<HitEvent>,
     query_command: Query<&Command>,
     query_equipment: Query<&Equipment>,
     query_npc: Query<&Npc>,
@@ -63,6 +64,8 @@ pub fn animation_effect_system(
                         SpawnEffectData::with_file_id(hit_effect_file_id),
                     ));
                 }
+
+                hit_events.send(HitEvent::new(event.entity, command_attack.target));
             }
         }
 
@@ -118,6 +121,21 @@ pub fn animation_effect_system(
                             hit_effect_file_id: projectile_effect_data.hit_normal, // TODO: .hit_critical
                         });
                     }
+                }
+            }
+        }
+
+        if event
+            .flags
+            .contains(AnimationEventFlags::EFFECT_SKILL_FIRE_BULLET)
+        {
+            // TODO: Fire skill bullet
+
+            if let Ok(Command::CastSkill(command_cast_skill)) = query_command.get(event.entity) {
+                if let Some(CommandCastSkillTarget::Entity(target_entity)) =
+                    command_cast_skill.skill_target
+                {
+                    hit_events.send(HitEvent::new(event.entity, target_entity));
                 }
             }
         }
@@ -197,6 +215,18 @@ pub fn animation_effect_system(
                             skill_data.skill_type
                         ),
                     }
+                }
+            }
+        }
+
+        if event.flags.contains(AnimationEventFlags::EFFECT_SKILL_HIT) {
+            // TODO: Show skill hit effect (if 0, then weapon hit, if 0 then npc hand hit effect)
+
+            if let Ok(Command::CastSkill(command_cast_skill)) = query_command.get(event.entity) {
+                if let Some(CommandCastSkillTarget::Entity(target_entity)) =
+                    command_cast_skill.skill_target
+                {
+                    hit_events.send(HitEvent::new(event.entity, target_entity));
                 }
             }
         }
