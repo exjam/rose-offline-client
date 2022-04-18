@@ -6,10 +6,13 @@ use bevy::{
 };
 use rand::prelude::SliceRandom;
 
-use rose_data::{CharacterMotionAction, NpcMotionAction, SkillActionMode};
+use rose_data::{CharacterMotionAction, EquipmentIndex, NpcMotionAction, SkillActionMode};
 use rose_file_readers::VfsPathBuf;
 use rose_game_common::{
-    components::{AbilityValues, Destination, HealthPoints, MoveMode, MoveSpeed, Npc, Target},
+    components::{
+        AbilityValues, CharacterGender, Destination, Equipment, HealthPoints, MoveMode, MoveSpeed,
+        Npc, Target,
+    },
     messages::client::ClientMessage,
 };
 
@@ -238,6 +241,7 @@ pub fn command_system(
         Option<&mut ActiveMotion>,
         Option<&CharacterModel>,
         Option<&NpcModel>,
+        Option<&Equipment>,
         &Position,
         &MoveMode,
         &MoveSpeed,
@@ -262,6 +266,7 @@ pub fn command_system(
         mut active_motion,
         character_model,
         npc_model,
+        equipment,
         position,
         move_mode,
         move_speed,
@@ -308,6 +313,25 @@ pub fn command_system(
             *command = Command::with_sit();
         }
 
+        let weapon_item_data = equipment.and_then(|equipment| {
+            equipment
+                .get_equipment_item(EquipmentIndex::WeaponRight)
+                .and_then(|weapon_item| {
+                    game_data
+                        .items
+                        .get_weapon_item(weapon_item.item.item_number)
+                })
+        });
+        let weapon_motion_type = weapon_item_data
+            .map(|weapon_item_data| weapon_item_data.motion_type as usize)
+            .unwrap_or(0);
+        let weapon_motion_gender = character_model
+            .map(|character_model| match character_model.gender {
+                CharacterGender::Male => 0,
+                CharacterGender::Female => 1,
+            })
+            .unwrap_or(0);
+
         // Handle skill casting transitions
         if let Command::CastSkill(CommandCastSkill {
             cast_skill_state,
@@ -331,7 +355,11 @@ pub fn command_system(
                     } else {
                         game_data
                             .character_motion_database
-                            .find_first_character_motion(*action_motion_id)
+                            .find_first_character_motion(
+                                *action_motion_id,
+                                weapon_motion_type,
+                                weapon_motion_gender,
+                            )
                     };
 
                     if let Some(motion_data) = motion_data {
@@ -357,7 +385,11 @@ pub fn command_system(
                     } else {
                         game_data
                             .character_motion_database
-                            .find_first_character_motion(*cast_repeat_motion_id)
+                            .find_first_character_motion(
+                                *cast_repeat_motion_id,
+                                weapon_motion_type,
+                                weapon_motion_gender,
+                            )
                     };
 
                     if let Some(motion_data) = motion_data {
@@ -718,7 +750,11 @@ pub fn command_system(
                 } else {
                     game_data
                         .character_motion_database
-                        .find_first_character_motion(motion_id)
+                        .find_first_character_motion(
+                            motion_id,
+                            weapon_motion_type,
+                            weapon_motion_gender,
+                        )
                 };
 
                 if let Some(motion_data) = motion_data {
@@ -821,7 +857,11 @@ pub fn command_system(
                                     } else {
                                         game_data
                                             .character_motion_database
-                                            .find_first_character_motion(motion_id)
+                                            .find_first_character_motion(
+                                                motion_id,
+                                                weapon_motion_type,
+                                                weapon_motion_gender,
+                                            )
                                     }
                                 });
 
