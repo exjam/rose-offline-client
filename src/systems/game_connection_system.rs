@@ -6,7 +6,7 @@ use bevy::{
     },
 };
 
-use rose_data::ItemSlotBehaviour;
+use rose_data::{EquipmentItem, ItemReference, ItemSlotBehaviour, ItemType};
 use rose_game_common::{
     components::{
         BasicStatType, BasicStats, CharacterInfo, Equipment, ExperiencePoints, HealthPoints,
@@ -435,6 +435,32 @@ pub fn game_connection_system(
                     }
                     _ => NextCommand::default(),
                 };
+                let mut equipment = Equipment::new();
+                if let Some(npc_data) = game_data.npcs.get_npc(message.npc.id) {
+                    if npc_data.right_hand_part_index > 0 {
+                        equipment
+                            .equip_item(
+                                EquipmentItem::new(&ItemReference::new(
+                                    ItemType::Weapon,
+                                    npc_data.right_hand_part_index as usize,
+                                ))
+                                .unwrap(),
+                            )
+                            .ok();
+                    }
+
+                    if npc_data.left_hand_part_index > 0 {
+                        equipment
+                            .equip_item(
+                                EquipmentItem::new(&ItemReference::new(
+                                    ItemType::SubWeapon,
+                                    npc_data.left_hand_part_index as usize,
+                                ))
+                                .unwrap(),
+                            )
+                            .ok();
+                    }
+                }
 
                 let entity = commands
                     .spawn_bundle((
@@ -446,16 +472,17 @@ pub fn game_connection_system(
                         message.move_mode,
                         Position::new(message.position),
                         ability_values,
+                        equipment,
                         level,
                         move_speed,
                         status_effects,
+                    ))
+                    .insert_bundle((
+                        ClientEntity::new(message.entity_id, ClientEntityType::Monster),
                         PendingDamageList::default(),
                         PendingSkillEffectList::default(),
                         PendingSkillTargetList::default(),
                         VisibleStatusEffects::default(),
-                    ))
-                    .insert_bundle((
-                        ClientEntity::new(message.entity_id, ClientEntityType::Monster),
                         Transform::from_xyz(
                             message.position.x / 100.0,
                             message.position.z / 100.0 + 10000.0,
