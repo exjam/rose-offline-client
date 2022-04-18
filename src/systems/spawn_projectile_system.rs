@@ -51,6 +51,7 @@ pub fn spawn_projectile_system(
                 Some(event.effect_id),
                 event.source_skill_id,
                 event.move_type,
+                event.apply_damage,
             ),
             event.move_speed,
             Transform::from_translation(source_global_transform.translation),

@@ -114,27 +114,48 @@ pub fn animation_effect_system(
                                 .cloned()
                                 .unwrap_or(EffectBulletMoveType::Linear),
                             move_speed: MoveSpeed::new(projectile_effect_data.bullet_speed / 100.0),
+                            apply_damage: true,
                         });
                     }
                 }
             }
         }
 
-        if event
-            .flags
-            .contains(AnimationEventFlags::EFFECT_SKILL_FIRE_BULLET)
-        {
-            // TODO: Fire skill bullet
-
+        if event.flags.intersects(
+            AnimationEventFlags::EFFECT_SKILL_FIRE_BULLET
+                | AnimationEventFlags::EFFECT_SKILL_FIRE_DUMMY_BULLET,
+        ) {
             if let Ok(Command::CastSkill(command_cast_skill)) = query_command.get(event.entity) {
-                if let Some(CommandCastSkillTarget::Entity(target_entity)) =
-                    command_cast_skill.skill_target
-                {
-                    hit_events.send(HitEvent::with_skill(
-                        event.entity,
-                        target_entity,
-                        command_cast_skill.skill_id,
-                    ));
+                if let Some(skill_data) = game_data.skills.get_skill(command_cast_skill.skill_id) {
+                    if let Some(CommandCastSkillTarget::Entity(target_entity)) =
+                        command_cast_skill.skill_target
+                    {
+                        if let Some(effect_data) = skill_data
+                            .bullet_effect_id
+                            .and_then(|id| game_data.effect_database.get_effect(id))
+                        {
+                            if effect_data.bullet_effect.is_some() {
+                                spawn_projectile_events.send(SpawnProjectileEvent {
+                                    effect_id: effect_data.id,
+                                    source: event.entity,
+                                    source_dummy_bone_id: Some(
+                                        skill_data.bullet_link_dummy_bone_id as usize,
+                                    ),
+                                    source_skill_id: Some(skill_data.id),
+                                    target: SpawnProjectileTarget::Entity(target_entity),
+                                    move_type: effect_data
+                                        .bullet_move_type
+                                        .as_ref()
+                                        .cloned()
+                                        .unwrap_or(EffectBulletMoveType::Linear),
+                                    move_speed: MoveSpeed::new(effect_data.bullet_speed / 100.0),
+                                    apply_damage: !event.flags.contains(
+                                        AnimationEventFlags::EFFECT_SKILL_FIRE_DUMMY_BULLET,
+                                    ),
+                                });
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -174,8 +195,38 @@ pub fn animation_effect_system(
                                 ));
                             }
                         }
-                        SkillType::FireBullet
-                        | SkillType::TargetBound
+                        SkillType::FireBullet => {
+                            if let Some(CommandCastSkillTarget::Entity(target_entity)) =
+                                command_cast_skill.skill_target
+                            {
+                                if let Some(effect_data) = skill_data
+                                    .bullet_effect_id
+                                    .and_then(|id| game_data.effect_database.get_effect(id))
+                                {
+                                    if effect_data.bullet_effect.is_some() {
+                                        spawn_projectile_events.send(SpawnProjectileEvent {
+                                            effect_id: effect_data.id,
+                                            source: event.entity,
+                                            source_dummy_bone_id: Some(
+                                                skill_data.bullet_link_dummy_bone_id as usize,
+                                            ),
+                                            source_skill_id: Some(skill_data.id),
+                                            target: SpawnProjectileTarget::Entity(target_entity),
+                                            move_type: effect_data
+                                                .bullet_move_type
+                                                .as_ref()
+                                                .cloned()
+                                                .unwrap_or(EffectBulletMoveType::Linear),
+                                            move_speed: MoveSpeed::new(
+                                                effect_data.bullet_speed / 100.0,
+                                            ),
+                                            apply_damage: true,
+                                        });
+                                    }
+                                }
+                            }
+                        }
+                        SkillType::TargetBound
                         | SkillType::TargetBoundDuration
                         | SkillType::TargetStateDuration
                         | SkillType::Resurrection => {
@@ -203,6 +254,7 @@ pub fn animation_effect_system(
                                             move_speed: MoveSpeed::new(
                                                 effect_data.bullet_speed / 100.0,
                                             ),
+                                            apply_damage: false,
                                         });
                                     }
                                 }

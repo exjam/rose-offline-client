@@ -19,4 +19,6 @@ pub struct SpawnProjectileEvent {
 
     pub move_type: EffectBulletMoveType,
     pub move_speed: MoveSpeed,
+
+    pub apply_damage: bool,
 }

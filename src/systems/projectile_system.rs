@@ -74,17 +74,19 @@ pub fn projectile_system(
             // Reached target, send hit event
             if let Some(target) = target {
                 if let Some(skill_id) = projectile.skill_id {
-                    hit_events.send(HitEvent::with_skill(
-                        projectile.source,
-                        target.entity,
-                        skill_id,
-                    ));
+                    hit_events.send(
+                        HitEvent::with_skill(projectile.source, target.entity, skill_id)
+                            .apply_damage(projectile.apply_damage),
+                    );
                 } else {
-                    hit_events.send(HitEvent::with_weapon(
-                        projectile.source,
-                        target.entity,
-                        projectile.effect_id,
-                    ));
+                    hit_events.send(
+                        HitEvent::with_weapon(
+                            projectile.source,
+                            target.entity,
+                            projectile.effect_id,
+                        )
+                        .apply_damage(projectile.apply_damage),
+                    );
                 }
             }
 

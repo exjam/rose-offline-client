@@ -33,4 +33,9 @@ impl HitEvent {
             apply_skill_effect: true,
         }
     }
+
+    pub fn apply_damage(mut self, apply_damage: bool) -> Self {
+        self.apply_damage = apply_damage;
+        self
+    }
 }
