@@ -31,6 +31,7 @@ pub struct UiStateDebugWindows {
     pub debug_ui_open: bool,
 
     pub camera_info_open: bool,
+    pub command_viewer_open: bool,
     pub item_list_open: bool,
     pub npc_list_open: bool,
     pub object_inspector_open: bool,
@@ -123,6 +124,10 @@ pub fn ui_debug_menu_system(
             });
 
             ui.menu_button("View", |ui| {
+                ui.checkbox(
+                    &mut ui_state_debug_windows.command_viewer_open,
+                    "Command Viewer",
+                );
                 ui.checkbox(&mut ui_state_debug_windows.zone_list_open, "Zone List");
                 ui.checkbox(&mut ui_state_debug_windows.item_list_open, "Item List");
                 ui.checkbox(&mut ui_state_debug_windows.npc_list_open, "NPC List");

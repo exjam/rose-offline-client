@@ -7,38 +7,38 @@ use std::ops::{Deref, DerefMut};
 
 use rose_game_common::components::MoveMode;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct CommandMove {
     pub destination: Vec3,
     pub target: Option<Entity>,
     pub move_mode: Option<MoveMode>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct CommandAttack {
     pub target: Entity,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct CommandEmote {
     pub motion_id: MotionId,
     pub is_stop: bool,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum CommandSit {
     Sitting,
     Sit,
     Standing,
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum CommandCastSkillTarget {
     Entity(Entity),
     Position(Vec2),
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum CommandCastSkillState {
     Starting,
     Casting,
@@ -46,7 +46,7 @@ pub enum CommandCastSkillState {
     Action,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct CommandCastSkill {
     pub skill_id: SkillId,
     pub skill_target: Option<CommandCastSkillTarget>,
@@ -57,7 +57,7 @@ pub struct CommandCastSkill {
     pub ready_action: bool,
 }
 
-#[derive(Component, Clone, Debug)]
+#[derive(Component, Clone, Debug, PartialEq)]
 pub enum Command {
     Stop,
     Move(CommandMove),
