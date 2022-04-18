@@ -32,6 +32,7 @@ pub fn client_entity_event_system(
 
                     spawn_effect_events.send(SpawnEffectEvent::OnEntity(
                         entity,
+                        None,
                         SpawnEffectData::with_path(VfsPathBuf::new("3DDATA/EFFECT/LEVELUP_01.EFT")),
                     ));
                 }
@@ -48,6 +49,7 @@ pub fn client_entity_event_system(
                         if let Some(effect_file_id) = consumable_item_data.effect_file_id {
                             spawn_effect_events.send(SpawnEffectEvent::OnEntity(
                                 entity,
+                                None,
                                 SpawnEffectData::with_file_id(effect_file_id),
                             ));
                         }

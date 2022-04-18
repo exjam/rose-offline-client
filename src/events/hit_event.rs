@@ -1,25 +1,23 @@
 use bevy::prelude::Entity;
-use rose_data::SkillId;
 
-pub enum HitEventType {
-    Weapon,
-    Skill(SkillId),
-}
+use rose_data::{EffectId, SkillId};
 
 pub struct HitEvent {
     pub attacker: Entity,
     pub defender: Entity,
-    pub event_type: HitEventType,
+    pub effect_id: Option<EffectId>,
+    pub skill_id: Option<SkillId>,
     pub apply_damage: bool,
     pub apply_skill_effect: bool,
 }
 
 impl HitEvent {
-    pub fn with_weapon(attacker: Entity, defender: Entity) -> Self {
+    pub fn with_weapon(attacker: Entity, defender: Entity, effect_id: Option<EffectId>) -> Self {
         Self {
             attacker,
             defender,
-            event_type: HitEventType::Weapon,
+            effect_id,
+            skill_id: None,
             apply_damage: true,
             apply_skill_effect: false,
         }
@@ -29,7 +27,8 @@ impl HitEvent {
         Self {
             attacker,
             defender,
-            event_type: HitEventType::Skill(skill_id),
+            effect_id: None,
+            skill_id: Some(skill_id),
             apply_damage: true,
             apply_skill_effect: true,
         }

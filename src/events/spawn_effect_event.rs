@@ -41,11 +41,8 @@ pub enum SpawnEffectEvent {
     // Adds the components for effect to the given entity
     InEntity(Entity, SpawnEffectData),
 
-    // Spawns an effect attached to Entity
-    OnEntity(Entity, SpawnEffectData),
-
-    // Spawns an effect attached to the given dummy bone index of Entity
-    OnDummyBone(Entity, usize, SpawnEffectData),
+    // Spawns an effect attached to Entity, optionally attached to dummy bone
+    OnEntity(Entity, Option<usize>, SpawnEffectData),
 
     // Spawns an effect with the given transform
     WithTransform(Transform, SpawnEffectData),

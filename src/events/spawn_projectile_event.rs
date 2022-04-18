@@ -1,6 +1,6 @@
 use bevy::{math::Vec3, prelude::Entity};
 
-use rose_data::{EffectBulletMoveType, EffectFileId, SkillId};
+use rose_data::{EffectBulletMoveType, EffectId, SkillId};
 use rose_game_common::components::MoveSpeed;
 
 #[allow(dead_code)]
@@ -10,6 +10,8 @@ pub enum SpawnProjectileTarget {
 }
 
 pub struct SpawnProjectileEvent {
+    pub effect_id: EffectId,
+
     pub source: Entity,
     pub source_dummy_bone_id: Option<usize>,
     pub source_skill_id: Option<SkillId>,
@@ -17,7 +19,4 @@ pub struct SpawnProjectileEvent {
 
     pub move_type: EffectBulletMoveType,
     pub move_speed: MoveSpeed,
-
-    pub projectile_effect_file_id: Option<EffectFileId>,
-    pub hit_effect_file_id: Option<EffectFileId>,
 }

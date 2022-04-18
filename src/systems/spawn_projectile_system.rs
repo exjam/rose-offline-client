@@ -1,7 +1,7 @@
 use bevy::{
     prelude::{
-        Commands, ComputedVisibility, EventReader, EventWriter, GlobalTransform, Query, Transform,
-        Visibility,
+        Commands, ComputedVisibility, EventReader, EventWriter, GlobalTransform, Query, Res,
+        Transform, Visibility,
     },
     render::mesh::skinning::SkinnedMesh,
 };
@@ -11,6 +11,7 @@ use rose_game_common::components::{Destination, Target};
 use crate::{
     components::{DummyBoneOffset, Projectile},
     events::{SpawnEffectData, SpawnEffectEvent, SpawnProjectileEvent, SpawnProjectileTarget},
+    resources::GameData,
 };
 
 pub fn spawn_projectile_system(
@@ -19,6 +20,7 @@ pub fn spawn_projectile_system(
     query_transform: Query<&GlobalTransform>,
     query_skeleton: Query<(&SkinnedMesh, &DummyBoneOffset)>,
     mut spawn_effect_events: EventWriter<SpawnEffectEvent>,
+    game_data: Res<GameData>,
 ) {
     for event in events.iter() {
         let mut source_global_transform = None;
@@ -46,9 +48,9 @@ pub fn spawn_projectile_system(
         let mut entity_commands = commands.spawn_bundle((
             Projectile::new(
                 event.source,
+                Some(event.effect_id),
                 event.source_skill_id,
                 event.move_type,
-                event.hit_effect_file_id,
             ),
             event.move_speed,
             Transform::from_translation(source_global_transform.translation),
@@ -66,9 +68,14 @@ pub fn spawn_projectile_system(
             }
         }
 
-        if let Some(projectile_effect_file_id) = event.projectile_effect_file_id {
+        if let Some(projectile_effect_file_id) = game_data
+            .effect_database
+            .get_effect(event.effect_id)
+            .and_then(|x| x.bullet_effect)
+        {
             spawn_effect_events.send(SpawnEffectEvent::OnEntity(
                 entity_commands.id(),
+                None,
                 SpawnEffectData::with_file_id(projectile_effect_file_id),
             ));
         }

@@ -1,7 +1,7 @@
 use bevy::{
     ecs::query::WorldQuery,
     hierarchy::BuildChildren,
-    prelude::{Commands, Entity, EventReader, Query, Res, ResMut},
+    prelude::{Commands, Entity, EventReader, EventWriter, Query, Res, ResMut},
 };
 use bevy_rapier3d::prelude::ColliderShapeComponent;
 
@@ -15,8 +15,8 @@ use crate::{
         ClientEntity, NextCommand, PendingDamageList, PendingSkillEffectList,
         PendingSkillTargetList,
     },
-    events::HitEvent,
-    resources::{ClientEntityList, DamageDigitsSpawner},
+    events::{HitEvent, SpawnEffectData, SpawnEffectEvent},
+    resources::{ClientEntityList, DamageDigitsSpawner, GameData},
 };
 
 #[derive(WorldQuery)]
@@ -84,8 +84,10 @@ pub fn hit_event_system(
     mut commands: Commands,
     mut query_defender: Query<HitDefenderQuery>,
     mut hit_events: EventReader<HitEvent>,
+    mut spawn_effect_events: EventWriter<SpawnEffectEvent>,
     mut client_entity_list: ResMut<ClientEntityList>,
     damage_digits_spawner: Res<DamageDigitsSpawner>,
+    game_data: Res<GameData>,
 ) {
     for event in hit_events.iter() {
         let defender = query_defender.get_mut(event.defender).ok();
@@ -94,16 +96,14 @@ pub fn hit_event_system(
         }
         let mut defender = defender.unwrap();
 
-        // TODO: Spawn hit effect here?
-
         // Apply pending damage
-        if event.apply_damage {
-            let mut damage = Damage {
-                amount: 0,
-                is_critical: false,
-                apply_hit_stun: false,
-            };
+        let mut damage = Damage {
+            amount: 0,
+            is_critical: false,
+            apply_hit_stun: false,
+        };
 
+        if event.apply_damage {
             let mut i = 0;
             let mut is_killed = false;
             while i < defender.pending_damage_list.pending_damage.len() {
@@ -129,6 +129,37 @@ pub fn hit_event_system(
                 &damage_digits_spawner,
                 &mut client_entity_list,
             );
+        }
+
+        if let Some(effect_data) = event
+            .effect_id
+            .and_then(|id| game_data.effect_database.get_effect(id))
+        {
+            if damage.is_critical {
+                if let Some(effect_file_id) = effect_data.hit_effect_critical {
+                    spawn_effect_events.send(SpawnEffectEvent::AtEntity(
+                        defender.entity,
+                        SpawnEffectData::with_file_id(effect_file_id),
+                    ));
+                }
+            }
+
+            if let Some(effect_file_id) = effect_data.hit_effect_normal {
+                spawn_effect_events.send(SpawnEffectEvent::AtEntity(
+                    defender.entity,
+                    SpawnEffectData::with_file_id(effect_file_id),
+                ));
+            }
+        }
+
+        if let Some(skill_data) = event.skill_id.and_then(|id| game_data.skills.get_skill(id)) {
+            if let Some(effect_file_id) = skill_data.hit_effect_file_id {
+                spawn_effect_events.send(SpawnEffectEvent::OnEntity(
+                    defender.entity,
+                    skill_data.hit_link_dummy_bone_id,
+                    SpawnEffectData::with_file_id(effect_file_id),
+                ));
+            }
         }
     }
 }

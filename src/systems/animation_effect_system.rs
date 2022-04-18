@@ -36,7 +36,7 @@ pub fn animation_effect_system(
             .contains(AnimationEventFlags::EFFECT_WEAPON_ATTACK_HIT)
         {
             if let Ok(Command::Attack(command_attack)) = query_command.get(event.entity) {
-                let hit_effect_file_id = query_equipment
+                let effect_id = query_equipment
                     .get(event.entity)
                     .ok()
                     .and_then(|equipment| {
@@ -54,18 +54,13 @@ pub fn animation_effect_system(
                             .ok()
                             .and_then(|npc| game_data.npcs.get_npc(npc.id))
                             .and_then(|npc_data| npc_data.hand_hit_effect_id)
-                    })
-                    .and_then(|effect_id| game_data.effect_database.get_effect(effect_id))
-                    .and_then(|effect_data| effect_data.hit_normal);
+                    });
 
-                if let Some(hit_effect_file_id) = hit_effect_file_id {
-                    spawn_effect_events.send(SpawnEffectEvent::AtEntity(
-                        command_attack.target,
-                        SpawnEffectData::with_file_id(hit_effect_file_id),
-                    ));
-                }
-
-                hit_events.send(HitEvent::with_weapon(event.entity, command_attack.target));
+                hit_events.send(HitEvent::with_weapon(
+                    event.entity,
+                    command_attack.target,
+                    effect_id,
+                ));
             }
         }
 
@@ -106,8 +101,9 @@ pub fn animation_effect_system(
                     .and_then(|id| game_data.effect_database.get_effect(id));
 
                 if let Some(projectile_effect_data) = projectile_effect_data {
-                    if let Some(projectile_effect_file_id) = projectile_effect_data.bullet_normal {
+                    if projectile_effect_data.bullet_effect.is_some() {
                         spawn_projectile_events.send(SpawnProjectileEvent {
+                            effect_id: projectile_effect_data.id,
                             source: event.entity,
                             source_dummy_bone_id: Some(0),
                             source_skill_id: None,
@@ -118,8 +114,6 @@ pub fn animation_effect_system(
                                 .cloned()
                                 .unwrap_or(EffectBulletMoveType::Linear),
                             move_speed: MoveSpeed::new(projectile_effect_data.bullet_speed / 100.0),
-                            projectile_effect_file_id: Some(projectile_effect_file_id),
-                            hit_effect_file_id: projectile_effect_data.hit_normal, // TODO: .hit_critical
                         });
                     }
                 }
@@ -160,19 +154,19 @@ pub fn animation_effect_system(
                                 .bullet_effect_id
                                 .and_then(|id| game_data.effect_database.get_effect(id))
                             {
-                                if let Some(effect_file_id) = effect_data.bullet_normal {
-                                    spawn_effect_events.send(SpawnEffectEvent::OnDummyBone(
+                                if let Some(effect_file_id) = effect_data.bullet_effect {
+                                    spawn_effect_events.send(SpawnEffectEvent::OnEntity(
                                         event.entity,
-                                        skill_data.bullet_link_dummy_bone_id as usize,
+                                        Some(skill_data.bullet_link_dummy_bone_id as usize),
                                         SpawnEffectData::with_file_id(effect_file_id),
                                     ));
                                 }
                             }
 
                             if let Some(hit_effect_file_id) = skill_data.hit_effect_file_id {
-                                spawn_effect_events.send(SpawnEffectEvent::OnDummyBone(
+                                spawn_effect_events.send(SpawnEffectEvent::OnEntity(
                                     event.entity,
-                                    skill_data.hit_link_dummy_bone_id as usize,
+                                    skill_data.hit_link_dummy_bone_id,
                                     SpawnEffectData::with_file_id(hit_effect_file_id),
                                 ));
                             }
@@ -189,10 +183,9 @@ pub fn animation_effect_system(
                                     .bullet_effect_id
                                     .and_then(|id| game_data.effect_database.get_effect(id))
                                 {
-                                    if let Some(projectile_effect_file_id) =
-                                        effect_data.bullet_normal
-                                    {
+                                    if effect_data.bullet_effect.is_some() {
                                         spawn_projectile_events.send(SpawnProjectileEvent {
+                                            effect_id: effect_data.id,
                                             source: event.entity,
                                             source_dummy_bone_id: Some(
                                                 skill_data.bullet_link_dummy_bone_id as usize,
@@ -207,10 +200,6 @@ pub fn animation_effect_system(
                                             move_speed: MoveSpeed::new(
                                                 effect_data.bullet_speed / 100.0,
                                             ),
-                                            projectile_effect_file_id: Some(
-                                                projectile_effect_file_id,
-                                            ),
-                                            hit_effect_file_id: skill_data.hit_effect_file_id,
                                         });
                                     }
                                 }
@@ -298,17 +287,10 @@ fn show_casting_effect(
         .get(casting_effect_index)
         .and_then(|x| x.as_ref())
     {
-        if let Some(dummy_bone_id) = casting_effect.effect_dummy_bone_id {
-            spawn_effect_events.send(SpawnEffectEvent::OnDummyBone(
-                entity,
-                dummy_bone_id,
-                SpawnEffectData::with_file_id(casting_effect.effect_file_id),
-            ));
-        } else {
-            spawn_effect_events.send(SpawnEffectEvent::OnEntity(
-                entity,
-                SpawnEffectData::with_file_id(casting_effect.effect_file_id),
-            ));
-        }
+        spawn_effect_events.send(SpawnEffectEvent::OnEntity(
+            entity,
+            casting_effect.effect_dummy_bone_id,
+            SpawnEffectData::with_file_id(casting_effect.effect_file_id),
+        ));
     }
 }

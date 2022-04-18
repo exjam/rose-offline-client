@@ -11,12 +11,11 @@ use rose_game_common::components::{Destination, MoveSpeed, Target};
 
 use crate::{
     components::{DummyBoneOffset, Projectile},
-    events::{HitEvent, SpawnEffectData, SpawnEffectEvent},
+    events::HitEvent,
 };
 
 pub fn projectile_system(
     mut commands: Commands,
-    mut spawn_effect_events: EventWriter<SpawnEffectEvent>,
     mut hit_events: EventWriter<HitEvent>,
     mut query_bullets: Query<(
         Entity,
@@ -72,14 +71,7 @@ pub fn projectile_system(
         }
 
         if move_distance + 0.1 >= distance {
-            // Reached target, play on hit effect
-            if let Some(hit_effect_file_id) = projectile.hit_effect_file_id {
-                spawn_effect_events.send(SpawnEffectEvent::WithTransform(
-                    Transform::from_translation(target_translation),
-                    SpawnEffectData::with_file_id(hit_effect_file_id),
-                ));
-            }
-
+            // Reached target, send hit event
             if let Some(target) = target {
                 if let Some(skill_id) = projectile.skill_id {
                     hit_events.send(HitEvent::with_skill(
@@ -88,7 +80,11 @@ pub fn projectile_system(
                         skill_id,
                     ));
                 } else {
-                    hit_events.send(HitEvent::with_weapon(projectile.source, target.entity));
+                    hit_events.send(HitEvent::with_weapon(
+                        projectile.source,
+                        target.entity,
+                        projectile.effect_id,
+                    ));
                 }
             }
 

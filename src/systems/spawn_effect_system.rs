@@ -80,7 +80,20 @@ pub fn spawn_effect_system(
                     }
                 }
             }
-            SpawnEffectEvent::OnEntity(on_entity, spawn_effect_data) => {
+            SpawnEffectEvent::OnEntity(on_entity, dummy_bone_id, spawn_effect_data) => {
+                let mut link_entity = *on_entity;
+
+                if let Some(dummy_bone_id) = dummy_bone_id {
+                    if let Ok((skinned_mesh, dummy_bone_offset)) = query_skeleton.get(*on_entity) {
+                        if let Some(joint) = skinned_mesh
+                            .joints
+                            .get(dummy_bone_offset.index + dummy_bone_id)
+                        {
+                            link_entity = *joint;
+                        }
+                    }
+                }
+
                 if let Some(effect_file_path) = get_effect_file_path(spawn_effect_data, &game_data)
                 {
                     if let Some(effect_entity) = spawn_effect(
@@ -93,38 +106,7 @@ pub fn spawn_effect_system(
                         spawn_effect_data.manual_despawn,
                         None,
                     ) {
-                        commands.entity(*on_entity).add_child(effect_entity);
-                    }
-                }
-            }
-            SpawnEffectEvent::OnDummyBone(skeleton_entity, dummy_bone_id, spawn_effect_data) => {
-                let mut dummy_entity = *skeleton_entity;
-
-                if let Ok((skinned_mesh, dummy_bone_offset)) = query_skeleton.get(*skeleton_entity)
-                {
-                    if let Some(joint) = skinned_mesh
-                        .joints
-                        .get(dummy_bone_offset.index + dummy_bone_id)
-                    {
-                        dummy_entity = *joint;
-                    }
-                }
-
-                if let Some(effect_file_path) = get_effect_file_path(spawn_effect_data, &game_data)
-                {
-                    if query_transform.get(dummy_entity).is_ok() {
-                        if let Some(effect_entity) = spawn_effect(
-                            &vfs_resource.vfs,
-                            &mut commands,
-                            &asset_server,
-                            &mut particle_materials,
-                            &mut effect_mesh_materials,
-                            effect_file_path,
-                            spawn_effect_data.manual_despawn,
-                            None,
-                        ) {
-                            commands.entity(dummy_entity).add_child(effect_entity);
-                        }
+                        commands.entity(link_entity).add_child(effect_entity);
                     }
                 }
             }
