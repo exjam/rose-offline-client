@@ -346,6 +346,7 @@ pub fn command_system(
                 }
 
                 *cast_skill_state = CommandCastSkillState::Action;
+                continue;
             } else if !*ready_action && matches!(*cast_skill_state, CommandCastSkillState::Casting)
             {
                 if let Some(cast_repeat_motion_id) = cast_repeat_motion_id {
@@ -371,6 +372,7 @@ pub fn command_system(
                 }
 
                 *cast_skill_state = CommandCastSkillState::CastingRepeat;
+                continue;
             } else if matches!(cast_skill_state, CommandCastSkillState::Action)
                 && next_command.is_none()
             {
