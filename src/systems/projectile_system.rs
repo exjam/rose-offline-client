@@ -89,10 +89,7 @@ pub fn projectile_system(
         // Update transform
         let mut transform = *transform;
         transform.translation += move_distance * direction.normalize();
-        transform.rotation = Quat::from_axis_angle(
-            Vec3::Y,
-            direction.z.atan2(direction.x) + std::f32::consts::PI / 2.0,
-        );
+        transform.rotation = Quat::from_axis_angle(Vec3::Y, (-direction.z).atan2(direction.x));
 
         if let Some(parabola_velocity) = projectile.parabola_velocity.as_ref() {
             transform.translation.y += parabola_velocity;
