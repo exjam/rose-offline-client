@@ -1,6 +1,18 @@
-use bevy::prelude::{Component, Entity};
+use bevy::{
+    math::Vec3,
+    prelude::{Component, Entity},
+};
 
 use rose_data::{EffectBulletMoveType, EffectId, SkillId};
+
+pub struct ProjectileParabola {
+    pub start_y: f32,
+    pub end_y: f32,
+    pub velocity_y: f32,
+    pub move_vec: Vec3,
+    pub current_time: f32,
+    pub total_time: f32,
+}
 
 #[derive(Component)]
 pub struct Projectile {
@@ -9,7 +21,7 @@ pub struct Projectile {
     pub skill_id: Option<SkillId>,
     pub move_type: EffectBulletMoveType,
     pub apply_damage: bool,
-    pub parabola_velocity: Option<f32>,
+    pub parabola: Option<ProjectileParabola>,
 }
 
 impl Projectile {
@@ -26,7 +38,7 @@ impl Projectile {
             skill_id,
             move_type,
             apply_damage,
-            parabola_velocity: None,
+            parabola: None,
         }
     }
 }

@@ -50,6 +50,6 @@ pub use pending_skill_effect_list::{
 pub use personal_store::{PersonalStore, PersonalStoreModel};
 pub use player_character::PlayerCharacter;
 pub use position::Position;
-pub use projectile::Projectile;
+pub use projectile::{Projectile, ProjectileParabola};
 pub use selected_target::SelectedTarget;
 pub use visible_status_effects::{VisibleStatusEffect, VisibleStatusEffects};

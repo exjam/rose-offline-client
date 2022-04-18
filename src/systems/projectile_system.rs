@@ -10,7 +10,7 @@ use rose_data::EffectBulletMoveType;
 use rose_game_common::components::{Destination, MoveSpeed, Target};
 
 use crate::{
-    components::{DummyBoneOffset, Projectile},
+    components::{DummyBoneOffset, Projectile, ProjectileParabola},
     events::HitEvent,
 };
 
@@ -57,20 +57,51 @@ pub fn projectile_system(
         let mut target_translation = target_translation.unwrap();
         target_translation.y += 0.5;
 
-        let distance = transform.translation.distance(target_translation);
-        let direction = target_translation - transform.translation;
-        let move_distance = move_speed.speed * time.delta_seconds();
+        let (complete, move_vec) = match projectile.move_type {
+            EffectBulletMoveType::Linear => {
+                let distance = transform.translation.distance(target_translation);
+                let direction = target_translation - transform.translation;
+                let move_distance = move_speed.speed * time.delta_seconds();
 
-        if matches!(projectile.move_type, EffectBulletMoveType::Parabola) {
-            if let Some(parabola_velocity) = projectile.parabola_velocity.as_mut() {
-                *parabola_velocity -= 0.98 * time.delta_seconds();
-            } else {
-                let travel_time = distance / move_speed.speed;
-                projectile.parabola_velocity = Some(travel_time * 0.98);
+                (
+                    move_distance + 0.1 >= distance,
+                    move_distance * direction.normalize(),
+                )
             }
-        }
+            EffectBulletMoveType::Parabola => {
+                let parabola = projectile.parabola.get_or_insert_with(|| {
+                    let distance = transform.translation.distance(target_translation);
+                    let travel_time = distance / move_speed.speed;
+                    let velocity_y = travel_time * 98.0 / 2.0;
 
-        if move_distance + 0.1 >= distance {
+                    let mut move_vec =
+                        move_speed.speed * (target_translation - transform.translation).normalize();
+                    move_vec.y = velocity_y;
+
+                    ProjectileParabola {
+                        start_y: transform.translation.y,
+                        end_y: target_translation.y,
+                        velocity_y,
+                        move_vec,
+                        current_time: 0.0,
+                        total_time: travel_time,
+                    }
+                });
+
+                parabola.velocity_y -= 98.0 * time.delta_seconds();
+                parabola.move_vec.y = parabola.velocity_y;
+                parabola.current_time += time.delta_seconds();
+
+                let mut move_vec = parabola.move_vec * time.delta_seconds();
+                move_vec.y += ((parabola.end_y - parabola.start_y) / parabola.total_time)
+                    * time.delta_seconds();
+
+                (parabola.current_time >= parabola.total_time, move_vec)
+            }
+            EffectBulletMoveType::Immediate => (true, Vec3::default()),
+        };
+
+        if complete {
             // Reached target, send hit event
             if let Some(target) = target {
                 if let Some(skill_id) = projectile.skill_id {
@@ -96,13 +127,8 @@ pub fn projectile_system(
 
         // Update transform
         let mut transform = *transform;
-        transform.translation += move_distance * direction.normalize();
-        transform.rotation = Quat::from_axis_angle(Vec3::Y, (-direction.z).atan2(direction.x));
-
-        if let Some(parabola_velocity) = projectile.parabola_velocity.as_ref() {
-            transform.translation.y += parabola_velocity;
-        }
-
+        transform.translation += move_vec;
+        transform.rotation = Quat::from_rotation_arc(Vec3::X, move_vec.normalize());
         commands.entity(entity).insert(transform);
     }
 }
