@@ -36,19 +36,17 @@ pub fn projectile_system(
             query_skeleton
                 .get(target.entity)
                 .ok()
-                .and_then(|(skinned_mesh, dummy_bone_offset)| {
-                    Some(if dummy_bone_offset.index > 0 {
+                .map(|(skinned_mesh, dummy_bone_offset)| {
+                    if dummy_bone_offset.index > 0 {
                         skinned_mesh.joints.last().copied().unwrap_or(target.entity)
                     } else {
                         target.entity
-                    })
+                    }
                 })
                 .and_then(|target_entity| query_global_transform.get(target_entity).ok())
                 .map(|transform| transform.translation)
-        } else if let Some(target_position) = destination.map(|destination| destination.position) {
-            Some(target_position)
         } else {
-            None
+            destination.map(|destination| destination.position)
         };
 
         if target_translation.is_none() {
