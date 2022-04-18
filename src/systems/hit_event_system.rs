@@ -1,0 +1,134 @@
+use bevy::{
+    ecs::query::WorldQuery,
+    hierarchy::BuildChildren,
+    prelude::{Commands, Entity, EventReader, Query, Res, ResMut},
+};
+use bevy_rapier3d::prelude::ColliderShapeComponent;
+
+use rose_game_common::{
+    components::{AbilityValues, HealthPoints, ManaPoints, MoveSpeed, StatusEffects},
+    data::Damage,
+};
+
+use crate::{
+    components::{
+        ClientEntity, NextCommand, PendingDamageList, PendingSkillEffectList,
+        PendingSkillTargetList,
+    },
+    events::HitEvent,
+    resources::{ClientEntityList, DamageDigitsSpawner},
+};
+
+#[derive(WorldQuery)]
+#[world_query(mutable)]
+pub struct HitAttackerQuery<'w> {
+    entity: Entity,
+    pending_skill_target_list: &'w mut PendingSkillTargetList,
+}
+
+#[derive(WorldQuery)]
+#[world_query(mutable)]
+pub struct HitDefenderQuery<'w> {
+    entity: Entity,
+    client_entity: &'w ClientEntity,
+    pending_damage_list: &'w mut PendingDamageList,
+    pending_skill_effect_list: &'w mut PendingSkillEffectList,
+    ability_values: &'w AbilityValues,
+    health_points: &'w mut HealthPoints,
+    mana_points: Option<&'w mut ManaPoints>,
+    move_speed: &'w MoveSpeed,
+    status_effects: &'w mut StatusEffects,
+    collider: Option<&'w ColliderShapeComponent>,
+}
+
+fn apply_damage(
+    commands: &mut Commands,
+    _attacker_entity: Option<Entity>,
+    defender: &mut HitDefenderQueryItem,
+    damage: Damage,
+    is_killed: bool,
+    damage_digits_spawner: &DamageDigitsSpawner,
+    client_entity_list: &mut ClientEntityList,
+) {
+    if defender.health_points.hp < damage.amount as i32 {
+        defender.health_points.hp = 0;
+    } else {
+        defender.health_points.hp -= damage.amount as i32;
+    }
+
+    if let Some(damage_digits_entity) = damage_digits_spawner.spawn(
+        commands,
+        damage.amount,
+        client_entity_list
+            .player_entity
+            .map_or(false, |player_entity| defender.entity == player_entity),
+        defender
+            .collider
+            .map_or(2.0, |collider| collider.compute_local_aabb().extents().y),
+    ) {
+        commands
+            .entity(defender.entity)
+            .add_child(damage_digits_entity);
+    }
+
+    if is_killed {
+        commands
+            .entity(defender.entity)
+            .insert(NextCommand::with_die())
+            .remove::<ClientEntity>();
+        client_entity_list.remove(defender.client_entity.id);
+    }
+}
+
+pub fn hit_event_system(
+    mut commands: Commands,
+    mut query_defender: Query<HitDefenderQuery>,
+    mut hit_events: EventReader<HitEvent>,
+    mut client_entity_list: ResMut<ClientEntityList>,
+    damage_digits_spawner: Res<DamageDigitsSpawner>,
+) {
+    for event in hit_events.iter() {
+        let defender = query_defender.get_mut(event.defender).ok();
+        if defender.is_none() {
+            continue;
+        }
+        let mut defender = defender.unwrap();
+
+        // TODO: Spawn hit effect here?
+
+        // Apply pending damage
+        if event.apply_damage {
+            let mut damage = Damage {
+                amount: 0,
+                is_critical: false,
+                apply_hit_stun: false,
+            };
+
+            let mut i = 0;
+            let mut is_killed = false;
+            while i < defender.pending_damage_list.pending_damage.len() {
+                if client_entity_list.get(defender.pending_damage_list.pending_damage[i].attacker)
+                    == Some(event.attacker)
+                {
+                    let pending_damage = defender.pending_damage_list.pending_damage.remove(i);
+                    damage.amount += pending_damage.damage.amount;
+                    damage.is_critical |= pending_damage.damage.is_critical;
+                    damage.apply_hit_stun |= pending_damage.damage.apply_hit_stun;
+                    is_killed |= pending_damage.is_kill;
+                } else {
+                    i += 1;
+                }
+            }
+
+            apply_damage(
+                &mut commands,
+                Some(event.attacker),
+                &mut defender,
+                damage,
+                is_killed,
+                &damage_digits_spawner,
+                &mut client_entity_list,
+            );
+        }
+    }
+}

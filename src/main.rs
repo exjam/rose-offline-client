@@ -60,14 +60,14 @@ use systems::{
     collision_system, command_system, conversation_dialog_system, cooldown_system,
     damage_digit_render_system, debug_render_collider_system, debug_render_skeleton_system,
     effect_system, game_connection_system, game_mouse_input_system, game_state_enter_system,
-    game_zone_change_system, item_drop_model_add_collider_system, item_drop_model_system,
-    load_zone_system, login_connection_system, login_state_enter_system, login_state_exit_system,
-    login_system, model_viewer_enter_system, model_viewer_system, npc_model_add_collider_system,
-    npc_model_system, particle_sequence_system, passive_recovery_system, pending_damage_system,
-    pending_skill_effect_system, player_command_system, projectile_system, quest_trigger_system,
-    spawn_effect_system, spawn_projectile_system, update_position_system,
-    visible_status_effects_system, world_connection_system, zone_viewer_enter_system,
-    DebugInspectorPlugin,
+    game_zone_change_system, hit_event_system, item_drop_model_add_collider_system,
+    item_drop_model_system, load_zone_system, login_connection_system, login_state_enter_system,
+    login_state_exit_system, login_system, model_viewer_enter_system, model_viewer_system,
+    npc_model_add_collider_system, npc_model_system, particle_sequence_system,
+    passive_recovery_system, pending_damage_system, pending_skill_effect_system,
+    player_command_system, projectile_system, quest_trigger_system, spawn_effect_system,
+    spawn_projectile_system, update_position_system, visible_status_effects_system,
+    world_connection_system, zone_viewer_enter_system, DebugInspectorPlugin,
 };
 use ui::{
     ui_character_info_system, ui_chatbox_system, ui_debug_camera_info_system,
@@ -376,7 +376,16 @@ fn main() {
                 .after(animation_effect_system)
                 .after(projectile_system),
         )
-        .add_system(damage_digit_render_system.after(pending_damage_system))
+        .add_system(
+            hit_event_system
+                .after(animation_effect_system)
+                .after(projectile_system),
+        )
+        .add_system(
+            damage_digit_render_system
+                .after(pending_damage_system)
+                .after(hit_event_system),
+        )
         .add_system(spawn_effect_system)
         .add_system(ui_debug_menu_system.before("ui_system"))
         .add_system(ui_debug_zone_list_system.label("ui_system"))

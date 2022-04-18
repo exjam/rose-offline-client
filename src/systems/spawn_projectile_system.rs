@@ -44,7 +44,12 @@ pub fn spawn_projectile_system(
         let source_global_transform = source_global_transform.unwrap();
 
         let mut entity_commands = commands.spawn_bundle((
-            Projectile::new(event.source, event.move_type, event.hit_effect_file_id),
+            Projectile::new(
+                event.source,
+                event.source_skill_id,
+                event.move_type,
+                event.hit_effect_file_id,
+            ),
             event.move_speed,
             Transform::from_translation(source_global_transform.translation),
             GlobalTransform::default(),

@@ -16,7 +16,7 @@ pub use chatbox_event::ChatboxEvent;
 pub use client_entity_event::ClientEntityEvent;
 pub use conversation_dialog_event::ConversationDialogEvent;
 pub use game_connection_event::GameConnectionEvent;
-pub use hit_event::HitEvent;
+pub use hit_event::{HitEvent, HitEventType};
 pub use player_command_event::PlayerCommandEvent;
 pub use quest_trigger_event::QuestTriggerEvent;
 pub use spawn_effect_event::{SpawnEffect, SpawnEffectData, SpawnEffectEvent};

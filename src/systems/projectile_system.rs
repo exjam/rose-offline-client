@@ -81,7 +81,15 @@ pub fn projectile_system(
             }
 
             if let Some(target) = target {
-                hit_events.send(HitEvent::new(projectile.source, target.entity));
+                if let Some(skill_id) = projectile.skill_id {
+                    hit_events.send(HitEvent::with_skill(
+                        projectile.source,
+                        target.entity,
+                        skill_id,
+                    ));
+                } else {
+                    hit_events.send(HitEvent::with_weapon(projectile.source, target.entity));
+                }
             }
 
             commands.entity(entity).despawn_recursive();

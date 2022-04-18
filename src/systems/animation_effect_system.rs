@@ -28,7 +28,7 @@ pub fn animation_effect_system(
 ) {
     for event in animation_frame_events.iter() {
         if client_entity_list.player_entity == Some(event.entity) {
-            log::trace!(target: "animation", "Player animation event flags: {:?}", event.flags);
+            log::info!(target: "animation", "Player animation event flags: {:?}", event.flags);
         }
 
         if event
@@ -65,7 +65,7 @@ pub fn animation_effect_system(
                     ));
                 }
 
-                hit_events.send(HitEvent::new(event.entity, command_attack.target));
+                hit_events.send(HitEvent::with_weapon(event.entity, command_attack.target));
             }
         }
 
@@ -110,6 +110,7 @@ pub fn animation_effect_system(
                         spawn_projectile_events.send(SpawnProjectileEvent {
                             source: event.entity,
                             source_dummy_bone_id: Some(0),
+                            source_skill_id: None,
                             target: SpawnProjectileTarget::Entity(command_attack.target),
                             move_type: projectile_effect_data
                                 .bullet_move_type
@@ -135,7 +136,11 @@ pub fn animation_effect_system(
                 if let Some(CommandCastSkillTarget::Entity(target_entity)) =
                     command_cast_skill.skill_target
                 {
-                    hit_events.send(HitEvent::new(event.entity, target_entity));
+                    hit_events.send(HitEvent::with_skill(
+                        event.entity,
+                        target_entity,
+                        command_cast_skill.skill_id,
+                    ));
                 }
             }
         }
@@ -192,6 +197,7 @@ pub fn animation_effect_system(
                                             source_dummy_bone_id: Some(
                                                 skill_data.bullet_link_dummy_bone_id as usize,
                                             ),
+                                            source_skill_id: Some(skill_data.id),
                                             target: SpawnProjectileTarget::Entity(target_entity),
                                             move_type: effect_data
                                                 .bullet_move_type
@@ -226,7 +232,11 @@ pub fn animation_effect_system(
                 if let Some(CommandCastSkillTarget::Entity(target_entity)) =
                     command_cast_skill.skill_target
                 {
-                    hit_events.send(HitEvent::new(event.entity, target_entity));
+                    hit_events.send(HitEvent::with_skill(
+                        event.entity,
+                        target_entity,
+                        command_cast_skill.skill_id,
+                    ));
                 }
             }
         }
