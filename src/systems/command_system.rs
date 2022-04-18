@@ -405,6 +405,11 @@ pub fn command_system(
 
                 *cast_skill_state = CommandCastSkillState::CastingRepeat;
                 continue;
+            } else if !*ready_action
+                && matches!(*cast_skill_state, CommandCastSkillState::CastingRepeat)
+            {
+                // Repeat CastingRepeat motion until ready_action is true
+                continue;
             } else if matches!(cast_skill_state, CommandCastSkillState::Action)
                 && next_command.is_none()
             {
