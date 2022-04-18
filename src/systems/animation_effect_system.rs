@@ -146,6 +146,9 @@ pub fn animation_effect_system(
             if let Ok(Command::CastSkill(command_cast_skill)) = query_command.get(event.entity) {
                 if let Some(skill_data) = game_data.skills.get_skill(command_cast_skill.skill_id) {
                     match skill_data.skill_type {
+                        SkillType::BasicAction => {}
+                        SkillType::CreateWindow => {}
+                        SkillType::Immediate => {}
                         SkillType::SelfBound
                         | SkillType::SelfBoundDuration
                         | SkillType::SelfStateDuration
