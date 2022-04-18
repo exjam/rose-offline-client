@@ -215,17 +215,47 @@ pub fn animation_effect_system(
         }
 
         if event.flags.contains(AnimationEventFlags::EFFECT_SKILL_HIT) {
-            // TODO: Show skill hit effect (if 0, then weapon hit, if 0 then npc hand hit effect)
-
             if let Ok(Command::CastSkill(command_cast_skill)) = query_command.get(event.entity) {
                 if let Some(CommandCastSkillTarget::Entity(target_entity)) =
                     command_cast_skill.skill_target
                 {
-                    hit_events.send(HitEvent::with_skill(
-                        event.entity,
-                        target_entity,
-                        command_cast_skill.skill_id,
-                    ));
+                    if let Some(skill_data) =
+                        game_data.skills.get_skill(command_cast_skill.skill_id)
+                    {
+                        let weapon_effect_id = query_equipment
+                            .get(event.entity)
+                            .ok()
+                            .and_then(|equipment| {
+                                game_data.items.get_weapon_item(
+                                    equipment
+                                        .get_equipment_item(EquipmentIndex::WeaponRight)
+                                        .map(|weapon| weapon.item.item_number)
+                                        .unwrap_or(0),
+                                )
+                            })
+                            .and_then(|weapon_item_data| weapon_item_data.effect_id)
+                            .or_else(|| {
+                                query_npc
+                                    .get(event.entity)
+                                    .ok()
+                                    .and_then(|npc| game_data.npcs.get_npc(npc.id))
+                                    .and_then(|npc_data| npc_data.hand_hit_effect_id)
+                            });
+
+                        if skill_data.hit_effect_file_id.is_some() {
+                            hit_events.send(HitEvent::with_skill(
+                                event.entity,
+                                target_entity,
+                                command_cast_skill.skill_id,
+                            ));
+                        } else {
+                            hit_events.send(HitEvent::with_weapon(
+                                event.entity,
+                                target_entity,
+                                weapon_effect_id,
+                            ));
+                        }
+                    }
                 }
             }
         }
