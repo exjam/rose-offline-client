@@ -340,51 +340,50 @@ fn main() {
         .insert_resource(Events::<SpawnEffectEvent>::default())
         .insert_resource(Events::<SpawnProjectileEvent>::default());
 
-    app.add_system(character_model_system.label("character_model_system"))
-        .add_system(character_model_add_collider_system.after("character_model_system"))
-        .add_system(npc_model_system.label("npc_model_system"))
-        .add_system(npc_model_add_collider_system.after("npc_model_system"))
-        .add_system(item_drop_model_system.label("item_drop_model_system"))
-        .add_system(item_drop_model_add_collider_system.after("item_drop_model_system"))
+    app.add_system(character_model_system)
+        .add_system(character_model_add_collider_system.after(character_model_system))
+        .add_system(npc_model_system)
+        .add_system(npc_model_add_collider_system.after(npc_model_system))
+        .add_system(item_drop_model_system)
+        .add_system(item_drop_model_add_collider_system.after(item_drop_model_system))
         .add_system(debug_render_collider_system)
         .add_system(debug_render_skeleton_system)
         .add_system(collision_system)
         .add_system(collision_add_colliders_system)
-        .add_system(animation_system.label("animation_system"))
+        .add_system(animation_system)
         .add_system(particle_sequence_system)
         .add_system(effect_system)
         .add_system(
             animation_effect_system
-                .label("animation_effect_system")
-                .after("animation_system")
-                .before("spawn_effect_system"),
+                .after(animation_system)
+                .before(spawn_effect_system),
+        )
+        .add_system(pending_skill_effect_system.after(animation_effect_system))
+        .add_system(
+            projectile_system
+                .after(animation_effect_system)
+                .before(spawn_effect_system),
+        )
+        .add_system(visible_status_effects_system.before(spawn_effect_system))
+        .add_system(
+            spawn_projectile_system
+                .after(animation_effect_system)
+                .before(spawn_effect_system),
         )
         .add_system(
             pending_damage_system
-                .label("pending_damage_system")
-                .after("animation_effect_system"),
+                .after(animation_effect_system)
+                .after(projectile_system),
         )
-        .add_system(pending_skill_effect_system.after("animation_effect_system"))
-        .add_system(
-            projectile_system
-                .after("animation_effect_system")
-                .before("spawn_effect_system"),
-        )
-        .add_system(damage_digit_render_system.after("pending_damage_system"))
-        .add_system(visible_status_effects_system.before("spawn_effect_system"))
-        .add_system(
-            spawn_projectile_system
-                .after("animation_effect_system")
-                .before("spawn_effect_system"),
-        )
-        .add_system(spawn_effect_system.label("spawn_effect_system"))
-        .add_system(ui_diagnostics_system)
+        .add_system(damage_digit_render_system.after(pending_damage_system))
+        .add_system(spawn_effect_system)
         .add_system(ui_debug_menu_system.before("ui_system"))
         .add_system(ui_debug_zone_list_system.label("ui_system"))
         .add_system(ui_debug_item_list_system.label("ui_system"))
         .add_system(ui_debug_npc_list_system.label("ui_system"))
         .add_system(ui_debug_skill_list_system.label("ui_system"))
         .add_system(ui_debug_camera_info_system.label("ui_system"))
+        .add_system(ui_diagnostics_system.label("ui_system"))
         .add_system(
             ui_debug_entity_inspector_system
                 .exclusive_system()
@@ -457,21 +456,17 @@ fn main() {
         .add_system_set(
             SystemSet::on_update(AppState::Game)
                 .with_system(ability_values_system)
-                .with_system(command_system.after("animation_system"))
+                .with_system(command_system.after(animation_system))
                 .with_system(update_position_system)
                 .with_system(client_entity_event_system)
                 .with_system(passive_recovery_system)
                 .with_system(quest_trigger_system)
-                .with_system(cooldown_system.label("cooldown_system").before("ui_system"))
-                .with_system(
-                    game_mouse_input_system
-                        .label("game_mouse_input_system")
-                        .after("ui_system"),
-                )
+                .with_system(cooldown_system.before("ui_system"))
+                .with_system(game_mouse_input_system.after("ui_system"))
                 .with_system(
                     player_command_system
-                        .after("cooldown_system")
-                        .after("game_mouse_input_system"),
+                        .after(cooldown_system)
+                        .after(game_mouse_input_system),
                 )
                 .with_system(ui_chatbox_system.label("ui_system"))
                 .with_system(ui_character_info_system.label("ui_system"))
