@@ -34,6 +34,8 @@ mod spawn_projectile_system;
 mod update_position_system;
 mod visible_status_effects_system;
 mod world_connection_system;
+mod world_time_system;
+mod zone_time_system;
 mod zone_viewer_system;
 
 pub use ability_values_system::ability_values_system;
@@ -75,4 +77,6 @@ pub use spawn_projectile_system::spawn_projectile_system;
 pub use update_position_system::update_position_system;
 pub use visible_status_effects_system::visible_status_effects_system;
 pub use world_connection_system::world_connection_system;
+pub use world_time_system::world_time_system;
+pub use zone_time_system::zone_time_system;
 pub use zone_viewer_system::zone_viewer_enter_system;

@@ -9,7 +9,7 @@ use bevy::{
         EventReader, EventWriter, GlobalTransform, Handle, Local, Mesh, Query, Res, ResMut,
         Transform, Visibility, With,
     },
-    render::{mesh::Indices, render_resource::PrimitiveTopology},
+    render::{mesh::Indices, render_resource::PrimitiveTopology, view::NoFrustumCulling},
 };
 use bevy_inspector_egui::Inspectable;
 use bevy_rapier3d::{
@@ -36,13 +36,15 @@ use crate::{
     effect_loader::spawn_effect,
     events::{LoadZoneEvent, ZoneEvent},
     render::{
-        EffectMeshMaterial, ParticleMaterial, StaticMeshMaterial, TerrainMaterial, TextureArray,
-        TextureArrayBuilder, WaterMeshMaterial, MESH_ATTRIBUTE_UV_1,
+        EffectMeshMaterial, ParticleMaterial, SkyMaterial, StaticMeshMaterial, TerrainMaterial,
+        TextureArray, TextureArrayBuilder, WaterMeshMaterial, MESH_ATTRIBUTE_UV_1,
         TERRAIN_MESH_ATTRIBUTE_TILE_INFO,
     },
-    resources::GameData,
+    resources::{GameData, ZoneTime},
     VfsResource,
 };
+
+const SKYBOX_MODEL_SCALE: f32 = 10.0;
 
 #[derive(Inspectable)]
 pub enum ZoneObjectStaticObjectPartCollisionShape {
@@ -117,19 +119,19 @@ impl Default for LoadZoneState {
 #[allow(clippy::too_many_arguments)]
 pub fn load_zone_system(
     mut commands: Commands,
-    asset_server: Res<AssetServer>,
-    vfs_resource: Res<VfsResource>,
-    game_data: Res<GameData>,
+    (asset_server, game_data, vfs_resource): (Res<AssetServer>, Res<GameData>, Res<VfsResource>),
     mut meshes: ResMut<Assets<Mesh>>,
     mut terrain_materials: ResMut<Assets<TerrainMaterial>>,
     mut effect_mesh_materials: ResMut<Assets<EffectMeshMaterial>>,
     mut particle_materials: ResMut<Assets<ParticleMaterial>>,
+    mut sky_materials: ResMut<Assets<SkyMaterial>>,
     mut static_mesh_materials: ResMut<Assets<StaticMeshMaterial>>,
     mut water_mesh_materials: ResMut<Assets<WaterMeshMaterial>>,
     mut texture_arrays: ResMut<Assets<TextureArray>>,
     mut load_zone_state: Local<LoadZoneState>,
     mut load_zone_event: EventReader<LoadZoneEvent>,
     mut zone_events: EventWriter<ZoneEvent>,
+    query_sky: Query<Entity, With<Handle<SkyMaterial>>>,
     query_zone_objects: Query<(Entity, Option<&Handle<Mesh>>), With<ZoneObject>>,
 ) {
     let current_zone_id = match *load_zone_state {
@@ -180,16 +182,22 @@ pub fn load_zone_system(
         commands.entity(entity).despawn_recursive();
     }
 
+    for entity in query_sky.iter() {
+        commands.entity(entity).despawn_recursive();
+    }
+
     // Spawn new zone
     if let Some(zone_list_entry) = game_data.zone_list.get_zone(next_zone_id) {
         load_zone(
             &mut commands,
             &asset_server,
+            &game_data,
             &vfs_resource,
             &mut meshes,
             &mut terrain_materials,
             &mut effect_mesh_materials,
             &mut particle_materials,
+            &mut sky_materials,
             &mut static_mesh_materials,
             &mut water_mesh_materials,
             &mut texture_arrays,
@@ -203,11 +211,13 @@ pub fn load_zone_system(
 fn load_zone(
     commands: &mut Commands,
     asset_server: &AssetServer,
+    game_data: &GameData,
     vfs_resource: &VfsResource,
     meshes: &mut ResMut<Assets<Mesh>>,
     terrain_materials: &mut ResMut<Assets<TerrainMaterial>>,
     effect_mesh_materials: &mut ResMut<Assets<EffectMeshMaterial>>,
     particle_materials: &mut ResMut<Assets<ParticleMaterial>>,
+    sky_materials: &mut ResMut<Assets<SkyMaterial>>,
     static_mesh_materials: &mut ResMut<Assets<StaticMeshMaterial>>,
     water_mesh_materials: &mut ResMut<Assets<WaterMeshMaterial>>,
     texture_arrays: &mut ResMut<Assets<TextureArray>>,
@@ -228,6 +238,35 @@ fn load_zone(
         .vfs
         .read_file::<StbFile, _>("3DDATA/STB/LIST_MORPH_OBJECT.STB")
         .ok();
+
+    // Update skybox
+    if let Some(skybox_data) = zone_list_entry
+        .skybox_id
+        .and_then(|skybox_id| game_data.skybox.get_skybox_data(skybox_id))
+    {
+        commands.spawn_bundle((
+            asset_server.load::<Mesh, _>(skybox_data.mesh.path()),
+            sky_materials.add(SkyMaterial {
+                texture_day: Some(asset_server.load(skybox_data.texture_day.path())),
+                texture_night: Some(asset_server.load(skybox_data.texture_night.path())),
+            }),
+            Transform::from_scale(Vec3::splat(SKYBOX_MODEL_SCALE)),
+            GlobalTransform::default(),
+            Visibility::default(),
+            ComputedVisibility::default(),
+            NoFrustumCulling,
+        ));
+    }
+
+    // Set zone time settings
+    commands.insert_resource(ZoneTime {
+        day_cycle: zone_list_entry.day_cycle,
+        morning_time: zone_list_entry.morning_time,
+        day_time: zone_list_entry.day_time,
+        evening_time: zone_list_entry.evening_time,
+        night_time: zone_list_entry.night_time,
+        ..Default::default()
+    });
 
     // Load zone tile array
     let mut tile_texture_array_builder = TextureArrayBuilder::new();

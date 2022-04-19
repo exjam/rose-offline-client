@@ -28,7 +28,7 @@ use crate::{
         VisibleStatusEffects,
     },
     events::{ChatboxEvent, ClientEntityEvent, GameConnectionEvent, QuestTriggerEvent},
-    resources::{AppState, ClientEntityList, GameConnection, GameData},
+    resources::{AppState, ClientEntityList, GameConnection, GameData, WorldTime},
 };
 
 fn get_entity_name(
@@ -216,6 +216,8 @@ pub fn game_connection_system(
                             message.mana_points,
                         ))
                         .add_child(down_ray_cast_source);
+
+                    commands.insert_resource(WorldTime::new(message.world_ticks));
 
                     client_entity_list.clear();
                     client_entity_list.add(message.entity_id, player_entity);

@@ -10,6 +10,7 @@ mod effect_mesh_material;
 mod particle_material;
 mod particle_pipeline;
 mod particle_render_data;
+mod sky_material;
 mod static_mesh_material;
 mod terrain_material;
 mod texture_array;
@@ -29,6 +30,7 @@ pub use damage_digit_render_data::DamageDigitRenderData;
 pub use effect_mesh_material::EffectMeshMaterial;
 pub use particle_material::ParticleMaterial;
 pub use particle_render_data::{ParticleRenderBillboardType, ParticleRenderData};
+pub use sky_material::SkyMaterial;
 pub use static_mesh_material::StaticMeshMaterial;
 pub use terrain_material::{TerrainMaterial, TERRAIN_MESH_ATTRIBUTE_TILE_INFO};
 pub use texture_array::{GpuTextureArray, TextureArray, TextureArrayBuilder};
@@ -39,6 +41,7 @@ use damage_digit_pipeline::DamageDigitRenderPlugin;
 use effect_mesh_material::EffectMeshMaterialPlugin;
 use particle_material::ParticleMaterialPlugin;
 use particle_pipeline::ParticleRenderPlugin;
+use sky_material::SkyMaterialPlugin;
 use static_mesh_material::StaticMeshMaterialPlugin;
 use terrain_material::TerrainMaterialPlugin;
 use texture_array::TextureArrayPlugin;
@@ -57,6 +60,7 @@ impl Plugin for RoseRenderPlugin {
             .add_plugin(ParticleMaterialPlugin)
             .add_plugin(ParticleRenderPlugin)
             .add_plugin(DamageDigitMaterialPlugin)
-            .add_plugin(DamageDigitRenderPlugin);
+            .add_plugin(DamageDigitRenderPlugin)
+            .add_plugin(SkyMaterialPlugin);
     }
 }
