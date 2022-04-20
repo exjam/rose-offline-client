@@ -31,6 +31,7 @@ pub struct UiStateDebugWindows {
     pub debug_ui_open: bool,
 
     pub camera_info_open: bool,
+    pub client_entity_list_open: bool,
     pub command_viewer_open: bool,
     pub item_list_open: bool,
     pub npc_list_open: bool,
@@ -134,6 +135,10 @@ pub fn ui_debug_menu_system(
                 ui.checkbox(&mut ui_state_debug_windows.skill_list_open, "Skill List");
                 ui.checkbox(&mut ui_state_debug_windows.zone_list_open, "Zone List");
                 ui.checkbox(&mut ui_state_debug_windows.zone_time_open, "Zone Time");
+                ui.checkbox(
+                    &mut ui_state_debug_windows.client_entity_list_open,
+                    "Client Entity List",
+                );
 
                 if ui
                     .checkbox(
