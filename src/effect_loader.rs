@@ -8,6 +8,7 @@ use bevy::{
     render::{
         primitives::Aabb,
         render_resource::{BlendFactor, BlendOperation},
+        view::NoFrustumCulling,
     },
 };
 use rose_file_readers::{EftFile, EftMesh, EftParticle, PtlFile, VfsIndex, VfsPath};
@@ -126,6 +127,8 @@ fn spawn_mesh(
                         * Quat::from_axis_angle(Vec3::Z, eft_mesh.roll.to_radians()),
                 ),
                 GlobalTransform::default(),
+                Visibility::default(),
+                ComputedVisibility::default(),
             ))
             .with_children(|child_builder| {
                 child_builder.spawn_bundle((
@@ -205,6 +208,8 @@ fn spawn_particle(
                         * Quat::from_axis_angle(Vec3::Z, eft_particle.roll.to_radians()),
                 ),
                 GlobalTransform::default(),
+                Visibility::default(),
+                ComputedVisibility::default(),
             ))
             .with_children(|child_builder| {
                 for sequence in ptl_file.sequences {
@@ -232,6 +237,7 @@ fn spawn_particle(
                         Aabb::default(),
                         Visibility::default(),
                         ComputedVisibility::default(),
+                        NoFrustumCulling, // AABB culling is broken for particles
                     ));
                 }
             })

@@ -24,14 +24,14 @@ use std::path::Path;
 use rose_data::{ZoneId, ZoneListEntry};
 use rose_file_readers::{
     HimFile, IfoFile, IfoObject, LitFile, LitObject, StbFile, TilFile, ZonFile, ZonTile,
-    ZonTileRotation, ZscCollisionFlags, ZscCollisionShape, ZscFile,
+    ZonTileRotation, ZscCollisionFlags, ZscCollisionShape, ZscEffectType, ZscFile,
 };
 
 use crate::{
     components::{
-        ActiveMotion, CollisionTriMesh, COLLISION_FILTER_CLICKABLE, COLLISION_FILTER_COLLIDABLE,
-        COLLISION_FILTER_INSPECTABLE, COLLISION_GROUP_ZONE_OBJECT, COLLISION_GROUP_ZONE_TERRAIN,
-        COLLISION_GROUP_ZONE_WATER,
+        ActiveMotion, CollisionTriMesh, NightTimeEffect, COLLISION_FILTER_CLICKABLE,
+        COLLISION_FILTER_COLLIDABLE, COLLISION_FILTER_INSPECTABLE, COLLISION_GROUP_ZONE_OBJECT,
+        COLLISION_GROUP_ZONE_TERRAIN, COLLISION_GROUP_ZONE_WATER,
     },
     effect_loader::spawn_effect,
     events::{LoadZoneEvent, ZoneEvent},
@@ -40,7 +40,7 @@ use crate::{
         TextureArray, TextureArrayBuilder, WaterMeshMaterial, MESH_ATTRIBUTE_UV_1,
         TERRAIN_MESH_ATTRIBUTE_TILE_INFO,
     },
-    resources::{GameData, ZoneTime},
+    resources::{CurrentZone, GameData},
     VfsResource,
 };
 
@@ -166,6 +166,7 @@ pub fn load_zone_system(
             }
 
             if loaded {
+                commands.insert_resource(CurrentZone::new(zone_id));
                 *load_zone_state = LoadZoneState::Loaded(zone_id);
                 zone_events.send(ZoneEvent::Loaded(zone_id));
             }
@@ -185,6 +186,8 @@ pub fn load_zone_system(
     for entity in query_sky.iter() {
         commands.entity(entity).despawn_recursive();
     }
+
+    commands.remove_resource::<CurrentZone>();
 
     // Spawn new zone
     if let Some(zone_list_entry) = game_data.zone_list.get_zone(next_zone_id) {
@@ -257,16 +260,6 @@ fn load_zone(
             NoFrustumCulling,
         ));
     }
-
-    // Set zone time settings
-    commands.insert_resource(ZoneTime {
-        day_cycle: zone_list_entry.day_cycle,
-        morning_time: zone_list_entry.morning_time,
-        day_time: zone_list_entry.day_time,
-        evening_time: zone_list_entry.evening_time,
-        night_time: zone_list_entry.night_time,
-        ..Default::default()
-    });
 
     // Load zone tile array
     let mut tile_texture_array_builder = TextureArrayBuilder::new();
@@ -832,8 +825,6 @@ fn load_block_object(
                 object_effect.scale.y,
             ));
 
-        // TODO: object_effect.effect_type
-
         if let Some(effect_path) = zsc.effects.get(object_effect.effect_id as usize) {
             if let Some(effect_entity) = spawn_effect(
                 &vfs_resource.vfs,
@@ -857,6 +848,10 @@ fn load_block_object(
                 }
 
                 commands.entity(effect_entity).insert(effect_transform);
+
+                if matches!(object_effect.effect_type, ZscEffectType::DayNight) {
+                    commands.entity(effect_entity).insert(NightTimeEffect);
+                }
             }
         }
     }

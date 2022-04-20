@@ -405,13 +405,11 @@ fn extract_particles(
         .get_resource_mut::<ExtractedParticles>()
         .unwrap();
     extracted_particles.particles.clear();
-    for (_visible, particles, material_handle) in query.iter() {
-        /*
-        // TODO: Fix aabb calculation so culling works correctly.
+    for (visible, particles, material_handle) in query.iter() {
         if !visible.is_visible {
             continue;
         }
-        */
+
         if let Some(material) = materials.get(material_handle) {
             if !images.contains(&material.texture) {
                 continue;
