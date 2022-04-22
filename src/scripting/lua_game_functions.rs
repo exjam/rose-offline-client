@@ -102,30 +102,30 @@ fn GF_getVariable(
     parameters: Vec<Lua4Value>,
 ) -> Vec<Lua4Value> {
     let variable_id = parameters[0].to_i32().unwrap();
-    let (character_info, basic_stats, experience_points, level, union_membership) =
-        context.query_character.single();
+    let character = context.query_character.single();
 
     let value = match variable_id {
-        SV_SEX => match character_info.gender {
+        SV_SEX => match character.character_info.gender {
             CharacterGender::Male => 0,
             CharacterGender::Female => 1,
         },
-        SV_BIRTH => character_info.birth_stone as i32,
-        SV_CLASS => character_info.job as i32,
-        SV_UNION => union_membership
+        SV_BIRTH => character.character_info.birth_stone as i32,
+        SV_CLASS => character.character_info.job as i32,
+        SV_UNION => character
+            .union_membership
             .current_union
             .map(|x| x.get() as i32)
             .unwrap_or(0),
-        SV_RANK => character_info.rank as i32,
-        SV_FAME => character_info.fame as i32,
-        SV_STR => basic_stats.strength,
-        SV_DEX => basic_stats.dexterity,
-        SV_INT => basic_stats.intelligence,
-        SV_CON => basic_stats.concentration,
-        SV_CHA => basic_stats.charm,
-        SV_SEN => basic_stats.sense,
-        SV_EXP => experience_points.xp as i32,
-        SV_LEVEL => level.level as i32,
+        SV_RANK => character.character_info.rank as i32,
+        SV_FAME => character.character_info.fame as i32,
+        SV_STR => character.basic_stats.strength,
+        SV_DEX => character.basic_stats.dexterity,
+        SV_INT => character.basic_stats.intelligence,
+        SV_CON => character.basic_stats.concentration,
+        SV_CHA => character.basic_stats.charm,
+        SV_SEN => character.basic_stats.sense,
+        SV_EXP => character.experience_points.xp as i32,
+        SV_LEVEL => character.level.level as i32,
         _ => 0,
     };
 

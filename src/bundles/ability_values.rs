@@ -18,7 +18,7 @@ pub fn ability_values_get_value(
     skill_points: Option<&SkillPoints>,
     stamina: Option<&Stamina>,
     stat_points: Option<&StatPoints>,
-    team_number: Option<&Team>,
+    team: Option<&Team>,
     union_membership: Option<&UnionMembership>,
 ) -> Option<i32> {
     match ability_type {
@@ -54,7 +54,7 @@ pub fn ability_values_get_value(
         AbilityType::Experience => experience_points.map(|x| x.xp as i32),
         AbilityType::Level => level.map(|x| x.level as i32),
         AbilityType::Money => inventory.map(|x| x.money.0 as i32),
-        AbilityType::TeamNumber => team_number.map(|x| x.id as i32),
+        AbilityType::TeamNumber => team.map(|x| x.id as i32),
         AbilityType::Union => {
             union_membership.map(|x| x.current_union.map(|x| x.get() as i32).unwrap_or(0))
         }

@@ -1,11 +1,15 @@
 use rose_data::QuestTrigger;
 use rose_file_readers::{
-    QsdCondition, QsdConditionOperator, QsdConditionQuestItem, QsdEquipmentIndex, QsdItemBase1000,
-    QsdVariableType,
+    QsdAbilityType, QsdCondition, QsdConditionOperator, QsdConditionQuestItem, QsdEquipmentIndex,
+    QsdItemBase1000, QsdVariableType,
 };
 
-use crate::scripting::{
-    quest::get_quest_variable, QuestFunctionContext, ScriptFunctionContext, ScriptFunctionResources,
+use crate::{
+    bundles::ability_values_get_value,
+    scripting::{
+        quest::get_quest_variable, QuestFunctionContext, ScriptFunctionContext,
+        ScriptFunctionResources,
+    },
 };
 
 fn quest_condition_operator<T: PartialEq + PartialOrd>(
@@ -21,6 +25,49 @@ fn quest_condition_operator<T: PartialEq + PartialOrd>(
         QsdConditionOperator::LessThanEqual => value_lhs <= value_rhs,
         QsdConditionOperator::NotEqual => value_lhs != value_rhs,
     }
+}
+
+fn quest_condition_ability_values(
+    script_resources: &ScriptFunctionResources,
+    script_context: &mut ScriptFunctionContext,
+    _quest_context: &mut QuestFunctionContext,
+    check_values: &[(QsdAbilityType, QsdConditionOperator, i32)],
+) -> bool {
+    let character = script_context.query_character.single();
+
+    for &(ability_type, operator, compare_value) in check_values {
+        let ability_type = script_resources
+            .game_data
+            .data_decoder
+            .decode_ability_type(ability_type.get());
+        if ability_type.is_none() {
+            return false;
+        }
+
+        let current_value = ability_values_get_value(
+            ability_type.unwrap(),
+            character.ability_values,
+            Some(character.character_info),
+            Some(character.experience_points),
+            Some(character.health_points),
+            Some(character.inventory),
+            Some(character.level),
+            Some(character.mana_points),
+            Some(character.move_speed),
+            Some(character.skill_points),
+            Some(character.stamina),
+            Some(character.stat_points),
+            Some(character.team),
+            Some(character.union_membership),
+        )
+        .unwrap_or(0);
+
+        if !quest_condition_operator(operator, current_value, compare_value) {
+            return false;
+        }
+    }
+
+    true
 }
 
 fn quest_condition_check_switch(
@@ -174,6 +221,12 @@ pub fn quest_trigger_check_conditions(
 ) -> bool {
     for condition in quest_trigger.conditions.iter() {
         let result = match *condition {
+            QsdCondition::AbilityValue(ref ability_values) => quest_condition_ability_values(
+                script_resources,
+                script_context,
+                quest_context,
+                ability_values,
+            ),
             QsdCondition::QuestItems(ref items) => {
                 quest_condition_quest_items(script_resources, script_context, quest_context, items)
             }
