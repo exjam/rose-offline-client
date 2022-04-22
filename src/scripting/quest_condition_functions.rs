@@ -256,6 +256,11 @@ pub fn quest_trigger_check_conditions(
                 quest_context,
                 quest_id,
             ),
+            // Server side only conditions:
+            QsdCondition::RandomPercent(_)
+            | QsdCondition::ObjectVariable(_)
+            | QsdCondition::SelectEventObject(_)
+            | QsdCondition::SelectNpc(_) => true,
             _ => {
                 log::warn!("Unimplemented quest condition: {:?}", condition);
                 false
