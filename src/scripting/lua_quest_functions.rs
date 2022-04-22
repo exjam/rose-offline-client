@@ -29,6 +29,7 @@ impl Default for LuaQuestFunctions {
         closures.insert("QF_doQuestTrigger".into(), QF_doQuestTrigger);
         closures.insert("QF_findQuest".into(), QF_findQuest);
         closures.insert("QF_getEventOwner".into(), QF_getEventOwner);
+        closures.insert("QF_getQuestSwitch".into(), QF_getQuestSwitch);
         closures.insert("QF_getUserSwitch".into(), QF_getUserSwitch);
 
         /*
@@ -50,7 +51,6 @@ impl Default for LuaQuestFunctions {
         QF_getQuestCount
         QF_getQuestID
         QF_getQuestItemQuantity
-        QF_getQuestSwitch
         QF_getQuestVar
         QF_getSkillLevel
         QF_getUnionVAR
@@ -153,6 +153,33 @@ fn QF_getEventOwner(
     }
 
     vec![0.into()]
+}
+
+#[allow(non_snake_case)]
+fn QF_getQuestSwitch(
+    _resources: &ScriptFunctionResources,
+    context: &mut ScriptFunctionContext,
+    parameters: Vec<Lua4Value>,
+) -> Vec<Lua4Value> {
+    let quest_index = parameters[0].to_i32().unwrap();
+    let quest_switch_id = parameters[1].to_i32().unwrap() as usize;
+    let quest_state = context.query_quest.single();
+
+    let result = if quest_index >= 0 {
+        if let Some(quest) = quest_state.get_quest(quest_index as usize) {
+            if quest.switches[quest_switch_id] {
+                1
+            } else {
+                0
+            }
+        } else {
+            -1
+        }
+    } else {
+        -1
+    };
+
+    vec![result.into()]
 }
 
 #[allow(non_snake_case)]
