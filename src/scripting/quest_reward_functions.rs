@@ -359,7 +359,10 @@ pub fn quest_triggers_apply_rewards(
         };
 
         if !result {
+            log::debug!(target: "quest", "Reward Failed: {:?}", reward);
             return false;
+        } else {
+            log::debug!(target: "quest", "Reward Success: {:?}", reward);
         }
     }
 

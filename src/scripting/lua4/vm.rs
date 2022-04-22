@@ -75,6 +75,7 @@ impl Lua4VM {
                         let function = function.clone();
                         self.call_lua_function(rust_closures, &function, &parameters)?
                     } else if let Lua4Value::RustClosure(function_name) = closure {
+                        log::debug!(target: "lua", "Call rust closure: {}", function_name);
                         rust_closures.call_rust_closure(&function_name, parameters)?
                     } else {
                         return Err(Lua4VMError::NotClosure.into());

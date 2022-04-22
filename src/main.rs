@@ -266,7 +266,7 @@ fn main() {
         })
         .insert_resource(LogSettings {
             level: Level::INFO,
-            filter: "wgpu=error,packets=debug".to_string(),
+            filter: "wgpu=error,packets=debug,quest=trace,lua=trace".to_string(),
         })
         .add_plugin(bevy::log::LogPlugin::default())
         .add_plugin(bevy::core::CorePlugin::default())

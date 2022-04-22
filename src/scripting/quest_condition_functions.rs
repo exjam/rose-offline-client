@@ -172,7 +172,10 @@ pub fn quest_trigger_check_conditions(
         };
 
         if !result {
+            log::debug!(target: "quest", "Condition Failed: {:?}", condition);
             return false;
+        } else {
+            log::debug!(target: "quest", "Condition Success: {:?}", condition);
         }
     }
 
