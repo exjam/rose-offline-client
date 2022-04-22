@@ -1,9 +1,12 @@
 use rose_data::QuestTrigger;
 use rose_file_readers::{
     QsdCondition, QsdConditionOperator, QsdConditionQuestItem, QsdEquipmentIndex, QsdItemBase1000,
+    QsdVariableType,
 };
 
-use crate::scripting::{QuestFunctionContext, ScriptFunctionContext, ScriptFunctionResources};
+use crate::scripting::{
+    quest::get_quest_variable, QuestFunctionContext, ScriptFunctionContext, ScriptFunctionResources,
+};
 
 fn quest_condition_operator<T: PartialEq + PartialOrd>(
     operator: QsdConditionOperator,
@@ -125,6 +128,28 @@ fn quest_condition_quest_items(
     true
 }
 
+fn quest_condition_quest_variable(
+    script_resources: &ScriptFunctionResources,
+    script_context: &mut ScriptFunctionContext,
+    quest_context: &mut QuestFunctionContext,
+    variable_type: QsdVariableType,
+    variable_id: usize,
+    operator: QsdConditionOperator,
+    value: i32,
+) -> bool {
+    if let Some(variable_value) = get_quest_variable(
+        script_resources,
+        script_context,
+        quest_context,
+        variable_type,
+        variable_id,
+    ) {
+        quest_condition_operator(operator, variable_value, value)
+    } else {
+        false
+    }
+}
+
 fn quest_condition_select_quest(
     _script_resources: &ScriptFunctionResources,
     script_context: &mut ScriptFunctionContext,
@@ -151,6 +176,19 @@ pub fn quest_trigger_check_conditions(
         let result = match *condition {
             QsdCondition::QuestItems(ref items) => {
                 quest_condition_quest_items(script_resources, script_context, quest_context, items)
+            }
+            QsdCondition::QuestVariable(ref quest_variables) => {
+                quest_variables.iter().all(|quest_variable| {
+                    quest_condition_quest_variable(
+                        script_resources,
+                        script_context,
+                        quest_context,
+                        quest_variable.variable_type,
+                        quest_variable.variable_id,
+                        quest_variable.operator,
+                        quest_variable.value,
+                    )
+                })
             }
             QsdCondition::QuestSwitch(switch_id, value) => quest_condition_check_switch(
                 script_resources,

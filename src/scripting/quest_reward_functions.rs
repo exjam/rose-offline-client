@@ -1,11 +1,26 @@
 use rose_data::{QuestTrigger, StackableItem};
-use rose_file_readers::{QsdItemBase1000, QsdReward, QsdRewardQuestAction};
+use rose_file_readers::{
+    QsdItemBase1000, QsdReward, QsdRewardOperator, QsdRewardQuestAction, QsdVariableType,
+};
 use rose_game_common::components::ActiveQuest;
 
 use crate::{
     events::ChatboxEvent,
-    scripting::{QuestFunctionContext, ScriptFunctionContext, ScriptFunctionResources},
+    scripting::{
+        quest::{get_quest_variable, set_quest_variable},
+        QuestFunctionContext, ScriptFunctionContext, ScriptFunctionResources,
+    },
 };
+
+fn quest_reward_operator(operator: QsdRewardOperator, variable_value: i32, value: i32) -> i32 {
+    match operator {
+        QsdRewardOperator::Set => value,
+        QsdRewardOperator::Add => variable_value + value,
+        QsdRewardOperator::Subtract => variable_value - value,
+        QsdRewardOperator::Zero => 0,
+        QsdRewardOperator::One => 1,
+    }
+}
 
 fn quest_reward_add_item(
     script_resources: &ScriptFunctionResources,
@@ -259,6 +274,37 @@ fn quest_reward_set_quest_switch(
     false
 }
 
+fn quest_reward_quest_variable(
+    script_resources: &ScriptFunctionResources,
+    script_context: &mut ScriptFunctionContext,
+    quest_context: &mut QuestFunctionContext,
+    variable_type: QsdVariableType,
+    variable_id: usize,
+    operator: QsdRewardOperator,
+    value: i32,
+) -> bool {
+    if let Some(variable_value) = get_quest_variable(
+        script_resources,
+        script_context,
+        quest_context,
+        variable_type,
+        variable_id,
+    ) {
+        let value = quest_reward_operator(operator, variable_value, value);
+        set_quest_variable(
+            script_resources,
+            script_context,
+            quest_context,
+            variable_type,
+            variable_id,
+            value,
+        );
+        true
+    } else {
+        false
+    }
+}
+
 fn quest_reward_set_next_trigger(
     _script_resources: &ScriptFunctionResources,
     _script_context: &mut ScriptFunctionContext,
@@ -338,6 +384,19 @@ pub fn quest_triggers_apply_rewards(
                     quest_id,
                     false,
                 )
+            }
+            QsdReward::QuestVariable(ref quest_variables) => {
+                quest_variables.iter().all(|quest_variable| {
+                    quest_reward_quest_variable(
+                        script_resources,
+                        script_context,
+                        quest_context,
+                        quest_variable.variable_type,
+                        quest_variable.variable_id,
+                        quest_variable.operator,
+                        quest_variable.value,
+                    )
+                })
             }
             QsdReward::SetQuestSwitch(switch_id, value) => quest_reward_set_quest_switch(
                 script_resources,
