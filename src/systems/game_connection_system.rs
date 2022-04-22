@@ -10,8 +10,8 @@ use rose_data::{EquipmentItem, ItemReference, ItemSlotBehaviour, ItemType};
 use rose_game_common::{
     components::{
         BasicStatType, BasicStats, CharacterInfo, Equipment, ExperiencePoints, HealthPoints,
-        Hotbar, Inventory, ItemDrop, Level, ManaPoints, MoveMode, MoveSpeed, Npc, QuestState,
-        SkillList, Stamina, StatPoints, StatusEffects,
+        Hotbar, Inventory, ItemDrop, ItemSlot, Level, ManaPoints, MoveMode, MoveSpeed, Npc,
+        QuestState, SkillList, Stamina, StatPoints, StatusEffects,
     },
     messages::server::{
         CommandState, LearnSkillError, LevelUpSkillError, PickupItemDropContent,
@@ -442,10 +442,13 @@ pub fn game_connection_system(
                     if npc_data.right_hand_part_index > 0 {
                         equipment
                             .equip_item(
-                                EquipmentItem::new(&ItemReference::new(
-                                    ItemType::Weapon,
-                                    npc_data.right_hand_part_index as usize,
-                                ))
+                                EquipmentItem::new(
+                                    ItemReference::new(
+                                        ItemType::Weapon,
+                                        npc_data.right_hand_part_index as usize,
+                                    ),
+                                    0,
+                                )
                                 .unwrap(),
                             )
                             .ok();
@@ -454,10 +457,13 @@ pub fn game_connection_system(
                     if npc_data.left_hand_part_index > 0 {
                         equipment
                             .equip_item(
-                                EquipmentItem::new(&ItemReference::new(
-                                    ItemType::SubWeapon,
-                                    npc_data.left_hand_part_index as usize,
-                                ))
+                                EquipmentItem::new(
+                                    ItemReference::new(
+                                        ItemType::SubWeapon,
+                                        npc_data.left_hand_part_index as usize,
+                                    ),
+                                    0,
+                                )
                                 .unwrap(),
                             )
                             .ok();
@@ -684,24 +690,83 @@ pub fn game_connection_system(
             Ok(ServerMessage::UpdateAmmo(entity_id, ammo_index, item)) => {
                 if let Some(entity) = client_entity_list.get(entity_id) {
                     if let Ok((mut equipment, _)) = query_set_character.p0().get_mut(entity) {
-                        equipment.equipped_ammo[ammo_index] = item;
+                        if let Some(equipped_ammo) = equipment.equipped_ammo[ammo_index].as_mut() {
+                            if let Some(item) = item {
+                                equipped_ammo.item = item.item;
+                            } else {
+                                equipment.equipped_ammo[ammo_index] = None;
+                            }
+                        }
                     }
                 }
             }
             Ok(ServerMessage::UpdateEquipment(message)) => {
                 if let Some(entity) = client_entity_list.get(message.entity_id) {
                     if let Ok((mut equipment, _)) = query_set_character.p0().get_mut(entity) {
-                        equipment.equipped_items[message.equipment_index] = message.item;
+                        if let Some(equipped_item) =
+                            equipment.equipped_items[message.equipment_index].as_mut()
+                        {
+                            if let Some(item) = message.item {
+                                // Only update visual related data
+                                equipped_item.item = item.item;
+                                equipped_item.has_socket = item.has_socket;
+                                equipped_item.gem = item.gem;
+                                equipped_item.grade = item.grade;
+                            } else {
+                                equipment.equipped_items[message.equipment_index] = None;
+                            }
+                        } else {
+                            equipment.equipped_items[message.equipment_index] = message.item;
+                        }
+                    }
+                }
+            }
+            Ok(ServerMessage::UpdateVehiclePart(message)) => {
+                if let Some(entity) = client_entity_list.get(message.entity_id) {
+                    if let Ok((mut equipment, _)) = query_set_character.p0().get_mut(entity) {
+                        if let Some(equipped_item) =
+                            equipment.equipped_vehicle[message.vehicle_part_index].as_mut()
+                        {
+                            if let Some(item) = message.item {
+                                // Only update visual related data
+                                equipped_item.item = item.item;
+                                equipped_item.has_socket = item.has_socket;
+                                equipped_item.gem = item.gem;
+                                equipped_item.grade = item.grade;
+                            } else {
+                                equipment.equipped_vehicle[message.vehicle_part_index] = None;
+                            }
+                        } else {
+                            equipment.equipped_vehicle[message.vehicle_part_index] = message.item;
+                        }
                     }
                 }
             }
             Ok(ServerMessage::UpdateInventory(update_items, update_money)) => {
                 if let Some(player_entity) = client_entity_list.player_entity {
-                    if let Ok((_, mut inventory)) = query_set_character.p0().get_mut(player_entity)
+                    if let Ok((mut equipment, mut inventory)) =
+                        query_set_character.p0().get_mut(player_entity)
                     {
                         for (item_slot, item) in update_items {
-                            if let Some(item_slot) = inventory.get_item_slot_mut(item_slot) {
-                                *item_slot = item;
+                            match item_slot {
+                                ItemSlot::Inventory(_, _) => {
+                                    if let Some(item_slot) = inventory.get_item_slot_mut(item_slot)
+                                    {
+                                        *item_slot = item;
+                                    }
+                                }
+                                ItemSlot::Ammo(ammo_index) => {
+                                    *equipment.get_ammo_slot_mut(ammo_index) =
+                                        item.and_then(|x| x.as_stackable().cloned())
+                                }
+                                ItemSlot::Equipment(equipment_index) => {
+                                    *equipment.get_equipment_slot_mut(equipment_index) =
+                                        item.and_then(|x| x.as_equipment().cloned())
+                                }
+                                ItemSlot::Vehicle(vehicle_part_index) => {
+                                    *equipment.get_vehicle_slot_mut(vehicle_part_index) =
+                                        item.and_then(|x| x.as_equipment().cloned())
+                                }
                             }
                         }
 
@@ -727,13 +792,6 @@ pub fn game_connection_system(
                     if let Ok((_, mut inventory)) = query_set_character.p0().get_mut(player_entity)
                     {
                         inventory.money = money;
-                    }
-                }
-            }
-            Ok(ServerMessage::UpdateVehiclePart(message)) => {
-                if let Some(entity) = client_entity_list.get(message.entity_id) {
-                    if let Ok((mut equipment, _)) = query_set_character.p0().get_mut(entity) {
-                        equipment.equipped_vehicle[message.vehicle_part_index] = message.item;
                     }
                 }
             }

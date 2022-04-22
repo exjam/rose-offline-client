@@ -51,7 +51,7 @@ pub fn ui_debug_item_list_system(
                     ui.add(
                         egui::DragValue::new(&mut ui_state_debug_item_list.spawn_quantity)
                             .speed(1)
-                            .clamp_range(1..=999),
+                            .clamp_range(1..=999usize),
                     );
                     ui.end_row();
 
@@ -195,7 +195,9 @@ pub fn ui_debug_item_list_system(
                                         )
                                         .on_hover_ui(
                                             |ui| {
-                                                if let Some(item) = Item::new(&item_reference, 1) {
+                                                if let Some(item) =
+                                                    Item::from_item_data(item_data, 1)
+                                                {
                                                     ui_add_item_tooltip(ui, &game_data, &item);
                                                 }
                                             },
@@ -236,8 +238,10 @@ pub fn ui_debug_item_list_system(
                                                     {
                                                         equipment.equipped_items[equipment_index] =
                                                             Some(
-                                                                EquipmentItem::new(&item_reference)
-                                                                    .unwrap(),
+                                                                EquipmentItem::from_item_data(
+                                                                    item_data,
+                                                                )
+                                                                .unwrap(),
                                                             );
 
                                                         if item_data.class.is_two_handed_weapon() {

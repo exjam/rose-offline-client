@@ -1,4 +1,4 @@
-use rose_data::{Item, QuestTrigger};
+use rose_data::{QuestTrigger, StackableItem};
 use rose_file_readers::{QsdItemBase1000, QsdReward, QsdRewardQuestAction};
 use rose_game_common::components::ActiveQuest;
 
@@ -31,8 +31,8 @@ fn quest_reward_add_item(
             if quest_state
                 .get_quest_mut(selected_quest_index)
                 .and_then(|active_quest| {
-                    Item::new(&item_reference, quantity as u32)
-                        .and_then(|item| active_quest.try_add_item(item).ok())
+                    StackableItem::new(item_reference, quantity as u32)
+                        .and_then(|item| active_quest.try_add_item(item.into()).ok())
                 })
                 .is_some()
             {

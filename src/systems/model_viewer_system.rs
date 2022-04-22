@@ -255,7 +255,8 @@ pub fn model_viewer_system(
                     let mut equipment = Equipment::default();
                     for (equipment_index, valid_items) in ui_state.valid_items.iter() {
                         if let Some(item) = valid_items.choose(&mut rng) {
-                            equipment.equipped_items[equipment_index] = EquipmentItem::new(item);
+                            equipment.equipped_items[equipment_index] =
+                                EquipmentItem::new(*item, 0);
                         }
                     }
 

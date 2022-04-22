@@ -26,13 +26,13 @@ rand = "0.8"
 smooth-bevy-cameras = "0.2.0"
 thiserror = "1.0"
 tokio = { version = "1.17", features = ["rt", "net", "sync", "macros", "io-util"] }
-rose-data = { git = "https://github.com/exjam/rose-offline", rev = "e5327f72b8a4780f26d6c7e8a2203347d2b18525" }
-rose-data-irose = { git = "https://github.com/exjam/rose-offline", rev = "e5327f72b8a4780f26d6c7e8a2203347d2b18525" }
-rose-file-readers = { git = "https://github.com/exjam/rose-offline", rev = "e5327f72b8a4780f26d6c7e8a2203347d2b18525" }
-rose-game-common = { git = "https://github.com/exjam/rose-offline", rev = "e5327f72b8a4780f26d6c7e8a2203347d2b18525" }
-rose-game-irose = { git = "https://github.com/exjam/rose-offline", rev = "e5327f72b8a4780f26d6c7e8a2203347d2b18525" }
-rose-network-common = { git = "https://github.com/exjam/rose-offline", rev = "e5327f72b8a4780f26d6c7e8a2203347d2b18525" }
-rose-network-irose = { git = "https://github.com/exjam/rose-offline", rev = "e5327f72b8a4780f26d6c7e8a2203347d2b18525" }
+rose-data = { git = "https://github.com/exjam/rose-offline", rev = "2d3a65c16c7da956849471d313a0f86e45f77801" }
+rose-data-irose = { git = "https://github.com/exjam/rose-offline", rev = "2d3a65c16c7da956849471d313a0f86e45f77801" }
+rose-file-readers = { git = "https://github.com/exjam/rose-offline", rev = "2d3a65c16c7da956849471d313a0f86e45f77801" }
+rose-game-common = { git = "https://github.com/exjam/rose-offline", rev = "2d3a65c16c7da956849471d313a0f86e45f77801" }
+rose-game-irose = { git = "https://github.com/exjam/rose-offline", rev = "2d3a65c16c7da956849471d313a0f86e45f77801" }
+rose-network-common = { git = "https://github.com/exjam/rose-offline", rev = "2d3a65c16c7da956849471d313a0f86e45f77801" }
+rose-network-irose = { git = "https://github.com/exjam/rose-offline", rev = "2d3a65c16c7da956849471d313a0f86e45f77801" }
 
 [patch.crates-io]
 bevy = { git = "https://github.com/exjam/bevy", rev = "20e5f3a1e664537f1fbb06a852f8c34a8d9ce510" }
@@ -42,6 +42,15 @@ bevy-inspector-egui = { git = "https://github.com/exjam/bevy-inspector-egui", re
 bevy_rapier3d = { git = "https://github.com/exjam/bevy_rapier", rev = "2016e45cfa58c8e51600d4bd6ac02b660d862bfe" }
 smooth-bevy-cameras = { git = "https://github.com/exjam/smooth-bevy-cameras", rev = "29bb4884f5e29f49cb599a21a0e9bc684a326402" }
 image = { git = "https://github.com/image-rs/image", branch = "version-0.23" }
+
+[patch."https://github.com/exjam/rose-offline"]
+rose-data = { path = "../rose-offline/rose-data" }
+rose-data-irose = { path = "../rose-offline/rose-data-irose" }
+rose-file-readers = { path = "../rose-offline/rose-file-readers" }
+rose-game-common = { path = "../rose-offline/rose-game-common" }
+rose-game-irose = { path = "../rose-offline/rose-game-irose" }
+rose-network-common = { path = "../rose-offline/rose-network-common" }
+rose-network-irose = { path = "../rose-offline/rose-network-irose" }
 
 [profile.dev.package."*"]
 opt-level = 3
