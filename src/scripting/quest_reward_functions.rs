@@ -257,6 +257,19 @@ fn quest_reward_change_selected_quest_id(
     false
 }
 
+fn quest_reward_set_health_mana_percent(
+    _script_resources: &ScriptFunctionResources,
+    script_context: &mut ScriptFunctionContext,
+    _quest_context: &mut QuestFunctionContext,
+    health_percent: i32,
+    mana_percent: i32,
+) -> bool {
+    let mut character = script_context.query_player.single_mut();
+    character.health_points.hp = (character.ability_values.get_max_health() * health_percent) / 100;
+    character.mana_points.mp = (character.ability_values.get_max_mana() * mana_percent) / 100;
+    true
+}
+
 fn quest_reward_set_quest_switch(
     _script_resources: &ScriptFunctionResources,
     script_context: &mut ScriptFunctionContext,
@@ -397,6 +410,15 @@ pub fn quest_triggers_apply_rewards(
                         quest_variable.value,
                     )
                 })
+            }
+            QsdReward::SetHealthManaPercent(_target, health_percent, mana_percent) => {
+                quest_reward_set_health_mana_percent(
+                    script_resources,
+                    script_context,
+                    quest_context,
+                    health_percent as i32,
+                    mana_percent as i32,
+                )
             }
             QsdReward::SetQuestSwitch(switch_id, value) => quest_reward_set_quest_switch(
                 script_resources,
