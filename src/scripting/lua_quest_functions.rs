@@ -34,6 +34,7 @@ impl Default for LuaQuestFunctions {
         closures.insert("QF_getPlanetVAR".into(), QF_getPlanetVAR);
         closures.insert("QF_getQuestCount".into(), QF_getQuestCount);
         closures.insert("QF_getQuestID".into(), QF_getQuestID);
+        closures.insert("QF_getQuestItemQuantity".into(), QF_getQuestItemQuantity);
         closures.insert("QF_getQuestSwitch".into(), QF_getQuestSwitch);
         closures.insert("QF_getQuestVar".into(), QF_getQuestVar);
         closures.insert("QF_getUserSwitch".into(), QF_getUserSwitch);
@@ -51,7 +52,6 @@ impl Default for LuaQuestFunctions {
         QF_deleteQuest
         QF_EffectCallNpc
         QF_EffectCallSelf
-        QF_getQuestItemQuantity
         QF_getSkillLevel
         QF_getUnionVAR
         QF_givePoint
@@ -250,6 +250,36 @@ fn QF_getQuestID(
         Some(quest.quest_id as i32)
     }()
     .unwrap_or(-1);
+
+    vec![result.into()]
+}
+
+#[allow(non_snake_case)]
+fn QF_getQuestItemQuantity(
+    resources: &ScriptFunctionResources,
+    context: &mut ScriptFunctionContext,
+    parameters: Vec<Lua4Value>,
+) -> Vec<Lua4Value> {
+    let result = || -> Option<i32> {
+        let quest_id = parameters.get(0)?.to_usize().ok()?;
+        let item_base1000 = parameters.get(1)?.to_usize().ok()?;
+        log::trace!(target: "lua", "QF_getQuestItemQuantity({}, {})", quest_id, item_base1000);
+
+        let item_reference = resources
+            .game_data
+            .data_decoder
+            .decode_item_base1000(item_base1000)?;
+        let quest_state = context.query_quest.get_single().ok()?;
+        let quest = quest_state.find_active_quest(quest_id)?;
+        for item in quest.items.iter().flatten() {
+            if item.get_item_reference() == item_reference {
+                return Some(item.get_quantity() as i32);
+            }
+        }
+
+        None
+    }()
+    .unwrap_or(0);
 
     vec![result.into()]
 }
