@@ -41,14 +41,15 @@ pub fn quest_check_conditions(
             quest_trigger,
         ) {
             success = true;
-            break;
-        }
 
-        if quest_context.next_quest_trigger.is_some() {
-            trigger = quest_context
-                .next_quest_trigger
-                .take()
-                .and_then(|name| script_resources.game_data.quests.get_trigger_by_name(&name));
+            if quest_context.next_quest_trigger.is_some() {
+                trigger = quest_context
+                    .next_quest_trigger
+                    .take()
+                    .and_then(|name| script_resources.game_data.quests.get_trigger_by_name(&name));
+            } else {
+                trigger = None;
+            }
         } else {
             trigger = trigger
                 .unwrap()
@@ -92,14 +93,15 @@ pub fn quest_apply_rewards(
             quest_trigger,
         ) {
             success = true;
-            break;
-        }
 
-        if quest_context.next_quest_trigger.is_some() {
-            trigger = quest_context
-                .next_quest_trigger
-                .take()
-                .and_then(|name| script_resources.game_data.quests.get_trigger_by_name(&name));
+            if quest_context.next_quest_trigger.is_some() {
+                trigger = quest_context
+                    .next_quest_trigger
+                    .take()
+                    .and_then(|name| script_resources.game_data.quests.get_trigger_by_name(&name));
+            } else {
+                trigger = None;
+            }
         } else {
             trigger = trigger
                 .unwrap()
