@@ -5,7 +5,7 @@ use bevy::{
 
 use rose_game_common::components::{
     AbilityValues, BasicStats, CharacterInfo, Equipment, ExperiencePoints, HealthPoints, Inventory,
-    Level, ManaPoints, MoveSpeed, QuestState, SkillPoints, Stamina, StatPoints, Team,
+    Level, ManaPoints, MoveSpeed, Npc, QuestState, SkillPoints, Stamina, StatPoints, Team,
     UnionMembership,
 };
 
@@ -39,5 +39,6 @@ pub struct ScriptFunctionContext<'w, 's> {
     pub query_quest: Query<'w, 's, &'static mut QuestState>,
     pub query_client_entity: Query<'w, 's, &'static ClientEntity>,
     pub query_player: Query<'w, 's, ScriptCharacterQuery<'static>, With<PlayerCharacter>>,
+    pub query_npc: Query<'w, 's, &'static Npc>,
     pub chatbox_events: EventWriter<'w, 's, ChatboxEvent>,
 }

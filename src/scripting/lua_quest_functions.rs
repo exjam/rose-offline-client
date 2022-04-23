@@ -29,8 +29,15 @@ impl Default for LuaQuestFunctions {
         closures.insert("QF_doQuestTrigger".into(), QF_doQuestTrigger);
         closures.insert("QF_findQuest".into(), QF_findQuest);
         closures.insert("QF_getEventOwner".into(), QF_getEventOwner);
+        closures.insert("QF_getEpisodeVAR".into(), QF_getEpisodeVAR);
+        closures.insert("QF_getJobVAR".into(), QF_getJobVAR);
+        closures.insert("QF_getPlanetVAR".into(), QF_getPlanetVAR);
+        closures.insert("QF_getQuestCount".into(), QF_getQuestCount);
+        closures.insert("QF_getQuestID".into(), QF_getQuestID);
         closures.insert("QF_getQuestSwitch".into(), QF_getQuestSwitch);
+        closures.insert("QF_getQuestVar".into(), QF_getQuestVar);
         closures.insert("QF_getUserSwitch".into(), QF_getUserSwitch);
+        closures.insert("QF_getNpcQuestZeroVal".into(), QF_getNpcQuestZeroVal);
 
         /*
         QF_appendQuest
@@ -44,14 +51,7 @@ impl Default for LuaQuestFunctions {
         QF_deleteQuest
         QF_EffectCallNpc
         QF_EffectCallSelf
-        QF_getEpisodeVAR
-        QF_getJobVAR
-        QF_getNpcQuestZeroVal
-        QF_getPlanetVAR
-        QF_getQuestCount
-        QF_getQuestID
         QF_getQuestItemQuantity
-        QF_getQuestVar
         QF_getSkillLevel
         QF_getUnionVAR
         QF_givePoint
@@ -130,14 +130,16 @@ fn QF_findQuest(
     context: &mut ScriptFunctionContext,
     parameters: Vec<Lua4Value>,
 ) -> Vec<Lua4Value> {
-    let quest_id = parameters[0].to_i32().unwrap() as usize;
-    let quest_state = context.query_quest.single();
+    let result = || -> Option<i32> {
+        let quest_id = parameters.get(0)?.to_usize().ok()?;
+        let quest_state = context.query_quest.get_single().ok()?;
+        quest_state
+            .find_active_quest_index(quest_id)
+            .map(|x| x as i32)
+    }()
+    .unwrap_or(-1);
 
-    vec![quest_state
-        .find_active_quest_index(quest_id)
-        .map(|x| x as i32)
-        .unwrap_or(-1)
-        .into()]
+    vec![result.into()]
 }
 
 #[allow(non_snake_case)]
@@ -156,28 +158,125 @@ fn QF_getEventOwner(
 }
 
 #[allow(non_snake_case)]
+fn QF_getEpisodeVAR(
+    _resources: &ScriptFunctionResources,
+    context: &mut ScriptFunctionContext,
+    parameters: Vec<Lua4Value>,
+) -> Vec<Lua4Value> {
+    let result = || -> Option<i32> {
+        let var_id = parameters.get(0)?.to_usize().ok()?;
+        let quest_state = context.query_quest.get_single().ok()?;
+        Some(*quest_state.episode_variables.get(var_id)? as i32)
+    }()
+    .unwrap_or(-1);
+
+    vec![result.into()]
+}
+
+#[allow(non_snake_case)]
+fn QF_getJobVAR(
+    _resources: &ScriptFunctionResources,
+    context: &mut ScriptFunctionContext,
+    parameters: Vec<Lua4Value>,
+) -> Vec<Lua4Value> {
+    let result = || -> Option<i32> {
+        let var_id = parameters.get(0)?.to_usize().ok()?;
+        let quest_state = context.query_quest.get_single().ok()?;
+        Some(*quest_state.job_variables.get(var_id)? as i32)
+    }()
+    .unwrap_or(-1);
+
+    vec![result.into()]
+}
+
+#[allow(non_snake_case)]
+fn QF_getPlanetVAR(
+    _resources: &ScriptFunctionResources,
+    context: &mut ScriptFunctionContext,
+    parameters: Vec<Lua4Value>,
+) -> Vec<Lua4Value> {
+    let result = || -> Option<i32> {
+        let var_id = parameters.get(0)?.to_usize().ok()?;
+        let quest_state = context.query_quest.get_single().ok()?;
+        Some(*quest_state.planet_variables.get(var_id)? as i32)
+    }()
+    .unwrap_or(-1);
+
+    vec![result.into()]
+}
+
+#[allow(non_snake_case)]
+fn QF_getQuestCount(
+    _resources: &ScriptFunctionResources,
+    context: &mut ScriptFunctionContext,
+    _parameters: Vec<Lua4Value>,
+) -> Vec<Lua4Value> {
+    let result = || -> Option<i32> {
+        let quest_state = context.query_quest.get_single().ok()?;
+        Some(
+            quest_state
+                .active_quests
+                .iter()
+                .filter(|x| x.is_some())
+                .count() as i32,
+        )
+    }()
+    .unwrap_or(0);
+
+    vec![result.into()]
+}
+
+#[allow(non_snake_case)]
+fn QF_getQuestID(
+    _resources: &ScriptFunctionResources,
+    context: &mut ScriptFunctionContext,
+    parameters: Vec<Lua4Value>,
+) -> Vec<Lua4Value> {
+    let result = || -> Option<i32> {
+        let quest_index = parameters.get(0)?.to_usize().ok()?;
+        let quest_state = context.query_quest.get_single().ok()?;
+        let quest = quest_state.get_quest(quest_index)?;
+        Some(quest.quest_id as i32)
+    }()
+    .unwrap_or(-1);
+
+    vec![result.into()]
+}
+
+#[allow(non_snake_case)]
 fn QF_getQuestSwitch(
     _resources: &ScriptFunctionResources,
     context: &mut ScriptFunctionContext,
     parameters: Vec<Lua4Value>,
 ) -> Vec<Lua4Value> {
-    let quest_index = parameters[0].to_i32().unwrap();
-    let quest_switch_id = parameters[1].to_i32().unwrap() as usize;
-    let quest_state = context.query_quest.single();
+    let result = || -> Option<i32> {
+        let quest_index = parameters.get(0)?.to_usize().ok()?;
+        let quest_switch_id = parameters.get(1)?.to_usize().ok()?;
+        let quest_state = context.query_quest.get_single().ok()?;
 
-    let result = if quest_index >= 0 {
-        if let Some(quest) = quest_state.get_quest(quest_index as usize) {
-            if quest.switches[quest_switch_id] {
-                1
-            } else {
-                0
-            }
-        } else {
-            -1
-        }
-    } else {
-        -1
-    };
+        let quest = quest_state.get_quest(quest_index)?;
+        Some(*quest.switches.get(quest_switch_id)? as i32)
+    }()
+    .unwrap_or(-1);
+
+    vec![result.into()]
+}
+
+#[allow(non_snake_case)]
+fn QF_getQuestVar(
+    _resources: &ScriptFunctionResources,
+    context: &mut ScriptFunctionContext,
+    parameters: Vec<Lua4Value>,
+) -> Vec<Lua4Value> {
+    let result = || -> Option<i32> {
+        let quest_index = parameters.get(0)?.to_usize().ok()?;
+        let quest_var_id = parameters.get(1)?.to_usize().ok()?;
+        let quest_state = context.query_quest.get_single().ok()?;
+
+        let quest = quest_state.get_quest(quest_index)?;
+        Some(*quest.variables.get(quest_var_id)? as i32)
+    }()
+    .unwrap_or(-1);
 
     vec![result.into()]
 }
@@ -188,8 +287,34 @@ fn QF_getUserSwitch(
     context: &mut ScriptFunctionContext,
     parameters: Vec<Lua4Value>,
 ) -> Vec<Lua4Value> {
-    let switch_id = parameters[0].to_i32().unwrap() as usize;
-    let quest_state = context.query_quest.single();
+    let result = || -> Option<i32> {
+        let switch_id = parameters.get(0)?.to_usize().ok()?;
+        let quest_state = context.query_quest.get_single().ok()?;
+        Some(*quest_state.quest_switches.get(switch_id)? as i32)
+    }()
+    .unwrap_or(-1);
 
-    vec![quest_state.quest_switches[switch_id].into()]
+    vec![result.into()]
+}
+
+#[allow(non_snake_case)]
+fn QF_getNpcQuestZeroVal(
+    _resources: &ScriptFunctionResources,
+    context: &mut ScriptFunctionContext,
+    parameters: Vec<Lua4Value>,
+) -> Vec<Lua4Value> {
+    let result = || -> Option<i32> {
+        let npc_id = parameters.get(0)?.to_usize().ok()?;
+
+        for npc in context.query_npc.iter() {
+            if npc.id.get() as usize == npc_id {
+                return Some(npc.quest_index as i32);
+            }
+        }
+
+        None
+    }()
+    .unwrap_or(0);
+
+    vec![result.into()]
 }
