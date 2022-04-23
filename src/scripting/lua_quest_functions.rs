@@ -74,24 +74,17 @@ fn QF_checkQuestCondition(
     context: &mut ScriptFunctionContext,
     parameters: Vec<Lua4Value>,
 ) -> Vec<Lua4Value> {
-    let result = if let Ok(quest_trigger_name) = parameters[0].to_string() {
-        match quest_check_conditions(resources, context, quest_trigger_name.as_str().into()) {
-            Ok(result) => {
-                if result {
-                    1 // Success
-                } else {
-                    2 // Failed
-                }
-            }
-            Err(_) => {
-                0 // Error
-            }
-        }
-    } else {
-        0 // Error
-    };
+    if let Ok(quest_trigger_name) = parameters[0].to_string() {
+        log::trace!(target: "lua", "QF_checkQuestCondition({})", &quest_trigger_name);
 
-    vec![result.into()]
+        if let Ok(true) =
+            quest_check_conditions(resources, context, quest_trigger_name.as_str().into())
+        {
+            return vec![1.into()];
+        }
+    }
+
+    vec![0.into()]
 }
 
 #[allow(non_snake_case)]
