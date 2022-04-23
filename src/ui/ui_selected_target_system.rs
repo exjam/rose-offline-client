@@ -1,28 +1,20 @@
-use bevy::prelude::{Commands, Entity, Query, Res, ResMut, With};
+use bevy::prelude::{Commands, Entity, Query, ResMut, With};
 use bevy_egui::{egui, EguiContext};
-use rose_game_common::components::{AbilityValues, CharacterInfo, HealthPoints, Npc};
 
-use crate::{
-    components::{PlayerCharacter, SelectedTarget},
-    resources::GameData,
-};
+use rose_game_common::components::{AbilityValues, HealthPoints};
+
+use crate::components::{ClientEntityName, PlayerCharacter, SelectedTarget};
 
 pub fn ui_selected_target_system(
     mut commands: Commands,
     mut egui_context: ResMut<EguiContext>,
-    game_data: Res<GameData>,
     query_player: Query<(Entity, Option<&SelectedTarget>), With<PlayerCharacter>>,
-    query_target: Query<(
-        &AbilityValues,
-        &HealthPoints,
-        Option<&Npc>,
-        Option<&CharacterInfo>,
-    )>,
+    query_target: Query<(&AbilityValues, &ClientEntityName, &HealthPoints)>,
 ) {
     let (player_entity, player_target) = query_player.single();
 
     if let Some(player_target) = player_target {
-        if let Ok((ability_values, health_points, npc, character_info)) =
+        if let Ok((ability_values, client_entity_name, health_points)) =
             query_target.get(player_target.entity)
         {
             egui::Window::new("Selected Target")
@@ -30,14 +22,7 @@ pub fn ui_selected_target_system(
                 .collapsible(false)
                 .title_bar(false)
                 .show(egui_context.ctx_mut(), |ui| {
-                    if let Some(npc_data) = npc.and_then(|npc| game_data.npcs.get_npc(npc.id)) {
-                        ui.label(&npc_data.name);
-                    } else if let Some(character_info) = character_info {
-                        ui.label(&character_info.name);
-                    } else {
-                        ui.label("???");
-                    }
-
+                    ui.label(&client_entity_name.name);
                     ui.label(format!("Level: {}", ability_values.level));
 
                     ui.scope(|ui| {

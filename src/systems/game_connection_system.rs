@@ -3,59 +3,37 @@ use bevy::{
     math::{Quat, Vec3},
     prelude::{
         BuildChildren, Commands, ComputedVisibility, DespawnRecursiveExt, Entity, EventWriter,
-        GlobalTransform, Or, ParamSet, Query, Res, ResMut, State, Transform, Visibility, With,
+        GlobalTransform, ParamSet, Query, Res, ResMut, State, Transform, Visibility,
     },
 };
 
 use rose_data::{EquipmentItem, ItemReference, ItemSlotBehaviour, ItemType};
 use rose_game_common::{
     components::{
-        BasicStatType, BasicStats, CharacterInfo, Equipment, ExperiencePoints, HealthPoints,
-        Hotbar, Inventory, ItemDrop, ItemSlot, Level, ManaPoints, MoveMode, MoveSpeed, Npc,
-        QuestState, SkillList, SkillPoints, Stamina, StatPoints, StatusEffects,
+        BasicStatType, BasicStats, CharacterInfo, DroppedItem, Equipment, ExperiencePoints,
+        HealthPoints, Hotbar, Inventory, ItemDrop, ItemSlot, Level, ManaPoints, MoveMode,
+        MoveSpeed, QuestState, SkillList, SkillPoints, Stamina, StatPoints, StatusEffects, Team,
+        UnionMembership,
     },
     messages::server::{
         CommandState, LearnSkillError, LevelUpSkillError, PickupItemDropContent,
         PickupItemDropError, QuestDeleteResult, QuestTriggerResult, ServerMessage,
+        UpdateAbilityValue,
     },
 };
 use rose_network_common::ConnectionError;
 
 use crate::{
+    bundles::ability_values_set_value,
     components::{
-        ClientEntity, ClientEntityType, CollisionRayCastSource, Command, CommandCastSkillTarget,
-        Cooldowns, MovementCollisionEntities, NextCommand, PassiveRecoveryTime, PendingDamageList,
-        PendingSkillEffectList, PendingSkillTargetList, PersonalStore, PlayerCharacter, Position,
-        VisibleStatusEffects,
+        ClientEntity, ClientEntityName, ClientEntityType, CollisionRayCastSource, Command,
+        CommandCastSkillTarget, Cooldowns, MovementCollisionEntities, NextCommand,
+        PassiveRecoveryTime, PendingDamageList, PendingSkillEffectList, PendingSkillTargetList,
+        PersonalStore, PlayerCharacter, Position, VisibleStatusEffects,
     },
     events::{ChatboxEvent, ClientEntityEvent, GameConnectionEvent, QuestTriggerEvent},
     resources::{AppState, ClientEntityList, GameConnection, GameData, WorldTime},
 };
-
-fn get_entity_name(
-    entity: Entity,
-    game_data: &GameData,
-    query_entity_name: &Query<
-        (Option<&CharacterInfo>, Option<&Npc>),
-        Or<(With<CharacterInfo>, With<Npc>)>,
-    >,
-) -> Option<String> {
-    match query_entity_name.get(entity) {
-        Ok((Some(character_info), None)) => {
-            return Some(character_info.name.clone());
-        }
-        Ok((None, Some(npc))) => {
-            if let Some(npc_data) = game_data.npcs.get_npc(npc.id) {
-                if !npc_data.name.is_empty() {
-                    return Some(npc_data.name.clone());
-                }
-            }
-        }
-        _ => {}
-    }
-
-    None
-}
 
 #[derive(WorldQuery)]
 #[world_query(mutable)]
@@ -73,13 +51,14 @@ pub struct QueryCharacter<'w> {
 #[world_query(mutable)]
 pub struct QueryPlayer<'w> {
     pub entity: Entity,
-    pub character_info: &'w CharacterInfo,
+    pub character_info: &'w mut CharacterInfo,
     pub basic_stats: &'w mut BasicStats,
     pub equipment: &'w mut Equipment,
     pub experience_points: &'w mut ExperiencePoints,
     pub health_points: &'w mut HealthPoints,
     pub hotbar: &'w mut Hotbar,
     pub inventory: &'w mut Inventory,
+    pub level: &'w mut Level,
     pub mana_points: &'w mut ManaPoints,
     pub quest_state: &'w mut QuestState,
     pub skill_list: &'w mut SkillList,
@@ -87,14 +66,13 @@ pub struct QueryPlayer<'w> {
     pub stamina: &'w mut Stamina,
     pub stat_points: &'w mut StatPoints,
     pub status_effects: &'w StatusEffects,
+    pub team: &'w mut Team,
+    pub union_membership: &'w mut UnionMembership,
 }
 
 pub fn game_connection_system(
     mut commands: Commands,
-    query_entity_name: Query<
-        (Option<&CharacterInfo>, Option<&Npc>),
-        Or<(With<CharacterInfo>, With<Npc>)>,
-    >,
+    query_name: Query<&ClientEntityName>,
     query_movement_collision_entities: Query<&MovementCollisionEntities>,
     mut query_pending_damage_list: Query<&mut PendingDamageList>,
     mut query_pending_skill_effect_list: Query<&mut PendingSkillEffectList>,
@@ -151,6 +129,8 @@ pub fn game_connection_system(
                 client_entity_list.player_entity = Some(
                     commands
                         .spawn_bundle((
+                            PlayerCharacter {},
+                            ClientEntityName::new(character_data.character_info.name.clone()),
                             character_data.character_info,
                             character_data.basic_stats,
                             character_data.level,
@@ -164,8 +144,6 @@ pub fn game_connection_system(
                             character_data.skill_points,
                             character_data.union_membership,
                             character_data.stamina,
-                            Position::new(character_data.position),
-                            PendingSkillEffectList::default(),
                         ))
                         .insert_bundle((
                             Command::with_stop(),
@@ -178,7 +156,11 @@ pub fn game_connection_system(
                             PassiveRecoveryTime::default(),
                             PendingSkillTargetList::default(),
                             PendingDamageList::default(),
-                            PlayerCharacter {},
+                            PendingSkillEffectList::default(),
+                            Position::new(character_data.position),
+                            VisibleStatusEffects::default(),
+                        ))
+                        .insert_bundle((
                             Transform::from_xyz(
                                 character_data.position.x / 100.0,
                                 character_data.position.z / 100.0 + 100.0,
@@ -188,7 +170,6 @@ pub fn game_connection_system(
                             Visibility::default(),
                             ComputedVisibility::default(),
                         ))
-                        .insert(VisibleStatusEffects::default())
                         .id(),
                 );
 
@@ -240,7 +221,6 @@ pub fn game_connection_system(
                     client_entity_list.clear();
                     client_entity_list.add(message.entity_id, player_entity);
                     client_entity_list.player_entity_id = Some(message.entity_id);
-                    // TODO: Do something with message.world_ticks
 
                     // Transition to in game state if we are not already
                     if !matches!(app_state.current(), AppState::Game) {
@@ -291,6 +271,7 @@ pub fn game_connection_system(
 
                 let entity = commands
                     .spawn_bundle((
+                        ClientEntityName::new(message.character_info.name.clone()),
                         Command::with_stop(),
                         next_command,
                         message.character_info,
@@ -303,12 +284,12 @@ pub fn game_connection_system(
                         message.move_speed,
                         ability_values,
                         status_effects,
-                        PendingDamageList::default(),
-                        PendingSkillEffectList::default(),
-                        PendingSkillTargetList::default(),
                     ))
                     .insert_bundle((
                         ClientEntity::new(message.entity_id, ClientEntityType::Character),
+                        PendingDamageList::default(),
+                        PendingSkillEffectList::default(),
+                        PendingSkillTargetList::default(),
                         Transform::from_xyz(
                             message.position.x / 100.0,
                             message.position.z / 100.0 + 10000.0,
@@ -373,9 +354,15 @@ pub fn game_connection_system(
                     }
                     _ => NextCommand::default(),
                 };
+                let name = game_data
+                    .npcs
+                    .get_npc(message.npc.id)
+                    .map(|npc_data| npc_data.name.clone())
+                    .unwrap_or_else(|| format!("[NPC {}]", message.npc.id.get()));
 
                 let entity = commands
                     .spawn_bundle((
+                        ClientEntityName::new(name),
                         Command::with_stop(),
                         next_command,
                         message.npc,
@@ -387,13 +374,13 @@ pub fn game_connection_system(
                         level,
                         move_speed,
                         status_effects,
+                    ))
+                    .insert_bundle((
+                        ClientEntity::new(message.entity_id, ClientEntityType::Npc),
                         PendingDamageList::default(),
                         PendingSkillEffectList::default(),
                         PendingSkillTargetList::default(),
                         VisibleStatusEffects::default(),
-                    ))
-                    .insert_bundle((
-                        ClientEntity::new(message.entity_id, ClientEntityType::Npc),
                         Transform::from_xyz(
                             message.position.x / 100.0,
                             message.position.z / 100.0 + 10000.0,
@@ -456,7 +443,7 @@ pub fn game_connection_system(
                     _ => NextCommand::default(),
                 };
                 let mut equipment = Equipment::new();
-                if let Some(npc_data) = game_data.npcs.get_npc(message.npc.id) {
+                let name = if let Some(npc_data) = game_data.npcs.get_npc(message.npc.id) {
                     if npc_data.right_hand_part_index > 0 {
                         equipment
                             .equip_item(
@@ -486,10 +473,15 @@ pub fn game_connection_system(
                             )
                             .ok();
                     }
-                }
+
+                    npc_data.name.clone()
+                } else {
+                    format!("[Monster {}]", message.npc.id.get())
+                };
 
                 let entity = commands
                     .spawn_bundle((
+                        ClientEntityName::new(name),
                         Command::with_stop(),
                         next_command,
                         message.npc,
@@ -532,9 +524,23 @@ pub fn game_connection_system(
                 client_entity_list.add(message.entity_id, entity);
             }
             Ok(ServerMessage::SpawnEntityItemDrop(message)) => {
+                let name = match &message.dropped_item {
+                    DroppedItem::Item(item) => game_data
+                        .items
+                        .get_base_item(item.get_item_reference())
+                        .map(|item_data| item_data.name.clone())
+                        .unwrap_or_else(|| {
+                            format!("[{:?} {}]", item.get_item_type(), item.get_item_number())
+                        }),
+                    DroppedItem::Money(money) => {
+                        format!("{} Zuly", money.0)
+                    }
+                };
+
                 // TODO: Use message.remaining_time, message.owner_entity_id ?
                 let entity = commands
                     .spawn_bundle((
+                        ClientEntityName::new(name),
                         ItemDrop::with_dropped_item(message.dropped_item),
                         Position::new(message.position),
                         ClientEntity::new(message.entity_id, ClientEntityType::ItemDrop),
@@ -631,11 +637,11 @@ pub fn game_connection_system(
                 {
                     if let Some(entity_name) = client_entity_list
                         .get(message.defender_entity_id)
-                        .and_then(|entity| get_entity_name(entity, &game_data, &query_entity_name))
+                        .and_then(|entity| query_name.get(entity).ok())
                     {
                         chatbox_events.send(ChatboxEvent::System(format!(
                             "You have succeeded in hunting {}",
-                            entity_name
+                            entity_name.name
                         )));
                     }
                 }
@@ -691,8 +697,8 @@ pub fn game_connection_system(
             }
             Ok(ServerMessage::LocalChat(message)) => {
                 if let Some(entity) = client_entity_list.get(message.entity_id) {
-                    if let Some(name) = get_entity_name(entity, &game_data, &query_entity_name) {
-                        chatbox_events.send(ChatboxEvent::Say(name, message.text));
+                    if let Ok(name) = query_name.get(entity) {
+                        chatbox_events.send(ChatboxEvent::Say(name.name.clone(), message.text));
                     }
                 }
             }

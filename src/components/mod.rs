@@ -1,6 +1,7 @@
 mod active_motion;
 mod character_model;
 mod client_entity;
+mod client_entity_name;
 mod collision;
 mod command;
 mod cooldowns;
@@ -25,6 +26,7 @@ mod visible_status_effects;
 pub use active_motion::ActiveMotion;
 pub use character_model::{CharacterModel, CharacterModelPart};
 pub use client_entity::{ClientEntity, ClientEntityId, ClientEntityType};
+pub use client_entity_name::ClientEntityName;
 pub use collision::{
     CollisionRayCastSource, CollisionTriMesh, MovementCollisionEntities,
     COLLISION_FILTER_CLICKABLE, COLLISION_FILTER_COLLIDABLE, COLLISION_FILTER_INSPECTABLE,
