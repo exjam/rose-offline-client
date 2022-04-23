@@ -29,8 +29,9 @@ use rose_file_readers::{
 
 use crate::{
     components::{
-        ActiveMotion, CollisionTriMesh, NightTimeEffect, COLLISION_FILTER_CLICKABLE,
-        COLLISION_FILTER_COLLIDABLE, COLLISION_FILTER_INSPECTABLE, COLLISION_GROUP_ZONE_OBJECT,
+        ActiveMotion, CollisionTriMesh, EventObject, NightTimeEffect, COLLISION_FILTER_CLICKABLE,
+        COLLISION_FILTER_COLLIDABLE, COLLISION_FILTER_INSPECTABLE,
+        COLLISION_GROUP_ZONE_EVENT_OBJECT, COLLISION_GROUP_ZONE_OBJECT,
         COLLISION_GROUP_ZONE_TERRAIN, COLLISION_GROUP_ZONE_WATER,
     },
     effect_loader::spawn_effect,
@@ -100,6 +101,7 @@ pub struct ZoneObjectTerrain {
 pub enum ZoneObject {
     Terrain(ZoneObjectTerrain),
     Water,
+    EventObjectPart(ZoneObjectStaticObjectPart),
     StaticObjectPart(ZoneObjectStaticObjectPart),
     AnimatedObject(ZoneObjectAnimatedObject),
 }
@@ -237,6 +239,10 @@ fn load_zone(
         .vfs
         .read_file::<ZscFile, _>(&zone_list_entry.zsc_deco_path)
         .ok();
+    let zsc_event_object = vfs_resource
+        .vfs
+        .read_file::<ZscFile, _>("3DDATA/SPECIAL/EVENT_OBJECT.ZSC")
+        .ok();
     let stb_morph_object = vfs_resource
         .vfs
         .read_file::<StbFile, _>("3DDATA/STB/LIST_MORPH_OBJECT.STB")
@@ -333,6 +339,29 @@ fn load_zone(
                     &water_material,
                 );
 
+                if let Some(zsc_event_object) = zsc_event_object.as_ref() {
+                    for event_object in ifo.event_objects.iter() {
+                        let event_entity = load_block_object(
+                            commands,
+                            asset_server,
+                            vfs_resource,
+                            effect_mesh_materials.as_mut(),
+                            particle_materials.as_mut(),
+                            static_mesh_materials.as_mut(),
+                            zsc_event_object,
+                            &lightmap_path,
+                            None,
+                            &event_object.object,
+                            true,
+                        );
+
+                        commands.entity(event_entity).insert(EventObject::new(
+                            event_object.quest_trigger_name.clone(),
+                            event_object.script_function_name.clone(),
+                        ));
+                    }
+                }
+
                 if let Some(zsc_cnst) = zsc_cnst.as_ref() {
                     let cnst_lit = vfs_resource
                         .vfs
@@ -360,6 +389,7 @@ fn load_zone(
                             &lightmap_path,
                             lit_object,
                             object_instance,
+                            false,
                         );
                     }
                 }
@@ -391,6 +421,7 @@ fn load_zone(
                             &lightmap_path,
                             lit_object,
                             object_instance,
+                            false,
                         );
                     }
                 }
@@ -650,7 +681,8 @@ fn load_block_object(
     lightmap_path: &Path,
     lit_object: Option<&LitObject>,
     object_instance: &IfoObject,
-) {
+    is_event_object: bool,
+) -> Entity {
     let object = &zsc.objects[object_instance.object_id as usize];
     let object_transform = Transform::default()
         .with_translation(
@@ -763,22 +795,41 @@ fn load_block_object(
                 };
 
                 let mut part_commands = object_commands.spawn_bundle((
-                    ZoneObject::StaticObjectPart(ZoneObjectStaticObjectPart {
-                        mesh_path: zsc.meshes[mesh_id].path().to_string_lossy().into(),
-                        collision_shape: (&object_part.collision_shape).into(),
-                        collision_not_moveable: object_part
-                            .collision_flags
-                            .contains(ZscCollisionFlags::NOT_MOVEABLE),
-                        collision_not_pickable: object_part
-                            .collision_flags
-                            .contains(ZscCollisionFlags::NOT_PICKABLE),
-                        collision_height_only: object_part
-                            .collision_flags
-                            .contains(ZscCollisionFlags::HEIGHT_ONLY),
-                        collision_no_camera: object_part
-                            .collision_flags
-                            .contains(ZscCollisionFlags::NOT_CAMERA_COLLISION),
-                    }),
+                    if is_event_object {
+                        ZoneObject::EventObjectPart(ZoneObjectStaticObjectPart {
+                            mesh_path: zsc.meshes[mesh_id].path().to_string_lossy().into(),
+                            collision_shape: (&object_part.collision_shape).into(),
+                            collision_not_moveable: object_part
+                                .collision_flags
+                                .contains(ZscCollisionFlags::NOT_MOVEABLE),
+                            collision_not_pickable: object_part
+                                .collision_flags
+                                .contains(ZscCollisionFlags::NOT_PICKABLE),
+                            collision_height_only: object_part
+                                .collision_flags
+                                .contains(ZscCollisionFlags::HEIGHT_ONLY),
+                            collision_no_camera: object_part
+                                .collision_flags
+                                .contains(ZscCollisionFlags::NOT_CAMERA_COLLISION),
+                        })
+                    } else {
+                        ZoneObject::StaticObjectPart(ZoneObjectStaticObjectPart {
+                            mesh_path: zsc.meshes[mesh_id].path().to_string_lossy().into(),
+                            collision_shape: (&object_part.collision_shape).into(),
+                            collision_not_moveable: object_part
+                                .collision_flags
+                                .contains(ZscCollisionFlags::NOT_MOVEABLE),
+                            collision_not_pickable: object_part
+                                .collision_flags
+                                .contains(ZscCollisionFlags::NOT_PICKABLE),
+                            collision_height_only: object_part
+                                .collision_flags
+                                .contains(ZscCollisionFlags::HEIGHT_ONLY),
+                            collision_no_camera: object_part
+                                .collision_flags
+                                .contains(ZscCollisionFlags::NOT_CAMERA_COLLISION),
+                        })
+                    },
                     mesh,
                     material,
                     part_transform,
@@ -786,7 +837,11 @@ fn load_block_object(
                     Visibility::default(),
                     ComputedVisibility::default(),
                     CollisionTriMesh {
-                        group: COLLISION_GROUP_ZONE_OBJECT,
+                        group: if is_event_object {
+                            COLLISION_GROUP_ZONE_EVENT_OBJECT
+                        } else {
+                            COLLISION_GROUP_ZONE_OBJECT
+                        },
                         filter: collision_filter,
                     },
                     NotShadowCaster {},
@@ -855,6 +910,8 @@ fn load_block_object(
             }
         }
     }
+
+    object_entity
 }
 
 fn load_animated_object(

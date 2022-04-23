@@ -1,8 +1,9 @@
 use bevy::{
+    core::Time,
     math::{Mat4, Vec2, Vec3},
     prelude::{
-        Assets, Camera, Commands, Entity, GlobalTransform, Handle, Mesh, Parent, Query, Res,
-        Transform, With, Without,
+        Assets, Camera, Commands, Entity, EventWriter, GlobalTransform, Handle, Mesh, Parent,
+        Query, Res, Transform, With, Without,
     },
     render::{
         camera::RenderTarget,
@@ -12,7 +13,8 @@ use bevy::{
 };
 use bevy_rapier3d::{
     physics::{
-        ColliderBundle, QueryPipelineColliderComponentsQuery, QueryPipelineColliderComponentsSet,
+        ColliderBundle, IntoEntity, QueryPipelineColliderComponentsQuery,
+        QueryPipelineColliderComponentsSet,
     },
     prelude::{
         ColliderFlags, ColliderFlagsComponent, ColliderShape, ColliderShapeComponent,
@@ -20,7 +22,12 @@ use bevy_rapier3d::{
     },
 };
 
-use crate::components::{CollisionRayCastSource, CollisionTriMesh, COLLISION_FILTER_COLLIDABLE};
+use crate::{
+    components::{
+        CollisionRayCastSource, CollisionTriMesh, EventObject, COLLISION_FILTER_COLLIDABLE,
+    },
+    events::QuestTriggerEvent,
+};
 
 fn get_window_for_camera<'a>(windows: &'a Windows, camera: &Camera) -> Option<&'a Window> {
     match camera.target {
@@ -66,8 +73,12 @@ pub fn ray_from_screenspace(
 pub fn collision_system(
     mut query_entity_ray: Query<(&GlobalTransform, &Parent), With<CollisionRayCastSource>>,
     mut query_parent: Query<&mut Transform>,
+    query_hit_parent_object: Query<&Parent>,
+    mut query_event_object: Query<&mut EventObject>,
     query_pipeline: Res<QueryPipeline>,
+    time: Res<Time>,
     colliders: QueryPipelineColliderComponentsQuery,
+    mut quest_trigger_events: EventWriter<QuestTriggerEvent>,
 ) {
     // Cast down to collide entities with ground
     let colliders = QueryPipelineColliderComponentsSet(&colliders);
@@ -83,7 +94,23 @@ pub fn collision_system(
             None,
         );
 
-        if let Some((_, distance)) = hit {
+        if let Some((collider_handle, distance)) = hit {
+            let hit_entity = collider_handle.entity();
+
+            if let Ok(hit_parent) = query_hit_parent_object.get(hit_entity) {
+                if let Ok(mut hit_event_object) = query_event_object.get_mut(hit_parent.0) {
+                    if time.seconds_since_startup() - hit_event_object.last_collision > 5.0 {
+                        if !hit_event_object.quest_trigger_name.is_empty() {
+                            quest_trigger_events.send(QuestTriggerEvent::DoTrigger(
+                                hit_event_object.quest_trigger_name.as_str().into(),
+                            ));
+                        }
+
+                        hit_event_object.last_collision = time.seconds_since_startup();
+                    }
+                }
+            }
+
             if let Ok(mut parent_transform) = query_parent.get_mut(parent.0) {
                 let hit_point = ray.point_at(distance);
                 parent_transform.translation.y = hit_point.y;
