@@ -1,4 +1,5 @@
 use bevy::{
+    ecs::query::WorldQuery,
     math::{Quat, Vec3},
     prelude::{
         BuildChildren, Commands, ComputedVisibility, DespawnRecursiveExt, Entity, EventWriter,
@@ -11,7 +12,7 @@ use rose_game_common::{
     components::{
         BasicStatType, BasicStats, CharacterInfo, Equipment, ExperiencePoints, HealthPoints,
         Hotbar, Inventory, ItemDrop, ItemSlot, Level, ManaPoints, MoveMode, MoveSpeed, Npc,
-        QuestState, SkillList, Stamina, StatPoints, StatusEffects,
+        QuestState, SkillList, SkillPoints, Stamina, StatPoints, StatusEffects,
     },
     messages::server::{
         CommandState, LearnSkillError, LevelUpSkillError, PickupItemDropContent,
@@ -56,6 +57,38 @@ fn get_entity_name(
     None
 }
 
+#[derive(WorldQuery)]
+#[world_query(mutable)]
+pub struct QueryCharacter<'w> {
+    pub basic_stats: &'w BasicStats,
+    pub character_info: &'w CharacterInfo,
+    pub equipment: &'w mut Equipment,
+    pub health_points: &'w mut HealthPoints,
+    pub mana_points: &'w mut ManaPoints,
+    pub skill_list: &'w SkillList,
+    pub status_effects: &'w StatusEffects,
+}
+
+#[derive(WorldQuery)]
+#[world_query(mutable)]
+pub struct QueryPlayer<'w> {
+    pub entity: Entity,
+    pub character_info: &'w CharacterInfo,
+    pub basic_stats: &'w mut BasicStats,
+    pub equipment: &'w mut Equipment,
+    pub experience_points: &'w mut ExperiencePoints,
+    pub health_points: &'w mut HealthPoints,
+    pub hotbar: &'w mut Hotbar,
+    pub inventory: &'w mut Inventory,
+    pub mana_points: &'w mut ManaPoints,
+    pub quest_state: &'w mut QuestState,
+    pub skill_list: &'w mut SkillList,
+    pub skill_points: &'w mut SkillPoints,
+    pub stamina: &'w mut Stamina,
+    pub stat_points: &'w mut StatPoints,
+    pub status_effects: &'w StatusEffects,
+}
+
 pub fn game_connection_system(
     mut commands: Commands,
     query_entity_name: Query<
@@ -66,22 +99,7 @@ pub fn game_connection_system(
     mut query_pending_damage_list: Query<&mut PendingDamageList>,
     mut query_pending_skill_effect_list: Query<&mut PendingSkillEffectList>,
     mut query_pending_skill_target_list: Query<&mut PendingSkillTargetList>,
-    mut query_hotbar: Query<&mut Hotbar>,
-    mut query_set_character: ParamSet<(
-        Query<(&mut Equipment, &mut Inventory)>,
-        Query<(
-            &mut HealthPoints,
-            &mut ManaPoints,
-            &CharacterInfo,
-            &Equipment,
-            &mut BasicStats,
-            &mut StatPoints,
-            &mut SkillList,
-            &StatusEffects,
-        )>,
-    )>,
-    mut query_quest_state: Query<&mut QuestState>,
-    mut query_xp_stamina: Query<(&mut ExperiencePoints, &mut Stamina)>,
+    mut query_set_client_entity: ParamSet<(Query<QueryCharacter>, Query<QueryPlayer>)>,
     mut query_command: Query<(&mut Command, &mut NextCommand)>,
     (mut app_state, mut client_entity_list, game_connection, game_data): (
         ResMut<State<AppState>>,
@@ -689,12 +707,14 @@ pub fn game_connection_system(
             }
             Ok(ServerMessage::UpdateAmmo(entity_id, ammo_index, item)) => {
                 if let Some(entity) = client_entity_list.get(entity_id) {
-                    if let Ok((mut equipment, _)) = query_set_character.p0().get_mut(entity) {
-                        if let Some(equipped_ammo) = equipment.equipped_ammo[ammo_index].as_mut() {
+                    if let Ok(mut character) = query_set_client_entity.p0().get_mut(entity) {
+                        if let Some(equipped_ammo) =
+                            character.equipment.equipped_ammo[ammo_index].as_mut()
+                        {
                             if let Some(item) = item {
                                 equipped_ammo.item = item.item;
                             } else {
-                                equipment.equipped_ammo[ammo_index] = None;
+                                character.equipment.equipped_ammo[ammo_index] = None;
                             }
                         }
                     }
@@ -702,9 +722,9 @@ pub fn game_connection_system(
             }
             Ok(ServerMessage::UpdateEquipment(message)) => {
                 if let Some(entity) = client_entity_list.get(message.entity_id) {
-                    if let Ok((mut equipment, _)) = query_set_character.p0().get_mut(entity) {
+                    if let Ok(mut character) = query_set_client_entity.p0().get_mut(entity) {
                         if let Some(equipped_item) =
-                            equipment.equipped_items[message.equipment_index].as_mut()
+                            character.equipment.equipped_items[message.equipment_index].as_mut()
                         {
                             if let Some(item) = message.item {
                                 // Only update visual related data
@@ -713,19 +733,21 @@ pub fn game_connection_system(
                                 equipped_item.gem = item.gem;
                                 equipped_item.grade = item.grade;
                             } else {
-                                equipment.equipped_items[message.equipment_index] = None;
+                                character.equipment.equipped_items[message.equipment_index] = None;
                             }
                         } else {
-                            equipment.equipped_items[message.equipment_index] = message.item;
+                            character.equipment.equipped_items[message.equipment_index] =
+                                message.item;
                         }
                     }
                 }
             }
             Ok(ServerMessage::UpdateVehiclePart(message)) => {
                 if let Some(entity) = client_entity_list.get(message.entity_id) {
-                    if let Ok((mut equipment, _)) = query_set_character.p0().get_mut(entity) {
-                        if let Some(equipped_item) =
-                            equipment.equipped_vehicle[message.vehicle_part_index].as_mut()
+                    if let Ok(mut character) = query_set_client_entity.p0().get_mut(entity) {
+                        if let Some(equipped_item) = character.equipment.equipped_vehicle
+                            [message.vehicle_part_index]
+                            .as_mut()
                         {
                             if let Some(item) = message.item {
                                 // Only update visual related data
@@ -734,53 +756,54 @@ pub fn game_connection_system(
                                 equipped_item.gem = item.gem;
                                 equipped_item.grade = item.grade;
                             } else {
-                                equipment.equipped_vehicle[message.vehicle_part_index] = None;
+                                character.equipment.equipped_vehicle[message.vehicle_part_index] =
+                                    None;
                             }
                         } else {
-                            equipment.equipped_vehicle[message.vehicle_part_index] = message.item;
+                            character.equipment.equipped_vehicle[message.vehicle_part_index] =
+                                message.item;
                         }
                     }
                 }
             }
             Ok(ServerMessage::UpdateInventory(update_items, update_money)) => {
                 if let Some(player_entity) = client_entity_list.player_entity {
-                    if let Ok((mut equipment, mut inventory)) =
-                        query_set_character.p0().get_mut(player_entity)
-                    {
+                    if let Ok(mut player) = query_set_client_entity.p1().get_mut(player_entity) {
                         for (item_slot, item) in update_items {
                             match item_slot {
                                 ItemSlot::Inventory(_, _) => {
-                                    if let Some(item_slot) = inventory.get_item_slot_mut(item_slot)
+                                    if let Some(item_slot) =
+                                        player.inventory.get_item_slot_mut(item_slot)
                                     {
                                         *item_slot = item;
                                     }
                                 }
                                 ItemSlot::Ammo(ammo_index) => {
-                                    *equipment.get_ammo_slot_mut(ammo_index) =
+                                    *player.equipment.get_ammo_slot_mut(ammo_index) =
                                         item.and_then(|x| x.as_stackable().cloned())
                                 }
                                 ItemSlot::Equipment(equipment_index) => {
-                                    *equipment.get_equipment_slot_mut(equipment_index) =
+                                    *player.equipment.get_equipment_slot_mut(equipment_index) =
                                         item.and_then(|x| x.as_equipment().cloned())
                                 }
                                 ItemSlot::Vehicle(vehicle_part_index) => {
-                                    *equipment.get_vehicle_slot_mut(vehicle_part_index) =
+                                    *player.equipment.get_vehicle_slot_mut(vehicle_part_index) =
                                         item.and_then(|x| x.as_equipment().cloned())
                                 }
                             }
                         }
 
                         if let Some(money) = update_money {
-                            inventory.money = money;
+                            player.inventory.money = money;
                         }
                     }
                 }
             }
             Ok(ServerMessage::UseInventoryItem(message)) => {
                 if let Some(player_entity) = client_entity_list.player_entity {
-                    if let Ok((_, mut inventory)) = query_set_character.p0().get_mut(player_entity)
-                    {
-                        if let Some(item_slot) = inventory.get_item_slot_mut(message.inventory_slot)
+                    if let Ok(mut player) = query_set_client_entity.p1().get_mut(player_entity) {
+                        if let Some(item_slot) =
+                            player.inventory.get_item_slot_mut(message.inventory_slot)
                         {
                             item_slot.try_take_quantity(1);
                         }
@@ -789,41 +812,42 @@ pub fn game_connection_system(
             }
             Ok(ServerMessage::UpdateMoney(money)) => {
                 if let Some(player_entity) = client_entity_list.player_entity {
-                    if let Ok((_, mut inventory)) = query_set_character.p0().get_mut(player_entity)
-                    {
-                        inventory.money = money;
+                    if let Ok(mut player) = query_set_client_entity.p1().get_mut(player_entity) {
+                        player.inventory.money = money;
                     }
                 }
             }
             Ok(ServerMessage::UpdateBasicStat(message)) => {
                 if let Some(player_entity) = client_entity_list.player_entity {
-                    if let Ok((_, _, _, _, mut basic_stats, mut stat_points, _, _)) =
-                        query_set_character.p1().get_mut(player_entity)
-                    {
+                    if let Ok(mut player) = query_set_client_entity.p1().get_mut(player_entity) {
                         // Update stat points if this was a user requested stat increase
-                        let current_value = basic_stats.get(message.basic_stat_type);
+                        let current_value = player.basic_stats.get(message.basic_stat_type);
                         if message.value == current_value + 1 {
                             if let Some(cost) = game_data
                                 .ability_value_calculator
                                 .calculate_basic_stat_increase_cost(
-                                    &basic_stats,
+                                    &player.basic_stats,
                                     message.basic_stat_type,
                                 )
                             {
-                                stat_points.points -= stat_points.points.min(cost);
+                                player.stat_points.points -= player.stat_points.points.min(cost);
                             }
                         }
 
                         // Update stats
                         match message.basic_stat_type {
-                            BasicStatType::Strength => basic_stats.strength = message.value,
-                            BasicStatType::Dexterity => basic_stats.dexterity = message.value,
-                            BasicStatType::Intelligence => basic_stats.intelligence = message.value,
-                            BasicStatType::Concentration => {
-                                basic_stats.concentration = message.value
+                            BasicStatType::Strength => player.basic_stats.strength = message.value,
+                            BasicStatType::Dexterity => {
+                                player.basic_stats.dexterity = message.value
                             }
-                            BasicStatType::Charm => basic_stats.charm = message.value,
-                            BasicStatType::Sense => basic_stats.sense = message.value,
+                            BasicStatType::Intelligence => {
+                                player.basic_stats.intelligence = message.value
+                            }
+                            BasicStatType::Concentration => {
+                                player.basic_stats.concentration = message.value
+                            }
+                            BasicStatType::Charm => player.basic_stats.charm = message.value,
+                            BasicStatType::Sense => player.basic_stats.sense = message.value,
                         }
                     }
                 }
@@ -838,28 +862,18 @@ pub fn game_connection_system(
                     ));
 
                     // Update hp / mp to new max
-                    if let Ok((
-                        mut health_points,
-                        mut mana_points,
-                        character_info,
-                        equipment,
-                        basic_stats,
-                        _,
-                        skill_list,
-                        status_effects,
-                    )) = query_set_character.p1().get_mut(entity)
-                    {
+                    if let Ok(mut character) = query_set_client_entity.p0().get_mut(entity) {
                         let ability_values = game_data.ability_value_calculator.calculate(
-                            character_info,
+                            character.character_info,
                             &message.level,
-                            equipment,
-                            &basic_stats,
-                            &skill_list,
-                            status_effects,
+                            &character.equipment,
+                            character.basic_stats,
+                            character.skill_list,
+                            character.status_effects,
                         );
 
-                        health_points.hp = ability_values.get_max_health();
-                        mana_points.mp = ability_values.get_max_mana();
+                        character.health_points.hp = ability_values.get_max_health();
+                        character.mana_points.mp = ability_values.get_max_mana();
                     }
 
                     client_entity_events.send(ClientEntityEvent::LevelUp(
@@ -885,28 +899,27 @@ pub fn game_connection_system(
             }
             Ok(ServerMessage::UpdateXpStamina(message)) => {
                 if let Some(player_entity) = client_entity_list.player_entity {
-                    if let Ok((mut experience_points, mut stamina)) =
-                        query_xp_stamina.get_mut(player_entity)
-                    {
-                        if message.xp > experience_points.xp {
+                    if let Ok(mut player) = query_set_client_entity.p1().get_mut(player_entity) {
+                        if message.xp > player.experience_points.xp {
                             chatbox_events.send(ChatboxEvent::System(format!(
                                 "You have earned {} experience points.",
-                                message.xp - experience_points.xp
+                                message.xp - player.experience_points.xp
                             )));
                         }
 
-                        experience_points.xp = message.xp;
-                        stamina.stamina = message.stamina;
+                        player.experience_points.xp = message.xp;
+                        player.stamina.stamina = message.stamina;
                     }
                 }
             }
             Ok(ServerMessage::PickupItemDropResult(message)) => match message.result {
                 Ok(PickupItemDropContent::Item(item_slot, item)) => {
                     if let Some(player_entity) = client_entity_list.player_entity {
-                        if let Ok((_, mut inventory)) =
-                            query_set_character.p0().get_mut(player_entity)
+                        if let Ok(mut player) = query_set_client_entity.p1().get_mut(player_entity)
                         {
-                            if let Some(inventory_slot) = inventory.get_item_slot_mut(item_slot) {
+                            if let Some(inventory_slot) =
+                                player.inventory.get_item_slot_mut(item_slot)
+                            {
                                 if let Some(item_data) =
                                     game_data.items.get_base_item(item.get_item_reference())
                                 {
@@ -923,14 +936,13 @@ pub fn game_connection_system(
                 }
                 Ok(PickupItemDropContent::Money(money)) => {
                     if let Some(player_entity) = client_entity_list.player_entity {
-                        if let Ok((_, mut inventory)) =
-                            query_set_character.p0().get_mut(player_entity)
+                        if let Ok(mut player) = query_set_client_entity.p1().get_mut(player_entity)
                         {
                             chatbox_events.send(ChatboxEvent::System(format!(
                                 "You have earned {} zuly.",
                                 money.0
                             )));
-                            inventory.try_add_money(money).ok();
+                            player.inventory.try_add_money(money).ok();
                         }
                     }
                 }
@@ -948,10 +960,11 @@ pub fn game_connection_system(
             },
             Ok(ServerMessage::RewardItems(items)) => {
                 if let Some(player_entity) = client_entity_list.player_entity {
-                    if let Ok((_, mut inventory)) = query_set_character.p0().get_mut(player_entity)
-                    {
+                    if let Ok(mut player) = query_set_client_entity.p1().get_mut(player_entity) {
                         for (item_slot, item) in items.into_iter() {
-                            if let Some(inventory_slot) = inventory.get_item_slot_mut(item_slot) {
+                            if let Some(inventory_slot) =
+                                player.inventory.get_item_slot_mut(item_slot)
+                            {
                                 if let Some(item_data) = item.as_ref().and_then(|item| {
                                     game_data.items.get_base_item(item.get_item_reference())
                                 }) {
@@ -969,13 +982,12 @@ pub fn game_connection_system(
             }
             Ok(ServerMessage::RewardMoney(money)) => {
                 if let Some(player_entity) = client_entity_list.player_entity {
-                    if let Ok((_, mut inventory)) = query_set_character.p0().get_mut(player_entity)
-                    {
+                    if let Ok(mut player) = query_set_client_entity.p1().get_mut(player_entity) {
                         chatbox_events.send(ChatboxEvent::System(format!(
                             "You have earned {} zuly.",
                             money.0
                         )));
-                        inventory.try_add_money(money).ok();
+                        player.inventory.try_add_money(money).ok();
                     }
                 }
             }
@@ -985,10 +997,16 @@ pub fn game_connection_system(
                 quest_id,
             })) => {
                 if success {
-                    let mut quest_state = query_quest_state.single_mut();
-                    if let Some(active_quest) = quest_state.active_quests[slot].as_ref() {
-                        if active_quest.quest_id == quest_id {
-                            quest_state.active_quests[slot] = None;
+                    if let Some(player_entity) = client_entity_list.player_entity {
+                        if let Ok(mut player) = query_set_client_entity.p1().get_mut(player_entity)
+                        {
+                            if let Some(active_quest) =
+                                player.quest_state.active_quests[slot].as_ref()
+                            {
+                                if active_quest.quest_id == quest_id {
+                                    player.quest_state.active_quests[slot] = None;
+                                }
+                            }
                         }
                     }
                 }
@@ -1009,21 +1027,25 @@ pub fn game_connection_system(
                 }
             }
             Ok(ServerMessage::SetHotbarSlot(slot_index, slot)) => {
-                let mut hotbar = query_hotbar.single_mut();
-                hotbar.set_slot(slot_index, slot);
+                if let Some(player_entity) = client_entity_list.player_entity {
+                    if let Ok(mut player) = query_set_client_entity.p1().get_mut(player_entity) {
+                        player.hotbar.set_slot(slot_index, slot);
+                    }
+                }
             }
             Ok(ServerMessage::LearnSkillResult(result)) => match result {
                 Ok(message) => {
                     if let Some(player_entity) = client_entity_list.player_entity {
-                        if let Ok((_, _, _, _, _, _, mut skill_list, _)) =
-                            query_set_character.p1().get_mut(player_entity)
+                        if let Ok(mut player) = query_set_client_entity.p1().get_mut(player_entity)
                         {
-                            if let Some(skill_slot) = skill_list.get_slot_mut(message.skill_slot) {
+                            if let Some(skill_slot) =
+                                player.skill_list.get_slot_mut(message.skill_slot)
+                            {
                                 *skill_slot = message.skill_id;
                             }
 
                             commands
-                                .entity(player_entity)
+                                .entity(player.entity)
                                 .insert_bundle((message.updated_skill_points,));
                         }
                     }
@@ -1062,10 +1084,11 @@ pub fn game_connection_system(
                 match message.result {
                     Ok((skill_slot, skill_id)) => {
                         if let Some(player_entity) = client_entity_list.player_entity {
-                            if let Ok((_, _, _, _, _, _, mut skill_list, _)) =
-                                query_set_character.p1().get_mut(player_entity)
+                            if let Ok(mut player) =
+                                query_set_client_entity.p1().get_mut(player_entity)
                             {
-                                if let Some(skill_slot) = skill_list.get_slot_mut(skill_slot) {
+                                if let Some(skill_slot) = player.skill_list.get_slot_mut(skill_slot)
+                                {
                                     *skill_slot = Some(skill_id);
                                 }
                             }
