@@ -402,6 +402,7 @@ fn main() {
         .add_system(ui_debug_camera_info_system.label("ui_system"))
         .add_system(ui_debug_client_entity_list_system.label("ui_system"))
         .add_system(ui_debug_command_viewer_system.label("ui_system"))
+        .add_system(ui_debug_render_system.label("ui_system"))
         .add_system(ui_debug_zone_time_system.label("ui_system"))
         .add_system(ui_diagnostics_system.label("ui_system"))
         .add_system(

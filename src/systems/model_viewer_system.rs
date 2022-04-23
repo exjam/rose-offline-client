@@ -104,6 +104,7 @@ pub fn model_viewer_enter_system(
 
     // Open relevant debug windows
     ui_state_debug_windows.debug_ui_open = true;
+    ui_state_debug_windows.debug_render_open = true;
     ui_state_debug_windows.npc_list_open = true;
     ui_state_debug_windows.item_list_open = true;
 }
@@ -113,63 +114,13 @@ pub fn model_viewer_system(
     mut commands: Commands,
     mut ui_state: ResMut<ModelViewerState>,
     mut spawn_effect_events: EventWriter<SpawnEffectEvent>,
-    query_character: Query<Entity, With<CharacterInfo>>,
-    query_npc: Query<Entity, With<Npc>>,
     query_character_model: Query<(Entity, &CharacterModel)>,
     query_npc_model: Query<(Entity, &NpcModel)>,
     query_effects: Query<Entity, With<Effect>>,
-    query_debug_colliders: Query<Entity, With<DebugRenderCollider>>,
-    query_debug_skeletons: Query<Entity, With<DebugRenderSkeleton>>,
     game_data: Res<GameData>,
     mut egui_context: ResMut<EguiContext>,
 ) {
     egui::Window::new("Model Viewer").show(egui_context.ctx_mut(), |ui| {
-        if ui
-            .checkbox(&mut ui_state.debug_colliders, "Show Debug Colliders")
-            .clicked()
-        {
-            if ui_state.debug_colliders {
-                for entity in query_character.iter() {
-                    commands
-                        .entity(entity)
-                        .insert(DebugRenderCollider::default());
-                }
-
-                for entity in query_npc.iter() {
-                    commands
-                        .entity(entity)
-                        .insert(DebugRenderCollider::default());
-                }
-            } else {
-                for entity in query_debug_colliders.iter() {
-                    commands.entity(entity).remove::<DebugRenderCollider>();
-                }
-            }
-        }
-
-        if ui
-            .checkbox(&mut ui_state.debug_skeletons, "Show Debug Skeletons")
-            .clicked()
-        {
-            if ui_state.debug_skeletons {
-                for entity in query_character.iter() {
-                    commands
-                        .entity(entity)
-                        .insert(DebugRenderSkeleton::default());
-                }
-
-                for entity in query_npc.iter() {
-                    commands
-                        .entity(entity)
-                        .insert(DebugRenderSkeleton::default());
-                }
-            } else {
-                for entity in query_debug_skeletons.iter() {
-                    commands.entity(entity).remove::<DebugRenderSkeleton>();
-                }
-            }
-        }
-
         let max_num_npcs = ui_state.max_num_npcs;
         let max_num_characters = ui_state.max_num_characters;
         ui.add(egui::Slider::new(&mut ui_state.num_npcs, 0..=(max_num_npcs - 1)).suffix(" NPCs"));
