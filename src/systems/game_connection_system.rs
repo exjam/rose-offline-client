@@ -10,10 +10,10 @@ use bevy::{
 use rose_data::{EquipmentItem, ItemReference, ItemSlotBehaviour, ItemType};
 use rose_game_common::{
     components::{
-        BasicStatType, BasicStats, CharacterInfo, DroppedItem, Equipment, ExperiencePoints,
-        HealthPoints, Hotbar, Inventory, ItemDrop, ItemSlot, Level, ManaPoints, MoveMode,
-        MoveSpeed, QuestState, SkillList, SkillPoints, Stamina, StatPoints, StatusEffects, Team,
-        UnionMembership,
+        AbilityValues, BasicStatType, BasicStats, CharacterInfo, DroppedItem, Equipment,
+        ExperiencePoints, HealthPoints, Hotbar, Inventory, ItemDrop, ItemSlot, Level, ManaPoints,
+        MoveMode, MoveSpeed, QuestState, SkillList, SkillPoints, Stamina, StatPoints,
+        StatusEffects, Team, UnionMembership,
     },
     messages::server::{
         CommandState, LearnSkillError, LevelUpSkillError, PickupItemDropContent,
@@ -24,7 +24,7 @@ use rose_game_common::{
 use rose_network_common::ConnectionError;
 
 use crate::{
-    bundles::ability_values_set_value,
+    bundles::{ability_values_add_value, ability_values_set_value},
     components::{
         ClientEntity, ClientEntityName, ClientEntityType, CollisionRayCastSource, Command,
         CommandCastSkillTarget, Cooldowns, MovementCollisionEntities, NextCommand,
@@ -51,6 +51,7 @@ pub struct QueryCharacter<'w> {
 #[world_query(mutable)]
 pub struct QueryPlayer<'w> {
     pub entity: Entity,
+    pub ability_values: &'w AbilityValues,
     pub character_info: &'w mut CharacterInfo,
     pub basic_stats: &'w mut BasicStats,
     pub equipment: &'w mut Equipment,
@@ -710,6 +711,56 @@ pub fn game_connection_system(
             }
             Ok(ServerMessage::AnnounceChat(message)) => {
                 chatbox_events.send(ChatboxEvent::Announce(message.name, message.text));
+            }
+            Ok(ServerMessage::UpdateAbilityValue(message)) => {
+                if let Some(player_entity) = client_entity_list.player_entity {
+                    if let Ok(mut player) = query_set_client_entity.p1().get_mut(player_entity) {
+                        match message {
+                            UpdateAbilityValue::RewardAdd(ability_type, add_value) => {
+                                ability_values_add_value(
+                                    ability_type,
+                                    add_value,
+                                    player.ability_values,
+                                    &mut player.basic_stats,
+                                    &mut player.experience_points,
+                                    &mut player.health_points,
+                                    &mut player.inventory,
+                                    &mut player.level,
+                                    &mut player.mana_points,
+                                    &mut player.skill_points,
+                                    &mut player.stamina,
+                                    &mut player.stat_points,
+                                    &mut player.union_membership,
+                                );
+
+                                chatbox_events.send(ChatboxEvent::System(format!(
+                                    "Ability {:?} has increased by {}.",
+                                    ability_type, add_value,
+                                )));
+                            }
+                            UpdateAbilityValue::RewardSet(ability_type, set_value) => {
+                                ability_values_set_value(
+                                    ability_type,
+                                    set_value,
+                                    player.ability_values,
+                                    &mut player.basic_stats,
+                                    &mut player.character_info,
+                                    &mut player.health_points,
+                                    &mut player.mana_points,
+                                    &mut player.experience_points,
+                                    &mut player.level,
+                                    &mut player.team,
+                                    &mut player.union_membership,
+                                );
+
+                                chatbox_events.send(ChatboxEvent::System(format!(
+                                    "Ability {:?} has been changed to {}.",
+                                    ability_type, set_value,
+                                )));
+                            }
+                        }
+                    }
+                }
             }
             Ok(ServerMessage::UpdateAmmo(entity_id, ammo_index, item)) => {
                 if let Some(entity) = client_entity_list.get(entity_id) {
