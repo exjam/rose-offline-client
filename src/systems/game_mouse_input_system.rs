@@ -9,6 +9,7 @@ use bevy::{
     window::Windows,
 };
 use bevy_egui::EguiContext;
+use bevy_inspector_egui::egui;
 use bevy_rapier3d::{
     physics::{
         IntoEntity, QueryPipelineColliderComponentsQuery, QueryPipelineColliderComponentsSet,
@@ -18,7 +19,9 @@ use bevy_rapier3d::{
 use rose_game_common::components::{ItemDrop, Team};
 
 use crate::{
-    components::{PlayerCharacter, Position, SelectedTarget, COLLISION_FILTER_CLICKABLE},
+    components::{
+        ClientEntityName, PlayerCharacter, Position, SelectedTarget, COLLISION_FILTER_CLICKABLE,
+    },
     events::PlayerCommandEvent,
     systems::{collision_system::ray_from_screenspace, ZoneObject},
 };
@@ -33,6 +36,7 @@ pub fn game_mouse_input_system(
     colliders: QueryPipelineColliderComponentsQuery,
     mut egui_ctx: ResMut<EguiContext>,
     query_hit_entity: Query<(
+        Option<&ClientEntityName>,
         Option<&Team>,
         Option<&Position>,
         Option<&ItemDrop>,
@@ -72,9 +76,24 @@ pub fn game_mouse_input_system(
                 let hit_position = ray.point_at(distance);
                 let hit_entity = hit_collider_handle.entity();
 
-                if let Ok((hit_team, hit_entity_position, hit_item_drop, hit_zone_object)) =
-                    query_hit_entity.get(hit_entity)
+                if let Ok((
+                    hit_client_entity_name,
+                    hit_team,
+                    hit_entity_position,
+                    hit_item_drop,
+                    hit_zone_object,
+                )) = query_hit_entity.get(hit_entity)
                 {
+                    if let Some(hit_client_entity_name) = hit_client_entity_name {
+                        egui::show_tooltip(
+                            egui_ctx.ctx_mut(),
+                            egui::Id::new("entity_mouse_tooltip"),
+                            |ui| {
+                                ui.label(&hit_client_entity_name.name);
+                            },
+                        );
+                    }
+
                     if hit_zone_object.is_some() {
                         if mouse_button_input.just_pressed(MouseButton::Left) {
                             player_command_events.send(PlayerCommandEvent::Move(
