@@ -433,6 +433,11 @@ pub fn quest_triggers_apply_rewards(
                 quest_context,
                 name.clone(),
             ),
+            // Server side only rewards:
+            QsdReward::CalculatedItem(_, _)
+            | QsdReward::CalculatedMoney(_, _, _)
+            | QsdReward::CalculatedExperiencePoints(_, _, _)
+            | QsdReward::AbilityValue(_) => true,
             _ => {
                 log::warn!("Unimplemented quest reward: {:?}", reward);
                 true
