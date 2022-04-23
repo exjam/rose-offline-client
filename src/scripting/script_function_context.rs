@@ -11,7 +11,7 @@ use rose_game_common::components::{
 
 use crate::{
     components::{ClientEntity, PlayerCharacter},
-    events::ChatboxEvent,
+    events::{ChatboxEvent, SystemFuncEvent},
 };
 
 #[derive(WorldQuery)]
@@ -20,6 +20,7 @@ pub struct ScriptCharacterQuery<'w> {
     pub ability_values: &'w AbilityValues,
     pub character_info: &'w CharacterInfo,
     pub basic_stats: &'w BasicStats,
+    pub client_entity: &'w ClientEntity,
     pub equipment: &'w Equipment,
     pub experience_points: &'w ExperiencePoints,
     pub health_points: &'w mut HealthPoints,
@@ -41,4 +42,5 @@ pub struct ScriptFunctionContext<'w, 's> {
     pub query_player: Query<'w, 's, ScriptCharacterQuery<'static>, With<PlayerCharacter>>,
     pub query_npc: Query<'w, 's, &'static Npc>,
     pub chatbox_events: EventWriter<'w, 's, ChatboxEvent>,
+    pub script_system_events: EventWriter<'w, 's, SystemFuncEvent>,
 }

@@ -32,7 +32,7 @@ pub struct GeneratedDialog {
 }
 
 pub struct ConversationDialogState {
-    pub npc_entity: Entity,
+    pub owner_entity: Option<Entity>,
     pub con_file: ConFile,
     pub generated_dialog: GeneratedDialog,
     pub lua_vm: Lua4VM,
@@ -74,7 +74,7 @@ impl<'a, 'w1, 's1, 'w2, 's2> Lua4VMRustClosures for LuaVMContext<'a, 'w1, 's1, '
 fn create_conversation_dialog(
     con_file: ConFile,
     user_context: &mut LuaVMContext,
-    npc_entity: Entity,
+    owner_entity: Option<Entity>,
 ) -> Option<ConversationDialogState> {
     let mut lua_vm = Lua4VM::new();
 
@@ -96,9 +96,9 @@ fn create_conversation_dialog(
         .ok()?;
 
     Some(ConversationDialogState {
-        npc_entity,
+        owner_entity,
         con_file,
-        event_object_handle: Arc::new(LuaUserValueEntity { entity: npc_entity }),
+        event_object_handle: Arc::new(LuaUserValueEntity { owner_entity }),
         generated_dialog: Default::default(),
         lua_vm,
     })
@@ -214,7 +214,12 @@ pub fn conversation_dialog_system(
     };
 
     for event in conversation_dialog_events.iter() {
-        let ConversationDialogEvent::OpenNpcDialog(npc_entity, con_file_path) = event;
+        let (owner_entity, con_file_path) = match event {
+            ConversationDialogEvent::OpenNpcDialog(npc_entity, con_file_path) => {
+                (Some(*npc_entity), con_file_path)
+            }
+            ConversationDialogEvent::OpenEventDialog(con_file_path) => (None, con_file_path),
+        };
         *current_dialog_state = None;
 
         if let Some(mut next_dialog_state) = vfs_resource
@@ -222,7 +227,7 @@ pub fn conversation_dialog_system(
             .read_file::<ConFile, _>(con_file_path)
             .ok()
             .and_then(|con_file| {
-                create_conversation_dialog(con_file, &mut user_context, *npc_entity)
+                create_conversation_dialog(con_file, &mut user_context, owner_entity)
             })
         {
             let check_open_function =
@@ -278,9 +283,11 @@ pub fn conversation_dialog_system(
         let mut open = true;
 
         // If player has moved away from NPC, close the dialog
-        if let (Ok(player_position), Ok(npc_position)) = (
+        if let (Ok(player_position), Some(npc_position)) = (
             query_player_position.get_single(),
-            query_position.get(dialog_state.npc_entity),
+            dialog_state
+                .owner_entity
+                .and_then(|entity| query_position.get(entity).ok()),
         ) {
             if npc_position
                 .position

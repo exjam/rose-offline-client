@@ -13,7 +13,7 @@ mod script_function_context;
 mod script_function_resources;
 
 pub struct LuaUserValueEntity {
-    pub entity: Entity,
+    pub owner_entity: Option<Entity>,
 }
 
 pub use lua_game_constants::LuaGameConstants;

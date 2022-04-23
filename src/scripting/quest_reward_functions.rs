@@ -5,7 +5,7 @@ use rose_file_readers::{
 use rose_game_common::components::ActiveQuest;
 
 use crate::{
-    events::ChatboxEvent,
+    events::{ChatboxEvent, SystemFuncEvent},
     scripting::{
         quest::{get_quest_variable, set_quest_variable},
         QuestFunctionContext, ScriptFunctionContext, ScriptFunctionResources,
@@ -328,6 +328,26 @@ fn quest_reward_set_next_trigger(
     true
 }
 
+fn quest_reward_call_lua_function(
+    _script_resources: &ScriptFunctionResources,
+    script_context: &mut ScriptFunctionContext,
+    _quest_context: &mut QuestFunctionContext,
+    name: String,
+) -> bool {
+    script_context
+        .script_system_events
+        .send(SystemFuncEvent::CallFunction(
+            name,
+            vec![script_context
+                .query_player
+                .get_single()
+                .map(|player| player.client_entity.id.0)
+                .unwrap_or(0)
+                .into()],
+        ));
+    true
+}
+
 pub fn quest_triggers_skip_rewards(
     script_resources: &ScriptFunctionResources,
     script_context: &mut ScriptFunctionContext,
@@ -428,6 +448,12 @@ pub fn quest_triggers_apply_rewards(
                 value,
             ),
             QsdReward::Trigger(ref name) => quest_reward_set_next_trigger(
+                script_resources,
+                script_context,
+                quest_context,
+                name.clone(),
+            ),
+            QsdReward::CallLuaFunction(ref name) => quest_reward_call_lua_function(
                 script_resources,
                 script_context,
                 quest_context,
