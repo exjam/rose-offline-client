@@ -102,7 +102,7 @@ fn GF_getVariable(
     parameters: Vec<Lua4Value>,
 ) -> Vec<Lua4Value> {
     let variable_id = parameters[0].to_i32().unwrap();
-    let character = context.query_character.single();
+    let character = context.query_player.single();
 
     let value = match variable_id {
         SV_SEX => match character.character_info.gender {

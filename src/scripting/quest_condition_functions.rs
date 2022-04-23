@@ -33,7 +33,7 @@ fn quest_condition_ability_values(
     _quest_context: &mut QuestFunctionContext,
     check_values: &[(QsdAbilityType, QsdConditionOperator, i32)],
 ) -> bool {
-    let character = script_context.query_character.single();
+    let character = script_context.query_player.single();
 
     for &(ability_type, operator, compare_value) in check_values {
         let ability_type = script_resources
@@ -110,11 +110,12 @@ fn quest_condition_quest_item(
     });
 
     let quest_state = script_context.query_quest.single();
-    let (equipment, inventory) = script_context.query_player_items.single();
+    let character = script_context.query_player.single();
 
     if let Some(equipment_index) = equipment_index {
         item_reference
-            == equipment
+            == character
+                .equipment
                 .get_equipment_item(equipment_index)
                 .map(|item| item.item)
     } else {
@@ -132,9 +133,10 @@ fn quest_condition_quest_item(
                 }
             } else {
                 // Check inventory
-                inventory
+                character
+                    .inventory
                     .find_item(item_reference)
-                    .and_then(|slot| inventory.get_item(slot))
+                    .and_then(|slot| character.inventory.get_item(slot))
                     .map(|inventory_item| inventory_item.get_quantity())
                     .unwrap_or(0)
             }

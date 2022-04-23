@@ -15,15 +15,17 @@ use crate::{
 };
 
 #[derive(WorldQuery)]
+#[world_query(mutable)]
 pub struct ScriptCharacterQuery<'w> {
     pub ability_values: &'w AbilityValues,
     pub character_info: &'w CharacterInfo,
     pub basic_stats: &'w BasicStats,
+    pub equipment: &'w Equipment,
     pub experience_points: &'w ExperiencePoints,
-    pub health_points: &'w HealthPoints,
+    pub health_points: &'w mut HealthPoints,
     pub inventory: &'w Inventory,
     pub level: &'w Level,
-    pub mana_points: &'w ManaPoints,
+    pub mana_points: &'w mut ManaPoints,
     pub move_speed: &'w MoveSpeed,
     pub skill_points: &'w SkillPoints,
     pub stamina: &'w Stamina,
@@ -36,8 +38,6 @@ pub struct ScriptCharacterQuery<'w> {
 pub struct ScriptFunctionContext<'w, 's> {
     pub query_quest: Query<'w, 's, &'static mut QuestState>,
     pub query_client_entity: Query<'w, 's, &'static ClientEntity>,
-    pub query_character: Query<'w, 's, ScriptCharacterQuery<'static>, With<PlayerCharacter>>,
-    pub query_player_items:
-        Query<'w, 's, (&'static Equipment, &'static Inventory), With<PlayerCharacter>>,
+    pub query_player: Query<'w, 's, ScriptCharacterQuery<'static>, With<PlayerCharacter>>,
     pub chatbox_events: EventWriter<'w, 's, ChatboxEvent>,
 }
