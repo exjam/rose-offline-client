@@ -43,14 +43,5 @@ bevy_rapier3d = { git = "https://github.com/exjam/bevy_rapier", rev = "2016e45cf
 smooth-bevy-cameras = { git = "https://github.com/exjam/smooth-bevy-cameras", rev = "29bb4884f5e29f49cb599a21a0e9bc684a326402" }
 image = { git = "https://github.com/image-rs/image", branch = "version-0.23" }
 
-[patch."https://github.com/exjam/rose-offline"]
-rose-data = { path = "../rose-offline/rose-data" }
-rose-data-irose = { path = "../rose-offline/rose-data-irose" }
-rose-file-readers = { path = "../rose-offline/rose-file-readers" }
-rose-game-common = { path = "../rose-offline/rose-game-common" }
-rose-game-irose = { path = "../rose-offline/rose-game-irose" }
-rose-network-common = { path = "../rose-offline/rose-network-common" }
-rose-network-irose = { path = "../rose-offline/rose-network-irose" }
-
 [profile.dev.package."*"]
 opt-level = 3
