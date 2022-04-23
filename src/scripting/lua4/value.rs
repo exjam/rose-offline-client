@@ -1,5 +1,7 @@
 use std::{any::Any, cmp::Ordering, sync::Arc};
 
+use num_traits::ToPrimitive;
+
 use crate::scripting::lua4::Lua4Function;
 
 #[derive(Clone)]
@@ -37,6 +39,10 @@ impl Lua4Value {
     }
 
     pub fn to_i64(&self) -> Result<i64, LuaValueConversionError> {
+        self.try_into()
+    }
+
+    pub fn to_usize(&self) -> Result<usize, LuaValueConversionError> {
         self.try_into()
     }
 
@@ -170,7 +176,9 @@ impl TryFrom<&Lua4Value> for i32 {
 
     fn try_from(value: &Lua4Value) -> Result<Self, Self::Error> {
         match value {
-            Lua4Value::Number(number) => Ok(*number as i32),
+            Lua4Value::Number(number) => {
+                number.to_i32().ok_or(LuaValueConversionError::InvalidType)
+            }
             Lua4Value::String(string) => string
                 .parse::<f64>()
                 .map_err(|_| LuaValueConversionError::InvalidType)
@@ -185,11 +193,29 @@ impl TryFrom<&Lua4Value> for i64 {
 
     fn try_from(value: &Lua4Value) -> Result<Self, Self::Error> {
         match value {
-            Lua4Value::Number(number) => Ok(*number as i64),
+            Lua4Value::Number(number) => {
+                number.to_i64().ok_or(LuaValueConversionError::InvalidType)
+            }
             Lua4Value::String(string) => string
                 .parse::<f64>()
                 .map_err(|_| LuaValueConversionError::InvalidType)
                 .map(|value| value as i64),
+            _ => Err(LuaValueConversionError::InvalidType),
+        }
+    }
+}
+
+impl TryFrom<&Lua4Value> for usize {
+    type Error = LuaValueConversionError;
+
+    fn try_from(value: &Lua4Value) -> Result<Self, Self::Error> {
+        match value {
+            Lua4Value::Number(number) => number
+                .to_usize()
+                .ok_or(LuaValueConversionError::InvalidType),
+            Lua4Value::String(string) => string
+                .parse::<usize>()
+                .map_err(|_| LuaValueConversionError::InvalidType),
             _ => Err(LuaValueConversionError::InvalidType),
         }
     }
