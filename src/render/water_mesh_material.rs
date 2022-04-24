@@ -59,10 +59,10 @@ impl Plugin for WaterMeshMaterialPlugin {
 
         let render_device = app.world.resource::<RenderDevice>();
         let buffer = render_device.create_buffer(&BufferDescriptor {
-            label: Some("time uniform buffer"),
             size: std::mem::size_of::<i32>() as u64,
             usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
             mapped_at_creation: false,
+            label: Some("water_texture_index"),
         });
 
         app.add_asset::<WaterMeshMaterial>()
@@ -71,15 +71,11 @@ impl Plugin for WaterMeshMaterialPlugin {
         if let Ok(render_app) = app.get_sub_app_mut(RenderApp) {
             render_app
                 .add_render_command::<Transparent3d, DrawWaterMaterial>()
-                .insert_resource(TimeMeta {
-                    buffer,
-                    bind_group: None,
-                })
+                .insert_resource(WaterTextureIndex { buffer })
                 .init_resource::<WaterMeshMaterialPipeline>()
                 .init_resource::<SpecializedMeshPipelines<WaterMeshMaterialPipeline>>()
                 .add_system_to_stage(RenderStage::Extract, extract_time)
-                .add_system_to_stage(RenderStage::Prepare, prepare_time)
-                .add_system_to_stage(RenderStage::Queue, queue_time_bind_group)
+                .add_system_to_stage(RenderStage::Prepare, prepare_water_texture_index)
                 .add_system_to_stage(RenderStage::Queue, queue_water_mesh_material_meshes);
         }
     }
@@ -90,52 +86,31 @@ struct ExtractedTime {
     seconds_since_startup: f64,
 }
 
-// extract the passed time into a resource in the render world
 fn extract_time(mut commands: Commands, time: Res<Time>) {
     commands.insert_resource(ExtractedTime {
         seconds_since_startup: time.seconds_since_startup(),
     });
 }
 
-struct TimeMeta {
+pub struct WaterTextureIndex {
     buffer: Buffer,
-    bind_group: Option<BindGroup>,
 }
 
-// write the extracted time into the corresponding uniform buffer
-fn prepare_time(
+fn prepare_water_texture_index(
     time: Res<ExtractedTime>,
-    time_meta: ResMut<TimeMeta>,
+    water_texture_index: ResMut<WaterTextureIndex>,
     render_queue: Res<RenderQueue>,
 ) {
     render_queue.write_buffer(
-        &time_meta.buffer,
+        &water_texture_index.buffer,
         0,
         bevy::core::cast_slice(&[(time.seconds_since_startup * 10.0) as i32 % 25]),
     );
 }
 
-// create a bind group for the time uniform buffer
-fn queue_time_bind_group(
-    render_device: Res<RenderDevice>,
-    mut time_meta: ResMut<TimeMeta>,
-    pipeline: Res<WaterMeshMaterialPipeline>,
-) {
-    let bind_group = render_device.create_bind_group(&BindGroupDescriptor {
-        label: None,
-        layout: &pipeline.time_uniform_layout,
-        entries: &[BindGroupEntry {
-            binding: 0,
-            resource: time_meta.buffer.as_entire_binding(),
-        }],
-    });
-    time_meta.bind_group = Some(bind_group);
-}
-
 pub struct WaterMeshMaterialPipeline {
     pub mesh_pipeline: MeshPipeline,
     pub material_layout: BindGroupLayout,
-    pub time_uniform_layout: BindGroupLayout,
     pub vertex_shader: Option<Handle<Shader>>,
     pub fragment_shader: Option<Handle<Shader>>,
     pub sampler: Sampler,
@@ -169,11 +144,17 @@ impl SpecializedMeshPipeline for WaterMeshMaterialPipeline {
                 },
             });
         }
+
+        descriptor
+            .depth_stencil
+            .as_mut()
+            .unwrap()
+            .depth_write_enabled = false;
+
         descriptor.layout = Some(vec![
             self.mesh_pipeline.view_layout.clone(),
             self.material_layout.clone(),
             self.mesh_pipeline.mesh_layout.clone(),
-            self.time_uniform_layout.clone(),
         ]);
 
         let vertex_layout = layout.get_layout(&[
@@ -209,29 +190,24 @@ impl FromWorld for WaterMeshMaterialPipeline {
                     ty: BindingType::Sampler(SamplerBindingType::Filtering),
                     count: None,
                 },
+                // Water Texture Index buffer
+                BindGroupLayoutEntry {
+                    binding: 2,
+                    visibility: ShaderStages::FRAGMENT,
+                    ty: BindingType::Buffer {
+                        ty: BufferBindingType::Uniform,
+                        min_binding_size: BufferSize::new(std::mem::size_of::<i32>() as u64),
+                        has_dynamic_offset: false,
+                    },
+                    count: None,
+                },
             ],
             label: Some("water_mesh_material_layout"),
         });
 
-        let time_uniform_layout =
-            render_device.create_bind_group_layout(&BindGroupLayoutDescriptor {
-                label: Some("time bind group"),
-                entries: &[BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: ShaderStages::FRAGMENT,
-                    ty: BindingType::Buffer {
-                        ty: BufferBindingType::Uniform,
-                        has_dynamic_offset: false,
-                        min_binding_size: BufferSize::new(std::mem::size_of::<i32>() as u64),
-                    },
-                    count: None,
-                }],
-            });
-
         WaterMeshMaterialPipeline {
             mesh_pipeline: world.resource::<MeshPipeline>().clone(),
             material_layout,
-            time_uniform_layout,
             vertex_shader: Some(WATER_MESH_MATERIAL_SHADER_HANDLE.typed()),
             fragment_shader: Some(WATER_MESH_MATERIAL_SHADER_HANDLE.typed()),
             sampler: render_device.create_sampler(&SamplerDescriptor {
@@ -270,6 +246,7 @@ impl RenderAsset for WaterMeshMaterial {
         SRes<RenderDevice>,
         SRes<WaterMeshMaterialPipeline>,
         SRes<RenderAssets<TextureArray>>,
+        SRes<WaterTextureIndex>,
     );
 
     fn extract_asset(&self) -> Self::ExtractedAsset {
@@ -278,7 +255,7 @@ impl RenderAsset for WaterMeshMaterial {
 
     fn prepare_asset(
         material: Self::ExtractedAsset,
-        (render_device, material_pipeline, gpu_texture_arrays): &mut SystemParamItem<Self::Param>,
+        (render_device, material_pipeline, gpu_texture_arrays, water_texture_index): &mut SystemParamItem<Self::Param>,
     ) -> Result<Self::PreparedAsset, PrepareAssetError<Self::ExtractedAsset>> {
         let water_texture_gpu_image = gpu_texture_arrays.get(&material.water_texture_array);
         if water_texture_gpu_image.is_none() {
@@ -296,6 +273,10 @@ impl RenderAsset for WaterMeshMaterial {
                 BindGroupEntry {
                     binding: 1,
                     resource: BindingResource::Sampler(water_texture_sampler),
+                },
+                BindGroupEntry {
+                    binding: 2,
+                    resource: water_texture_index.buffer.as_entire_binding(),
                 },
             ],
             label: Some("water_mesh_material_bind_group"),
@@ -328,29 +309,11 @@ impl<const I: usize> EntityRenderCommand for SetWaterMaterialBindGroup<I> {
     }
 }
 
-struct SetTimeBindGroup<const I: usize>;
-impl<const I: usize> EntityRenderCommand for SetTimeBindGroup<I> {
-    type Param = SRes<TimeMeta>;
-
-    fn render<'w>(
-        _view: Entity,
-        _item: Entity,
-        time_meta: SystemParamItem<'w, '_, Self::Param>,
-        pass: &mut TrackedRenderPass<'w>,
-    ) -> RenderCommandResult {
-        let time_bind_group = time_meta.into_inner().bind_group.as_ref().unwrap();
-        pass.set_bind_group(I, time_bind_group, &[]);
-
-        RenderCommandResult::Success
-    }
-}
-
 type DrawWaterMaterial = (
     SetItemPipeline,
     SetMeshViewBindGroup<0>,
     SetWaterMaterialBindGroup<1>,
     SetMeshBindGroup<2>,
-    SetTimeBindGroup<3>,
     DrawMesh,
 );
 
