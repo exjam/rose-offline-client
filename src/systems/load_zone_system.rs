@@ -38,7 +38,7 @@ use crate::{
     events::{LoadZoneEvent, ZoneEvent},
     render::{
         EffectMeshMaterial, ParticleMaterial, SkyMaterial, StaticMeshMaterial, TerrainMaterial,
-        TextureArray, TextureArrayBuilder, WaterMeshMaterial, MESH_ATTRIBUTE_UV_1,
+        TextureArray, TextureArrayBuilder, WaterMaterial, MESH_ATTRIBUTE_UV_1,
         TERRAIN_MESH_ATTRIBUTE_TILE_INFO,
     },
     resources::{CurrentZone, GameData},
@@ -130,7 +130,7 @@ pub fn load_zone_system(
     mut particle_materials: ResMut<Assets<ParticleMaterial>>,
     mut sky_materials: ResMut<Assets<SkyMaterial>>,
     mut static_mesh_materials: ResMut<Assets<StaticMeshMaterial>>,
-    mut water_mesh_materials: ResMut<Assets<WaterMeshMaterial>>,
+    mut water_materials: ResMut<Assets<WaterMaterial>>,
     mut texture_arrays: ResMut<Assets<TextureArray>>,
     mut load_zone_state: Local<LoadZoneState>,
     mut load_zone_event: EventReader<LoadZoneEvent>,
@@ -206,7 +206,7 @@ pub fn load_zone_system(
             &mut particle_materials,
             &mut sky_materials,
             &mut static_mesh_materials,
-            &mut water_mesh_materials,
+            &mut water_materials,
             &mut texture_arrays,
             zone_list_entry,
         )
@@ -226,7 +226,7 @@ fn load_zone(
     particle_materials: &mut ResMut<Assets<ParticleMaterial>>,
     sky_materials: &mut ResMut<Assets<SkyMaterial>>,
     static_mesh_materials: &mut ResMut<Assets<StaticMeshMaterial>>,
-    water_mesh_materials: &mut ResMut<Assets<WaterMeshMaterial>>,
+    water_materials: &mut ResMut<Assets<WaterMaterial>>,
     texture_arrays: &mut ResMut<Assets<TextureArray>>,
     zone_list_entry: &ZoneListEntry,
 ) -> Result<(), anyhow::Error> {
@@ -291,7 +291,7 @@ fn load_zone(
     for i in 1..=25 {
         water_texture_array_builder.add(format!("3DDATA/JUNON/WATER/OCEAN01_{:02}.DDS", i));
     }
-    let water_material = water_mesh_materials.add(WaterMeshMaterial {
+    let water_material = water_materials.add(WaterMaterial {
         water_texture_array: texture_arrays.add(water_texture_array_builder.build(asset_server)),
     });
 
@@ -636,7 +636,7 @@ fn load_block_waterplanes(
         rose_file_readers::types::Vec3<f32>,
         rose_file_readers::types::Vec3<f32>,
     )],
-    water_material: &Handle<WaterMeshMaterial>,
+    water_material: &Handle<WaterMaterial>,
 ) {
     for (plane_start, plane_end) in water_planes {
         let start = Vec3::new(

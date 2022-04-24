@@ -14,7 +14,7 @@ mod sky_material;
 mod static_mesh_material;
 mod terrain_material;
 mod texture_array;
-mod water_mesh_material;
+mod water_material;
 
 pub const MESH_ATTRIBUTE_UV_1: MeshVertexAttribute =
     MeshVertexAttribute::new("Vertex_Uv2", 280035324, VertexFormat::Float32x2);
@@ -34,7 +34,7 @@ pub use sky_material::SkyMaterial;
 pub use static_mesh_material::StaticMeshMaterial;
 pub use terrain_material::{TerrainMaterial, TERRAIN_MESH_ATTRIBUTE_TILE_INFO};
 pub use texture_array::{GpuTextureArray, TextureArray, TextureArrayBuilder};
-pub use water_mesh_material::WaterMeshMaterial;
+pub use water_material::WaterMaterial;
 
 use damage_digit_material::DamageDigitMaterialPlugin;
 use damage_digit_pipeline::DamageDigitRenderPlugin;
@@ -45,7 +45,7 @@ use sky_material::SkyMaterialPlugin;
 use static_mesh_material::StaticMeshMaterialPlugin;
 use terrain_material::TerrainMaterialPlugin;
 use texture_array::TextureArrayPlugin;
-use water_mesh_material::WaterMeshMaterialPlugin;
+use water_material::WaterMaterialPlugin;
 
 #[derive(Default)]
 pub struct RoseRenderPlugin;
@@ -56,7 +56,7 @@ impl Plugin for RoseRenderPlugin {
             .add_plugin(TerrainMaterialPlugin)
             .add_plugin(EffectMeshMaterialPlugin)
             .add_plugin(StaticMeshMaterialPlugin)
-            .add_plugin(WaterMeshMaterialPlugin)
+            .add_plugin(WaterMaterialPlugin)
             .add_plugin(ParticleMaterialPlugin)
             .add_plugin(ParticleRenderPlugin)
             .add_plugin(DamageDigitMaterialPlugin)
