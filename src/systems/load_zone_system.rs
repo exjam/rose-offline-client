@@ -21,7 +21,7 @@ use bevy_rapier3d::{
 };
 use std::path::Path;
 
-use rose_data::{ZoneId, ZoneListEntry};
+use rose_data::{WarpGateId, ZoneId, ZoneListEntry};
 use rose_file_readers::{
     HimFile, IfoFile, IfoObject, LitFile, LitObject, StbFile, TilFile, ZonFile, ZonTile,
     ZonTileRotation, ZscCollisionFlags, ZscCollisionShape, ZscEffectType, ZscFile,
@@ -29,10 +29,10 @@ use rose_file_readers::{
 
 use crate::{
     components::{
-        ActiveMotion, CollisionTriMesh, EventObject, NightTimeEffect, COLLISION_FILTER_CLICKABLE,
-        COLLISION_FILTER_COLLIDABLE, COLLISION_FILTER_INSPECTABLE,
+        ActiveMotion, CollisionTriMesh, EventObject, NightTimeEffect, WarpObject,
+        COLLISION_FILTER_CLICKABLE, COLLISION_FILTER_COLLIDABLE, COLLISION_FILTER_INSPECTABLE,
         COLLISION_GROUP_ZONE_EVENT_OBJECT, COLLISION_GROUP_ZONE_OBJECT,
-        COLLISION_GROUP_ZONE_TERRAIN, COLLISION_GROUP_ZONE_WATER,
+        COLLISION_GROUP_ZONE_TERRAIN, COLLISION_GROUP_ZONE_WARP_OBJECT, COLLISION_GROUP_ZONE_WATER,
     },
     effect_loader::spawn_effect,
     events::{LoadZoneEvent, ZoneEvent},
@@ -48,7 +48,7 @@ use crate::{
 const SKYBOX_MODEL_SCALE: f32 = 10.0;
 
 #[derive(Inspectable)]
-pub enum ZoneObjectStaticObjectPartCollisionShape {
+pub enum ZoneObjectPartCollisionShape {
     None,
     Sphere,
     AxisAlignedBoundingBox,
@@ -56,13 +56,13 @@ pub enum ZoneObjectStaticObjectPartCollisionShape {
     Polygon,
 }
 
-impl Default for ZoneObjectStaticObjectPartCollisionShape {
+impl Default for ZoneObjectPartCollisionShape {
     fn default() -> Self {
         Self::AxisAlignedBoundingBox
     }
 }
 
-impl From<&Option<ZscCollisionShape>> for ZoneObjectStaticObjectPartCollisionShape {
+impl From<&Option<ZscCollisionShape>> for ZoneObjectPartCollisionShape {
     fn from(value: &Option<ZscCollisionShape>) -> Self {
         match value {
             Some(ZscCollisionShape::Sphere) => Self::Sphere,
@@ -75,9 +75,9 @@ impl From<&Option<ZscCollisionShape>> for ZoneObjectStaticObjectPartCollisionSha
 }
 
 #[derive(Inspectable, Default)]
-pub struct ZoneObjectStaticObjectPart {
+pub struct ZoneObjectPart {
     pub mesh_path: String,
-    pub collision_shape: ZoneObjectStaticObjectPartCollisionShape,
+    pub collision_shape: ZoneObjectPartCollisionShape,
     pub collision_not_moveable: bool,
     pub collision_not_pickable: bool,
     pub collision_height_only: bool,
@@ -99,11 +99,13 @@ pub struct ZoneObjectTerrain {
 
 #[derive(Component, Inspectable)]
 pub enum ZoneObject {
+    AnimatedObject(ZoneObjectAnimatedObject),
+    WarpObjectPart(ZoneObjectPart),
+    EventObjectPart(ZoneObjectPart),
+    CnstObjectPart(ZoneObjectPart),
+    DecoObjectPart(ZoneObjectPart),
     Terrain(ZoneObjectTerrain),
     Water,
-    EventObjectPart(ZoneObjectStaticObjectPart),
-    StaticObjectPart(ZoneObjectStaticObjectPart),
-    AnimatedObject(ZoneObjectAnimatedObject),
 }
 
 pub enum LoadZoneState {
@@ -239,9 +241,15 @@ fn load_zone(
         .vfs
         .read_file::<ZscFile, _>(&zone_list_entry.zsc_deco_path)
         .ok();
+
+    // TODO: Cache these
     let zsc_event_object = vfs_resource
         .vfs
         .read_file::<ZscFile, _>("3DDATA/SPECIAL/EVENT_OBJECT.ZSC")
+        .ok();
+    let zsc_special_object = vfs_resource
+        .vfs
+        .read_file::<ZscFile, _>("3DDATA/SPECIAL/LIST_DECO_SPECIAL.ZSC")
         .ok();
     let stb_morph_object = vfs_resource
         .vfs
@@ -352,13 +360,39 @@ fn load_zone(
                             &lightmap_path,
                             None,
                             &event_object.object,
-                            true,
+                            event_object.object.object_id as usize,
+                            ZoneObject::EventObjectPart,
+                            COLLISION_GROUP_ZONE_EVENT_OBJECT,
                         );
 
                         commands.entity(event_entity).insert(EventObject::new(
                             event_object.quest_trigger_name.clone(),
                             event_object.script_function_name.clone(),
                         ));
+                    }
+                }
+
+                if let Some(zsc_special_object) = zsc_special_object.as_ref() {
+                    for warp_object in ifo.warps.iter() {
+                        let warp_entity = load_block_object(
+                            commands,
+                            asset_server,
+                            vfs_resource,
+                            effect_mesh_materials.as_mut(),
+                            particle_materials.as_mut(),
+                            static_mesh_materials.as_mut(),
+                            zsc_special_object,
+                            &lightmap_path,
+                            None,
+                            warp_object,
+                            1,
+                            ZoneObject::EventObjectPart,
+                            COLLISION_GROUP_ZONE_WARP_OBJECT,
+                        );
+
+                        commands
+                            .entity(warp_entity)
+                            .insert(WarpObject::new(WarpGateId::new(warp_object.warp_id)));
                     }
                 }
 
@@ -389,7 +423,9 @@ fn load_zone(
                             &lightmap_path,
                             lit_object,
                             object_instance,
-                            false,
+                            object_instance.object_id as usize,
+                            ZoneObject::CnstObjectPart,
+                            COLLISION_GROUP_ZONE_OBJECT,
                         );
                     }
                 }
@@ -421,7 +457,9 @@ fn load_zone(
                             &lightmap_path,
                             lit_object,
                             object_instance,
-                            false,
+                            object_instance.object_id as usize,
+                            ZoneObject::DecoObjectPart,
+                            COLLISION_GROUP_ZONE_OBJECT,
                         );
                     }
                 }
@@ -681,9 +719,11 @@ fn load_block_object(
     lightmap_path: &Path,
     lit_object: Option<&LitObject>,
     object_instance: &IfoObject,
-    is_event_object: bool,
+    object_id: usize,
+    object_type: fn(ZoneObjectPart) -> ZoneObject,
+    collision_group: u32,
 ) -> Entity {
-    let object = &zsc.objects[object_instance.object_id as usize];
+    let object = &zsc.objects[object_id as usize];
     let object_transform = Transform::default()
         .with_translation(
             Vec3::new(
@@ -786,50 +826,43 @@ fn load_block_object(
                     handle
                 });
 
-                let collision_filter = if object_part.collision_shape.is_none() {
-                    COLLISION_FILTER_INSPECTABLE
-                } else {
-                    COLLISION_FILTER_INSPECTABLE
-                        | COLLISION_FILTER_COLLIDABLE
-                        | COLLISION_FILTER_CLICKABLE
-                };
+                let mut collision_filter = COLLISION_FILTER_INSPECTABLE;
+
+                if object_part.collision_shape.is_some() {
+                    collision_filter |= COLLISION_FILTER_COLLIDABLE;
+
+                    if collision_group != COLLISION_GROUP_ZONE_WARP_OBJECT
+                        && !object_part
+                            .collision_flags
+                            .contains(ZscCollisionFlags::NOT_PICKABLE)
+                    {
+                        collision_filter |= COLLISION_FILTER_CLICKABLE;
+                    }
+                }
 
                 let mut part_commands = object_commands.spawn_bundle((
-                    if is_event_object {
-                        ZoneObject::EventObjectPart(ZoneObjectStaticObjectPart {
-                            mesh_path: zsc.meshes[mesh_id].path().to_string_lossy().into(),
-                            collision_shape: (&object_part.collision_shape).into(),
-                            collision_not_moveable: object_part
-                                .collision_flags
-                                .contains(ZscCollisionFlags::NOT_MOVEABLE),
-                            collision_not_pickable: object_part
-                                .collision_flags
-                                .contains(ZscCollisionFlags::NOT_PICKABLE),
-                            collision_height_only: object_part
-                                .collision_flags
-                                .contains(ZscCollisionFlags::HEIGHT_ONLY),
-                            collision_no_camera: object_part
-                                .collision_flags
-                                .contains(ZscCollisionFlags::NOT_CAMERA_COLLISION),
-                        })
-                    } else {
-                        ZoneObject::StaticObjectPart(ZoneObjectStaticObjectPart {
-                            mesh_path: zsc.meshes[mesh_id].path().to_string_lossy().into(),
-                            collision_shape: (&object_part.collision_shape).into(),
-                            collision_not_moveable: object_part
-                                .collision_flags
-                                .contains(ZscCollisionFlags::NOT_MOVEABLE),
-                            collision_not_pickable: object_part
-                                .collision_flags
-                                .contains(ZscCollisionFlags::NOT_PICKABLE),
-                            collision_height_only: object_part
-                                .collision_flags
-                                .contains(ZscCollisionFlags::HEIGHT_ONLY),
-                            collision_no_camera: object_part
-                                .collision_flags
-                                .contains(ZscCollisionFlags::NOT_CAMERA_COLLISION),
-                        })
-                    },
+                    object_type(ZoneObjectPart {
+                        mesh_path: zsc.meshes[mesh_id].path().to_string_lossy().into(),
+                        // collision_shape.is_none(): cannot be hit with any raycast
+                        // collision_shape.is_some(): can be hit with forward raycast
+                        collision_shape: (&object_part.collision_shape).into(),
+                        // collision_not_moveable: does not hit downwards ray cast, but can hit forwards ray cast
+                        collision_not_moveable: object_part
+                            .collision_flags
+                            .contains(ZscCollisionFlags::NOT_MOVEABLE),
+                        // collision_not_pickable: can not be clicked on with mouse
+                        collision_not_pickable: object_part
+                            .collision_flags
+                            .contains(ZscCollisionFlags::NOT_PICKABLE),
+                        // collision_height_only: ?
+                        collision_height_only: object_part
+                            .collision_flags
+                            .contains(ZscCollisionFlags::HEIGHT_ONLY),
+                        // collision_no_camera: does not collide with camera
+                        collision_no_camera: object_part
+                            .collision_flags
+                            .contains(ZscCollisionFlags::NOT_CAMERA_COLLISION),
+                    }),
                     mesh,
                     material,
                     part_transform,
@@ -837,11 +870,7 @@ fn load_block_object(
                     Visibility::default(),
                     ComputedVisibility::default(),
                     CollisionTriMesh {
-                        group: if is_event_object {
-                            COLLISION_GROUP_ZONE_EVENT_OBJECT
-                        } else {
-                            COLLISION_GROUP_ZONE_OBJECT
-                        },
+                        group: collision_group,
                         filter: collision_filter,
                     },
                     NotShadowCaster {},

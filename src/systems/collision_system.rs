@@ -21,12 +21,15 @@ use bevy_rapier3d::{
         InteractionGroups, QueryPipeline, Ray,
     },
 };
+use rose_game_common::messages::client::ClientMessage;
 
 use crate::{
     components::{
-        CollisionRayCastSource, CollisionTriMesh, EventObject, COLLISION_FILTER_COLLIDABLE,
+        CollisionRayCastSource, CollisionTriMesh, EventObject, WarpObject,
+        COLLISION_FILTER_COLLIDABLE,
     },
     events::QuestTriggerEvent,
+    resources::GameConnection,
 };
 
 fn get_window_for_camera<'a>(windows: &'a Windows, camera: &Camera) -> Option<&'a Window> {
@@ -75,10 +78,12 @@ pub fn collision_system(
     mut query_parent: Query<&mut Transform>,
     query_hit_parent_object: Query<&Parent>,
     mut query_event_object: Query<&mut EventObject>,
+    mut query_warp_object: Query<&mut WarpObject>,
     query_pipeline: Res<QueryPipeline>,
     time: Res<Time>,
     colliders: QueryPipelineColliderComponentsQuery,
     mut quest_trigger_events: EventWriter<QuestTriggerEvent>,
+    game_connection: Option<Res<GameConnection>>,
 ) {
     // Cast down to collide entities with ground
     let colliders = QueryPipelineColliderComponentsSet(&colliders);
@@ -108,6 +113,21 @@ pub fn collision_system(
 
                         hit_event_object.last_collision = time.seconds_since_startup();
                     }
+
+                    continue; // Skip collision
+                } else if let Ok(mut hit_warp_object) = query_warp_object.get_mut(hit_parent.0) {
+                    if time.seconds_since_startup() - hit_warp_object.last_collision > 5.0 {
+                        if let Some(game_connection) = game_connection.as_ref() {
+                            game_connection
+                                .client_message_tx
+                                .send(ClientMessage::WarpGateRequest(hit_warp_object.warp_id))
+                                .ok();
+                        }
+
+                        hit_warp_object.last_collision = time.seconds_since_startup();
+                    }
+
+                    continue; // Skip collision
                 }
             }
 
