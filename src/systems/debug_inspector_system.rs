@@ -22,8 +22,7 @@ use crate::{
 use super::{
     collision_system::ray_from_screenspace,
     load_zone_system::{
-        ZoneObjectAnimatedObject, ZoneObjectStaticObjectPart,
-        ZoneObjectStaticObjectPartCollisionShape, ZoneObjectTerrain,
+        ZoneObjectAnimatedObject, ZoneObjectPart, ZoneObjectPartCollisionShape, ZoneObjectTerrain,
     },
     ZoneObject,
 };
@@ -43,8 +42,8 @@ impl Plugin for DebugInspectorPlugin {
         inspectable_registry.register::<ZoneObject>();
         inspectable_registry.register::<ZoneObjectTerrain>();
         inspectable_registry.register::<ZoneObjectAnimatedObject>();
-        inspectable_registry.register::<ZoneObjectStaticObjectPart>();
-        inspectable_registry.register::<ZoneObjectStaticObjectPartCollisionShape>();
+        inspectable_registry.register::<ZoneObjectPart>();
+        inspectable_registry.register::<ZoneObjectPartCollisionShape>();
 
         let mut world_inspector_params = app
             .world

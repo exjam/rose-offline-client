@@ -323,6 +323,7 @@ pub fn debug_render_skeleton_system(
 
     for (entity, debug_skeleton) in query_remove_debug_skeleton.iter() {
         commands.entity(debug_skeleton.polyline_entity).despawn();
+        commands.entity(debug_skeleton.polyline_entity_up).despawn();
         commands.entity(entity).remove::<DebugRenderSkeletonData>();
     }
 }
