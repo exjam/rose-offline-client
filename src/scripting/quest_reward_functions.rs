@@ -1,4 +1,4 @@
-use rose_data::{QuestTrigger, StackableItem};
+use rose_data::{QuestTrigger, StackableItem, WorldTicks};
 use rose_file_readers::{
     QsdItemBase1000, QsdReward, QsdRewardOperator, QsdRewardQuestAction, QsdVariableType,
 };
@@ -20,6 +20,18 @@ fn quest_reward_operator(operator: QsdRewardOperator, variable_value: i32, value
         QsdRewardOperator::Zero => 0,
         QsdRewardOperator::One => 1,
     }
+}
+
+fn quest_get_expire_time(
+    script_resources: &ScriptFunctionResources,
+    quest_id: usize,
+) -> Option<WorldTicks> {
+    script_resources
+        .game_data
+        .quests
+        .get_quest_data(quest_id)
+        .and_then(|quest_data| quest_data.time_limit)
+        .map(|time_limit| script_resources.world_time.ticks + time_limit)
 }
 
 fn quest_reward_add_item(
@@ -173,7 +185,8 @@ fn quest_reward_add_quest(
     let mut quest_state = script_context.query_quest.single_mut();
 
     if let Some(quest_index) = quest_state.try_add_quest(ActiveQuest::new(
-        quest_id, None, // TODO: Get quest expire time
+        quest_id,
+        quest_get_expire_time(script_resources, quest_id),
     )) {
         if quest_context.selected_quest_index.is_none() {
             quest_context.selected_quest_index = Some(quest_index);
