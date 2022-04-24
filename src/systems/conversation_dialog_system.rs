@@ -8,7 +8,7 @@ use bevy_egui::{egui, EguiContext};
 use rose_file_readers::{ConFile, ConMessageType};
 
 use crate::{
-    components::{PlayerCharacter, Position},
+    components::{ClientEntityName, PlayerCharacter, Position},
     events::ConversationDialogEvent,
     resources::GameData,
     scripting::{
@@ -20,14 +20,14 @@ use crate::{
 };
 
 pub struct GeneratedDialogResponse {
-    pub text: String,
+    pub text: egui::text::LayoutJob,
     pub action_function: String,
     pub menu_index: i32,
 }
 
 #[derive(Default)]
 pub struct GeneratedDialog {
-    pub message: String,
+    pub message: egui::text::LayoutJob,
     pub responses: Vec<GeneratedDialogResponse>,
 }
 
@@ -104,6 +104,122 @@ fn create_conversation_dialog(
     })
 }
 
+fn parse_message(message: &str, user_context: &LuaVMContext) -> String {
+    let mut string = String::with_capacity(message.len());
+
+    let mut remaining = message;
+    while let Some(template_start) = remaining.find(|c| c == '<') {
+        let (before_template, template) = remaining.split_at(template_start);
+
+        let template_end = template.find(|c| c == '>');
+        if template_end.is_none() {
+            return string;
+        }
+        let template_end = template_end.unwrap();
+        let (template, after_template) = template.split_at(template_end + 1);
+
+        string += before_template;
+        string += match template {
+            "<NAME>" => user_context
+                .function_context
+                .query_player
+                .get_single()
+                .map(|player| player.character_info.name.clone())
+                .ok(),
+            "<LEVEL>" => user_context
+                .function_context
+                .query_player
+                .get_single()
+                .map(|player| format!("{}", player.level.level))
+                .ok(),
+            _ => None,
+        }
+        .unwrap_or_else(|| template.to_string())
+        .as_str();
+        remaining = after_template;
+    }
+
+    string += remaining;
+    string
+}
+
+fn message_layout_job(message: &str) -> egui::text::LayoutJob {
+    let default_text_color = egui::Color32::LIGHT_GRAY;
+    let mut remaining = message;
+    let mut job = egui::text::LayoutJob::default();
+    let mut current_text_format = egui::text::TextFormat {
+        color: default_text_color,
+        ..Default::default()
+    };
+
+    while let Some(tag_start) = remaining.find('{') {
+        let (before_tag, tag) = remaining.split_at(tag_start);
+        let tag_end = tag.find('}');
+        if tag_end.is_none() {
+            break;
+        }
+        let tag_end = tag_end.unwrap();
+        let (tag, after_tag) = tag.split_at(tag_end + 1);
+
+        let tag_lower = tag.to_lowercase();
+        match tag_lower.as_str() {
+            "{br}" => {
+                job.append(before_tag, 0.0, current_text_format.clone());
+                job.append("\n", 0.0, current_text_format.clone());
+            }
+            "{b}" => {
+                job.append(before_tag, 0.0, current_text_format.clone());
+                current_text_format.italics = true;
+            }
+            "{/b}" => {
+                job.append(before_tag, 0.0, current_text_format.clone());
+                current_text_format.italics = false;
+            }
+            "{/fc}" => {
+                job.append(before_tag, 0.0, current_text_format.clone());
+                current_text_format.color = default_text_color;
+            }
+            tag if tag.starts_with("{fc=") => {
+                let len = tag.len();
+                let index_str = &tag[4..len - 1];
+                if let Ok(color_index) = index_str.parse::<i32>() {
+                    job.append(before_tag, 0.0, current_text_format.clone());
+                    current_text_format.color = match color_index {
+                        1 => egui::Color32::from_rgb(0x80, 0, 0),
+                        2 => egui::Color32::from_rgb(0, 0x80, 0),
+                        3 => egui::Color32::from_rgb(0, 0, 0x80),
+                        4 => egui::Color32::from_rgb(0x80, 0x80, 0),
+                        5 => egui::Color32::from_rgb(0x80, 0, 0x80),
+                        6 => egui::Color32::from_rgb(0, 0x80, 0x80),
+                        7 => egui::Color32::from_rgb(0x80, 0x80, 0x80),
+                        8 => egui::Color32::from_rgb(0xC0, 0xC0, 0xC0),
+                        9 => egui::Color32::from_rgb(0xC0, 0xDC, 0xC0),
+                        10 => egui::Color32::from_rgb(0xC0, 0xC0, 0xDC),
+                        11 => egui::Color32::from_rgb(0xA6, 0xCA, 0xF0),
+                        12 => egui::Color32::from_rgb(0xFF, 0, 0),
+                        13 => egui::Color32::from_rgb(0, 0xFF, 0),
+                        14 => egui::Color32::from_rgb(0, 0, 0xFF),
+                        15 => egui::Color32::from_rgb(0xFF, 0xFF, 0),
+                        16 => egui::Color32::from_rgb(0, 0xFF, 0xFF),
+                        17 => egui::Color32::from_rgb(0xFF, 0xFB, 0xF0),
+                        18 => egui::Color32::from_rgb(0xFF, 0xFF, 0xFF),
+                        _ => default_text_color,
+                    };
+                }
+            }
+            _ => {}
+        }
+
+        remaining = after_tag;
+    }
+
+    if !remaining.is_empty() {
+        job.append(remaining, 0.0, current_text_format);
+    }
+
+    job
+}
+
 impl GeneratedDialog {
     fn run_menu(
         &mut self,
@@ -158,19 +274,27 @@ impl GeneratedDialog {
                 | ConMessageType::PlayerSelect
                 | ConMessageType::JumpSelect => {
                     self.responses.push(GeneratedDialogResponse {
-                        text: game_data
-                            .ltb_event
-                            .get_string(message.string_id as usize, 2)
-                            .unwrap_or_else(|| "???".into()),
+                        text: message_layout_job(
+                            game_data
+                                .ltb_event
+                                .get_string(message.string_id as usize, 2)
+                                .map(|message| parse_message(&message, user_context))
+                                .unwrap_or_else(|| "???".into())
+                                .as_str(),
+                        ),
                         action_function: message.action_function.clone(),
                         menu_index: message.message_value,
                     });
                 }
                 ConMessageType::NextMessage | ConMessageType::ShowMessage => {
-                    self.message = game_data
-                        .ltb_event
-                        .get_string(message.string_id as usize, 2)
-                        .unwrap_or_else(|| "???".into());
+                    self.message = message_layout_job(
+                        game_data
+                            .ltb_event
+                            .get_string(message.string_id as usize, 2)
+                            .map(|message| parse_message(&message, user_context))
+                            .unwrap_or_else(|| "???".into())
+                            .as_str(),
+                    );
                     self.responses.clear();
 
                     self.run_menu(
@@ -199,6 +323,7 @@ pub fn conversation_dialog_system(
     script_function_resources: ScriptFunctionResources,
     query_player_position: Query<&Position, With<PlayerCharacter>>,
     query_position: Query<&Position>,
+    query_name: Query<&ClientEntityName>,
     lua_game_constants: Res<LuaGameConstants>,
     lua_game_functions: Res<LuaGameFunctions>,
     lua_quest_functions: Res<LuaQuestFunctions>,
@@ -300,7 +425,14 @@ pub fn conversation_dialog_system(
             }
         }
 
-        egui::Window::new("NPC Dialog")
+        let title = dialog_state
+            .owner_entity
+            .and_then(|entity| query_name.get(entity).ok())
+            .map(|name| name.name.as_str())
+            .unwrap_or("Event Dialog");
+
+        egui::Window::new(title)
+            .id(egui::Id::new("conversation_dialog"))
             .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
             .collapsible(false)
             .resizable(false)
@@ -319,14 +451,17 @@ pub fn conversation_dialog_system(
 
                 ui.spacing_mut().item_spacing = egui::Vec2::new(10.0, 10.0);
                 ui.spacing_mut().button_padding = egui::Vec2::new(5.0, 5.0);
-                ui.label(&dialog_state.generated_dialog.message);
+                ui.label(dialog_state.generated_dialog.message.clone());
                 ui.separator();
 
                 for (index, response) in dialog_state.generated_dialog.responses.iter().enumerate()
                 {
-                    if ui.button(format!("{}. {}", index, response.text)).clicked() {
-                        selected_response = Some(index);
-                    }
+                    ui.horizontal(|ui| {
+                        ui.label(format!("{}. ", index));
+                        if ui.button(response.text.clone()).clicked() {
+                            selected_response = Some(index);
+                        }
+                    });
                 }
             });
 
