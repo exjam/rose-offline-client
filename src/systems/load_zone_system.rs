@@ -37,8 +37,8 @@ use crate::{
     effect_loader::spawn_effect,
     events::{LoadZoneEvent, ZoneEvent},
     render::{
-        EffectMeshMaterial, ParticleMaterial, SkyMaterial, StaticMeshMaterial, TerrainMaterial,
-        TextureArray, TextureArrayBuilder, WaterMaterial, MESH_ATTRIBUTE_UV_1,
+        EffectMeshMaterial, ParticleMaterial, RgbTextureLoader, SkyMaterial, StaticMeshMaterial,
+        TerrainMaterial, TextureArray, TextureArrayBuilder, WaterMaterial, MESH_ATTRIBUTE_UV_1,
         TERRAIN_MESH_ATTRIBUTE_TILE_INFO,
     },
     resources::{CurrentZone, GameData},
@@ -264,8 +264,12 @@ fn load_zone(
         commands.spawn_bundle((
             asset_server.load::<Mesh, _>(skybox_data.mesh.path()),
             sky_materials.add(SkyMaterial {
-                texture_day: Some(asset_server.load(skybox_data.texture_day.path())),
-                texture_night: Some(asset_server.load(skybox_data.texture_night.path())),
+                texture_day: Some(asset_server.load(RgbTextureLoader::convert_path(
+                    skybox_data.texture_day.path(),
+                ))),
+                texture_night: Some(asset_server.load(RgbTextureLoader::convert_path(
+                    skybox_data.texture_night.path(),
+                ))),
             }),
             Transform::from_scale(Vec3::splat(SKYBOX_MODEL_SCALE)),
             GlobalTransform::default(),
@@ -314,7 +318,7 @@ fn load_zone(
             if let (Ok(heightmap), Ok(tilemap)) = (heightmap, tilemap) {
                 let block_terrain_material = terrain_materials.add(TerrainMaterial {
                     lightmap_texture: asset_server.load(&format!(
-                        "{}/{1:}_{2:}/{1:}_{2:}_PLANELIGHTINGMAP.DDS",
+                        "{}/{1:}_{2:}/{1:}_{2:}_PLANELIGHTINGMAP.DDS.rgb_texture",
                         zone_path.to_str().unwrap(),
                         block_x,
                         block_y,
@@ -781,8 +785,11 @@ fn load_block_object(
                     handle
                 });
                 let lit_part = lit_object.and_then(|lit_object| lit_object.parts.get(part_index));
-                let lightmap_texture = lit_part
-                    .map(|lit_part| asset_server.load(lightmap_path.join(&lit_part.filename)));
+                let lightmap_texture = lit_part.map(|lit_part| {
+                    asset_server.load(RgbTextureLoader::convert_path(
+                        &lightmap_path.join(&lit_part.filename),
+                    ))
+                });
                 let (lightmap_uv_offset, lightmap_uv_scale) = lit_part
                     .map(|lit_part| {
                         let scale = 1.0 / lit_part.parts_per_row as f32;
@@ -800,7 +807,10 @@ fn load_block_object(
                 let material = material_cache[material_id].clone().unwrap_or_else(|| {
                     let zsc_material = &zsc.materials[material_id];
                     let handle = static_mesh_materials.add(StaticMeshMaterial {
-                        base_texture: Some(asset_server.load(zsc_material.path.path())),
+                        base_texture: Some(
+                            asset_server
+                                .load(RgbTextureLoader::convert_path(zsc_material.path.path())),
+                        ),
                         lightmap_texture,
                         alpha_value: if zsc_material.alpha != 1.0 {
                             Some(zsc_material.alpha)
@@ -989,7 +999,9 @@ fn load_animated_object(
 
     let mesh = asset_server.load::<Mesh, _>(mesh_path);
     let material = static_mesh_materials.add(StaticMeshMaterial {
-        base_texture: Some(asset_server.load(texture_path)),
+        base_texture: Some(
+            asset_server.load(RgbTextureLoader::convert_path(Path::new(texture_path))),
+        ),
         lightmap_texture: None,
         alpha_value: None,
         alpha_enabled,

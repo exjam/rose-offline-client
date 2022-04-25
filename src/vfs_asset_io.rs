@@ -18,8 +18,14 @@ impl VfsAssetIo {
 impl AssetIo for VfsAssetIo {
     fn load_path<'a>(&'a self, path: &'a Path) -> BoxedFuture<'a, Result<Vec<u8>, AssetIoError>> {
         Box::pin(async move {
-            // HACK: render/texture_array.rs relies on a custom asset loader with extension image_copy_src
-            let path = path.to_str().unwrap().trim_end_matches(".image_copy_src");
+            // bevy plsssss whyyy
+            // HACK: render/texture_array.rs relies on a custom asset loader with extension .image_copy_src
+            // HACK: render/rgb_texture_loader.rs relies on a custom asset loader with extension .rgb_texture
+            let path = path
+                .to_str()
+                .unwrap()
+                .trim_end_matches(".image_copy_src")
+                .trim_end_matches(".rgb_texture");
             if let Some(file) = self.vfs.open_file(path) {
                 match file {
                     VfsFile::Buffer(buffer) => Ok(buffer),

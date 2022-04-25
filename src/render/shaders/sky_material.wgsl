@@ -57,7 +57,7 @@ struct FragmentInput {
 fn fragment(in: FragmentInput) -> [[location(0)]] vec4<f32> {
     var color_day: vec4<f32> = textureSample(sky_texture_day, sky_sampler_day, in.uv);
     var color_night: vec4<f32> = textureSample(sky_texture_night, sky_sampler_night, in.uv);
-    var output_color: vec4<f32> = mix(color_night, color_day, sky_data.day_weight);
+    var output_color: vec4<f32> = pow(mix(color_night, color_day, sky_data.day_weight), vec4<f32>(2.2));
     output_color.a = 1.0;
     return output_color;
 }

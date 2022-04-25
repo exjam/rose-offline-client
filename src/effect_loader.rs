@@ -17,6 +17,7 @@ use crate::{
     components::{Effect, EffectMesh, EffectParticle, ParticleSequence},
     render::{
         EffectMeshMaterial, ParticleMaterial, ParticleRenderBillboardType, ParticleRenderData,
+        RgbTextureLoader,
     },
 };
 
@@ -135,7 +136,9 @@ fn spawn_mesh(
                     EffectMesh {},
                     asset_server.load::<Mesh, _>(eft_mesh.mesh_file.path()),
                     effect_mesh_materials.add(EffectMeshMaterial {
-                        base_texture: Some(asset_server.load(eft_mesh.mesh_texture_file.path())),
+                        base_texture: Some(asset_server.load(RgbTextureLoader::convert_path(
+                            eft_mesh.mesh_texture_file.path(),
+                        ))),
                         alpha_enabled: eft_mesh.alpha_enabled,
                         alpha_test: eft_mesh.alpha_test_enabled,
                         two_sided: eft_mesh.two_sided,
@@ -228,7 +231,8 @@ fn spawn_particle(
                             },
                         ),
                         particle_materials.add(ParticleMaterial {
-                            texture: asset_server.load(sequence.texture_path.path()),
+                            texture: asset_server
+                                .load(RgbTextureLoader::convert_path(sequence.texture_path.path())),
                         }),
                         ParticleSequence::from(sequence)
                             .with_start_delay(eft_particle.start_delay as f32 / 1000.0),

@@ -23,7 +23,7 @@ use crate::{
         PersonalStoreModel,
     },
     effect_loader::spawn_effect,
-    render::{EffectMeshMaterial, ParticleMaterial, StaticMeshMaterial},
+    render::{EffectMeshMaterial, ParticleMaterial, RgbTextureLoader, StaticMeshMaterial},
     zmo_asset_loader::ZmoAsset,
 };
 
@@ -674,7 +674,9 @@ fn spawn_model(
         let material_id = object_part.material_id as usize;
         let zsc_material = &model_list.materials[material_id];
         let material = static_mesh_materials.add(StaticMeshMaterial {
-            base_texture: Some(asset_server.load(zsc_material.path.path())),
+            base_texture: Some(
+                asset_server.load(RgbTextureLoader::convert_path(zsc_material.path.path())),
+            ),
             lightmap_texture: None,
             alpha_value: if zsc_material.alpha != 1.0 {
                 Some(zsc_material.alpha)

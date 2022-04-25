@@ -94,7 +94,7 @@ impl RenderAsset for TextureArray {
             mip_level_count: 1,
             sample_count: 1,
             dimension: TextureDimension::D2,
-            format: TextureFormat::Rgba8UnormSrgb,
+            format: TextureFormat::Rgba8Unorm,
             usage: TextureUsages::COPY_DST | TextureUsages::TEXTURE_BINDING,
         });
 
@@ -155,7 +155,7 @@ fn image_to_texture(dyn_img: DynamicImage) -> Image {
             let i = DynamicImage::ImageLuma8(i).into_rgba8();
             width = i.width();
             height = i.height();
-            format = TextureFormat::Rgba8UnormSrgb;
+            format = TextureFormat::Rgba8Unorm;
 
             data = i.into_raw();
         }
@@ -163,7 +163,7 @@ fn image_to_texture(dyn_img: DynamicImage) -> Image {
             let i = DynamicImage::ImageLumaA8(i).into_rgba8();
             width = i.width();
             height = i.height();
-            format = TextureFormat::Rgba8UnormSrgb;
+            format = TextureFormat::Rgba8Unorm;
 
             data = i.into_raw();
         }
@@ -171,14 +171,14 @@ fn image_to_texture(dyn_img: DynamicImage) -> Image {
             let i = DynamicImage::ImageRgb8(i).into_rgba8();
             width = i.width();
             height = i.height();
-            format = TextureFormat::Rgba8UnormSrgb;
+            format = TextureFormat::Rgba8Unorm;
 
             data = i.into_raw();
         }
         DynamicImage::ImageRgba8(i) => {
             width = i.width();
             height = i.height();
-            format = TextureFormat::Rgba8UnormSrgb;
+            format = TextureFormat::Rgba8Unorm;
 
             data = i.into_raw();
         }
@@ -187,14 +187,14 @@ fn image_to_texture(dyn_img: DynamicImage) -> Image {
 
             width = i.width();
             height = i.height();
-            format = TextureFormat::Bgra8UnormSrgb;
+            format = TextureFormat::Bgra8Unorm;
 
             data = i.into_raw();
         }
         DynamicImage::ImageBgra8(i) => {
             width = i.width();
             height = i.height();
-            format = TextureFormat::Bgra8UnormSrgb;
+            format = TextureFormat::Bgra8Unorm;
 
             data = i.into_raw();
         }

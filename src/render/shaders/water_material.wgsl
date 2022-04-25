@@ -42,5 +42,7 @@ struct FragmentInput {
 
 [[stage(fragment)]]
 fn fragment(in: FragmentInput) -> [[location(0)]] vec4<f32> {
-    return textureSample(water_array_texture, water_array_sampler, in.uv0, water_texture_index.index);
+    var output_color: vec4<f32> = textureSample(water_array_texture, water_array_sampler, in.uv0, water_texture_index.index);
+    output_color = pow(output_color * 2.0, vec4<f32>(2.2)) * lights.ambient_color;
+    return output_color;
 }

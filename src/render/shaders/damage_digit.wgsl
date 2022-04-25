@@ -79,5 +79,5 @@ fn vs_main(model: VertexInput) -> VertexOutput {
 
 [[stage(fragment)]]
 fn fs_main(in: VertexOutput) -> [[location(0)]] vec4<f32> {
-  return textureSample(base_color_texture, base_color_sampler, in.uv);
+  return pow(textureSample(base_color_texture, base_color_sampler, in.uv), vec4<f32>(2.2));
 }

@@ -1,5 +1,5 @@
 use bevy::{
-    prelude::{App, Plugin},
+    prelude::{AddAsset, App, Plugin},
     render::{mesh::MeshVertexAttribute, render_resource::VertexFormat},
 };
 
@@ -10,6 +10,7 @@ mod effect_mesh_material;
 mod particle_material;
 mod particle_pipeline;
 mod particle_render_data;
+mod rgb_texture_loader;
 mod sky_material;
 mod static_mesh_material;
 mod terrain_material;
@@ -30,6 +31,7 @@ pub use damage_digit_render_data::DamageDigitRenderData;
 pub use effect_mesh_material::EffectMeshMaterial;
 pub use particle_material::ParticleMaterial;
 pub use particle_render_data::{ParticleRenderBillboardType, ParticleRenderData};
+pub use rgb_texture_loader::RgbTextureLoader;
 pub use sky_material::SkyMaterial;
 pub use static_mesh_material::StaticMeshMaterial;
 pub use terrain_material::{TerrainMaterial, TERRAIN_MESH_ATTRIBUTE_TILE_INFO};
@@ -61,6 +63,7 @@ impl Plugin for RoseRenderPlugin {
             .add_plugin(ParticleRenderPlugin)
             .add_plugin(DamageDigitMaterialPlugin)
             .add_plugin(DamageDigitRenderPlugin)
-            .add_plugin(SkyMaterialPlugin);
+            .add_plugin(SkyMaterialPlugin)
+            .init_asset_loader::<RgbTextureLoader>();
     }
 }

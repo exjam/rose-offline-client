@@ -47,7 +47,7 @@ struct FragmentInput {
 
 [[stage(fragment)]]
 fn fragment(in: FragmentInput) -> [[location(0)]] vec4<f32> {
-    var output_color: vec4<f32> = textureSample(base_texture, base_sampler, in.uv);
+    var output_color: vec4<f32> = pow(textureSample(base_texture, base_sampler, in.uv), vec4<f32>(2.2));
 
     if ((material.flags & EFFECT_MESH_MATERIAL_FLAGS_ALPHA_MODE_OPAQUE) != 0u) {
         // NOTE: If rendering as opaque, alpha should be ignored so set to 1.0
