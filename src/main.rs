@@ -41,8 +41,9 @@ use rose_file_readers::{LtbFile, StlFile, StlReadOptions, VfsIndex};
 
 use events::{
     AnimationFrameEvent, ChatboxEvent, ClientEntityEvent, ConversationDialogEvent,
-    GameConnectionEvent, HitEvent, LoadZoneEvent, PlayerCommandEvent, QuestTriggerEvent,
-    SpawnEffectEvent, SpawnProjectileEvent, SystemFuncEvent, WorldConnectionEvent, ZoneEvent,
+    GameConnectionEvent, HitEvent, LoadZoneEvent, NpcStoreEvent, PlayerCommandEvent,
+    QuestTriggerEvent, SpawnEffectEvent, SpawnProjectileEvent, SystemFuncEvent,
+    WorldConnectionEvent, ZoneEvent,
 };
 use fly_camera::FlyCameraPlugin;
 use follow_camera::FollowCameraPlugin;
@@ -76,9 +77,9 @@ use ui::{
     ui_debug_entity_inspector_system, ui_debug_item_list_system, ui_debug_menu_system,
     ui_debug_npc_list_system, ui_debug_render_system, ui_debug_skill_list_system,
     ui_debug_zone_list_system, ui_debug_zone_time_system, ui_diagnostics_system,
-    ui_drag_and_drop_system, ui_hotbar_system, ui_inventory_system, ui_player_info_system,
-    ui_quest_list_system, ui_selected_target_system, ui_skill_list_system, ui_window_system,
-    UiStateDebugWindows, UiStateDragAndDrop, UiStateWindows,
+    ui_drag_and_drop_system, ui_hotbar_system, ui_inventory_system, ui_npc_store_system,
+    ui_player_info_system, ui_quest_list_system, ui_selected_target_system, ui_skill_list_system,
+    ui_window_system, UiStateDebugWindows, UiStateDragAndDrop, UiStateWindows,
 };
 use vfs_asset_io::VfsAssetIo;
 use zmo_asset_loader::{ZmoAsset, ZmoAssetLoader};
@@ -338,6 +339,7 @@ fn main() {
         .insert_resource(Events::<WorldConnectionEvent>::default())
         .insert_resource(Events::<AnimationFrameEvent>::default())
         .insert_resource(Events::<ConversationDialogEvent>::default())
+        .insert_resource(Events::<NpcStoreEvent>::default())
         .insert_resource(Events::<PlayerCommandEvent>::default())
         .insert_resource(Events::<QuestTriggerEvent>::default())
         .insert_resource(Events::<SystemFuncEvent>::default())
@@ -394,6 +396,7 @@ fn main() {
         .add_system(world_time_system)
         .add_system(system_func_event_system)
         .add_system(zone_time_system.after(world_time_system))
+        .add_system(ui_npc_store_system.label("ui_system"))
         .add_system(ui_debug_menu_system.before("ui_system"))
         .add_system(ui_debug_zone_list_system.label("ui_system"))
         .add_system(ui_debug_item_list_system.label("ui_system"))

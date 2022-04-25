@@ -8,6 +8,9 @@ pub enum DragAndDropId {
     Inventory(ItemSlot),
     Skill(SkillSlot),
     Hotbar(usize, usize),
+    NpcStore(usize, usize),
+    NpcStoreBuyList(usize),
+    NpcStoreSellList(usize),
 }
 
 pub struct DragAndDropSlot<'a> {

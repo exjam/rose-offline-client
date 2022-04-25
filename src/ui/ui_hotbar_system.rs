@@ -150,8 +150,7 @@ fn ui_add_hotbar_slot(
                 Some(HotbarSlot::Skill(skill_slot)),
             ));
         }
-        Some(DragAndDropId::NotDraggable) => {}
-        None => {}
+        _ => {}
     }
 }
 

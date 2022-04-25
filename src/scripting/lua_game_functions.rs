@@ -1,14 +1,17 @@
 use std::collections::HashMap;
 
-use rose_game_common::components::CharacterGender;
+use rose_game_common::{components::CharacterGender, messages::ClientEntityId};
 
-use crate::scripting::{
-    lua4::Lua4Value,
-    lua_game_constants::{
-        SV_BIRTH, SV_CHA, SV_CLASS, SV_CON, SV_DEX, SV_EXP, SV_FAME, SV_INT, SV_LEVEL, SV_RANK,
-        SV_SEN, SV_SEX, SV_STR, SV_UNION,
+use crate::{
+    events::NpcStoreEvent,
+    scripting::{
+        lua4::Lua4Value,
+        lua_game_constants::{
+            SV_BIRTH, SV_CHA, SV_CLASS, SV_CON, SV_DEX, SV_EXP, SV_FAME, SV_INT, SV_LEVEL, SV_RANK,
+            SV_SEN, SV_SEX, SV_STR, SV_UNION,
+        },
+        ScriptFunctionContext, ScriptFunctionResources,
     },
-    ScriptFunctionContext, ScriptFunctionResources,
 };
 
 pub struct LuaGameFunctions {
@@ -30,6 +33,7 @@ impl Default for LuaGameFunctions {
         > = HashMap::new();
 
         closures.insert("GF_getVariable".into(), GF_getVariable);
+        closures.insert("GF_openStore".into(), GF_openStore);
 
         /*
         GF_addUserMoney
@@ -66,7 +70,6 @@ impl Default for LuaGameFunctions {
         GF_openBank
         GF_openDeliveryStore
         GF_openSeparate
-        GF_openStore
         GF_openUpgrade
         GF_organizeClan
         GF_playEffect
@@ -130,4 +133,20 @@ fn GF_getVariable(
     };
 
     vec![value.into()]
+}
+
+#[allow(non_snake_case)]
+fn GF_openStore(
+    _resources: &ScriptFunctionResources,
+    context: &mut ScriptFunctionContext,
+    parameters: Vec<Lua4Value>,
+) -> Vec<Lua4Value> {
+    (|| -> Option<()> {
+        let npc_client_entity_id = ClientEntityId(parameters.get(0)?.to_usize().ok()?);
+        context
+            .npc_store_events
+            .send(NpcStoreEvent::OpenClientEntityStore(npc_client_entity_id));
+        Some(())
+    })();
+    vec![]
 }
