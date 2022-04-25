@@ -3,8 +3,9 @@ use std::cmp::Ordering;
 use bevy::{
     hierarchy::DespawnRecursiveExt,
     math::Vec3,
+    pbr::AmbientLight,
     prelude::{
-        Commands, ComputedVisibility, Entity, EventWriter, GlobalTransform,
+        Color, Commands, ComputedVisibility, Entity, EventWriter, GlobalTransform,
         PerspectiveCameraBundle, Query, Res, ResMut, Transform, Visibility, With,
     },
     render::camera::Camera3d,
@@ -100,6 +101,12 @@ pub fn model_viewer_enter_system(
         max_num_characters: 500,
 
         last_effect_entity: None,
+    });
+
+    // Reset ambient light
+    commands.insert_resource(AmbientLight {
+        color: Color::WHITE,
+        brightness: 1.0,
     });
 
     // Open relevant debug windows
