@@ -235,9 +235,8 @@ fn quest_reward_change_selected_quest_id(
             if keep_data {
                 active_quest.quest_id = quest_id;
             } else {
-                *active_quest = ActiveQuest::new(
-                    quest_id, None, // TODO: Get quest expire time
-                );
+                *active_quest =
+                    ActiveQuest::new(quest_id, quest_get_expire_time(script_resources, quest_id));
             }
 
             if let Some(quest_data) = script_resources.game_data.quests.get_quest_data(quest_id) {
