@@ -32,7 +32,7 @@ use crate::{
         PersonalStore, PlayerCharacter, Position, VisibleStatusEffects,
     },
     events::{ChatboxEvent, ClientEntityEvent, GameConnectionEvent, QuestTriggerEvent},
-    resources::{AppState, ClientEntityList, GameConnection, GameData, WorldTime},
+    resources::{AppState, ClientEntityList, GameConnection, GameData, WorldRates, WorldTime},
 };
 
 #[derive(WorldQuery)]
@@ -217,6 +217,12 @@ pub fn game_connection_system(
                         ))
                         .add_child(down_ray_cast_source);
 
+                    commands.insert_resource(WorldRates {
+                        craft_rate: message.craft_rate,
+                        item_price_rate: message.item_price_rate,
+                        world_price_rate: message.world_price_rate,
+                        town_price_rate: message.town_price_rate,
+                    });
                     commands.insert_resource(WorldTime::new(message.world_ticks));
 
                     client_entity_list.clear();
@@ -1320,6 +1326,12 @@ pub fn game_connection_system(
                         }
                     }
                 }
+            }
+            Ok(ServerMessage::NpcStoreTransactionError(error)) => {
+                chatbox_events.send(ChatboxEvent::System(format!(
+                    "Store transation failed with error {:?}",
+                    error
+                )));
             }
             Ok(message) => {
                 log::warn!("Received unimplemented game server message: {:#?}", message);

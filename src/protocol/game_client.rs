@@ -29,9 +29,10 @@ use rose_network_irose::{
         PacketClientChangeVehiclePart, PacketClientChat, PacketClientConnectRequest,
         PacketClientDropItemFromInventory, PacketClientEmote, PacketClientIncreaseBasicStat,
         PacketClientJoinZone, PacketClientLevelUpSkill, PacketClientMove, PacketClientMoveToggle,
-        PacketClientMoveToggleType, PacketClientPersonalStoreListItems, PacketClientPickupItemDrop,
-        PacketClientQuestRequest, PacketClientQuestRequestType, PacketClientReviveRequest,
-        PacketClientSetHotbarSlot, PacketClientUseItem, PacketClientWarpGateRequest,
+        PacketClientMoveToggleType, PacketClientNpcStoreTransaction,
+        PacketClientPersonalStoreListItems, PacketClientPickupItemDrop, PacketClientQuestRequest,
+        PacketClientQuestRequestType, PacketClientReviveRequest, PacketClientSetHotbarSlot,
+        PacketClientUseItem, PacketClientWarpGateRequest,
     },
     game_server_packets::{
         ConnectResult, PacketConnectionReply, PacketServerAnnounceChat,
@@ -42,10 +43,11 @@ use rose_network_irose::{
         PacketServerDamageEntity, PacketServerFinishCastingSkill, PacketServerJoinZone,
         PacketServerLearnSkillResult, PacketServerLevelUpSkillResult, PacketServerLocalChat,
         PacketServerMoveEntity, PacketServerMoveToggle, PacketServerMoveToggleType,
-        PacketServerPickupItemDropResult, PacketServerQuestResult, PacketServerQuestResultType,
-        PacketServerRemoveEntities, PacketServerRewardItems, PacketServerRewardMoney,
-        PacketServerRunNpcDeathTrigger, PacketServerSelectCharacter, PacketServerSetHotbarSlot,
-        PacketServerShoutChat, PacketServerSpawnEntityCharacter, PacketServerSpawnEntityItemDrop,
+        PacketServerNpcStoreTransactionError, PacketServerPickupItemDropResult,
+        PacketServerQuestResult, PacketServerQuestResultType, PacketServerRemoveEntities,
+        PacketServerRewardItems, PacketServerRewardMoney, PacketServerRunNpcDeathTrigger,
+        PacketServerSelectCharacter, PacketServerSetHotbarSlot, PacketServerShoutChat,
+        PacketServerSpawnEntityCharacter, PacketServerSpawnEntityItemDrop,
         PacketServerSpawnEntityMonster, PacketServerSpawnEntityNpc, PacketServerStartCastingSkill,
         PacketServerStopMoveEntity, PacketServerTeleport, PacketServerUpdateAbilityValue,
         PacketServerUpdateAmmo, PacketServerUpdateBasicStat, PacketServerUpdateEquipment,
@@ -154,6 +156,10 @@ impl GameClient {
                         health_points: response.health_points,
                         mana_points: response.mana_points,
                         world_ticks: response.world_ticks,
+                        craft_rate: response.craft_rate,
+                        world_price_rate: response.world_price_rate,
+                        item_price_rate: response.item_price_rate,
+                        town_price_rate: response.town_price_rate,
                     }))
                     .ok();
             }
@@ -365,7 +371,7 @@ impl GameClient {
                     }))
                     .ok();
             }
-            Some(ServerPackets::UpdateInventory) => {
+            Some(ServerPackets::UpdateInventory) | Some(ServerPackets::UpdateMoneyAndInventory) => {
                 let message = PacketServerUpdateInventory::try_from(&packet)?;
                 self.server_message_tx
                     .send(ServerMessage::UpdateInventory(
@@ -708,6 +714,12 @@ impl GameClient {
                     }
                 }
             }
+            Some(ServerPackets::NpcStoreTransactionError) => {
+                let message = PacketServerNpcStoreTransactionError::try_from(&packet)?;
+                self.server_message_tx
+                    .send(ServerMessage::NpcStoreTransactionError(message.error))
+                    .ok();
+            }
             _ => log::info!("Unhandled game packet {:x}", packet.command),
         }
 
@@ -922,6 +934,15 @@ impl GameClient {
                 connection
                     .write_packet(Packet::from(&PacketClientMoveToggle {
                         toggle_type: PacketClientMoveToggleType::Drive,
+                    }))
+                    .await?
+            }
+            ClientMessage::NpcStoreTransaction(message) => {
+                connection
+                    .write_packet(Packet::from(&PacketClientNpcStoreTransaction {
+                        npc_entity_id: message.npc_entity_id,
+                        buy_items: message.buy_items,
+                        sell_items: message.sell_items,
                     }))
                     .await?
             }
