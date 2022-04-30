@@ -77,9 +77,10 @@ use ui::{
     ui_debug_entity_inspector_system, ui_debug_item_list_system, ui_debug_menu_system,
     ui_debug_npc_list_system, ui_debug_render_system, ui_debug_skill_list_system,
     ui_debug_zone_list_system, ui_debug_zone_time_system, ui_diagnostics_system,
-    ui_drag_and_drop_system, ui_hotbar_system, ui_inventory_system, ui_npc_store_system,
-    ui_player_info_system, ui_quest_list_system, ui_selected_target_system, ui_skill_list_system,
-    ui_window_system, UiStateDebugWindows, UiStateDragAndDrop, UiStateWindows,
+    ui_drag_and_drop_system, ui_hotbar_system, ui_inventory_system, ui_minimap_system,
+    ui_npc_store_system, ui_player_info_system, ui_quest_list_system, ui_selected_target_system,
+    ui_skill_list_system, ui_window_system, UiStateDebugWindows, UiStateDragAndDrop,
+    UiStateWindows,
 };
 use vfs_asset_io::VfsAssetIo;
 use zmo_asset_loader::{ZmoAsset, ZmoAssetLoader};
@@ -498,6 +499,7 @@ fn main() {
                 .with_system(ui_character_info_system.label("ui_system"))
                 .with_system(ui_inventory_system.label("ui_system"))
                 .with_system(ui_hotbar_system.label("ui_system"))
+                .with_system(ui_minimap_system.label("ui_minimap_system"))
                 .with_system(ui_skill_list_system.label("ui_system"))
                 .with_system(ui_quest_list_system.label("ui_system"))
                 .with_system(ui_player_info_system.label("ui_system"))
@@ -636,10 +638,15 @@ fn load_game_data(
     let window_icons_image = asset_server.load("3DDATA/CONTROL/RES/UI21.DDS");
     let window_icons_texture_id = egui_context.add_image(window_icons_image.clone_weak());
 
+    let minimap_player_icon_image = asset_server.load("3DDATA/CONTROL/RES/MINIMAP_ARROW.TGA");
+    let minimap_player_icon_texture_id =
+        egui_context.add_image(minimap_player_icon_image.clone_weak());
+
     commands.insert_resource(Icons {
         item_pages,
         skill_pages,
         window_icons_image: (window_icons_image, window_icons_texture_id),
+        minimap_player_icon: (minimap_player_icon_image, minimap_player_icon_texture_id),
     });
 
     commands.insert_resource(DamageDigitsSpawner::load(

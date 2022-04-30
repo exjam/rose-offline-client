@@ -11,6 +11,7 @@ pub struct Icons {
     pub item_pages: Vec<(Handle<Image>, egui::TextureId)>,
     pub skill_pages: Vec<(Handle<Image>, egui::TextureId)>,
     pub window_icons_image: (Handle<Image>, egui::TextureId),
+    pub minimap_player_icon: (Handle<Image>, egui::TextureId),
 }
 
 impl Icons {

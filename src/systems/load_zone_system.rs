@@ -133,6 +133,7 @@ pub fn load_zone_system(
     mut water_materials: ResMut<Assets<WaterMaterial>>,
     mut texture_arrays: ResMut<Assets<TextureArray>>,
     mut load_zone_state: Local<LoadZoneState>,
+    mut loading_current_zone: Local<Option<CurrentZone>>,
     mut load_zone_event: EventReader<LoadZoneEvent>,
     mut zone_events: EventWriter<ZoneEvent>,
     query_sky: Query<Entity, With<Handle<SkyMaterial>>>,
@@ -170,7 +171,10 @@ pub fn load_zone_system(
             }
 
             if loaded {
-                commands.insert_resource(CurrentZone::new(zone_id));
+                if let Some(current_zone) = loading_current_zone.take() {
+                    commands.insert_resource(current_zone);
+                }
+
                 *load_zone_state = LoadZoneState::Loaded(zone_id);
                 zone_events.send(ZoneEvent::Loaded(zone_id));
             }
@@ -195,7 +199,7 @@ pub fn load_zone_system(
 
     // Spawn new zone
     if let Some(zone_list_entry) = game_data.zone_list.get_zone(next_zone_id) {
-        load_zone(
+        *loading_current_zone = load_zone(
             &mut commands,
             &asset_server,
             &game_data,
@@ -229,7 +233,7 @@ fn load_zone(
     water_materials: &mut ResMut<Assets<WaterMaterial>>,
     texture_arrays: &mut ResMut<Assets<TextureArray>>,
     zone_list_entry: &ZoneListEntry,
-) -> Result<(), anyhow::Error> {
+) -> Result<CurrentZone, anyhow::Error> {
     let zone_file = vfs_resource
         .vfs
         .read_file::<ZonFile, _>(&zone_list_entry.zon_file_path)?;
@@ -483,7 +487,11 @@ fn load_zone(
         }
     }
 
-    Ok(())
+    Ok(CurrentZone {
+        id: zone_list_entry.id,
+        grid_per_patch: zone_file.grid_per_patch,
+        grid_size: zone_file.grid_size,
+    })
 }
 
 #[allow(clippy::too_many_arguments)]
