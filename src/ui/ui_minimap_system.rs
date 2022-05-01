@@ -118,7 +118,7 @@ pub fn ui_minimap_system(
         let minimap_min_rect = ui.min_rect();
 
         if let Some(minimap_image_size) = ui_state.minimap_image_size {
-            let mut scroll_area = egui::ScrollArea::both().always_show_scroll(true);
+            let mut scroll_area = egui::ScrollArea::both();
 
             let minimap_player_pos = if let Some(player_position) = player_position {
                 let minimap_player_x = minimap_min_rect.left()

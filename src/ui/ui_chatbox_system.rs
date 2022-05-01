@@ -73,12 +73,61 @@ pub fn ui_chatbox_system(
         .anchor(egui::Align2::LEFT_BOTTOM, [10.0, -10.0])
         .collapsible(false)
         .title_bar(false)
+        .default_size([350.0, 300.0])
         .frame(egui::Frame::window(&chatbox_style))
         .show(egui_context.ctx_mut(), |ui| {
             ui.with_layout(egui::Layout::top_down_justified(egui::Align::LEFT), |ui| {
                 let text_style = egui::TextStyle::Body;
                 let row_height = ui.text_style_height(&text_style);
 
+                egui_extras::StripBuilder::new(ui)
+                    .size(egui_extras::Size::remainder().at_least(50.0))
+                    .size(egui_extras::Size::exact(20.0))
+                    .vertical(|mut strip| {
+                        strip.cell(|ui| {
+                            egui::ScrollArea::vertical()
+                                .auto_shrink([false; 2])
+                                .stick_to_bottom()
+                                .show_rows(
+                                    ui,
+                                    row_height,
+                                    ui_state_chatbox.textbox_history.len(),
+                                    |ui, row_range| {
+                                        for row in row_range {
+                                            if let Some((colour, text)) =
+                                                ui_state_chatbox.textbox_history.get(row)
+                                            {
+                                                ui.colored_label(*colour, text);
+                                            }
+                                        }
+                                    },
+                                );
+                        });
+
+                        strip.cell(|ui| {
+                            let response =
+                                ui.text_edit_singleline(&mut ui_state_chatbox.textbox_text);
+
+                            if ui.input().key_pressed(egui::Key::Enter) {
+                                if response.lost_focus() {
+                                    if !ui_state_chatbox.textbox_text.is_empty() {
+                                        if let Some(game_connection) = game_connection.as_ref() {
+                                            game_connection
+                                                .client_message_tx
+                                                .send(ClientMessage::Chat(
+                                                    ui_state_chatbox.textbox_text.clone(),
+                                                ))
+                                                .ok();
+                                            ui_state_chatbox.textbox_text.clear();
+                                        }
+                                    }
+                                } else {
+                                    response.request_focus();
+                                }
+                            }
+                        });
+                    });
+                /*
                 egui::ScrollArea::vertical()
                     .max_height(250.0)
                     .auto_shrink([false; 2])
@@ -116,7 +165,7 @@ pub fn ui_chatbox_system(
                     } else {
                         response.request_focus();
                     }
-                }
+                } */
             });
         });
 }

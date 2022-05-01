@@ -39,24 +39,43 @@ pub fn ui_debug_skill_list_system(
                     ui.end_row();
                 });
 
-            egui::ScrollArea::vertical()
-                .auto_shrink([false, false])
-                .always_show_scroll(true)
-                .show(ui, |ui| {
-                    egui::Grid::new("skill_list_grid")
-                        .num_columns(3)
-                        .min_row_height(45.0)
-                        .striped(true)
-                        .show(ui, |ui| {
-                            for skill_data in game_data.skills.iter().filter(|skill_data| {
-                                if ui_state_debug_skill_list.name_filter.is_empty() {
-                                    true
-                                } else {
-                                    skill_data
-                                        .name
-                                        .contains(&ui_state_debug_skill_list.name_filter)
-                                }
-                            }) {
+            egui_extras::TableBuilder::new(ui)
+                .striped(true)
+                .cell_layout(egui::Layout::left_to_right().with_cross_align(egui::Align::Center))
+                .column(egui_extras::Size::exact(45.0))
+                .column(egui_extras::Size::initial(50.0).at_least(50.0))
+                .column(egui_extras::Size::remainder().at_least(80.0))
+                .column(egui_extras::Size::initial(100.0).at_least(100.0))
+                .column(egui_extras::Size::initial(60.0).at_least(60.0))
+                .header(20.0, |mut header| {
+                    header.col(|ui| {
+                        ui.heading("Icon");
+                    });
+                    header.col(|ui| {
+                        ui.heading("ID");
+                    });
+                    header.col(|ui| {
+                        ui.heading("Name");
+                    });
+                    header.col(|ui| {
+                        ui.heading("Type");
+                    });
+                    header.col(|ui| {
+                        ui.heading("Action");
+                    });
+                })
+                .body(|mut body| {
+                    for skill_data in game_data.skills.iter().filter(|skill_data| {
+                        if ui_state_debug_skill_list.name_filter.is_empty() {
+                            true
+                        } else {
+                            skill_data
+                                .name
+                                .contains(&ui_state_debug_skill_list.name_filter)
+                        }
+                    }) {
+                        body.row(45.0, |mut row| {
+                            row.col(|ui| {
                                 if let Some((icon_texture_id, icon_uv)) =
                                     icons.get_skill_icon(skill_data.icon_number as usize)
                                 {
@@ -66,13 +85,22 @@ pub fn ui_debug_skill_list_system(
                                     .on_hover_ui(|ui| {
                                         ui_add_skill_tooltip(ui, &game_data, skill_data.id);
                                     });
-                                } else {
-                                    ui.label(" ");
                                 }
-                                ui.label(format!("{}", skill_data.id.get()));
-                                ui.label(&skill_data.name);
-                                ui.label(format!("{:?}", skill_data.skill_type));
+                            });
 
+                            row.col(|ui| {
+                                ui.label(format!("{}", skill_data.id.get()));
+                            });
+
+                            row.col(|ui| {
+                                ui.label(&skill_data.name);
+                            });
+
+                            row.col(|ui| {
+                                ui.label(format!("{:?}", skill_data.skill_type));
+                            });
+
+                            row.col(|ui| {
                                 if matches!(app_state.current(), AppState::Game)
                                     && ui.button("Learn").clicked()
                                 {
@@ -86,10 +114,9 @@ pub fn ui_debug_skill_list_system(
                                             .ok();
                                     }
                                 }
-
-                                ui.end_row();
-                            }
+                            });
                         });
+                    }
                 });
         });
 }

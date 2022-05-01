@@ -22,6 +22,7 @@ pub struct UiStateDebugNpcList {
     spawn_count: usize,
     spawn_distance: usize,
     spawn_team: UiStateSpawnNpcTeam,
+    num_npcs: Option<usize>,
 }
 
 impl Default for UiStateDebugNpcList {
@@ -30,6 +31,7 @@ impl Default for UiStateDebugNpcList {
             spawn_count: 1,
             spawn_distance: 250,
             spawn_team: UiStateSpawnNpcTeam::Monster,
+            num_npcs: None,
         }
     }
 }
@@ -95,22 +97,47 @@ pub fn ui_debug_npc_list_system(
                     });
             }
 
-            egui::ScrollArea::vertical()
-                .auto_shrink([false, false])
-                .always_show_scroll(true)
-                .show(ui, |ui| {
-                    egui::Grid::new("npc_list_grid")
-                        .num_columns(3)
-                        .show(ui, |ui| {
-                            ui.label("id");
-                            ui.label("name");
-                            ui.end_row();
+            if ui_state_debug_npc_list.num_npcs.is_none() {
+                ui_state_debug_npc_list.num_npcs = Some(game_data.npcs.iter().count());
+            }
+            let num_npcs = ui_state_debug_npc_list.num_npcs.unwrap();
 
-                            for npc_data in game_data.npcs.iter() {
-                                ui.label(format!("{}", npc_data.id.get()));
-                                ui.label(&npc_data.name);
+            egui_extras::TableBuilder::new(ui)
+                .striped(true)
+                .cell_layout(egui::Layout::left_to_right().with_cross_align(egui::Align::Center))
+                .column(egui_extras::Size::initial(50.0).at_least(50.0))
+                .column(egui_extras::Size::remainder().at_least(80.0))
+                .column(egui_extras::Size::initial(60.0).at_least(60.0))
+                .header(20.0, |mut header| {
+                    header.col(|ui| {
+                        ui.heading("ID");
+                    });
+                    header.col(|ui| {
+                        ui.heading("Name");
+                    });
+                    header.col(|ui| {
+                        ui.heading("Action");
+                    });
+                })
+                .body(|body| {
+                    let mut itr = None;
 
-                                match app_state.current() {
+                    body.rows(20.0, num_npcs, |row_index, mut row| {
+                        if itr.is_none() {
+                            itr = Some(game_data.npcs.iter().skip(row_index));
+                        }
+
+                        if let Some(itr) = itr.as_mut() {
+                            if let Some(npc_data) = itr.next() {
+                                row.col(|ui| {
+                                    ui.label(format!("{}", npc_data.id.get()));
+                                });
+
+                                row.col(|ui| {
+                                    ui.label(&npc_data.name);
+                                });
+
+                                row.col(|ui| match app_state.current() {
                                     AppState::Game => {
                                         if ui
                                             .add_enabled(
@@ -157,11 +184,10 @@ pub fn ui_debug_npc_list_system(
                                         }
                                     }
                                     _ => {}
-                                }
-
-                                ui.end_row();
+                                });
                             }
-                        });
+                        }
+                    });
                 });
         });
 }

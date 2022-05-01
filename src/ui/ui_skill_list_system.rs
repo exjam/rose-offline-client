@@ -98,38 +98,37 @@ pub fn ui_skill_list_system(
                 );
             });
 
-            egui::ScrollArea::vertical()
-                .auto_shrink([false, false])
-                .always_show_scroll(true)
-                .show(ui, |ui| {
-                    egui::Grid::new("my_grid")
-                        .num_columns(2)
-                        .spacing([4.0, 4.0])
-                        .striped(true)
-                        .show(ui, |ui| {
-                            for i in 0..SKILL_PAGE_SIZE {
-                                let skill_slot = SkillSlot(ui_state_skill_list.current_page, i);
-                                ui_add_skill_list_slot(
-                                    ui,
-                                    skill_slot,
-                                    player_skill_list,
-                                    &game_data,
-                                    &icons,
-                                    &mut ui_state_dnd,
-                                    &mut player_command_events,
-                                );
+            egui_extras::TableBuilder::new(ui)
+                .striped(true)
+                .cell_layout(egui::Layout::left_to_right().with_cross_align(egui::Align::Center))
+                .column(egui_extras::Size::exact(45.0))
+                .column(egui_extras::Size::remainder().at_least(80.0))
+                .body(|body| {
+                    body.rows(45.0, SKILL_PAGE_SIZE, |row_index, mut row| {
+                        let skill_slot = SkillSlot(ui_state_skill_list.current_page, row_index);
 
-                                let skill = player_skill_list.get_skill(skill_slot);
-                                let skill_data = skill
-                                    .as_ref()
-                                    .and_then(|skill| game_data.skills.get_skill(*skill));
+                        row.col(|ui| {
+                            ui_add_skill_list_slot(
+                                ui,
+                                skill_slot,
+                                player_skill_list,
+                                &game_data,
+                                &icons,
+                                &mut ui_state_dnd,
+                                &mut player_command_events,
+                            );
+                        });
 
-                                if let Some(skill_data) = skill_data {
-                                    ui.label(&skill_data.name);
-                                }
-                                ui.end_row();
+                        row.col(|ui| {
+                            let skill = player_skill_list.get_skill(skill_slot);
+                            let skill_data = skill
+                                .as_ref()
+                                .and_then(|skill| game_data.skills.get_skill(*skill));
+                            if let Some(skill_data) = skill_data {
+                                ui.label(&skill_data.name);
                             }
                         });
+                    });
                 });
         });
 }

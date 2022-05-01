@@ -21,47 +21,62 @@ pub fn ui_debug_zone_list_system(
         return;
     }
 
-    let ctx = egui_context.ctx_mut();
     egui::Window::new("Zone List")
         .vscroll(true)
         .resizable(true)
         .default_height(300.0)
         .open(&mut ui_state_debug_windows.zone_list_open)
-        .show(ctx, |ui| {
-            egui::Grid::new("zone_list_grid")
-                .num_columns(3)
-                .show(ui, |ui| {
-                    ui.label("id");
-                    ui.label("name");
-                    ui.end_row();
-
+        .show(egui_context.ctx_mut(), |ui| {
+            egui_extras::TableBuilder::new(ui)
+                .striped(true)
+                .cell_layout(egui::Layout::left_to_right().with_cross_align(egui::Align::Center))
+                .column(egui_extras::Size::initial(50.0).at_least(50.0))
+                .column(egui_extras::Size::remainder().at_least(80.0))
+                .column(egui_extras::Size::initial(60.0).at_least(60.0))
+                .header(20.0, |mut header| {
+                    header.col(|ui| {
+                        ui.heading("ID");
+                    });
+                    header.col(|ui| {
+                        ui.heading("Name");
+                    });
+                    header.col(|ui| {
+                        ui.heading("Action");
+                    });
+                })
+                .body(|mut body| {
                     for zone in game_data.zone_list.iter() {
-                        ui.label(format!("{}", zone.id.get()));
-                        ui.label(&zone.name);
+                        body.row(20.0, |mut row| {
+                            row.col(|ui| {
+                                ui.label(format!("{}", zone.id.get()));
+                            });
 
-                        match app_state.current() {
-                            AppState::Game => {
-                                if ui.button("Teleport").clicked() {
-                                    if let Some(game_connection) = game_connection.as_ref() {
-                                        game_connection
-                                            .client_message_tx
-                                            .send(ClientMessage::Chat(format!(
-                                                "/mm {}",
-                                                zone.id.get()
-                                            )))
-                                            .ok();
+                            row.col(|ui| {
+                                ui.label(&zone.name);
+                            });
+
+                            row.col(|ui| match app_state.current() {
+                                AppState::Game => {
+                                    if ui.button("Teleport").clicked() {
+                                        if let Some(game_connection) = game_connection.as_ref() {
+                                            game_connection
+                                                .client_message_tx
+                                                .send(ClientMessage::Chat(format!(
+                                                    "/mm {}",
+                                                    zone.id.get()
+                                                )))
+                                                .ok();
+                                        }
                                     }
                                 }
-                            }
-                            AppState::ZoneViewer => {
-                                if ui.button("Load").clicked() {
-                                    load_zone_events.send(LoadZoneEvent::new(zone.id));
+                                AppState::ZoneViewer => {
+                                    if ui.button("Load").clicked() {
+                                        load_zone_events.send(LoadZoneEvent::new(zone.id));
+                                    }
                                 }
-                            }
-                            _ => {}
-                        }
-
-                        ui.end_row();
+                                _ => {}
+                            });
+                        });
                     }
                 });
         });

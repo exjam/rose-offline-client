@@ -302,42 +302,64 @@ pub fn model_viewer_system(
         .resizable(true)
         .default_height(300.0)
         .show(egui_context.ctx_mut(), |ui| {
-            egui::Grid::new("effect_list_grid")
-                .num_columns(3)
-                .show(ui, |ui| {
-                    ui.label("id");
-                    ui.label("path");
-                    ui.end_row();
-
+            egui_extras::TableBuilder::new(ui)
+                .striped(true)
+                .cell_layout(egui::Layout::left_to_right().with_cross_align(egui::Align::Center))
+                .column(egui_extras::Size::initial(50.0).at_least(50.0))
+                .column(egui_extras::Size::remainder().at_least(50.0))
+                .column(egui_extras::Size::initial(60.0).at_least(60.0))
+                .header(20.0, |mut header| {
+                    header.col(|ui| {
+                        ui.heading("ID");
+                    });
+                    header.col(|ui| {
+                        ui.heading("Path");
+                    });
+                    header.col(|ui| {
+                        ui.heading("Action");
+                    });
+                })
+                .body(|mut body| {
                     for (effect_file_id, effect_file_path) in game_data.effect_database.iter_files()
                     {
-                        ui.label(format!("{}", effect_file_id.get()));
-                        ui.label(effect_file_path.path().to_string_lossy().as_ref());
-                        if ui.button("View").clicked() {
-                            if let Some(last_effect_entity) = ui_state.last_effect_entity.take() {
-                                if query_effects.get(last_effect_entity).is_ok() {
-                                    commands.entity(last_effect_entity).despawn_recursive();
+                        body.row(20.0, |mut row| {
+                            row.col(|ui| {
+                                ui.label(format!("{}", effect_file_id.get()));
+                            });
+
+                            row.col(|ui| {
+                                ui.label(effect_file_path.path().to_string_lossy().as_ref());
+                            });
+
+                            row.col(|ui| {
+                                if ui.button("View").clicked() {
+                                    if let Some(last_effect_entity) =
+                                        ui_state.last_effect_entity.take()
+                                    {
+                                        if query_effects.get(last_effect_entity).is_ok() {
+                                            commands.entity(last_effect_entity).despawn_recursive();
+                                        }
+                                    }
+
+                                    let effect_entity = commands
+                                        .spawn_bundle((
+                                            Transform::default(),
+                                            GlobalTransform::default(),
+                                            Visibility::default(),
+                                            ComputedVisibility::default(),
+                                        ))
+                                        .id();
+
+                                    spawn_effect_events.send(SpawnEffectEvent::InEntity(
+                                        effect_entity,
+                                        SpawnEffectData::with_path(effect_file_path.clone())
+                                            .manual_despawn(true),
+                                    ));
+
+                                    ui_state.last_effect_entity = Some(effect_entity);
                                 }
-                            }
-
-                            let effect_entity = commands
-                                .spawn_bundle((
-                                    Transform::default(),
-                                    GlobalTransform::default(),
-                                    Visibility::default(),
-                                    ComputedVisibility::default(),
-                                ))
-                                .id();
-
-                            spawn_effect_events.send(SpawnEffectEvent::InEntity(
-                                effect_entity,
-                                SpawnEffectData::with_path(effect_file_path.clone())
-                                    .manual_despawn(true),
-                            ));
-
-                            ui_state.last_effect_entity = Some(effect_entity);
-                        }
-                        ui.end_row();
+                            });
+                        });
                     }
                 });
         });

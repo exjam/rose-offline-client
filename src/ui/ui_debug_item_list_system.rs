@@ -1,5 +1,6 @@
 use bevy::prelude::{Local, Query, Res, ResMut, State};
 use bevy_egui::{egui, EguiContext};
+
 use rose_data::{EquipmentIndex, EquipmentItem, Item, ItemType};
 use rose_data_irose::encode_item_type;
 use rose_game_common::{components::Equipment, messages::client::ClientMessage};
@@ -136,23 +137,44 @@ pub fn ui_debug_item_list_system(
                 );
             });
 
-            egui::ScrollArea::vertical()
-                .auto_shrink([false, false])
-                .always_show_scroll(true)
-                .show(ui, |ui| {
-                    egui::Grid::new("item_list_grid")
-                        .num_columns(3)
-                        .min_row_height(45.0)
-                        .striped(true)
-                        .show(ui, |ui| {
-                            let equipment_index: Option<EquipmentIndex> =
-                                ui_state_debug_item_list.item_list_type.try_into().ok();
+            egui_extras::TableBuilder::new(ui)
+                .striped(true)
+                .cell_layout(egui::Layout::left_to_right().with_cross_align(egui::Align::Center))
+                .column(egui_extras::Size::exact(45.0))
+                .column(egui_extras::Size::initial(50.0).at_least(50.0))
+                .column(egui_extras::Size::remainder().at_least(80.0))
+                .column(egui_extras::Size::initial(60.0).at_least(60.0))
+                .header(20.0, |mut header| {
+                    header.col(|ui| {
+                        ui.heading("Icon");
+                    });
+                    header.col(|ui| {
+                        ui.heading("ID");
+                    });
+                    header.col(|ui| {
+                        ui.heading("Name");
+                    });
+                    header.col(|ui| {
+                        ui.heading("Action");
+                    });
+                })
+                .body(|mut body| {
+                    let equipment_index: Option<EquipmentIndex> =
+                        ui_state_debug_item_list.item_list_type.try_into().ok();
 
-                            if ui_state_debug_item_list.item_list_type.is_equipment_item() {
-                                ui.label(" ");
+                    if ui_state_debug_item_list.item_list_type.is_equipment_item() {
+                        body.row(45.0, |mut row| {
+                            row.col(|_| {});
+
+                            row.col(|ui| {
                                 ui.label("0");
-                                ui.label("None");
+                            });
 
+                            row.col(|ui| {
+                                ui.label("None");
+                            });
+
+                            row.col(|ui| {
                                 if matches!(app_state.current(), AppState::ModelViewer)
                                     && ui.button("Equip").clicked()
                                 {
@@ -162,103 +184,96 @@ pub fn ui_debug_item_list_system(
                                         }
                                     }
                                 }
-
-                                ui.end_row();
-                            }
-
-                            for (item_reference, item_data) in game_data
-                                .items
-                                .iter_items(ui_state_debug_item_list.item_list_type)
-                                .filter_map(|item_reference| {
-                                    game_data
-                                        .items
-                                        .get_base_item(item_reference)
-                                        .map(|item_data| (item_reference, item_data))
-                                })
-                                .filter(|(_, item_data)| {
-                                    if ui_state_debug_item_list.item_name_filter.is_empty() {
-                                        true
-                                    } else {
-                                        item_data
-                                            .name
-                                            .contains(&ui_state_debug_item_list.item_name_filter)
-                                    }
-                                })
-                            {
-                                if !item_data.name.is_empty() {
-                                    if let Some((icon_texture_id, icon_uv)) =
-                                        icons.get_item_icon(item_data.icon_index as usize)
-                                    {
-                                        ui.add(
-                                            egui::Image::new(icon_texture_id, [40.0, 40.0])
-                                                .uv(icon_uv),
-                                        )
-                                        .on_hover_ui(
-                                            |ui| {
-                                                if let Some(item) =
-                                                    Item::from_item_data(item_data, 1)
-                                                {
-                                                    ui_add_item_tooltip(ui, &game_data, &item);
-                                                }
-                                            },
-                                        );
-                                    } else {
-                                        ui.label(" ");
-                                    }
-                                    ui.label(format!("{}", item_reference.item_number));
-                                    ui.label(&item_data.name);
-
-                                    match app_state.current() {
-                                        AppState::Game => {
-                                            if ui.button("Spawn").clicked() {
-                                                if let Some(game_connection) =
-                                                    game_connection.as_ref()
-                                                {
-                                                    if let Some(item_type) = encode_item_type(
-                                                        ui_state_debug_item_list.item_list_type,
-                                                    ) {
-                                                        game_connection
-                                                            .client_message_tx
-                                                            .send(ClientMessage::Chat(format!(
-                                                                "/item {} {} {}",
-                                                                item_type,
-                                                                item_reference.item_number,
-                                                                ui_state_debug_item_list
-                                                                    .spawn_quantity,
-                                                            )))
-                                                            .ok();
-                                                    }
-                                                }
-                                            }
-                                        }
-                                        AppState::ModelViewer => {
-                                            if let Some(equipment_index) = equipment_index {
-                                                if ui.button("Equip").clicked() {
-                                                    for mut equipment in query_equipment.iter_mut()
-                                                    {
-                                                        equipment.equipped_items[equipment_index] =
-                                                            Some(
-                                                                EquipmentItem::from_item_data(
-                                                                    item_data,
-                                                                )
-                                                                .unwrap(),
-                                                            );
-
-                                                        if item_data.class.is_two_handed_weapon() {
-                                                            equipment.equipped_items
-                                                                [EquipmentIndex::WeaponLeft] = None;
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
-                                        _ => {}
-                                    }
-
-                                    ui.end_row();
-                                }
-                            }
+                            });
                         });
+                    }
+
+                    for (item_reference, item_data) in game_data
+                        .items
+                        .iter_items(ui_state_debug_item_list.item_list_type)
+                        .filter_map(|item_reference| {
+                            game_data
+                                .items
+                                .get_base_item(item_reference)
+                                .map(|item_data| (item_reference, item_data))
+                        })
+                        .filter(|(_, item_data)| {
+                            if item_data.name.is_empty() {
+                                false
+                            } else if ui_state_debug_item_list.item_name_filter.is_empty() {
+                                true
+                            } else {
+                                item_data
+                                    .name
+                                    .contains(&ui_state_debug_item_list.item_name_filter)
+                            }
+                        })
+                    {
+                        body.row(45.0, |mut row| {
+                            row.col(|ui| {
+                                if let Some((icon_texture_id, icon_uv)) =
+                                    icons.get_item_icon(item_data.icon_index as usize)
+                                {
+                                    ui.add(
+                                        egui::Image::new(icon_texture_id, [40.0, 40.0]).uv(icon_uv),
+                                    )
+                                    .on_hover_ui(|ui| {
+                                        if let Some(item) = Item::from_item_data(item_data, 1) {
+                                            ui_add_item_tooltip(ui, &game_data, &item);
+                                        }
+                                    });
+                                }
+                            });
+
+                            row.col(|ui| {
+                                ui.label(format!("{}", item_reference.item_number));
+                            });
+
+                            row.col(|ui| {
+                                ui.label(&item_data.name);
+                            });
+
+                            row.col(|ui| match app_state.current() {
+                                AppState::Game => {
+                                    if ui.button("Spawn").clicked() {
+                                        if let Some(game_connection) = game_connection.as_ref() {
+                                            if let Some(item_type) = encode_item_type(
+                                                ui_state_debug_item_list.item_list_type,
+                                            ) {
+                                                game_connection
+                                                    .client_message_tx
+                                                    .send(ClientMessage::Chat(format!(
+                                                        "/item {} {} {}",
+                                                        item_type,
+                                                        item_reference.item_number,
+                                                        ui_state_debug_item_list.spawn_quantity,
+                                                    )))
+                                                    .ok();
+                                            }
+                                        }
+                                    }
+                                }
+                                AppState::ModelViewer => {
+                                    if let Some(equipment_index) = equipment_index {
+                                        if ui.button("Equip").clicked() {
+                                            for mut equipment in query_equipment.iter_mut() {
+                                                equipment.equipped_items[equipment_index] = Some(
+                                                    EquipmentItem::from_item_data(item_data)
+                                                        .unwrap(),
+                                                );
+
+                                                if item_data.class.is_two_handed_weapon() {
+                                                    equipment.equipped_items
+                                                        [EquipmentIndex::WeaponLeft] = None;
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                                _ => {}
+                            });
+                        });
+                    }
                 });
         });
 }
