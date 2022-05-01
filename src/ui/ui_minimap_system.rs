@@ -13,6 +13,8 @@ use crate::{
 };
 
 const PLAYER_ICON_SIZE: egui::Vec2 = egui::Vec2::new(16.0, 16.0);
+const MAP_BLOCK_PIXELS: f32 = 64.0;
+const MAP_OUTLINE_PIXELS: f32 = MAP_BLOCK_PIXELS;
 
 #[derive(Default)]
 pub struct UiStateMinimap {
@@ -68,19 +70,21 @@ pub fn ui_minimap_system(
             ui_state.minimap_image_size = Some(minimap_image_size);
 
             if let Some(zone_data) = game_data.zone_list.get_zone(current_zone.id) {
-                let block_size = 16.0 * current_zone.grid_per_patch * current_zone.grid_size;
-                let minimap_blocks_x = minimap_image_size.x / 64.0 - 2.0;
-                let minimap_blocks_y = minimap_image_size.y / 64.0 - 2.0;
+                let world_block_size = 16.0 * current_zone.grid_per_patch * current_zone.grid_size;
+                let minimap_blocks_x =
+                    (minimap_image_size.x - 2.0 * MAP_OUTLINE_PIXELS) / MAP_BLOCK_PIXELS;
+                let minimap_blocks_y =
+                    (minimap_image_size.y - 2.0 * MAP_OUTLINE_PIXELS) / MAP_BLOCK_PIXELS;
 
-                let min_pos_x = zone_data.minimap_start_x as f32 * block_size;
-                let min_pos_y = (64.0 - zone_data.minimap_start_y as f32 + 1.0) * block_size;
+                let min_pos_x = zone_data.minimap_start_x as f32 * world_block_size;
+                let min_pos_y = (64.0 - zone_data.minimap_start_y as f32 + 1.0) * world_block_size;
 
-                let max_pos_x = min_pos_x + minimap_blocks_x * block_size;
-                let max_pos_y = min_pos_y - minimap_blocks_y * block_size;
+                let max_pos_x = min_pos_x + minimap_blocks_x * world_block_size;
+                let max_pos_y = min_pos_y - minimap_blocks_y * world_block_size;
 
                 ui_state.min_world_pos = Vec2::new(min_pos_x, min_pos_y);
                 ui_state.max_world_pos = Vec2::new(max_pos_x, max_pos_y);
-                ui_state.distance_per_pixel = block_size / 64.0;
+                ui_state.distance_per_pixel = world_block_size / MAP_BLOCK_PIXELS;
             }
         }
     }
@@ -118,14 +122,14 @@ pub fn ui_minimap_system(
 
             let minimap_player_pos = if let Some(player_position) = player_position {
                 let minimap_player_x = minimap_min_rect.left()
-                    + 64.0
+                    + MAP_OUTLINE_PIXELS
                     + f32::max(
                         0.0,
                         (player_position.position.x - ui_state.min_world_pos.x)
                             / ui_state.distance_per_pixel,
                     );
                 let minimap_player_y = minimap_min_rect.top()
-                    + 64.0
+                    + MAP_OUTLINE_PIXELS
                     + f32::max(
                         0.0,
                         (ui_state.min_world_pos.y - player_position.position.y)
@@ -156,7 +160,7 @@ pub fn ui_minimap_system(
                     egui::Vec2::new(minimap_image_size.x, minimap_image_size.y),
                 );
 
-                // Draw player position
+                // Draw player position arrow texture on a rotated rectangle to face camera position
                 if let Some(minimap_player_pos) = minimap_player_pos {
                     let minimap_player_pos = minimap_player_pos - scroll_offset;
                     let widget_rect = egui::Rect::from_min_size(
@@ -169,6 +173,7 @@ pub fn ui_minimap_system(
                             let (rect, response) =
                                 ui.allocate_exact_size(PLAYER_ICON_SIZE, egui::Sense::hover());
 
+                            // Calculate rotated rectangle from camera angle
                             let sin_a = camera_angle.sin();
                             let cos_a = camera_angle.cos();
 
