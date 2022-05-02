@@ -20,9 +20,7 @@ use rose_data::{
 use rose_game_common::components::{CharacterGender, CharacterInfo, Equipment, Npc};
 
 use crate::{
-    components::{
-        ActiveMotion, CharacterModel, DebugRenderCollider, DebugRenderSkeleton, Effect, NpcModel,
-    },
+    components::{ActiveMotion, CharacterModel, Effect, NpcModel},
     events::{SpawnEffectData, SpawnEffectEvent},
     fly_camera::{FlyCameraBundle, FlyCameraController},
     follow_camera::FollowCameraController,
@@ -31,9 +29,6 @@ use crate::{
 };
 
 pub struct ModelViewerState {
-    debug_skeletons: bool,
-    debug_colliders: bool,
-
     valid_items: EnumMap<EquipmentIndex, Vec<ItemReference>>,
 
     npcs: Vec<Entity>,
@@ -85,9 +80,6 @@ pub fn model_viewer_enter_system(
     };
 
     commands.insert_resource(ModelViewerState {
-        debug_skeletons: false,
-        debug_colliders: false,
-
         valid_items: enum_map! {
             equipment_index => get_valid_items(equipment_index.into()),
         },
@@ -153,25 +145,19 @@ pub fn model_viewer_system(
                     .skip(ui_state.npcs.len())
                     .take(ui_state.num_npcs - ui_state.npcs.len())
                 {
-                    let mut entity_commands = commands.spawn_bundle((
-                        Npc::new(npc.id, 0),
-                        GlobalTransform::default(),
-                        Transform::default().with_translation(Vec3::new(
-                            2.5 + (count / 30) as f32 * 5.0,
-                            0.0,
-                            (count % 30) as f32 * -5.0,
-                        )),
-                    ));
+                    let entity = commands
+                        .spawn_bundle((
+                            Npc::new(npc.id, 0),
+                            GlobalTransform::default(),
+                            Transform::default().with_translation(Vec3::new(
+                                2.5 + (count / 30) as f32 * 5.0,
+                                0.0,
+                                (count % 30) as f32 * -5.0,
+                            )),
+                        ))
+                        .id();
 
-                    if ui_state.debug_colliders {
-                        entity_commands.insert(DebugRenderCollider::default());
-                    }
-
-                    if ui_state.debug_skeletons {
-                        entity_commands.insert(DebugRenderSkeleton::default());
-                    }
-
-                    ui_state.npcs.push(entity_commands.id());
+                    ui_state.npcs.push(entity);
                 }
             }
             Ordering::Equal => {}
@@ -232,26 +218,20 @@ pub fn model_viewer_system(
                         }
                     }
 
-                    let mut entity_commands = commands.spawn_bundle((
-                        character_info,
-                        equipment,
-                        GlobalTransform::default(),
-                        Transform::default().with_translation(Vec3::new(
-                            -2.5 + (count / 25) as f32 * -5.0,
-                            0.0,
-                            (count % 25) as f32 * -5.0,
-                        )),
-                    ));
+                    let entity = commands
+                        .spawn_bundle((
+                            character_info,
+                            equipment,
+                            GlobalTransform::default(),
+                            Transform::default().with_translation(Vec3::new(
+                                -2.5 + (count / 25) as f32 * -5.0,
+                                0.0,
+                                (count % 25) as f32 * -5.0,
+                            )),
+                        ))
+                        .id();
 
-                    if ui_state.debug_colliders {
-                        entity_commands.insert(DebugRenderCollider::default());
-                    }
-
-                    if ui_state.debug_skeletons {
-                        entity_commands.insert(DebugRenderSkeleton::default());
-                    }
-
-                    ui_state.characters.push(entity_commands.id());
+                    ui_state.characters.push(entity);
                 }
             }
             Ordering::Equal => {}

@@ -50,8 +50,8 @@ use follow_camera::FollowCameraPlugin;
 use model_loader::ModelLoader;
 use render::{DamageDigitMaterial, RoseRenderPlugin};
 use resources::{
-    run_network_thread, AppState, ClientEntityList, DamageDigitsSpawner, GameData, Icons,
-    NetworkThread, NetworkThreadMessage, ServerConfiguration, WorldTime, ZoneTime,
+    run_network_thread, AppState, ClientEntityList, DamageDigitsSpawner, DebugRenderConfig,
+    GameData, Icons, NetworkThread, NetworkThreadMessage, ServerConfiguration, WorldTime, ZoneTime,
 };
 use systems::{
     ability_values_system, animation_effect_system, animation_system,
@@ -94,6 +94,7 @@ pub struct VfsResource {
 enum GameStages {
     Network,
     ZoneChange,
+    DebugRender,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, StageLabel)]
@@ -292,7 +293,7 @@ fn main() {
         .add_plugin(bevy::pbr::PbrPlugin::default());
 
     // Initialise 3rd party bevy plugins
-    app.add_plugin(bevy_polyline::PolylinePlugin)
+    app.add_plugin(bevy_prototype_debug_lines::DebugLinesPlugin::default())
         .add_plugin(bevy_egui::EguiPlugin)
         .add_plugin(smooth_bevy_cameras::LookTransformPlugin)
         .add_plugin(bevy_rapier3d::prelude::RapierPhysicsPlugin::<
@@ -354,8 +355,6 @@ fn main() {
         .add_system(npc_model_add_collider_system.after(npc_model_system))
         .add_system(item_drop_model_system)
         .add_system(item_drop_model_add_collider_system.after(item_drop_model_system))
-        .add_system(debug_render_collider_system)
-        .add_system(debug_render_skeleton_system)
         .add_system(collision_system)
         .add_system(animation_system)
         .add_system(particle_sequence_system)
@@ -423,6 +422,15 @@ fn main() {
             .with_system(game_zone_change_system),
     );
 
+    // Run debug render stage last so it has accurate data
+    app.add_stage_after(
+        GameStages::ZoneChange,
+        GameStages::DebugRender,
+        SystemStage::parallel()
+            .with_system(debug_render_collider_system)
+            .with_system(debug_render_skeleton_system),
+    );
+
     // Zone Viewer
     app.add_system_set(
         SystemSet::on_enter(AppState::ZoneViewer).with_system(zone_viewer_enter_system),
@@ -475,6 +483,7 @@ fn main() {
         .insert_resource(UiStateWindows::default())
         .insert_resource(UiStateDebugWindows::default())
         .insert_resource(ClientEntityList::default())
+        .insert_resource(DebugRenderConfig::default())
         .insert_resource(WorldTime::default())
         .insert_resource(ZoneTime::default());
 
