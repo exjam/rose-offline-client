@@ -1,4 +1,5 @@
 use bevy::{
+    hierarchy::Parent,
     input::Input,
     math::Vec3,
     prelude::{
@@ -10,12 +11,8 @@ use bevy::{
 };
 use bevy_egui::EguiContext;
 use bevy_inspector_egui::egui;
-use bevy_rapier3d::{
-    physics::{
-        IntoEntity, QueryPipelineColliderComponentsQuery, QueryPipelineColliderComponentsSet,
-    },
-    prelude::{InteractionGroups, QueryPipeline},
-};
+use bevy_rapier3d::prelude::{InteractionGroups, RapierContext};
+
 use rose_game_common::components::{ItemDrop, Team};
 
 use crate::{
@@ -32,9 +29,9 @@ pub fn game_mouse_input_system(
     mouse_button_input: Res<Input<MouseButton>>,
     windows: Res<Windows>,
     query_camera: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
-    query_pipeline: Res<QueryPipeline>,
-    colliders: QueryPipelineColliderComponentsQuery,
+    rapier_context: Res<RapierContext>,
     mut egui_ctx: ResMut<EguiContext>,
+    query_parent: Query<&Parent>,
     query_hit_entity: Query<(
         Option<&ClientEntityName>,
         Option<&Team>,
@@ -45,7 +42,6 @@ pub fn game_mouse_input_system(
     query_player: Query<(Entity, &Team, Option<&SelectedTarget>), With<PlayerCharacter>>,
     mut player_command_events: EventWriter<PlayerCommandEvent>,
 ) {
-    let colliders = QueryPipelineColliderComponentsSet(&colliders);
     let cursor_position = windows.primary().cursor_position();
     if cursor_position.is_none() {
         // Mouse not in window
@@ -61,20 +57,21 @@ pub fn game_mouse_input_system(
     let (player_entity, player_team, player_selected_target) = query_player.single();
 
     for (camera, camera_transform) in query_camera.iter() {
-        if let Some(ray) = ray_from_screenspace(cursor_position, &windows, camera, camera_transform)
+        if let Some((ray_origin, ray_direction)) =
+            ray_from_screenspace(cursor_position, &windows, camera, camera_transform)
         {
-            let hit = query_pipeline.cast_ray(
-                &colliders,
-                &ray,
+            let hit = rapier_context.cast_ray(
+                ray_origin,
+                ray_direction,
                 10000000.0,
                 false,
                 InteractionGroups::all().with_memberships(COLLISION_FILTER_CLICKABLE),
                 None,
             );
 
-            if let Some((hit_collider_handle, distance)) = hit {
-                let hit_position = ray.point_at(distance);
-                let hit_entity = hit_collider_handle.entity();
+            if let Some((hit_entity, distance)) = hit {
+                let hit_position = ray_origin + ray_direction * distance;
+                let hit_entity = query_parent.get(hit_entity).map_or(hit_entity, |x| x.0);
 
                 if let Ok((
                     hit_client_entity_name,

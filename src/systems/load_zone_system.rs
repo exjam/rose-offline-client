@@ -12,13 +12,7 @@ use bevy::{
     render::{mesh::Indices, render_resource::PrimitiveTopology, view::NoFrustumCulling},
 };
 use bevy_inspector_egui::Inspectable;
-use bevy_rapier3d::{
-    physics::ColliderBundle,
-    prelude::{
-        ColliderFlags, ColliderFlagsComponent, ColliderShape, ColliderShapeComponent,
-        InteractionGroups,
-    },
-};
+use bevy_rapier3d::prelude::{AsyncCollider, Collider, CollisionGroups};
 use std::path::Path;
 
 use rose_data::{WarpGateId, ZoneId, ZoneListEntry};
@@ -29,7 +23,7 @@ use rose_file_readers::{
 
 use crate::{
     components::{
-        ActiveMotion, CollisionTriMesh, EventObject, NightTimeEffect, WarpObject,
+        ActiveMotion, ColliderEntity, EventObject, NightTimeEffect, WarpObject,
         COLLISION_FILTER_CLICKABLE, COLLISION_FILTER_COLLIDABLE, COLLISION_FILTER_INSPECTABLE,
         COLLISION_GROUP_ZONE_EVENT_OBJECT, COLLISION_GROUP_ZONE_OBJECT,
         COLLISION_GROUP_ZONE_TERRAIN, COLLISION_GROUP_ZONE_WARP_OBJECT, COLLISION_GROUP_ZONE_WATER,
@@ -614,6 +608,20 @@ fn load_block_heightmap(
         }
     }
 
+    let terrain_collider_entity = commands
+        .spawn_bundle((
+            Collider::trimesh(collider_verts, collider_indices),
+            CollisionGroups::new(
+                COLLISION_GROUP_ZONE_TERRAIN,
+                COLLISION_FILTER_INSPECTABLE
+                    | COLLISION_FILTER_COLLIDABLE
+                    | COLLISION_FILTER_CLICKABLE,
+            ),
+            Transform::default(),
+            GlobalTransform::default(),
+        ))
+        .id();
+
     commands
         .spawn_bundle((
             ZoneObject::Terrain(ZoneObjectTerrain { block_x, block_y }),
@@ -624,20 +632,9 @@ fn load_block_heightmap(
             Visibility::default(),
             ComputedVisibility::default(),
             NotShadowCaster {},
+            ColliderEntity::new(terrain_collider_entity),
         ))
-        .insert_bundle(ColliderBundle {
-            shape: ColliderShapeComponent(ColliderShape::trimesh(collider_verts, collider_indices)),
-            flags: ColliderFlagsComponent(ColliderFlags {
-                collision_groups: InteractionGroups::new(
-                    COLLISION_GROUP_ZONE_TERRAIN,
-                    COLLISION_FILTER_INSPECTABLE
-                        | COLLISION_FILTER_COLLIDABLE
-                        | COLLISION_FILTER_CLICKABLE,
-                ),
-                ..Default::default()
-            }),
-            ..Default::default()
-        });
+        .add_child(terrain_collider_entity);
 }
 
 fn load_block_waterplanes(
@@ -690,6 +687,15 @@ fn load_block_waterplanes(
         mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
         mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, uvs);
 
+        let water_collider_entity = commands
+            .spawn_bundle((
+                Collider::trimesh(collider_verts, collider_indices),
+                CollisionGroups::new(COLLISION_GROUP_ZONE_WATER, COLLISION_FILTER_INSPECTABLE),
+                Transform::default(),
+                GlobalTransform::default(),
+            ))
+            .id();
+
         commands
             .spawn()
             .insert_bundle((
@@ -702,21 +708,9 @@ fn load_block_waterplanes(
                 ComputedVisibility::default(),
                 NotShadowCaster {},
                 NotShadowReceiver {},
+                ColliderEntity::new(water_collider_entity),
             ))
-            .insert_bundle(ColliderBundle {
-                shape: ColliderShapeComponent(ColliderShape::trimesh(
-                    collider_verts,
-                    collider_indices,
-                )),
-                flags: ColliderFlagsComponent(ColliderFlags {
-                    collision_groups: InteractionGroups::new(
-                        COLLISION_GROUP_ZONE_WATER,
-                        COLLISION_FILTER_INSPECTABLE,
-                    ),
-                    ..Default::default()
-                }),
-                ..Default::default()
-            });
+            .add_child(water_collider_entity);
     }
 }
 
@@ -762,149 +756,156 @@ fn load_block_object(
     let mut mesh_cache: Vec<Option<Handle<Mesh>>> = vec![None; zsc.meshes.len()];
 
     let mut part_entities: ArrayVec<Entity, 32> = ArrayVec::new();
-    let object_entity = commands
-        .spawn_bundle((object_transform, GlobalTransform::default()))
-        .with_children(|object_commands| {
-            for (part_index, object_part) in object.parts.iter().enumerate() {
-                let part_transform = Transform::default()
-                    .with_translation(
-                        Vec3::new(
-                            object_part.position.x,
-                            object_part.position.z,
-                            -object_part.position.y,
-                        ) / 100.0,
-                    )
-                    .with_rotation(Quat::from_xyzw(
-                        object_part.rotation.x,
-                        object_part.rotation.z,
-                        -object_part.rotation.y,
-                        object_part.rotation.w,
-                    ))
-                    .with_scale(Vec3::new(
-                        object_part.scale.x,
-                        object_part.scale.z,
-                        object_part.scale.y,
-                    ));
+    let mut object_entity_commands =
+        commands.spawn_bundle((object_transform, GlobalTransform::default()));
 
-                let mesh_id = object_part.mesh_id as usize;
-                let mesh = mesh_cache[mesh_id].clone().unwrap_or_else(|| {
-                    let handle = asset_server.load(zsc.meshes[mesh_id].path());
-                    mesh_cache.insert(mesh_id, Some(handle.clone()));
-                    handle
-                });
-                let lit_part = lit_object.and_then(|lit_object| lit_object.parts.get(part_index));
-                let lightmap_texture = lit_part.map(|lit_part| {
-                    asset_server.load(RgbTextureLoader::convert_path(
-                        &lightmap_path.join(&lit_part.filename),
-                    ))
-                });
-                let (lightmap_uv_offset, lightmap_uv_scale) = lit_part
-                    .map(|lit_part| {
-                        let scale = 1.0 / lit_part.parts_per_row as f32;
-                        (
-                            Vec2::new(
-                                (lit_part.part_index % lit_part.parts_per_row) as f32,
-                                (lit_part.part_index / lit_part.parts_per_row) as f32,
-                            ),
-                            scale,
-                        )
-                    })
-                    .unwrap_or((Vec2::new(0.0, 0.0), 1.0));
+    let object_entity = object_entity_commands.id();
 
-                let material_id = object_part.material_id as usize;
-                let material = material_cache[material_id].clone().unwrap_or_else(|| {
-                    let zsc_material = &zsc.materials[material_id];
-                    let handle = static_mesh_materials.add(StaticMeshMaterial {
-                        base_texture: Some(
-                            asset_server
-                                .load(RgbTextureLoader::convert_path(zsc_material.path.path())),
-                        ),
-                        lightmap_texture,
-                        alpha_value: if zsc_material.alpha != 1.0 {
-                            Some(zsc_material.alpha)
-                        } else {
-                            None
-                        },
-                        alpha_enabled: zsc_material.alpha_enabled,
-                        alpha_test: zsc_material.alpha_test,
-                        two_sided: zsc_material.two_sided,
-                        z_write_enabled: zsc_material.z_write_enabled,
-                        z_test_enabled: zsc_material.z_test_enabled,
-                        specular_enabled: zsc_material.specular_enabled,
-                        skinned: zsc_material.is_skin,
-                        lightmap_uv_offset,
-                        lightmap_uv_scale,
-                    });
-
-                    /*
-                    pub blend_mode: SceneBlendMode,
-                    pub glow: Option<ZscMaterialGlow>,
-                    */
-                    material_cache.insert(material_id, Some(handle.clone()));
-                    handle
-                });
-
-                let mut collision_filter = COLLISION_FILTER_INSPECTABLE;
-
-                if object_part.collision_shape.is_some() {
-                    collision_filter |= COLLISION_FILTER_COLLIDABLE;
-
-                    if collision_group != COLLISION_GROUP_ZONE_WARP_OBJECT
-                        && !object_part
-                            .collision_flags
-                            .contains(ZscCollisionFlags::NOT_PICKABLE)
-                    {
-                        collision_filter |= COLLISION_FILTER_CLICKABLE;
-                    }
-                }
-
-                let mut part_commands = object_commands.spawn_bundle((
-                    object_type(ZoneObjectPart {
-                        mesh_path: zsc.meshes[mesh_id].path().to_string_lossy().into(),
-                        // collision_shape.is_none(): cannot be hit with any raycast
-                        // collision_shape.is_some(): can be hit with forward raycast
-                        collision_shape: (&object_part.collision_shape).into(),
-                        // collision_not_moveable: does not hit downwards ray cast, but can hit forwards ray cast
-                        collision_not_moveable: object_part
-                            .collision_flags
-                            .contains(ZscCollisionFlags::NOT_MOVEABLE),
-                        // collision_not_pickable: can not be clicked on with mouse
-                        collision_not_pickable: object_part
-                            .collision_flags
-                            .contains(ZscCollisionFlags::NOT_PICKABLE),
-                        // collision_height_only: ?
-                        collision_height_only: object_part
-                            .collision_flags
-                            .contains(ZscCollisionFlags::HEIGHT_ONLY),
-                        // collision_no_camera: does not collide with camera
-                        collision_no_camera: object_part
-                            .collision_flags
-                            .contains(ZscCollisionFlags::NOT_CAMERA_COLLISION),
-                    }),
-                    mesh,
-                    material,
-                    part_transform,
-                    GlobalTransform::default(),
-                    Visibility::default(),
-                    ComputedVisibility::default(),
-                    CollisionTriMesh {
-                        group: collision_group,
-                        filter: collision_filter,
-                    },
-                    NotShadowCaster {},
+    object_entity_commands.with_children(|object_commands| {
+        for (part_index, object_part) in object.parts.iter().enumerate() {
+            let part_transform = Transform::default()
+                .with_translation(
+                    Vec3::new(
+                        object_part.position.x,
+                        object_part.position.z,
+                        -object_part.position.y,
+                    ) / 100.0,
+                )
+                .with_rotation(Quat::from_xyzw(
+                    object_part.rotation.x,
+                    object_part.rotation.z,
+                    -object_part.rotation.y,
+                    object_part.rotation.w,
+                ))
+                .with_scale(Vec3::new(
+                    object_part.scale.x,
+                    object_part.scale.z,
+                    object_part.scale.y,
                 ));
 
-                let active_motion = object_part.animation_path.as_ref().map(|animation_path| {
-                    ActiveMotion::new_repeating(asset_server.load(animation_path.path()))
-                });
-                if let Some(active_motion) = active_motion {
-                    part_commands.insert(active_motion);
-                }
+            let mesh_id = object_part.mesh_id as usize;
+            let mesh = mesh_cache[mesh_id].clone().unwrap_or_else(|| {
+                let handle = asset_server.load(zsc.meshes[mesh_id].path());
+                mesh_cache.insert(mesh_id, Some(handle.clone()));
+                handle
+            });
+            let lit_part = lit_object.and_then(|lit_object| lit_object.parts.get(part_index));
+            let lightmap_texture = lit_part.map(|lit_part| {
+                asset_server.load(RgbTextureLoader::convert_path(
+                    &lightmap_path.join(&lit_part.filename),
+                ))
+            });
+            let (lightmap_uv_offset, lightmap_uv_scale) = lit_part
+                .map(|lit_part| {
+                    let scale = 1.0 / lit_part.parts_per_row as f32;
+                    (
+                        Vec2::new(
+                            (lit_part.part_index % lit_part.parts_per_row) as f32,
+                            (lit_part.part_index / lit_part.parts_per_row) as f32,
+                        ),
+                        scale,
+                    )
+                })
+                .unwrap_or((Vec2::new(0.0, 0.0), 1.0));
 
-                part_entities.push(part_commands.id());
+            let material_id = object_part.material_id as usize;
+            let material = material_cache[material_id].clone().unwrap_or_else(|| {
+                let zsc_material = &zsc.materials[material_id];
+                let handle = static_mesh_materials.add(StaticMeshMaterial {
+                    base_texture: Some(
+                        asset_server.load(RgbTextureLoader::convert_path(zsc_material.path.path())),
+                    ),
+                    lightmap_texture,
+                    alpha_value: if zsc_material.alpha != 1.0 {
+                        Some(zsc_material.alpha)
+                    } else {
+                        None
+                    },
+                    alpha_enabled: zsc_material.alpha_enabled,
+                    alpha_test: zsc_material.alpha_test,
+                    two_sided: zsc_material.two_sided,
+                    z_write_enabled: zsc_material.z_write_enabled,
+                    z_test_enabled: zsc_material.z_test_enabled,
+                    specular_enabled: zsc_material.specular_enabled,
+                    skinned: zsc_material.is_skin,
+                    lightmap_uv_offset,
+                    lightmap_uv_scale,
+                });
+
+                /*
+                pub blend_mode: SceneBlendMode,
+                pub glow: Option<ZscMaterialGlow>,
+                */
+                material_cache.insert(material_id, Some(handle.clone()));
+                handle
+            });
+
+            let mut collision_filter = COLLISION_FILTER_INSPECTABLE;
+
+            if object_part.collision_shape.is_some() {
+                collision_filter |= COLLISION_FILTER_COLLIDABLE;
+
+                if collision_group != COLLISION_GROUP_ZONE_WARP_OBJECT
+                    && !object_part
+                        .collision_flags
+                        .contains(ZscCollisionFlags::NOT_PICKABLE)
+                {
+                    collision_filter |= COLLISION_FILTER_CLICKABLE;
+                }
             }
-        })
-        .id();
+
+            let mut part_commands = object_commands.spawn_bundle((
+                object_type(ZoneObjectPart {
+                    mesh_path: zsc.meshes[mesh_id].path().to_string_lossy().into(),
+                    // collision_shape.is_none(): cannot be hit with any raycast
+                    // collision_shape.is_some(): can be hit with forward raycast
+                    collision_shape: (&object_part.collision_shape).into(),
+                    // collision_not_moveable: does not hit downwards ray cast, but can hit forwards ray cast
+                    collision_not_moveable: object_part
+                        .collision_flags
+                        .contains(ZscCollisionFlags::NOT_MOVEABLE),
+                    // collision_not_pickable: can not be clicked on with mouse
+                    collision_not_pickable: object_part
+                        .collision_flags
+                        .contains(ZscCollisionFlags::NOT_PICKABLE),
+                    // collision_height_only: ?
+                    collision_height_only: object_part
+                        .collision_flags
+                        .contains(ZscCollisionFlags::HEIGHT_ONLY),
+                    // collision_no_camera: does not collide with camera
+                    collision_no_camera: object_part
+                        .collision_flags
+                        .contains(ZscCollisionFlags::NOT_CAMERA_COLLISION),
+                }),
+                mesh.clone(),
+                material,
+                part_transform,
+                GlobalTransform::default(),
+                Visibility::default(),
+                ComputedVisibility::default(),
+                NotShadowCaster {},
+            ));
+
+            part_commands.with_children(|builder| {
+                // Transform for collider must be absolute
+                let collider_transform = object_transform * part_transform;
+                builder.spawn_bundle((
+                    AsyncCollider::Mesh(mesh),
+                    CollisionGroups::new(collision_group, collision_filter),
+                    collider_transform,
+                ));
+            });
+
+            let active_motion = object_part.animation_path.as_ref().map(|animation_path| {
+                ActiveMotion::new_repeating(asset_server.load(animation_path.path()))
+            });
+            if let Some(active_motion) = active_motion {
+                part_commands.insert(active_motion);
+            }
+
+            part_entities.push(part_commands.id());
+        }
+    });
 
     for object_effect in object.effects.iter() {
         let effect_transform = Transform::default()
@@ -1024,21 +1025,25 @@ fn load_animated_object(
     });
 
     // TODO: Animation object morph targets, blocked by lack of bevy morph targets
-    commands.spawn_bundle((
-        ZoneObject::AnimatedObject(ZoneObjectAnimatedObject {
-            mesh_path: mesh_path.to_string(),
-            motion_path: motion_path.to_string(),
-            texture_path: texture_path.to_string(),
-        }),
-        mesh,
-        material,
-        object_transform,
-        GlobalTransform::default(),
-        Visibility::default(),
-        ComputedVisibility::default(),
-        CollisionTriMesh {
-            group: COLLISION_GROUP_ZONE_OBJECT,
-            filter: COLLISION_FILTER_INSPECTABLE,
-        },
-    ));
+    commands
+        .spawn_bundle((
+            ZoneObject::AnimatedObject(ZoneObjectAnimatedObject {
+                mesh_path: mesh_path.to_string(),
+                motion_path: motion_path.to_string(),
+                texture_path: texture_path.to_string(),
+            }),
+            mesh.clone(),
+            material,
+            object_transform,
+            GlobalTransform::default(),
+            Visibility::default(),
+            ComputedVisibility::default(),
+        ))
+        .with_children(|builder| {
+            builder.spawn_bundle((
+                AsyncCollider::Mesh(mesh),
+                CollisionGroups::new(COLLISION_GROUP_ZONE_OBJECT, COLLISION_FILTER_INSPECTABLE),
+                object_transform,
+            ));
+        });
 }

@@ -3,7 +3,6 @@ use bevy::{
     hierarchy::BuildChildren,
     prelude::{Commands, Entity, EventReader, EventWriter, Query, Res, ResMut},
 };
-use bevy_rapier3d::prelude::ColliderShapeComponent;
 
 use rose_game_common::{
     components::{AbilityValues, HealthPoints, ManaPoints, MoveSpeed, StatusEffects},
@@ -12,7 +11,7 @@ use rose_game_common::{
 
 use crate::{
     components::{
-        ClientEntity, NextCommand, PendingDamageList, PendingSkillEffectList,
+        ClientEntity, ModelHeight, NextCommand, PendingDamageList, PendingSkillEffectList,
         PendingSkillTargetList,
     },
     events::{HitEvent, SpawnEffectData, SpawnEffectEvent},
@@ -38,7 +37,7 @@ pub struct HitDefenderQuery<'w> {
     mana_points: Option<&'w mut ManaPoints>,
     move_speed: &'w MoveSpeed,
     status_effects: &'w mut StatusEffects,
-    collider: Option<&'w ColliderShapeComponent>,
+    model_height: Option<&'w ModelHeight>,
 }
 
 fn apply_damage(
@@ -63,8 +62,8 @@ fn apply_damage(
             .player_entity
             .map_or(false, |player_entity| defender.entity == player_entity),
         defender
-            .collider
-            .map_or(2.0, |collider| collider.compute_local_aabb().extents().y),
+            .model_height
+            .map_or(2.0, |model_height| model_height.height),
     ) {
         commands
             .entity(defender.entity)

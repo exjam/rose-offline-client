@@ -2,6 +2,7 @@ use std::time::{Duration, Instant};
 
 use bevy::{
     app::AppExit,
+    hierarchy::Parent,
     input::Input,
     math::{Quat, Vec3},
     prelude::{
@@ -13,12 +14,7 @@ use bevy::{
     window::Windows,
 };
 use bevy_egui::{egui, EguiContext};
-use bevy_rapier3d::{
-    physics::{
-        IntoEntity, QueryPipelineColliderComponentsQuery, QueryPipelineColliderComponentsSet,
-    },
-    prelude::{InteractionGroups, QueryPipeline},
-};
+use bevy_rapier3d::prelude::{InteractionGroups, RapierContext};
 use rose_data::{CharacterMotionAction, ZoneId};
 use rose_game_common::{
     components::{CharacterGender, CharacterInfo, Equipment},
@@ -696,13 +692,12 @@ pub fn character_select_input_system(
     mouse_button_input: Res<Input<MouseButton>>,
     windows: Res<Windows>,
     query_camera: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
-    query_pipeline: Res<QueryPipeline>,
-    colliders: QueryPipelineColliderComponentsQuery,
+    query_parent: Query<&Parent>,
+    rapier_context: Res<RapierContext>,
     mut egui_ctx: ResMut<EguiContext>,
     query_hit_entity: Query<&CharacterSelectCharacter>,
     asset_server: Res<AssetServer>,
 ) {
-    let colliders = QueryPipelineColliderComponentsSet(&colliders);
     let cursor_position = windows.primary().cursor_position();
     if cursor_position.is_none() {
         // Mouse not in window
@@ -717,20 +712,20 @@ pub fn character_select_input_system(
 
     if mouse_button_input.just_pressed(MouseButton::Left) {
         for (camera, camera_transform) in query_camera.iter() {
-            if let Some(ray) =
+            if let Some((ray_origin, ray_direction)) =
                 ray_from_screenspace(cursor_position, &windows, camera, camera_transform)
             {
-                let hit = query_pipeline.cast_ray(
-                    &colliders,
-                    &ray,
+                let hit = rapier_context.cast_ray(
+                    ray_origin,
+                    ray_direction,
                     10000000.0,
                     false,
                     InteractionGroups::all().with_memberships(COLLISION_FILTER_CLICKABLE),
                     None,
                 );
 
-                if let Some((hit_collider_handle, _)) = hit {
-                    let hit_entity = hit_collider_handle.entity();
+                if let Some((hit_entity, _)) = hit {
+                    let hit_entity = query_parent.get(hit_entity).map_or(hit_entity, |x| x.0);
 
                     if let Ok(hit_character_select_index) = query_hit_entity.get(hit_entity) {
                         let now = Instant::now();

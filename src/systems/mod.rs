@@ -48,7 +48,7 @@ pub use character_select_system::{
     character_select_models_system, character_select_system,
 };
 pub use client_entity_event_system::client_entity_event_system;
-pub use collision_system::{collision_add_colliders_system, collision_system};
+pub use collision_system::collision_system;
 pub use command_system::command_system;
 pub use conversation_dialog_system::conversation_dialog_system;
 pub use cooldown_system::cooldown_system;

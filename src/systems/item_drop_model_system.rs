@@ -1,25 +1,19 @@
 use bevy::{
     math::{Quat, Vec3, Vec3A},
     prelude::{
-        AssetServer, Assets, Changed, Commands, Component, Entity, GlobalTransform, Query, Res,
-        ResMut, Without,
+        AssetServer, Assets, BuildChildren, Changed, Commands, Component, Entity, GlobalTransform,
+        Handle, Mesh, Query, Res, ResMut, Transform, With, Without,
     },
     render::primitives::Aabb,
 };
-use bevy_rapier3d::{
-    physics::ColliderBundle,
-    prelude::{
-        ColliderFlags, ColliderFlagsComponent, ColliderPosition, ColliderPositionComponent,
-        ColliderShape, ColliderShapeComponent, InteractionGroups,
-    },
-};
+use bevy_rapier3d::prelude::{Collider, CollisionGroups};
 
 use rose_game_common::components::ItemDrop;
 
 use crate::{
     components::{
-        ActiveMotion, ItemDropModel, COLLISION_FILTER_CLICKABLE, COLLISION_FILTER_INSPECTABLE,
-        COLLISION_GROUP_ITEM_DROP,
+        ActiveMotion, ColliderEntity, ItemDropModel, COLLISION_FILTER_CLICKABLE,
+        COLLISION_FILTER_INSPECTABLE, COLLISION_GROUP_ITEM_DROP,
     },
     model_loader::ModelLoader,
     render::StaticMeshMaterial,
@@ -69,16 +63,10 @@ pub struct ItemDropColliderOffset {
 
 pub fn item_drop_model_add_collider_system(
     mut commands: Commands,
-    query_models: Query<
-        (Entity, &ItemDropModel, &GlobalTransform),
-        Without<ColliderShapeComponent>,
-    >,
-    mut query_collider_position: Query<(
-        &GlobalTransform,
-        &ItemDropColliderOffset,
-        &mut ColliderPositionComponent,
-    )>,
-    query_aabb: Query<&Aabb>,
+    query_models: Query<(Entity, &ItemDropModel, &GlobalTransform), Without<ColliderEntity>>,
+    query_collider: Query<(&GlobalTransform, &ItemDropColliderOffset, &ColliderEntity)>,
+    mut query_transform: Query<&mut Transform>,
+    query_aabb: Query<Option<&Aabb>, With<Handle<Mesh>>>,
 ) {
     // Add colliders to NPC models without one
     for (entity, item_drop_model, global_transform) in query_models.iter() {
@@ -89,11 +77,13 @@ pub fn item_drop_model_add_collider_system(
         // Collect the AABB of mesh parts
         for part_entity in item_drop_model.model_parts.iter() {
             if let Ok(aabb) = query_aabb.get(*part_entity) {
-                min = Some(min.map_or_else(|| aabb.min(), |min| min.min(aabb.min())));
-                max = Some(max.map_or_else(|| aabb.max(), |max| max.max(aabb.max())));
-            } else {
-                all_parts_loaded = false;
-                break;
+                if let Some(aabb) = aabb {
+                    min = Some(min.map_or_else(|| aabb.min(), |min| min.min(aabb.min())));
+                    max = Some(max.map_or_else(|| aabb.max(), |max| max.max(aabb.max())));
+                } else {
+                    all_parts_loaded = false;
+                    break;
+                }
             }
         }
 
@@ -106,44 +96,39 @@ pub fn item_drop_model_add_collider_system(
         let half_extents = Vec3::from(0.5 * (max - min));
         let collider_offset = Vec3::from(local_bound_center);
 
-        commands
-            .entity(entity)
-            .insert_bundle(ColliderBundle {
-                shape: ColliderShapeComponent(ColliderShape::cuboid(
-                    half_extents.x,
-                    half_extents.y,
-                    half_extents.z,
-                )),
-                flags: ColliderFlagsComponent(ColliderFlags {
-                    collision_groups: InteractionGroups::new(
-                        COLLISION_GROUP_ITEM_DROP,
-                        COLLISION_FILTER_INSPECTABLE | COLLISION_FILTER_CLICKABLE,
-                    ),
-                    ..Default::default()
-                }),
-                position: ColliderPositionComponent(ColliderPosition(
-                    (
-                        global_transform.translation + collider_offset,
+        let collider_entity = commands
+            .spawn_bundle((
+                Collider::cuboid(half_extents.x, half_extents.y, half_extents.z),
+                CollisionGroups::new(
+                    COLLISION_GROUP_ITEM_DROP,
+                    COLLISION_FILTER_INSPECTABLE | COLLISION_FILTER_CLICKABLE,
+                ),
+                Transform::from_translation(global_transform.translation + collider_offset)
+                    .with_rotation(
                         global_transform.rotation
                             * Quat::from_axis_angle(Vec3::Z, std::f32::consts::PI / 2.0),
-                    )
-                        .into(),
-                )),
-                ..Default::default()
-            })
-            .insert(ItemDropColliderOffset {
-                offset: collider_offset,
-            });
+                    ),
+                GlobalTransform::default(),
+            ))
+            .id();
+
+        commands
+            .entity(entity)
+            .insert_bundle((
+                ColliderEntity::new(collider_entity),
+                ItemDropColliderOffset {
+                    offset: collider_offset,
+                },
+            ))
+            .add_child(collider_entity);
     }
 
     // Update any existing collider's position
-    for (global_transform, collider_offset, mut collider_position) in
-        query_collider_position.iter_mut()
-    {
-        collider_position.translation =
-            (global_transform.translation + collider_offset.offset).into();
-        collider_position.rotation = (global_transform.rotation
-            * Quat::from_axis_angle(Vec3::Z, std::f32::consts::PI / 2.0))
-        .into();
+    for (global_transform, collider_offset, collider_entity) in query_collider.iter() {
+        if let Ok(mut collider_transform) = query_transform.get_mut(collider_entity.entity) {
+            collider_transform.translation = global_transform.translation + collider_offset.offset;
+            collider_transform.rotation = global_transform.rotation
+                * Quat::from_axis_angle(Vec3::Z, std::f32::consts::PI / 2.0);
+        }
     }
 }

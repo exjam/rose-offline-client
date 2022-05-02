@@ -57,10 +57,10 @@ use systems::{
     ability_values_system, animation_effect_system, animation_system,
     character_model_add_collider_system, character_model_system, character_select_enter_system,
     character_select_exit_system, character_select_input_system, character_select_models_system,
-    character_select_system, client_entity_event_system, collision_add_colliders_system,
-    collision_system, command_system, conversation_dialog_system, cooldown_system,
-    damage_digit_render_system, debug_render_collider_system, debug_render_skeleton_system,
-    effect_system, game_connection_system, game_mouse_input_system, game_state_enter_system,
+    character_select_system, client_entity_event_system, collision_system, command_system,
+    conversation_dialog_system, cooldown_system, damage_digit_render_system,
+    debug_render_collider_system, debug_render_skeleton_system, effect_system,
+    game_connection_system, game_mouse_input_system, game_state_enter_system,
     game_zone_change_system, hit_event_system, item_drop_model_add_collider_system,
     item_drop_model_system, load_zone_system, login_connection_system, login_state_enter_system,
     login_state_exit_system, login_system, model_viewer_enter_system, model_viewer_system,
@@ -295,10 +295,10 @@ fn main() {
     app.add_plugin(bevy_polyline::PolylinePlugin)
         .add_plugin(bevy_egui::EguiPlugin)
         .add_plugin(smooth_bevy_cameras::LookTransformPlugin)
-        .add_plugin(bevy_rapier3d::physics::RapierPhysicsPlugin::<
-            bevy_rapier3d::physics::NoUserData,
+        .add_plugin(bevy_rapier3d::prelude::RapierPhysicsPlugin::<
+            bevy_rapier3d::prelude::NoUserData,
         >::default())
-        .insert_resource(bevy_rapier3d::physics::RapierConfiguration {
+        .insert_resource(bevy_rapier3d::prelude::RapierConfiguration {
             physics_pipeline_active: false,
             query_pipeline_active: true,
             ..Default::default()
@@ -357,7 +357,6 @@ fn main() {
         .add_system(debug_render_collider_system)
         .add_system(debug_render_skeleton_system)
         .add_system(collision_system)
-        .add_system(collision_add_colliders_system)
         .add_system(animation_system)
         .add_system(particle_sequence_system)
         .add_system(effect_system)

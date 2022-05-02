@@ -8,7 +8,7 @@ use bevy::{
     render::mesh::skinning::SkinnedMesh,
 };
 use bevy_polyline::{Polyline, PolylineBundle, PolylineMaterial};
-use bevy_rapier3d::prelude::{ColliderPositionComponent, ColliderShapeComponent};
+use bevy_rapier3d::prelude::Collider;
 use rand::prelude::SliceRandom;
 
 use crate::components::{DebugRenderCollider, DebugRenderSkeleton};
@@ -109,8 +109,8 @@ pub fn debug_render_collider_system(
         (
             Entity,
             &GlobalTransform,
-            &ColliderShapeComponent,
-            &ColliderPositionComponent,
+            &Transform,
+            &Collider,
             Option<&DebugRenderColliderData>,
         ),
         With<DebugRenderCollider>,
@@ -124,27 +124,27 @@ pub fn debug_render_collider_system(
 ) {
     let mut rng = rand::thread_rng();
 
-    for (entity, model_transform, collider_shape, collider_position, debug_polyline_data) in
+    for (entity, global_transform, collider_transform, collider, debug_polyline_data) in
         query_update_collider_shape.iter()
     {
-        let inverse_transform = Transform::from_matrix(model_transform.compute_matrix().inverse());
+        let inverse_transform = Transform::from_matrix(global_transform.compute_matrix().inverse());
 
-        if let Some(cuboid) = collider_shape.as_cuboid() {
+        if let Some(cuboid) = collider.as_cuboid() {
             if let Some(debug_polyline_data) = debug_polyline_data.as_ref() {
                 if let Some(polyline) = polylines.get_mut(&debug_polyline_data.polyline) {
                     polyline.vertices.clear();
-                    generate_cuboid_polyline(&mut polyline.vertices, cuboid.half_extents.into());
+                    generate_cuboid_polyline(&mut polyline.vertices, cuboid.half_extents());
                 }
 
                 commands.entity(debug_polyline_data.polyline_entity).insert(
                     inverse_transform
-                        * Transform::from_translation(collider_position.translation.into())
-                            .with_rotation(collider_position.rotation.into()),
+                        * Transform::from_translation(collider_transform.translation)
+                            .with_rotation(collider_transform.rotation),
                 );
             } else {
-                // Add a new debug skeleton
+                // Add a new debug collider
                 let mut polyline_vertices = Vec::new();
-                generate_cuboid_polyline(&mut polyline_vertices, cuboid.half_extents.into());
+                generate_cuboid_polyline(&mut polyline_vertices, cuboid.half_extents());
 
                 let polyline = polylines.add(Polyline {
                     vertices: polyline_vertices,
@@ -158,8 +158,8 @@ pub fn debug_render_collider_system(
                             ..Default::default()
                         }),
                         transform: inverse_transform
-                            * Transform::from_translation(collider_position.translation.into())
-                                .with_rotation(collider_position.rotation.into()),
+                            * Transform::from_translation(collider_transform.translation)
+                                .with_rotation(collider_transform.rotation),
                         ..Default::default()
                     })
                     .id();

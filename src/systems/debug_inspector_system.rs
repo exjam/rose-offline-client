@@ -8,12 +8,7 @@ use bevy::{
 };
 use bevy_egui::EguiContext;
 use bevy_inspector_egui::{InspectableRegistry, WorldInspectorParams};
-use bevy_rapier3d::{
-    physics::{
-        IntoEntity, QueryPipelineColliderComponentsQuery, QueryPipelineColliderComponentsSet,
-    },
-    prelude::{InteractionGroups, QueryPipeline},
-};
+use bevy_rapier3d::prelude::{InteractionGroups, RapierContext};
 
 use crate::{
     components::COLLISION_FILTER_INSPECTABLE, render::StaticMeshMaterial, resources::DebugInspector,
@@ -49,19 +44,6 @@ impl Plugin for DebugInspectorPlugin {
             .world
             .get_resource_or_insert_with(WorldInspectorParams::default);
         world_inspector_params.ignore_component::<bevy::render::primitives::Aabb>();
-        world_inspector_params.ignore_component::<bevy_rapier3d::prelude::ColliderTypeComponent>();
-        world_inspector_params.ignore_component::<bevy_rapier3d::prelude::ColliderShapeComponent>();
-        world_inspector_params
-            .ignore_component::<bevy_rapier3d::prelude::ColliderPositionComponent>();
-        world_inspector_params
-            .ignore_component::<bevy_rapier3d::prelude::ColliderMaterialComponent>();
-        world_inspector_params.ignore_component::<bevy_rapier3d::prelude::ColliderFlagsComponent>();
-        world_inspector_params
-            .ignore_component::<bevy_rapier3d::prelude::ColliderMassPropsComponent>();
-        world_inspector_params
-            .ignore_component::<bevy_rapier3d::prelude::ColliderChangesComponent>();
-        world_inspector_params
-            .ignore_component::<bevy_rapier3d::prelude::ColliderBroadPhaseDataComponent>();
     }
 }
 
@@ -71,16 +53,14 @@ fn debug_inspector_picking_system(
     mut egui_ctx: ResMut<EguiContext>,
     query_camera: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
     mouse_button_input: Res<Input<MouseButton>>,
+    rapier_context: Res<RapierContext>,
     windows: Res<Windows>,
-    colliders: QueryPipelineColliderComponentsQuery,
-    query_pipeline: Res<QueryPipeline>,
 ) {
     if !debug_inspector_state.enable_picking {
         // Picking disabled
         return;
     }
 
-    let colliders = QueryPipelineColliderComponentsSet(&colliders);
     let cursor_position = windows.primary().cursor_position();
     if cursor_position.is_none() || egui_ctx.ctx_mut().wants_pointer_input() {
         // Mouse not in window, or is over UI
@@ -90,20 +70,20 @@ fn debug_inspector_picking_system(
 
     if mouse_button_input.just_pressed(MouseButton::Middle) {
         for (camera, camera_transform) in query_camera.iter() {
-            if let Some(ray) =
+            if let Some((ray_origin, ray_direction)) =
                 ray_from_screenspace(cursor_position, &windows, camera, camera_transform)
             {
-                let hit = query_pipeline.cast_ray(
-                    &colliders,
-                    &ray,
+                let hit = rapier_context.cast_ray(
+                    ray_origin,
+                    ray_direction,
                     10000000.0,
                     false,
                     InteractionGroups::all().with_memberships(COLLISION_FILTER_INSPECTABLE),
                     None,
                 );
 
-                if let Some((hit_object, _distance)) = hit {
-                    debug_inspector_state.entity = Some(hit_object.0.entity());
+                if let Some((hit_entity, _distance)) = hit {
+                    debug_inspector_state.entity = Some(hit_entity);
                 }
             }
         }

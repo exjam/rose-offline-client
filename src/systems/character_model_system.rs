@@ -2,28 +2,23 @@ use bevy::{
     hierarchy::DespawnRecursiveExt,
     math::{Quat, Vec3, Vec3A},
     prelude::{
-        AssetServer, Assets, Changed, Commands, Component, Entity, GlobalTransform, Or, Query, Res,
-        ResMut, Transform, Without,
+        AssetServer, Assets, BuildChildren, Changed, Commands, Component, Entity, GlobalTransform,
+        Handle, Mesh, Or, Query, Res, ResMut, Transform, With, Without,
     },
     render::{
         mesh::skinning::{SkinnedMesh, SkinnedMeshInverseBindposes},
         primitives::Aabb,
     },
 };
-use bevy_rapier3d::{
-    physics::ColliderBundle,
-    prelude::{
-        ColliderFlags, ColliderFlagsComponent, ColliderPosition, ColliderPositionComponent,
-        ColliderShape, ColliderShapeComponent, InteractionGroups,
-    },
-};
+use bevy_rapier3d::prelude::{Collider, CollisionGroups};
 
 use rose_game_common::components::{CharacterInfo, Equipment};
 
 use crate::{
     components::{
-        CharacterModel, CharacterModelPart, DummyBoneOffset, PersonalStore, PersonalStoreModel,
-        COLLISION_FILTER_CLICKABLE, COLLISION_FILTER_INSPECTABLE, COLLISION_GROUP_CHARACTER,
+        CharacterModel, CharacterModelPart, ColliderEntity, DummyBoneOffset, ModelHeight,
+        PersonalStore, PersonalStoreModel, COLLISION_FILTER_CLICKABLE,
+        COLLISION_FILTER_INSPECTABLE, COLLISION_GROUP_CHARACTER,
     },
     model_loader::ModelLoader,
     render::StaticMeshMaterial,
@@ -36,13 +31,14 @@ pub struct CharacterColliderRootBoneOffset {
 
 pub fn character_model_add_collider_system(
     mut commands: Commands,
-    query_models: Query<(Entity, &CharacterModel, &SkinnedMesh), Without<ColliderShapeComponent>>,
-    mut query_collider_position: Query<(
+    query_models: Query<(Entity, &CharacterModel, &SkinnedMesh), Without<ColliderEntity>>,
+    query_collider: Query<(
         &SkinnedMesh,
         &CharacterColliderRootBoneOffset,
-        &mut ColliderPositionComponent,
+        &ColliderEntity,
     )>,
-    query_aabb: Query<&Aabb>,
+    mut query_transform: Query<&mut Transform>,
+    query_aabb: Query<Option<&Aabb>, With<Handle<Mesh>>>,
     query_global_transform: Query<&GlobalTransform>,
     inverse_bindposes: Res<Assets<SkinnedMeshInverseBindposes>>,
 ) {
@@ -68,11 +64,13 @@ pub fn character_model_add_collider_system(
             )
         {
             if let Ok(aabb) = query_aabb.get(*part_entity) {
-                min = Some(min.map_or_else(|| aabb.min(), |min| min.min(aabb.min())));
-                max = Some(max.map_or_else(|| aabb.max(), |max| max.max(aabb.max())));
-            } else {
-                all_parts_loaded = false;
-                break;
+                if let Some(aabb) = aabb {
+                    min = Some(min.map_or_else(|| aabb.min(), |min| min.min(aabb.min())));
+                    max = Some(max.map_or_else(|| aabb.max(), |max| max.max(aabb.max())));
+                } else {
+                    all_parts_loaded = false;
+                    break;
+                }
             }
         }
 
@@ -97,46 +95,42 @@ pub fn character_model_add_collider_system(
         let root_bone_offset =
             Vec3::from(local_bound_center) - root_bone_local_transform.translation;
 
+        let collider_entity = commands
+            .spawn_bundle((
+                Collider::cuboid(half_extents.x, half_extents.y, half_extents.z),
+                CollisionGroups::new(
+                    COLLISION_GROUP_CHARACTER,
+                    COLLISION_FILTER_INSPECTABLE | COLLISION_FILTER_CLICKABLE,
+                ),
+                Transform::from_translation(
+                    root_bone_global_transform.translation + root_bone_offset,
+                )
+                .with_rotation(Quat::from_axis_angle(Vec3::Z, std::f32::consts::PI / 2.0)),
+                GlobalTransform::default(),
+            ))
+            .id();
+
         commands
             .entity(entity)
-            .insert_bundle(ColliderBundle {
-                shape: ColliderShapeComponent(ColliderShape::cuboid(
-                    half_extents.x,
-                    half_extents.y,
-                    half_extents.z,
-                )),
-                flags: ColliderFlagsComponent(ColliderFlags {
-                    collision_groups: InteractionGroups::new(
-                        COLLISION_GROUP_CHARACTER,
-                        COLLISION_FILTER_INSPECTABLE | COLLISION_FILTER_CLICKABLE,
-                    ),
-                    ..Default::default()
-                }),
-                position: ColliderPositionComponent(ColliderPosition(
-                    (
-                        root_bone_global_transform.translation + root_bone_offset,
-                        root_bone_global_transform.rotation
-                            * Quat::from_axis_angle(Vec3::Z, std::f32::consts::PI / 2.0),
-                    )
-                        .into(),
-                )),
-                ..Default::default()
-            })
-            .insert(CharacterColliderRootBoneOffset {
-                offset: root_bone_offset,
-            });
+            .insert_bundle((
+                CharacterColliderRootBoneOffset {
+                    offset: root_bone_offset,
+                },
+                ColliderEntity::new(collider_entity),
+                ModelHeight::new(half_extents.y * 2.0),
+            ))
+            .add_child(collider_entity);
     }
 
     // Update any existing collider's position
-    for (skinned_mesh, root_bone_offset, mut collider_position) in
-        query_collider_position.iter_mut()
-    {
+    for (skinned_mesh, root_bone_offset, collider_entity) in query_collider.iter() {
         if let Ok(root_bone_global_transform) = query_global_transform.get(skinned_mesh.joints[0]) {
-            collider_position.translation =
-                (root_bone_global_transform.translation + root_bone_offset.offset).into();
-            collider_position.rotation = (root_bone_global_transform.rotation
-                * Quat::from_axis_angle(Vec3::Z, std::f32::consts::PI / 2.0))
-            .into();
+            if let Ok(mut collider_transform) = query_transform.get_mut(collider_entity.entity) {
+                collider_transform.translation =
+                    root_bone_global_transform.translation + root_bone_offset.offset;
+                collider_transform.rotation = root_bone_global_transform.rotation
+                    * Quat::from_axis_angle(Vec3::Z, std::f32::consts::PI / 2.0);
+            }
         }
     }
 }

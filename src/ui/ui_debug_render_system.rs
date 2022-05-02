@@ -3,7 +3,7 @@ use bevy::{
     prelude::{Assets, Commands, Entity, Handle, Local, Or, Query, ResMut, With},
 };
 use bevy_egui::{egui, EguiContext};
-use bevy_rapier3d::prelude::ColliderShapeComponent;
+use bevy_rapier3d::prelude::Collider;
 
 use crate::{
     components::{
@@ -26,7 +26,7 @@ pub fn ui_debug_render_system(
     mut egui_context: ResMut<EguiContext>,
     mut ui_state_debug_windows: ResMut<UiStateDebugWindows>,
     mut ui_state_debug_render: Local<UiStateDebugRender>,
-    query_add_colliders: Query<Entity, With<ColliderShapeComponent>>,
+    query_add_colliders: Query<Entity, With<Collider>>,
     query_add_skeletons: Query<Entity, Or<(With<CharacterModel>, With<NpcModel>)>>,
     query_remove_colliders: Query<Entity, With<DebugRenderCollider>>,
     query_remove_skeletons: Query<Entity, With<DebugRenderSkeleton>>,

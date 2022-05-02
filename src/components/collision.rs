@@ -1,9 +1,14 @@
 use bevy::prelude::{Component, Entity};
 
 #[derive(Component)]
-pub struct CollisionTriMesh {
-    pub group: u32,
-    pub filter: u32,
+pub struct ColliderEntity {
+    pub entity: Entity,
+}
+
+impl ColliderEntity {
+    pub fn new(entity: Entity) -> Self {
+        Self { entity }
+    }
 }
 
 #[derive(Component)]
