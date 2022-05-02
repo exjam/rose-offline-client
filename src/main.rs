@@ -59,7 +59,8 @@ use systems::{
     character_select_exit_system, character_select_input_system, character_select_models_system,
     character_select_system, client_entity_event_system, collision_system, command_system,
     conversation_dialog_system, cooldown_system, damage_digit_render_system,
-    debug_render_collider_system, debug_render_skeleton_system, effect_system,
+    debug_render_collider_system, debug_render_polylines_setup_system,
+    debug_render_polylines_update_system, debug_render_skeleton_system, effect_system,
     game_connection_system, game_mouse_input_system, game_state_enter_system,
     game_zone_change_system, hit_event_system, item_drop_model_add_collider_system,
     item_drop_model_system, load_zone_system, login_connection_system, login_state_enter_system,
@@ -293,7 +294,7 @@ fn main() {
         .add_plugin(bevy::pbr::PbrPlugin::default());
 
     // Initialise 3rd party bevy plugins
-    app.add_plugin(bevy_prototype_debug_lines::DebugLinesPlugin::default())
+    app.add_plugin(bevy_polyline::PolylinePlugin)
         .add_plugin(bevy_egui::EguiPlugin)
         .add_plugin(smooth_bevy_cameras::LookTransformPlugin)
         .add_plugin(bevy_rapier3d::prelude::RapierPhysicsPlugin::<
@@ -423,12 +424,14 @@ fn main() {
     );
 
     // Run debug render stage last so it has accurate data
+    app.add_startup_system(debug_render_polylines_setup_system);
     app.add_stage_after(
         GameStages::ZoneChange,
         GameStages::DebugRender,
         SystemStage::parallel()
-            .with_system(debug_render_collider_system)
-            .with_system(debug_render_skeleton_system),
+            .with_system(debug_render_collider_system.before(debug_render_polylines_update_system))
+            .with_system(debug_render_skeleton_system.before(debug_render_polylines_update_system))
+            .with_system(debug_render_polylines_update_system),
     );
 
     // Zone Viewer

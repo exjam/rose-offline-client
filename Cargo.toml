@@ -7,9 +7,9 @@ edition = "2021"
 anyhow = "1.0.4"
 arrayvec = "0.7"
 bevy = { version = "0.7.0-dev", features = ["dds", "tga"] }
-bevy_prototype_debug_lines = { version = "0.6.1", features = ["3d"] }
 bevy_egui = "0.14.0"
 bevy-inspector-egui = "0.10.0"
+bevy_polyline = "0.1"
 bevy_rapier3d = "0.13.1"
 bitflags = "1.2"
 bytemuck = { version = "1.7.0", features = ["derive"] }
@@ -37,7 +37,7 @@ rose-network-irose = { git = "https://github.com/exjam/rose-offline", rev = "451
 
 [patch.crates-io]
 bevy = { git = "https://github.com/exjam/bevy", rev = "20e5f3a1e664537f1fbb06a852f8c34a8d9ce510" }
-bevy_prototype_debug_lines = { git = "https://github.com/exjam/bevy_debug_lines", rev = "4ffec084021f755cf725de3e7484dccdea06f0db" }
+bevy_polyline = { git = "https://github.com/exjam/bevy_polyline", rev = "23572d5da68a6a2b76592092c6f0f7037b7faea3" }
 bevy_egui = { git = "https://github.com/exjam/bevy_egui", rev = "e501861f04242a938790c81c24d5ed8413b5fc2a" }
 bevy-inspector-egui = { git = "https://github.com/exjam/bevy-inspector-egui", rev = "b71891de2ac560ea1fe337836b03353d1dadc66a" }
 bevy_rapier3d = { git = "https://github.com/exjam/bevy_rapier", rev = "75ffc00c44ef3b3cc1ebbbbb83d210ac3918a053" }
