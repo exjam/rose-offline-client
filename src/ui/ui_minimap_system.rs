@@ -200,7 +200,7 @@ pub fn ui_minimap_system(
 
                                 let color = egui::Color32::WHITE;
                                 let idx = mesh.vertices.len() as u32;
-                                mesh.add_triangle(idx + 0, idx + 1, idx + 2);
+                                mesh.add_triangle(idx, idx + 1, idx + 2);
                                 mesh.add_triangle(idx + 2, idx + 1, idx + 3);
 
                                 mesh.vertices.push(egui::epaint::Vertex {

@@ -256,7 +256,7 @@ fn ui_add_sell_item_slot(
             .ability_value_calculator
             .calculate_npc_store_item_sell_price(
                 &game_data.items,
-                &item,
+                item,
                 player.map_or(0, |player| player.ability_values.get_npc_store_sell_rate()),
                 world_rates.map_or(0, |x| x.world_price_rate),
                 world_rates.map_or(0, |x| x.item_price_rate),
@@ -286,7 +286,7 @@ fn ui_add_sell_item_slot(
 
     if let Some(item) = item {
         response.on_hover_ui(|ui| {
-            ui_add_item_tooltip(ui, game_data, &item);
+            ui_add_item_tooltip(ui, game_data, item);
 
             ui.colored_label(egui::Color32::YELLOW, format!("Sell Value: {}", item_price));
         });
