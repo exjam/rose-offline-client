@@ -2,7 +2,6 @@ use std::time::{Duration, Instant};
 
 use bevy::{
     app::AppExit,
-    hierarchy::Parent,
     input::Input,
     math::{Quat, Vec3},
     prelude::{
@@ -25,7 +24,7 @@ use rose_game_common::{
 };
 
 use crate::{
-    components::{ActiveMotion, CharacterModel, COLLISION_FILTER_CLICKABLE},
+    components::{ActiveMotion, CharacterModel, ColliderParent, COLLISION_FILTER_CLICKABLE},
     events::{GameConnectionEvent, LoadZoneEvent, WorldConnectionEvent, ZoneEvent},
     fly_camera::FlyCameraController,
     follow_camera::FollowCameraController,
@@ -689,14 +688,14 @@ pub fn character_select_system(
 pub fn character_select_input_system(
     mut commands: Commands,
     mut character_select_state: ResMut<CharacterSelect>,
+    mut egui_ctx: ResMut<EguiContext>,
+    asset_server: Res<AssetServer>,
     mouse_button_input: Res<Input<MouseButton>>,
+    rapier_context: Res<RapierContext>,
     windows: Res<Windows>,
     query_camera: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
-    query_parent: Query<&Parent>,
-    rapier_context: Res<RapierContext>,
-    mut egui_ctx: ResMut<EguiContext>,
-    query_hit_entity: Query<&CharacterSelectCharacter>,
-    asset_server: Res<AssetServer>,
+    query_collider_parent: Query<&ColliderParent>,
+    query_select_character: Query<&CharacterSelectCharacter>,
 ) {
     let cursor_position = windows.primary().cursor_position();
     if cursor_position.is_none() {
@@ -715,23 +714,23 @@ pub fn character_select_input_system(
             if let Some((ray_origin, ray_direction)) =
                 ray_from_screenspace(cursor_position, &windows, camera, camera_transform)
             {
-                let hit = rapier_context.cast_ray(
+                if let Some((collider_entity, _)) = rapier_context.cast_ray(
                     ray_origin,
                     ray_direction,
                     10000000.0,
                     false,
                     InteractionGroups::all().with_memberships(COLLISION_FILTER_CLICKABLE),
                     None,
-                );
+                ) {
+                    let hit_entity = query_collider_parent
+                        .get(collider_entity)
+                        .map_or(collider_entity, |collider_parent| collider_parent.entity);
 
-                if let Some((hit_entity, _)) = hit {
-                    let hit_entity = query_parent.get(hit_entity).map_or(hit_entity, |x| x.0);
-
-                    if let Ok(hit_character_select_index) = query_hit_entity.get(hit_entity) {
+                    if let Ok(select_character) = query_select_character.get(hit_entity) {
                         let now = Instant::now();
 
                         if character_select_state.selected_character_index
-                            == SelectedCharacterIndex::Some(hit_character_select_index.index)
+                            == SelectedCharacterIndex::Some(select_character.index)
                         {
                             if let Some(last_selected_time) =
                                 character_select_state.last_selected_time
@@ -743,7 +742,7 @@ pub fn character_select_input_system(
                         }
 
                         character_select_state.selected_character_index =
-                            SelectedCharacterIndex::Some(hit_character_select_index.index);
+                            SelectedCharacterIndex::Some(select_character.index);
                         character_select_state.last_selected_time = Some(now);
 
                         commands.entity(hit_entity).insert(ActiveMotion::new_once(

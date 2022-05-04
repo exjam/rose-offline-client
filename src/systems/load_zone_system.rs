@@ -23,7 +23,7 @@ use rose_file_readers::{
 
 use crate::{
     components::{
-        ActiveMotion, ColliderEntity, EventObject, NightTimeEffect, WarpObject,
+        ActiveMotion, ColliderEntity, ColliderParent, EventObject, NightTimeEffect, WarpObject,
         COLLISION_FILTER_CLICKABLE, COLLISION_FILTER_COLLIDABLE, COLLISION_FILTER_INSPECTABLE,
         COLLISION_GROUP_ZONE_EVENT_OBJECT, COLLISION_GROUP_ZONE_OBJECT,
         COLLISION_GROUP_ZONE_TERRAIN, COLLISION_GROUP_ZONE_WARP_OBJECT, COLLISION_GROUP_ZONE_WATER,
@@ -69,6 +69,11 @@ impl From<&Option<ZscCollisionShape>> for ZoneObjectPartCollisionShape {
 }
 
 #[derive(Inspectable, Default)]
+pub struct ZoneObjectId {
+    pub id: usize,
+}
+
+#[derive(Inspectable, Default)]
 pub struct ZoneObjectPart {
     pub mesh_path: String,
     pub collision_shape: ZoneObjectPartCollisionShape,
@@ -94,9 +99,13 @@ pub struct ZoneObjectTerrain {
 #[derive(Component, Inspectable)]
 pub enum ZoneObject {
     AnimatedObject(ZoneObjectAnimatedObject),
+    WarpObject(ZoneObjectId),
     WarpObjectPart(ZoneObjectPart),
+    EventObject(ZoneObjectId),
     EventObjectPart(ZoneObjectPart),
+    CnstObject(ZoneObjectId),
     CnstObjectPart(ZoneObjectPart),
+    DecoObject(ZoneObjectId),
     DecoObjectPart(ZoneObjectPart),
     Terrain(ZoneObjectTerrain),
     Water,
@@ -363,6 +372,7 @@ fn load_zone(
                             None,
                             &event_object.object,
                             event_object.object.object_id as usize,
+                            ZoneObject::EventObject,
                             ZoneObject::EventObjectPart,
                             COLLISION_GROUP_ZONE_EVENT_OBJECT,
                         );
@@ -388,7 +398,8 @@ fn load_zone(
                             None,
                             warp_object,
                             1,
-                            ZoneObject::EventObjectPart,
+                            ZoneObject::WarpObject,
+                            ZoneObject::WarpObjectPart,
                             COLLISION_GROUP_ZONE_WARP_OBJECT,
                         );
 
@@ -426,6 +437,7 @@ fn load_zone(
                             lit_object,
                             object_instance,
                             object_instance.object_id as usize,
+                            ZoneObject::CnstObject,
                             ZoneObject::CnstObjectPart,
                             COLLISION_GROUP_ZONE_OBJECT,
                         );
@@ -460,6 +472,7 @@ fn load_zone(
                             lit_object,
                             object_instance,
                             object_instance.object_id as usize,
+                            ZoneObject::DecoObject,
                             ZoneObject::DecoObjectPart,
                             COLLISION_GROUP_ZONE_OBJECT,
                         );
@@ -622,7 +635,7 @@ fn load_block_heightmap(
         ))
         .id();
 
-    commands
+    let entity = commands
         .spawn_bundle((
             ZoneObject::Terrain(ZoneObjectTerrain { block_x, block_y }),
             meshes.add(mesh),
@@ -634,7 +647,12 @@ fn load_block_heightmap(
             NotShadowCaster {},
             ColliderEntity::new(terrain_collider_entity),
         ))
-        .add_child(terrain_collider_entity);
+        .add_child(terrain_collider_entity)
+        .id();
+
+    commands
+        .entity(terrain_collider_entity)
+        .insert(ColliderParent::new(entity));
 }
 
 fn load_block_waterplanes(
@@ -696,7 +714,7 @@ fn load_block_waterplanes(
             ))
             .id();
 
-        commands
+        let entity = commands
             .spawn()
             .insert_bundle((
                 ZoneObject::Water,
@@ -710,7 +728,12 @@ fn load_block_waterplanes(
                 NotShadowReceiver {},
                 ColliderEntity::new(water_collider_entity),
             ))
-            .add_child(water_collider_entity);
+            .add_child(water_collider_entity)
+            .id();
+
+        commands
+            .entity(water_collider_entity)
+            .insert(ColliderParent::new(entity));
     }
 }
 
@@ -726,7 +749,8 @@ fn load_block_object(
     lit_object: Option<&LitObject>,
     object_instance: &IfoObject,
     object_id: usize,
-    object_type: fn(ZoneObjectPart) -> ZoneObject,
+    object_type: fn(ZoneObjectId) -> ZoneObject,
+    part_object_type: fn(ZoneObjectPart) -> ZoneObject,
     collision_group: u32,
 ) -> Entity {
     let object = &zsc.objects[object_id as usize];
@@ -756,8 +780,11 @@ fn load_block_object(
     let mut mesh_cache: Vec<Option<Handle<Mesh>>> = vec![None; zsc.meshes.len()];
 
     let mut part_entities: ArrayVec<Entity, 32> = ArrayVec::new();
-    let mut object_entity_commands =
-        commands.spawn_bundle((object_transform, GlobalTransform::default()));
+    let mut object_entity_commands = commands.spawn_bundle((
+        object_type(ZoneObjectId { id: object_id }),
+        object_transform,
+        GlobalTransform::default(),
+    ));
 
     let object_entity = object_entity_commands.id();
 
@@ -855,7 +882,7 @@ fn load_block_object(
             }
 
             let mut part_commands = object_commands.spawn_bundle((
-                object_type(ZoneObjectPart {
+                part_object_type(ZoneObjectPart {
                     mesh_path: zsc.meshes[mesh_id].path().to_string_lossy().into(),
                     // collision_shape.is_none(): cannot be hit with any raycast
                     // collision_shape.is_some(): can be hit with forward raycast
@@ -890,6 +917,7 @@ fn load_block_object(
                 // Transform for collider must be absolute
                 let collider_transform = object_transform * part_transform;
                 builder.spawn_bundle((
+                    ColliderParent::new(object_entity),
                     AsyncCollider::Mesh(mesh),
                     CollisionGroups::new(collision_group, collision_filter),
                     collider_transform,
@@ -1025,25 +1053,27 @@ fn load_animated_object(
     });
 
     // TODO: Animation object morph targets, blocked by lack of bevy morph targets
-    commands
-        .spawn_bundle((
-            ZoneObject::AnimatedObject(ZoneObjectAnimatedObject {
-                mesh_path: mesh_path.to_string(),
-                motion_path: motion_path.to_string(),
-                texture_path: texture_path.to_string(),
-            }),
-            mesh.clone(),
-            material,
+    let mut entity_commands = commands.spawn_bundle((
+        ZoneObject::AnimatedObject(ZoneObjectAnimatedObject {
+            mesh_path: mesh_path.to_string(),
+            motion_path: motion_path.to_string(),
+            texture_path: texture_path.to_string(),
+        }),
+        mesh.clone(),
+        material,
+        object_transform,
+        GlobalTransform::default(),
+        Visibility::default(),
+        ComputedVisibility::default(),
+    ));
+    let object_entity = entity_commands.id();
+
+    entity_commands.with_children(|builder| {
+        builder.spawn_bundle((
+            ColliderParent::new(object_entity),
+            AsyncCollider::Mesh(mesh),
+            CollisionGroups::new(COLLISION_GROUP_ZONE_OBJECT, COLLISION_FILTER_INSPECTABLE),
             object_transform,
-            GlobalTransform::default(),
-            Visibility::default(),
-            ComputedVisibility::default(),
-        ))
-        .with_children(|builder| {
-            builder.spawn_bundle((
-                AsyncCollider::Mesh(mesh),
-                CollisionGroups::new(COLLISION_GROUP_ZONE_OBJECT, COLLISION_FILTER_INSPECTABLE),
-                object_transform,
-            ));
-        });
+        ));
+    });
 }

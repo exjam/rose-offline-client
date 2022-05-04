@@ -16,8 +16,8 @@ use rose_game_common::components::{CharacterInfo, Equipment};
 
 use crate::{
     components::{
-        CharacterModel, CharacterModelPart, ColliderEntity, DummyBoneOffset, ModelHeight,
-        PersonalStore, PersonalStoreModel, COLLISION_FILTER_CLICKABLE,
+        CharacterModel, CharacterModelPart, ColliderEntity, ColliderParent, DummyBoneOffset,
+        ModelHeight, PersonalStore, PersonalStoreModel, COLLISION_FILTER_CLICKABLE,
         COLLISION_FILTER_INSPECTABLE, COLLISION_GROUP_CHARACTER,
     },
     model_loader::ModelLoader,
@@ -97,6 +97,7 @@ pub fn character_model_add_collider_system(
 
         let collider_entity = commands
             .spawn_bundle((
+                ColliderParent::new(entity),
                 Collider::cuboid(half_extents.x, half_extents.y, half_extents.z),
                 CollisionGroups::new(
                     COLLISION_GROUP_CHARACTER,

@@ -1,5 +1,4 @@
 use bevy::{
-    hierarchy::Parent,
     input::Input,
     math::Vec3,
     prelude::{
@@ -17,7 +16,8 @@ use rose_game_common::components::{ItemDrop, Team};
 
 use crate::{
     components::{
-        ClientEntityName, PlayerCharacter, Position, SelectedTarget, COLLISION_FILTER_CLICKABLE,
+        ClientEntityName, ColliderParent, PlayerCharacter, Position, SelectedTarget,
+        COLLISION_FILTER_CLICKABLE,
     },
     events::PlayerCommandEvent,
     systems::{collision_system::ray_from_screenspace, ZoneObject},
@@ -31,7 +31,7 @@ pub fn game_mouse_input_system(
     query_camera: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
     rapier_context: Res<RapierContext>,
     mut egui_ctx: ResMut<EguiContext>,
-    query_parent: Query<&Parent>,
+    query_collider_parent: Query<&ColliderParent>,
     query_hit_entity: Query<(
         Option<&ClientEntityName>,
         Option<&Team>,
@@ -60,18 +60,18 @@ pub fn game_mouse_input_system(
         if let Some((ray_origin, ray_direction)) =
             ray_from_screenspace(cursor_position, &windows, camera, camera_transform)
         {
-            let hit = rapier_context.cast_ray(
+            if let Some((collider_entity, distance)) = rapier_context.cast_ray(
                 ray_origin,
                 ray_direction,
                 10000000.0,
                 false,
                 InteractionGroups::all().with_memberships(COLLISION_FILTER_CLICKABLE),
                 None,
-            );
-
-            if let Some((hit_entity, distance)) = hit {
+            ) {
                 let hit_position = ray_origin + ray_direction * distance;
-                let hit_entity = query_parent.get(hit_entity).map_or(hit_entity, |x| x.0);
+                let hit_entity = query_collider_parent
+                    .get(collider_entity)
+                    .map_or(collider_entity, |collider_parent| collider_parent.entity);
 
                 if let Ok((
                     hit_client_entity_name,

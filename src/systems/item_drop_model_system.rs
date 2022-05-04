@@ -12,7 +12,7 @@ use rose_game_common::components::ItemDrop;
 
 use crate::{
     components::{
-        ActiveMotion, ColliderEntity, ItemDropModel, COLLISION_FILTER_CLICKABLE,
+        ActiveMotion, ColliderEntity, ColliderParent, ItemDropModel, COLLISION_FILTER_CLICKABLE,
         COLLISION_FILTER_INSPECTABLE, COLLISION_GROUP_ITEM_DROP,
     },
     model_loader::ModelLoader,
@@ -98,6 +98,7 @@ pub fn item_drop_model_add_collider_system(
 
         let collider_entity = commands
             .spawn_bundle((
+                ColliderParent::new(entity),
                 Collider::cuboid(half_extents.x, half_extents.y, half_extents.z),
                 CollisionGroups::new(
                     COLLISION_GROUP_ITEM_DROP,

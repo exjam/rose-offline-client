@@ -12,6 +12,17 @@ impl ColliderEntity {
 }
 
 #[derive(Component)]
+pub struct ColliderParent {
+    pub entity: Entity,
+}
+
+impl ColliderParent {
+    pub fn new(entity: Entity) -> Self {
+        Self { entity }
+    }
+}
+
+#[derive(Component)]
 pub struct MovementCollisionEntities {
     pub down_ray_cast_source: Option<Entity>,
     pub forward_ray_cast_source: Option<Entity>,

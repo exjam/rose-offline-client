@@ -1,4 +1,5 @@
 use bevy::{
+    hierarchy::Parent,
     input::Input,
     prelude::{
         App, Camera, GlobalTransform, Handle, MouseButton, Plugin, Query, Res, ResMut, With,
@@ -51,10 +52,11 @@ impl Plugin for DebugInspectorPlugin {
 fn debug_inspector_picking_system(
     mut debug_inspector_state: ResMut<DebugInspector>,
     mut egui_ctx: ResMut<EguiContext>,
-    query_camera: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
     mouse_button_input: Res<Input<MouseButton>>,
     rapier_context: Res<RapierContext>,
     windows: Res<Windows>,
+    query_camera: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
+    query_parent: Query<&Parent>,
 ) {
     if !debug_inspector_state.enable_picking {
         // Picking disabled
@@ -73,17 +75,19 @@ fn debug_inspector_picking_system(
             if let Some((ray_origin, ray_direction)) =
                 ray_from_screenspace(cursor_position, &windows, camera, camera_transform)
             {
-                let hit = rapier_context.cast_ray(
+                if let Some((collider_entity, _distance)) = rapier_context.cast_ray(
                     ray_origin,
                     ray_direction,
                     10000000.0,
                     false,
                     InteractionGroups::all().with_memberships(COLLISION_FILTER_INSPECTABLE),
                     None,
-                );
-
-                if let Some((hit_entity, _distance)) = hit {
-                    debug_inspector_state.entity = Some(hit_entity);
+                ) {
+                    debug_inspector_state.entity = Some(
+                        query_parent
+                            .get(collider_entity)
+                            .map_or(collider_entity, |parent| parent.0),
+                    );
                 }
             }
         }

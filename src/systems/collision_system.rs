@@ -10,7 +10,10 @@ use bevy_rapier3d::prelude::{InteractionGroups, RapierContext};
 use rose_game_common::messages::client::ClientMessage;
 
 use crate::{
-    components::{CollisionRayCastSource, EventObject, WarpObject, COLLISION_FILTER_COLLIDABLE},
+    components::{
+        ColliderParent, CollisionRayCastSource, EventObject, WarpObject,
+        COLLISION_FILTER_COLLIDABLE,
+    },
     events::QuestTriggerEvent,
     resources::GameConnection,
 };
@@ -59,33 +62,32 @@ pub fn ray_from_screenspace(
 pub fn collision_system(
     mut query_entity_ray: Query<(&GlobalTransform, &Parent), With<CollisionRayCastSource>>,
     mut query_parent: Query<&mut Transform>,
-    query_hit_parent_object: Query<&Parent>,
     mut query_event_object: Query<&mut EventObject>,
     mut query_warp_object: Query<&mut WarpObject>,
+    query_collider_parent: Query<&ColliderParent>,
+    mut quest_trigger_events: EventWriter<QuestTriggerEvent>,
     rapier_context: Res<RapierContext>,
     time: Res<Time>,
-    mut quest_trigger_events: EventWriter<QuestTriggerEvent>,
     game_connection: Option<Res<GameConnection>>,
 ) {
     // Cast down to collide entities with ground
     for (transform, parent) in query_entity_ray.iter_mut() {
         let ray_origin = transform.translation;
         let ray_direction = Vec3::new(0.0, -1.0, 0.0);
-        let hit = rapier_context.cast_ray(
+
+        if let Some((collider_entity, distance)) = rapier_context.cast_ray(
             ray_origin,
             ray_direction,
             10000000.0,
             false,
             InteractionGroups::all().with_memberships(COLLISION_FILTER_COLLIDABLE),
             None,
-        );
-
-        if let Some((hit_entity, distance)) = hit {
-            if let Ok(hit_parent) = query_hit_parent_object
-                .get(hit_entity)
-                .and_then(|x| query_hit_parent_object.get(x.0))
+        ) {
+            if let Ok(hit_entity) = query_collider_parent
+                .get(collider_entity)
+                .map(|collider_parent| collider_parent.entity)
             {
-                if let Ok(mut hit_event_object) = query_event_object.get_mut(hit_parent.0) {
+                if let Ok(mut hit_event_object) = query_event_object.get_mut(hit_entity) {
                     if time.seconds_since_startup() - hit_event_object.last_collision > 5.0 {
                         if !hit_event_object.quest_trigger_name.is_empty() {
                             quest_trigger_events.send(QuestTriggerEvent::DoTrigger(
@@ -97,7 +99,7 @@ pub fn collision_system(
                     }
 
                     continue; // Skip collision
-                } else if let Ok(mut hit_warp_object) = query_warp_object.get_mut(hit_parent.0) {
+                } else if let Ok(mut hit_warp_object) = query_warp_object.get_mut(hit_entity) {
                     if time.seconds_since_startup() - hit_warp_object.last_collision > 5.0 {
                         if let Some(game_connection) = game_connection.as_ref() {
                             game_connection
