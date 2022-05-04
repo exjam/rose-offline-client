@@ -726,6 +726,10 @@ pub fn command_system(
 
                 *command = Command::with_die();
                 *next_command = NextCommand::default();
+                commands
+                    .entity(entity)
+                    .remove::<Destination>()
+                    .remove::<Target>();
             }
             &mut Command::PickupItem(item_entity) => {
                 if let Ok((target_position, _)) = query_move_target.get(item_entity) {
