@@ -1,4 +1,4 @@
-use bevy::asset::{AssetIo, AssetIoError, BoxedFuture};
+use bevy::asset::{AssetIo, AssetIoError, BoxedFuture, Metadata};
 use rose_file_readers::{VfsFile, VfsIndex};
 use std::{
     path::{Path, PathBuf},
@@ -44,8 +44,8 @@ impl AssetIo for VfsAssetIo {
         Ok(Box::new(std::iter::empty::<PathBuf>()))
     }
 
-    fn is_directory(&self, _path: &Path) -> bool {
-        false
+    fn get_metadata(&self, path: &Path) -> Result<Metadata, AssetIoError> {
+        Err(AssetIoError::NotFound(path.to_path_buf()))
     }
 
     fn watch_path_for_changes(&self, _path: &Path) -> Result<(), AssetIoError> {

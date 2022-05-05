@@ -87,8 +87,8 @@ impl RenderAsset for TextureArray {
         let array_texture = render_device.create_texture(&TextureDescriptor {
             label: Some("texture_array"),
             size: Extent3d {
-                width: size.width as u32,
-                height: size.height as u32,
+                width: size.x as u32,
+                height: size.y as u32,
                 depth_or_array_layers: texture_array_gpu_images.len() as u32,
             },
             mip_level_count: 1,
@@ -121,8 +121,8 @@ impl RenderAsset for TextureArray {
                     aspect: TextureAspect::All,
                 },
                 Extent3d {
-                    width: size.width as u32,
-                    height: size.height as u32,
+                    width: size.x as u32,
+                    height: size.y as u32,
                     depth_or_array_layers: 1,
                 },
             );
