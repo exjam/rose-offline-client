@@ -253,7 +253,7 @@ fn main() {
             watch_for_changes: false,
         })
         .insert_resource(WindowDescriptor {
-            title: "Definitely not a ROSE client".to_string(),
+            title: "rose-offline-client".to_string(),
             present_mode: if disable_vsync {
                 bevy::window::PresentMode::Immediate
             } else {
