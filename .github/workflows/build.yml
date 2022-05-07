@@ -1,0 +1,44 @@
+on: [push, pull_request]
+
+name: Build
+
+jobs:
+  release:
+    name: Build
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os:
+          - ubuntu-latest
+          - macOS-latest
+          - windows-latest
+    steps:
+      - name: 'Checkout'
+        uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+      - uses: Swatinem/rust-cache@v1
+      - name: 'Install Dependencies (Ubuntu)'
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get install -y libasound2-dev libudev-dev
+      - name: 'Build (Release)'
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --release
+      - name: 'Upload Artifact (Windows)'
+        if: matrix.os == 'windows-latest'
+        uses: actions/upload-artifact@v3
+        with:
+          name: rose-offline-client-${{ matrix.os }}
+          path: target/release/rose-offline-client.exe
+      - name: 'Upload Artifact (Ubuntu, MacOS)'
+        if: matrix.os != 'windows-latest'
+        uses: actions/upload-artifact@v3
+        with:
+          name: rose-offline-client-${{ matrix.os }}
+          path: target/release/rose-offline-client
