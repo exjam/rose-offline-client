@@ -1,5 +1,5 @@
-# bevy_rose
-Definitely not a ROSE client.
+# rose-offline-client
+An open source client for ROSE Online, currently only compatible with irose_129_129en. For a matching open source server see [rose-offline](https://github.com/exjam/rose-offline/)
 
 # Running
 ## Required arguments:
@@ -25,7 +25,7 @@ Use `--zone=<N>` to run in zone viewer mode, this allows you to view zones.
 
 # Screenshots
 
-<img alt="Game Mode"  src="https://user-images.githubusercontent.com/1302758/159884305-308bc117-1234-46f6-bcca-fc942f24dfb3.jpg">
+<img alt="Game Mode"  src="https://user-images.githubusercontent.com/1302758/167260422-2cb29850-a049-4271-9e82-f45552c7e939.jpg">
 
 <img alt="Model Viewer" src="https://user-images.githubusercontent.com/1302758/159884786-772d7b53-a58e-4e16-a5c9-c8ab52536afa.jpg">
 
