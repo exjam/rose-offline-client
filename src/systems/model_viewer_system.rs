@@ -206,14 +206,14 @@ pub fn model_viewer_system(
 
                     // If has a two-handed weapon equipped, cannot have a sub weapon equipped
                     if let Some(equipped_weapon) =
-                        equipment.equipped_items[EquipmentIndex::WeaponRight].as_ref()
+                        equipment.equipped_items[EquipmentIndex::Weapon].as_ref()
                     {
                         if let Some(item_data) = game_data.items.get_base_item(equipped_weapon.item)
                         {
                             if item_data.class.is_two_handed_weapon()
-                                && equipment.equipped_items[EquipmentIndex::WeaponLeft].is_some()
+                                && equipment.equipped_items[EquipmentIndex::SubWeapon].is_some()
                             {
-                                equipment.equipped_items[EquipmentIndex::WeaponLeft] = None;
+                                equipment.equipped_items[EquipmentIndex::SubWeapon] = None;
                             }
                         }
                     }

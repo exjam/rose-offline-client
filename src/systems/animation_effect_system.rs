@@ -42,7 +42,7 @@ pub fn animation_effect_system(
                     .and_then(|equipment| {
                         game_data.items.get_weapon_item(
                             equipment
-                                .get_equipment_item(EquipmentIndex::WeaponRight)
+                                .get_equipment_item(EquipmentIndex::Weapon)
                                 .map(|weapon| weapon.item.item_number)
                                 .unwrap_or(0),
                         )
@@ -77,7 +77,7 @@ pub fn animation_effect_system(
                             .items
                             .get_weapon_item(
                                 equipment
-                                    .get_equipment_item(EquipmentIndex::WeaponRight)
+                                    .get_equipment_item(EquipmentIndex::Weapon)
                                     .map(|weapon| weapon.item.item_number)
                                     .unwrap_or(0),
                             )
@@ -283,7 +283,7 @@ pub fn animation_effect_system(
                             .and_then(|equipment| {
                                 game_data.items.get_weapon_item(
                                     equipment
-                                        .get_equipment_item(EquipmentIndex::WeaponRight)
+                                        .get_equipment_item(EquipmentIndex::Weapon)
                                         .map(|weapon| weapon.item.item_number)
                                         .unwrap_or(0),
                                 )

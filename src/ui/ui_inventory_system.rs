@@ -51,9 +51,9 @@ const EQUIPMENT_GRID_SLOTS: [[std::option::Option<rose_game_common::components::
         Some(ItemSlot::Ammo(AmmoIndex::Arrow)),
     ],
     [
-        Some(ItemSlot::Equipment(EquipmentIndex::WeaponRight)),
+        Some(ItemSlot::Equipment(EquipmentIndex::Weapon)),
         Some(ItemSlot::Equipment(EquipmentIndex::Body)),
-        Some(ItemSlot::Equipment(EquipmentIndex::WeaponLeft)),
+        Some(ItemSlot::Equipment(EquipmentIndex::SubWeapon)),
         Some(ItemSlot::Ammo(AmmoIndex::Bullet)),
     ],
     [
@@ -394,8 +394,8 @@ fn ui_add_inventory_slot(
                         None
                     }
                 }
-                ItemType::Weapon => Some(EquipmentIndex::WeaponRight),
-                ItemType::SubWeapon => Some(EquipmentIndex::WeaponLeft),
+                ItemType::Weapon => Some(EquipmentIndex::Weapon),
+                ItemType::SubWeapon => Some(EquipmentIndex::SubWeapon),
                 _ => None,
             };
 

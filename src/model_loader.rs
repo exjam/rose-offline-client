@@ -364,7 +364,7 @@ impl ModelLoader {
     ) -> EnumMap<CharacterMotionAction, Handle<ZmoAsset>> {
         let weapon_motion_type = self
             .item_database
-            .get_equipped_weapon_item_data(equipment, EquipmentIndex::WeaponRight)
+            .get_equipped_weapon_item_data(equipment, EquipmentIndex::Weapon)
             .map(|item_data| item_data.motion_type)
             .unwrap_or(0) as usize;
         let gender_index = match character_info.gender {
@@ -775,10 +775,10 @@ fn get_model_part_index(
         CharacterModelPart::Back => equipment.equipped_items[EquipmentIndex::Back]
             .as_ref()
             .map(|equipment_item| equipment_item.item.item_number),
-        CharacterModelPart::Weapon => equipment.equipped_items[EquipmentIndex::WeaponRight]
+        CharacterModelPart::Weapon => equipment.equipped_items[EquipmentIndex::Weapon]
             .as_ref()
             .map(|equipment_item| equipment_item.item.item_number),
-        CharacterModelPart::SubWeapon => equipment.equipped_items[EquipmentIndex::WeaponLeft]
+        CharacterModelPart::SubWeapon => equipment.equipped_items[EquipmentIndex::SubWeapon]
             .as_ref()
             .map(|equipment_item| equipment_item.item.item_number),
     }

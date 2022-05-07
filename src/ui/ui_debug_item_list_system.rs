@@ -264,7 +264,7 @@ pub fn ui_debug_item_list_system(
 
                                                 if item_data.class.is_two_handed_weapon() {
                                                     equipment.equipped_items
-                                                        [EquipmentIndex::WeaponLeft] = None;
+                                                        [EquipmentIndex::SubWeapon] = None;
                                                 }
                                             }
                                         }
