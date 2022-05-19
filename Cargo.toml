@@ -39,7 +39,7 @@ rose-network-irose = { git = "https://github.com/exjam/rose-offline", rev = "e2d
 bevy = { git = "https://github.com/exjam/bevy", rev = "8e4f6968899dfa2c1d697899df588fd3725299c1" }
 bevy_polyline = { git = "https://github.com/exjam/bevy_polyline", rev = "3dd7821086b21e6d719184b2d1553514c135c193" }
 bevy_egui = { git = "https://github.com/exjam/bevy_egui", rev = "143bb5e864fd7fa26b189c3b9904bfbb131c41b0" }
-bevy-inspector-egui = { git = "https://github.com/exjam/bevy-inspector-egui", rev = "52fce5d902d9f306dcc9690a90ae81a9c64014d5" }
+bevy-inspector-egui = { git = "https://github.com/exjam/bevy-inspector-egui", rev = "5ab02c77dc41f57004f541fd679b06f4ce1eb4c5" }
 bevy_rapier3d = { git = "https://github.com/exjam/bevy_rapier", rev = "27bbad14175370615a01ee1701cb8ebae92faaa5" }
 smooth-bevy-cameras = { git = "https://github.com/exjam/smooth-bevy-cameras", rev = "9361f1181b8dda71219dfab0c299624fb7e5d19a" }
 image = { git = "https://github.com/image-rs/image", branch = "version-0.23" }
