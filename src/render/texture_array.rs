@@ -1,7 +1,7 @@
 use bevy::{
     asset::{AssetLoader, BoxedFuture, LoadContext, LoadedAsset},
     ecs::system::{lifetimeless::SRes, SystemParamItem},
-    prelude::{AddAsset, App, AssetServer, Handle, Image, Plugin},
+    prelude::{AddAsset, App, AssetServer, FromWorld, Handle, Image, Plugin, World},
     reflect::TypeUuid,
     render::{
         render_asset::{PrepareAssetError, RenderAsset, RenderAssetPlugin, RenderAssets},
@@ -12,10 +12,13 @@ use bevy::{
             TextureViewDescriptor,
         },
         renderer::{RenderDevice, RenderQueue},
-        texture::{TextureError, TextureFormatPixelInfo},
+        texture::{CompressedImageFormats, ImageType, TextureError, TextureFormatPixelInfo},
     },
 };
 use image::DynamicImage;
+use thiserror::Error;
+
+use crate::resources::RenderConfiguration;
 
 #[derive(Debug, Clone, TypeUuid)]
 #[uuid = "f1963cac-7435-4adf-a3cf-676c62f5453f"]
@@ -83,6 +86,7 @@ impl RenderAsset for TextureArray {
         }
 
         let size = texture_array_gpu_images[0].size;
+        let texture_format = texture_array_gpu_images[0].texture_format;
 
         let array_texture = render_device.create_texture(&TextureDescriptor {
             label: Some("texture_array"),
@@ -91,10 +95,10 @@ impl RenderAsset for TextureArray {
                 height: size.y as u32,
                 depth_or_array_layers: texture_array_gpu_images.len() as u32,
             },
-            mip_level_count: 1,
+            mip_level_count: 1, // TODO: Load mipmaps
             sample_count: 1,
             dimension: TextureDimension::D2,
-            format: TextureFormat::Rgba8Unorm,
+            format: texture_format,
             usage: TextureUsages::COPY_DST | TextureUsages::TEXTURE_BINDING,
         });
 
@@ -139,8 +143,10 @@ impl RenderAsset for TextureArray {
     }
 }
 
-#[derive(Default)]
-pub struct CopySrcImageAssetLoader;
+pub struct CopySrcImageAssetLoader {
+    cpu_decompress_texture: bool,
+    supported_compressed_formats: CompressedImageFormats,
+}
 
 fn image_to_texture(dyn_img: DynamicImage) -> Image {
     use bevy::core::cast_slice;
@@ -270,18 +276,71 @@ impl AssetLoader for CopySrcImageAssetLoader {
         load_context: &'a mut LoadContext,
     ) -> BoxedFuture<'a, Result<(), anyhow::Error>> {
         Box::pin(async move {
-            let mut dyn_img = image_to_texture(
-                image::load_from_memory_with_format(bytes, image::ImageFormat::Dds)
-                    .map_err(TextureError::ImageError)?,
-            );
-            dyn_img.texture_descriptor.usage |= TextureUsages::COPY_SRC;
-            load_context.set_default_asset(LoadedAsset::new(dyn_img));
-            Ok(())
+            if self.cpu_decompress_texture {
+                let mut dyn_img = image_to_texture(
+                    image::load_from_memory_with_format(bytes, image::ImageFormat::Dds)
+                        .map_err(TextureError::ImageError)?,
+                );
+                dyn_img.texture_descriptor.usage |= TextureUsages::COPY_SRC;
+                load_context.set_default_asset(LoadedAsset::new(dyn_img));
+                Ok(())
+            } else {
+                // use the file extension for the image type
+                let original_path = load_context.path().with_extension("");
+                let ext = original_path.extension().unwrap().to_str().unwrap();
+
+                let mut dyn_img = Image::from_buffer(
+                    bytes,
+                    ImageType::Extension(ext),
+                    self.supported_compressed_formats,
+                    false,
+                )
+                .map_err(|err| FileTextureError {
+                    error: err,
+                    path: format!("{}", load_context.path().display()),
+                })?;
+                dyn_img.texture_descriptor.usage |= TextureUsages::COPY_SRC;
+
+                load_context.set_default_asset(LoadedAsset::new(dyn_img));
+                Ok(())
+            }
         })
     }
 
     fn extensions(&self) -> &[&str] {
         &["image_copy_src"]
+    }
+}
+
+/// An error that occurs when loading a texture from a file.
+#[derive(Error, Debug)]
+pub struct FileTextureError {
+    error: TextureError,
+    path: String,
+}
+impl std::fmt::Display for FileTextureError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
+        write!(
+            f,
+            "Error reading image file {}: {}, this is an error in `bevy_render`.",
+            self.path, self.error
+        )
+    }
+}
+
+impl FromWorld for CopySrcImageAssetLoader {
+    fn from_world(world: &mut World) -> Self {
+        let supported_compressed_formats = match world.get_resource::<RenderDevice>() {
+            Some(render_device) => CompressedImageFormats::from_features(render_device.features()),
+            None => CompressedImageFormats::all(),
+        };
+        let cpu_decompress_texture = !world
+            .resource::<RenderConfiguration>()
+            .passthrough_terrain_textures;
+        Self {
+            supported_compressed_formats,
+            cpu_decompress_texture,
+        }
     }
 }
 

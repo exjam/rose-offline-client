@@ -51,7 +51,8 @@ use model_loader::ModelLoader;
 use render::{DamageDigitMaterial, RoseRenderPlugin};
 use resources::{
     run_network_thread, AppState, ClientEntityList, DamageDigitsSpawner, DebugRenderConfig,
-    GameData, Icons, NetworkThread, NetworkThreadMessage, ServerConfiguration, WorldTime, ZoneTime,
+    GameData, Icons, NetworkThread, NetworkThreadMessage, RenderConfiguration, ServerConfiguration,
+    WorldTime, ZoneTime,
 };
 use systems::{
     ability_values_system, animation_effect_system, animation_system,
@@ -186,6 +187,11 @@ fn main() {
             clap::Arg::new("auto-login")
                 .long("auto-login")
                 .help("Automatically login to server"),
+        )
+        .arg(
+            clap::Arg::new("passthrough-terrain-textures")
+                .long("passthrough-terrain-textures")
+                .help("Assume all terrain textures are the same format such that we can pass through compressed textures to the GPU without decompression on the CPU. Note: This is not true for default irose 129_129en assets."),
         );
     let data_path_error = command.error(
         clap::ErrorKind::ArgumentNotFound,
@@ -211,6 +217,7 @@ fn main() {
         .and_then(|x| x.parse::<usize>().ok());
     let preset_character_name = matches.value_of("character-name").map(|x| x.to_string());
     let auto_login = matches.is_present("auto-login");
+    let passthrough_terrain_textures = matches.is_present("passthrough-terrain-textures");
 
     let disable_vsync = matches.is_present("disable-vsync");
     let mut app_state = AppState::ZoneViewer;
@@ -312,6 +319,9 @@ fn main() {
         .init_asset_loader::<ZmoAssetLoader>()
         .add_plugin(FlyCameraPlugin::default())
         .add_plugin(FollowCameraPlugin::default())
+        .insert_resource(RenderConfiguration {
+            passthrough_terrain_textures,
+        })
         .add_plugin(RoseRenderPlugin)
         .add_plugin(RoseScriptingPlugin)
         .insert_resource(ServerConfiguration {
