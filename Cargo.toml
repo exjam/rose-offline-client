@@ -36,7 +36,7 @@ rose-network-common = { git = "https://github.com/exjam/rose-offline", rev = "e2
 rose-network-irose = { git = "https://github.com/exjam/rose-offline", rev = "e2dad33d6f31ea862aa691c7e975921332c612a1" }
 
 [patch.crates-io]
-bevy = { git = "https://github.com/exjam/bevy", rev = "9eb8ea5864c5b20ac06120ceed52b3ef9a7d47dc" }
+bevy = { git = "https://github.com/exjam/bevy", rev = "8e4f6968899dfa2c1d697899df588fd3725299c1" }
 bevy_polyline = { git = "https://github.com/exjam/bevy_polyline", rev = "3dd7821086b21e6d719184b2d1553514c135c193" }
 bevy_egui = { git = "https://github.com/exjam/bevy_egui", rev = "143bb5e864fd7fa26b189c3b9904bfbb131c41b0" }
 bevy-inspector-egui = { git = "https://github.com/exjam/bevy-inspector-egui", rev = "52fce5d902d9f306dcc9690a90ae81a9c64014d5" }

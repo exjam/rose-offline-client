@@ -1,7 +1,10 @@
 use bevy::{
     core::Time,
     math::{Mat4, Vec2, Vec3},
-    prelude::{Camera, EventWriter, GlobalTransform, Parent, Query, Res, Transform, With},
+    prelude::{
+        Camera, EventWriter, GlobalTransform, Parent, PerspectiveProjection, Query, Res, Transform,
+        With,
+    },
     render::camera::RenderTarget,
     window::{Window, Windows},
 };
@@ -32,6 +35,7 @@ pub fn ray_from_screenspace(
     cursor_pos_screen: Vec2,
     windows: &Res<Windows>,
     camera: &Camera,
+    camera_projection: &PerspectiveProjection,
     camera_transform: &GlobalTransform,
 ) -> Option<(Vec3, Vec3)> {
     let view = camera_transform.compute_matrix();
@@ -46,7 +50,9 @@ pub fn ray_from_screenspace(
     let is_orthographic = projection.w_axis[3] == 1.0;
 
     // Compute the cursor position at the near plane. The bevy camera looks at -Z.
-    let ndc_near = world_to_ndc.transform_point3(-Vec3::Z * camera.near).z;
+    let ndc_near = world_to_ndc
+        .transform_point3(-Vec3::Z * camera_projection.near)
+        .z;
     let cursor_pos_near = ndc_to_world.transform_point3(cursor_ndc.extend(ndc_near));
 
     // Compute the ray's direction depending on the projection used.

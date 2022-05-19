@@ -6,8 +6,8 @@ use bevy::{
     math::{Quat, Vec3},
     prelude::{
         AssetServer, Assets, Camera, Commands, Component, DespawnRecursiveExt, Entity, EventReader,
-        EventWriter, GlobalTransform, Image, MouseButton, Query, Res, ResMut, State, Transform,
-        With,
+        EventWriter, GlobalTransform, Image, MouseButton, PerspectiveProjection, Query, Res,
+        ResMut, State, Transform, With,
     },
     render::{camera::Camera3d, mesh::skinning::SkinnedMesh},
     window::Windows,
@@ -693,7 +693,7 @@ pub fn character_select_input_system(
     mouse_button_input: Res<Input<MouseButton>>,
     rapier_context: Res<RapierContext>,
     windows: Res<Windows>,
-    query_camera: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
+    query_camera: Query<(&Camera, &PerspectiveProjection, &GlobalTransform), With<Camera3d>>,
     query_collider_parent: Query<&ColliderParent>,
     query_select_character: Query<&CharacterSelectCharacter>,
 ) {
@@ -710,10 +710,14 @@ pub fn character_select_input_system(
     }
 
     if mouse_button_input.just_pressed(MouseButton::Left) {
-        for (camera, camera_transform) in query_camera.iter() {
-            if let Some((ray_origin, ray_direction)) =
-                ray_from_screenspace(cursor_position, &windows, camera, camera_transform)
-            {
+        for (camera, camera_projection, camera_transform) in query_camera.iter() {
+            if let Some((ray_origin, ray_direction)) = ray_from_screenspace(
+                cursor_position,
+                &windows,
+                camera,
+                camera_projection,
+                camera_transform,
+            ) {
                 if let Some((collider_entity, _)) = rapier_context.cast_ray(
                     ray_origin,
                     ray_direction,

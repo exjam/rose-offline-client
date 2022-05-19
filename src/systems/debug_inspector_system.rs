@@ -2,7 +2,8 @@ use bevy::{
     hierarchy::Parent,
     input::Input,
     prelude::{
-        App, Camera, GlobalTransform, Handle, MouseButton, Plugin, Query, Res, ResMut, With,
+        App, Camera, GlobalTransform, Handle, MouseButton, PerspectiveProjection, Plugin, Query,
+        Res, ResMut, With,
     },
     render::camera::Camera3d,
     window::Windows,
@@ -55,7 +56,7 @@ fn debug_inspector_picking_system(
     mouse_button_input: Res<Input<MouseButton>>,
     rapier_context: Res<RapierContext>,
     windows: Res<Windows>,
-    query_camera: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
+    query_camera: Query<(&Camera, &PerspectiveProjection, &GlobalTransform), With<Camera3d>>,
     query_parent: Query<&Parent>,
 ) {
     if !debug_inspector_state.enable_picking {
@@ -71,10 +72,14 @@ fn debug_inspector_picking_system(
     let cursor_position = cursor_position.unwrap();
 
     if mouse_button_input.just_pressed(MouseButton::Middle) {
-        for (camera, camera_transform) in query_camera.iter() {
-            if let Some((ray_origin, ray_direction)) =
-                ray_from_screenspace(cursor_position, &windows, camera, camera_transform)
-            {
+        for (camera, camera_projection, camera_transform) in query_camera.iter() {
+            if let Some((ray_origin, ray_direction)) = ray_from_screenspace(
+                cursor_position,
+                &windows,
+                camera,
+                camera_projection,
+                camera_transform,
+            ) {
                 if let Some((collider_entity, _distance)) = rapier_context.cast_ray(
                     ray_origin,
                     ray_direction,

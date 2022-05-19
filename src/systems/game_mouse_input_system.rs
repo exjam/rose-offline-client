@@ -2,8 +2,8 @@ use bevy::{
     input::Input,
     math::Vec3,
     prelude::{
-        Camera, Commands, Entity, EventWriter, GlobalTransform, MouseButton, Query, Res, ResMut,
-        With,
+        Camera, Commands, Entity, EventWriter, GlobalTransform, MouseButton, PerspectiveProjection,
+        Query, Res, ResMut, With,
     },
     render::camera::Camera3d,
     window::Windows,
@@ -28,7 +28,7 @@ pub fn game_mouse_input_system(
     mut commands: Commands,
     mouse_button_input: Res<Input<MouseButton>>,
     windows: Res<Windows>,
-    query_camera: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
+    query_camera: Query<(&Camera, &PerspectiveProjection, &GlobalTransform), With<Camera3d>>,
     rapier_context: Res<RapierContext>,
     mut egui_ctx: ResMut<EguiContext>,
     query_collider_parent: Query<&ColliderParent>,
@@ -56,10 +56,14 @@ pub fn game_mouse_input_system(
 
     let (player_entity, player_team, player_selected_target) = query_player.single();
 
-    for (camera, camera_transform) in query_camera.iter() {
-        if let Some((ray_origin, ray_direction)) =
-            ray_from_screenspace(cursor_position, &windows, camera, camera_transform)
-        {
+    for (camera, camera_projection, camera_transform) in query_camera.iter() {
+        if let Some((ray_origin, ray_direction)) = ray_from_screenspace(
+            cursor_position,
+            &windows,
+            camera,
+            camera_projection,
+            camera_transform,
+        ) {
             if let Some((collider_entity, distance)) = rapier_context.cast_ray(
                 ray_origin,
                 ray_direction,
