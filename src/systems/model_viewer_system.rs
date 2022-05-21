@@ -2,11 +2,12 @@ use std::{cmp::Ordering, path::Path};
 
 use arrayvec::ArrayVec;
 use bevy::{
+    core::Time,
     hierarchy::{BuildChildren, DespawnRecursiveExt},
     math::{Quat, Vec2, Vec3},
-    pbr::{AmbientLight, StandardMaterial, AlphaMode},
+    pbr::{AlphaMode, AmbientLight, StandardMaterial},
     prelude::{
-        AssetServer, Assets, Color, Commands, ComputedVisibility, Entity, EventWriter,
+        AssetServer, Assets, Color, Commands, Component, ComputedVisibility, Entity, EventWriter,
         GlobalTransform, Handle, Mesh, PerspectiveCameraBundle, Query, Res, ResMut, Transform,
         Visibility, With,
     },
@@ -37,6 +38,9 @@ use crate::{
     VfsResource,
 };
 
+#[derive(Component)]
+pub struct PbrObjectTing;
+
 pub struct ModelViewerState {
     valid_items: EnumMap<EquipmentIndex, Vec<ItemReference>>,
 
@@ -61,13 +65,15 @@ fn load_block_object(
     object_transform: Transform,
 ) -> Entity {
     let object = &zsc.objects[object_id as usize];
-    let mut material_cache: Vec<Option<Handle<StandardMaterial>>> =
-        vec![None; zsc.materials.len()];
+    let mut material_cache: Vec<Option<Handle<StandardMaterial>>> = vec![None; zsc.materials.len()];
     let mut mesh_cache: Vec<Option<Handle<Mesh>>> = vec![None; zsc.meshes.len()];
 
     let mut part_entities: ArrayVec<Entity, 32> = ArrayVec::new();
-    let mut object_entity_commands =
-        commands.spawn_bundle((object_transform, GlobalTransform::default()));
+    let mut object_entity_commands = commands.spawn_bundle((
+        PbrObjectTing {},
+        object_transform,
+        GlobalTransform::default(),
+    ));
 
     let object_entity = object_entity_commands.id();
 
@@ -108,16 +114,28 @@ fn load_block_object(
                 let filename = filename_tmp.file_name().unwrap().to_string_lossy();
                 let handle = standard_materials.add(StandardMaterial {
                     base_color: Color::WHITE,
-                    base_color_texture: Some(asset_server.load(texture_path.with_file_name(format!("{}.dds", filename)))),
+                    base_color_texture: Some(
+                        asset_server.load(texture_path.with_file_name(format!("{}.dds", filename))),
+                    ),
                     emissive: Color::BLACK,
                     emissive_texture: None,
                     perceptual_roughness: 1.0,
                     metallic: 0.0,
-                    metallic_roughness_texture: Some(asset_server.load(texture_path.with_file_name(format!("{}_smoothness.dds", filename)))),
+                    metallic_roughness_texture: Some(
+                        asset_server.load(
+                            texture_path.with_file_name(format!("{}_smoothness.dds", filename)),
+                        ),
+                    ),
                     reflectance: 0.05,
-                    normal_map_texture:  Some(asset_server.load(texture_path.with_file_name(format!("{}_normal.dds", filename)))),
+                    normal_map_texture: Some(
+                        asset_server
+                            .load(texture_path.with_file_name(format!("{}_normal.dds", filename))),
+                    ),
                     flip_normal_map_y: false,
-                    occlusion_texture:  Some(asset_server.load(texture_path.with_file_name(format!("{}_ao.dds", filename)))),
+                    occlusion_texture: Some(
+                        asset_server
+                            .load(texture_path.with_file_name(format!("{}_ao.dds", filename))),
+                    ),
                     double_sided: false,
                     cull_mode: Some(Face::Back),
                     unlit: false,
@@ -263,8 +281,18 @@ pub fn model_viewer_system(
     query_npc_model: Query<(Entity, &NpcModel)>,
     query_effects: Query<Entity, With<Effect>>,
     game_data: Res<GameData>,
+    time: Res<Time>,
+    query_pbr_ting: Query<Entity, With<PbrObjectTing>>,
     mut egui_context: ResMut<EguiContext>,
 ) {
+    for entity in query_pbr_ting.iter() {
+        commands
+            .entity(entity)
+            .insert(Transform::from_rotation(Quat::from_rotation_y(
+                std::f32::consts::PI * time.seconds_since_startup() as f32 / 5.0,
+            )));
+    }
+
     egui::Window::new("Model Viewer").show(egui_context.ctx_mut(), |ui| {
         let max_num_npcs = ui_state.max_num_npcs;
         let max_num_characters = ui_state.max_num_characters;
