@@ -1,31 +1,40 @@
-use std::cmp::Ordering;
+use std::{cmp::Ordering, path::Path};
 
+use arrayvec::ArrayVec;
 use bevy::{
-    hierarchy::DespawnRecursiveExt,
-    math::Vec3,
-    pbr::AmbientLight,
+    hierarchy::{BuildChildren, DespawnRecursiveExt},
+    math::{Quat, Vec2, Vec3},
+    pbr::{AmbientLight, StandardMaterial, AlphaMode},
     prelude::{
-        Color, Commands, ComputedVisibility, Entity, EventWriter, GlobalTransform,
-        PerspectiveCameraBundle, Query, Res, ResMut, Transform, Visibility, With,
+        AssetServer, Assets, Color, Commands, ComputedVisibility, Entity, EventWriter,
+        GlobalTransform, Handle, Mesh, PerspectiveCameraBundle, Query, Res, ResMut, Transform,
+        Visibility, With,
     },
-    render::camera::Camera3d,
+    render::{camera::Camera3d, render_resource::Face},
 };
 use bevy_egui::{egui, EguiContext};
+use bevy_rapier3d::prelude::{AsyncCollider, CollisionGroups};
 use enum_map::{enum_map, EnumMap};
 use rand::prelude::SliceRandom;
 
 use rose_data::{
     CharacterMotionAction, EquipmentIndex, EquipmentItem, ItemReference, NpcMotionAction, ZoneId,
 };
+use rose_file_readers::{IfoObject, LitObject, ZscFile};
 use rose_game_common::components::{CharacterGender, CharacterInfo, Equipment, Npc};
 
 use crate::{
-    components::{ActiveMotion, CharacterModel, Effect, NpcModel},
+    components::{
+        ActiveMotion, CharacterModel, ColliderParent, Effect, NpcModel,
+        COLLISION_FILTER_INSPECTABLE, COLLISION_GROUP_ZONE_OBJECT,
+    },
     events::{SpawnEffectData, SpawnEffectEvent},
     fly_camera::{FlyCameraBundle, FlyCameraController},
     follow_camera::FollowCameraController,
+    render::{RgbTextureLoader, StaticMeshMaterial},
     resources::GameData,
     ui::UiStateDebugWindows,
+    VfsResource,
 };
 
 pub struct ModelViewerState {
@@ -42,12 +51,125 @@ pub struct ModelViewerState {
     last_effect_entity: Option<Entity>,
 }
 
+fn load_block_object(
+    commands: &mut Commands,
+    asset_server: &AssetServer,
+    vfs_resource: &VfsResource,
+    standard_materials: &mut Assets<StandardMaterial>,
+    zsc: &ZscFile,
+    object_id: usize,
+    object_transform: Transform,
+) -> Entity {
+    let object = &zsc.objects[object_id as usize];
+    let mut material_cache: Vec<Option<Handle<StandardMaterial>>> =
+        vec![None; zsc.materials.len()];
+    let mut mesh_cache: Vec<Option<Handle<Mesh>>> = vec![None; zsc.meshes.len()];
+
+    let mut part_entities: ArrayVec<Entity, 32> = ArrayVec::new();
+    let mut object_entity_commands =
+        commands.spawn_bundle((object_transform, GlobalTransform::default()));
+
+    let object_entity = object_entity_commands.id();
+
+    object_entity_commands.with_children(|object_commands| {
+        for (part_index, object_part) in object.parts.iter().enumerate() {
+            let part_transform = Transform::default()
+                .with_translation(
+                    Vec3::new(
+                        object_part.position.x,
+                        object_part.position.z,
+                        -object_part.position.y,
+                    ) / 100.0,
+                )
+                .with_rotation(Quat::from_xyzw(
+                    object_part.rotation.x,
+                    object_part.rotation.z,
+                    -object_part.rotation.y,
+                    object_part.rotation.w,
+                ))
+                .with_scale(Vec3::new(
+                    object_part.scale.x,
+                    object_part.scale.z,
+                    object_part.scale.y,
+                ));
+
+            let mesh_id = object_part.mesh_id as usize;
+            let mesh = mesh_cache[mesh_id].clone().unwrap_or_else(|| {
+                let handle = asset_server.load(zsc.meshes[mesh_id].path());
+                mesh_cache.insert(mesh_id, Some(handle.clone()));
+                handle
+            });
+
+            let material_id = object_part.material_id as usize;
+            let material = material_cache[material_id].clone().unwrap_or_else(|| {
+                let zsc_material = &zsc.materials[material_id];
+                let texture_path = zsc_material.path.path();
+                let filename_tmp = texture_path.with_extension("");
+                let filename = filename_tmp.file_name().unwrap().to_string_lossy();
+                let handle = standard_materials.add(StandardMaterial {
+                    base_color: Color::WHITE,
+                    base_color_texture: Some(asset_server.load(texture_path.with_file_name(format!("{}.dds", filename)))),
+                    emissive: Color::BLACK,
+                    emissive_texture: None,
+                    perceptual_roughness: 1.0,
+                    metallic: 0.0,
+                    metallic_roughness_texture: Some(asset_server.load(texture_path.with_file_name(format!("{}_smoothness.dds", filename)))),
+                    reflectance: 0.05,
+                    normal_map_texture:  Some(asset_server.load(texture_path.with_file_name(format!("{}_normal.dds", filename)))),
+                    flip_normal_map_y: false,
+                    occlusion_texture:  Some(asset_server.load(texture_path.with_file_name(format!("{}_ao.dds", filename)))),
+                    double_sided: false,
+                    cull_mode: Some(Face::Back),
+                    unlit: false,
+                    alpha_mode: AlphaMode::Opaque,
+                });
+                material_cache.insert(material_id, Some(handle.clone()));
+                handle
+            });
+
+            let mut part_commands = object_commands.spawn_bundle((
+                mesh.clone(),
+                material,
+                part_transform,
+                GlobalTransform::default(),
+                Visibility::default(),
+                ComputedVisibility::default(),
+            ));
+
+            part_commands.with_children(|builder| {
+                // Transform for collider must be absolute
+                let collider_transform = object_transform * part_transform;
+                builder.spawn_bundle((
+                    ColliderParent::new(object_entity),
+                    AsyncCollider::Mesh(mesh),
+                    CollisionGroups::new(COLLISION_GROUP_ZONE_OBJECT, COLLISION_FILTER_INSPECTABLE),
+                    collider_transform,
+                ));
+            });
+
+            let active_motion = object_part.animation_path.as_ref().map(|animation_path| {
+                ActiveMotion::new_repeating(asset_server.load(animation_path.path()))
+            });
+            if let Some(active_motion) = active_motion {
+                part_commands.insert(active_motion);
+            }
+
+            part_entities.push(part_commands.id());
+        }
+    });
+
+    object_entity
+}
+
 #[allow(clippy::too_many_arguments)]
 pub fn model_viewer_enter_system(
     mut commands: Commands,
     query_cameras: Query<Entity, With<Camera3d>>,
     game_data: Res<GameData>,
     mut ui_state_debug_windows: ResMut<UiStateDebugWindows>,
+    vfs_resource: Res<VfsResource>,
+    asset_server: Res<AssetServer>,
+    mut standard_materials: ResMut<Assets<StandardMaterial>>,
 ) {
     // Reset camera
     for entity in query_cameras.iter() {
@@ -85,7 +207,7 @@ pub fn model_viewer_enter_system(
         },
 
         npcs: Vec::new(),
-        num_npcs: 1,
+        num_npcs: 0,
         max_num_npcs: game_data.npcs.iter().count(),
 
         characters: Vec::new(),
@@ -106,6 +228,30 @@ pub fn model_viewer_enter_system(
     ui_state_debug_windows.debug_render_open = true;
     ui_state_debug_windows.npc_list_open = true;
     ui_state_debug_windows.item_list_open = true;
+
+    // Load model
+    let zone_list_entry = game_data
+        .zone_list
+        .get_zone(ZoneId::new(2).unwrap())
+        .unwrap();
+    let zone_path = zone_list_entry
+        .zon_file_path
+        .path()
+        .parent()
+        .unwrap_or_else(|| Path::new(""));
+    let zsc_deco = vfs_resource
+        .vfs
+        .read_file::<ZscFile, _>(&zone_list_entry.zsc_deco_path)
+        .unwrap();
+    let object_entity = load_block_object(
+        &mut commands,
+        &asset_server,
+        &vfs_resource,
+        &mut standard_materials,
+        &zsc_deco,
+        175,
+        Transform::default(),
+    );
 }
 
 #[allow(clippy::too_many_arguments)]

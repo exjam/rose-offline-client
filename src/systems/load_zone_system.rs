@@ -3,13 +3,17 @@ use bevy::{
     asset::LoadState,
     hierarchy::BuildChildren,
     math::{Quat, Vec2, Vec3},
-    pbr::{NotShadowCaster, NotShadowReceiver, StandardMaterial, AlphaMode},
+    pbr::{AlphaMode, NotShadowCaster, NotShadowReceiver, StandardMaterial},
     prelude::{
-        AssetServer, Assets, Commands, Component, ComputedVisibility, DespawnRecursiveExt, Entity,
-        EventReader, EventWriter, GlobalTransform, Handle, Local, Mesh, Query, Res, ResMut,
-        Transform, Visibility, With, Color,
+        AssetServer, Assets, Color, Commands, Component, ComputedVisibility, DespawnRecursiveExt,
+        Entity, EventReader, EventWriter, GlobalTransform, Handle, Local, Mesh, Query, Res, ResMut,
+        Transform, Visibility, With,
     },
-    render::{mesh::Indices, render_resource::{PrimitiveTopology, Face}, view::NoFrustumCulling},
+    render::{
+        mesh::Indices,
+        render_resource::{Face, PrimitiveTopology},
+        view::NoFrustumCulling,
+    },
 };
 use bevy_inspector_egui::Inspectable;
 use bevy_rapier3d::prelude::{AsyncCollider, Collider, CollisionGroups};
@@ -135,8 +139,10 @@ pub fn load_zone_system(
     mut sky_materials: ResMut<Assets<SkyMaterial>>,
     mut standard_materials: ResMut<Assets<StandardMaterial>>,
     mut static_mesh_materials: ResMut<Assets<StaticMeshMaterial>>,
-    (mut water_materials, mut texture_arrays): (ResMut<Assets<WaterMaterial>>,
-     ResMut<Assets<TextureArray>>),
+    (mut water_materials, mut texture_arrays): (
+        ResMut<Assets<WaterMaterial>>,
+        ResMut<Assets<TextureArray>>,
+    ),
     mut load_zone_state: Local<LoadZoneState>,
     mut loading_current_zone: Local<Option<CurrentZone>>,
     mut load_zone_event: EventReader<LoadZoneEvent>,
@@ -297,9 +303,13 @@ fn load_zone(
         emissive_texture: None,
         perceptual_roughness: 1.0,
         metallic: 0.0,
-        metallic_roughness_texture:Some(asset_server.load("3DDATA/TERRAIN/TILES/JUNON/JG/T026_03_smoothness.dds")),
+        metallic_roughness_texture: Some(
+            asset_server.load("3DDATA/TERRAIN/TILES/JUNON/JG/T026_03_smoothness.dds"),
+        ),
         reflectance: 0.5,
-        normal_map_texture: Some(asset_server.load("3DDATA/TERRAIN/TILES/JUNON/JG/T026_03_normal.dds")),
+        normal_map_texture: Some(
+            asset_server.load("3DDATA/TERRAIN/TILES/JUNON/JG/T026_03_normal.dds"),
+        ),
         flip_normal_map_y: false,
         occlusion_texture: Some(asset_server.load("3DDATA/TERRAIN/TILES/JUNON/JG/T026_03_ao.dds")),
         double_sided: false,

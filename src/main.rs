@@ -6,14 +6,16 @@ use bevy::{
     core_pipeline::ClearColor,
     ecs::{event::Events, schedule::ShouldRun},
     log::{Level, LogSettings},
+    math::{Quat, Vec3},
+    pbr::{DirectionalLight, DirectionalLightBundle},
     prelude::{
         AddAsset, App, AssetServer, Assets, Color, Commands, CoreStage,
-        ExclusiveSystemDescriptorCoercion, IntoExclusiveSystem, Msaa,
+        ExclusiveSystemDescriptorCoercion, IntoExclusiveSystem, Msaa, OrthographicProjection,
         ParallelSystemDescriptorCoercion, PerspectiveCameraBundle, Res, ResMut, StageLabel, State,
-        SystemSet, SystemStage, OrthographicProjection, Transform,
+        SystemSet, SystemStage, Transform,
     },
     render::{render_resource::WgpuFeatures, settings::WgpuSettings},
-    window::WindowDescriptor, pbr::{DirectionalLightBundle, DirectionalLight}, math::{Vec3, Quat},
+    window::WindowDescriptor,
 };
 use bevy_egui::EguiContext;
 use scripting::RoseScriptingPlugin;
@@ -698,5 +700,4 @@ fn load_game_data(
         },
         ..Default::default()
     });
-
 }
