@@ -10,10 +10,10 @@ use bevy::{
         AddAsset, App, AssetServer, Assets, Color, Commands, CoreStage,
         ExclusiveSystemDescriptorCoercion, IntoExclusiveSystem, Msaa,
         ParallelSystemDescriptorCoercion, PerspectiveCameraBundle, Res, ResMut, StageLabel, State,
-        SystemSet, SystemStage,
+        SystemSet, SystemStage, OrthographicProjection, Transform,
     },
     render::{render_resource::WgpuFeatures, settings::WgpuSettings},
-    window::WindowDescriptor,
+    window::WindowDescriptor, pbr::{DirectionalLightBundle, DirectionalLight}, math::{Vec3, Quat},
 };
 use bevy_egui::EguiContext;
 use scripting::RoseScriptingPlugin;
@@ -674,4 +674,29 @@ fn load_game_data(
         &asset_server,
         &mut damage_digit_materials,
     ));
+
+    const HALF_SIZE: f32 = 100.0;
+    commands.spawn_bundle(DirectionalLightBundle {
+        directional_light: DirectionalLight {
+            // Configure the projection to better fit the scene
+            shadow_projection: OrthographicProjection {
+                left: -HALF_SIZE,
+                right: HALF_SIZE,
+                bottom: -HALF_SIZE,
+                top: HALF_SIZE,
+                near: -10.0 * HALF_SIZE,
+                far: 10.0 * HALF_SIZE,
+                ..Default::default()
+            },
+            shadows_enabled: true,
+            ..Default::default()
+        },
+        transform: Transform {
+            translation: Vec3::new(0.0, 0.0, 0.0),
+            rotation: Quat::from_rotation_x(-std::f32::consts::FRAC_PI_4),
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+
 }

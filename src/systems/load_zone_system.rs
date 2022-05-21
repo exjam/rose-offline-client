@@ -3,13 +3,13 @@ use bevy::{
     asset::LoadState,
     hierarchy::BuildChildren,
     math::{Quat, Vec2, Vec3},
-    pbr::{NotShadowCaster, NotShadowReceiver},
+    pbr::{NotShadowCaster, NotShadowReceiver, StandardMaterial, AlphaMode},
     prelude::{
         AssetServer, Assets, Commands, Component, ComputedVisibility, DespawnRecursiveExt, Entity,
         EventReader, EventWriter, GlobalTransform, Handle, Local, Mesh, Query, Res, ResMut,
-        Transform, Visibility, With,
+        Transform, Visibility, With, Color,
     },
-    render::{mesh::Indices, render_resource::PrimitiveTopology, view::NoFrustumCulling},
+    render::{mesh::Indices, render_resource::{PrimitiveTopology, Face}, view::NoFrustumCulling},
 };
 use bevy_inspector_egui::Inspectable;
 use bevy_rapier3d::prelude::{AsyncCollider, Collider, CollisionGroups};
@@ -75,6 +75,7 @@ pub struct ZoneObjectId {
 
 #[derive(Inspectable, Default)]
 pub struct ZoneObjectPart {
+    pub object_id: usize,
     pub mesh_path: String,
     pub collision_shape: ZoneObjectPartCollisionShape,
     pub collision_not_moveable: bool,
@@ -132,9 +133,10 @@ pub fn load_zone_system(
     mut effect_mesh_materials: ResMut<Assets<EffectMeshMaterial>>,
     mut particle_materials: ResMut<Assets<ParticleMaterial>>,
     mut sky_materials: ResMut<Assets<SkyMaterial>>,
+    mut standard_materials: ResMut<Assets<StandardMaterial>>,
     mut static_mesh_materials: ResMut<Assets<StaticMeshMaterial>>,
-    mut water_materials: ResMut<Assets<WaterMaterial>>,
-    mut texture_arrays: ResMut<Assets<TextureArray>>,
+    (mut water_materials, mut texture_arrays): (ResMut<Assets<WaterMaterial>>,
+     ResMut<Assets<TextureArray>>),
     mut load_zone_state: Local<LoadZoneState>,
     mut loading_current_zone: Local<Option<CurrentZone>>,
     mut load_zone_event: EventReader<LoadZoneEvent>,
@@ -212,6 +214,7 @@ pub fn load_zone_system(
             &mut effect_mesh_materials,
             &mut particle_materials,
             &mut sky_materials,
+            &mut standard_materials,
             &mut static_mesh_materials,
             &mut water_materials,
             &mut texture_arrays,
@@ -232,6 +235,7 @@ fn load_zone(
     effect_mesh_materials: &mut ResMut<Assets<EffectMeshMaterial>>,
     particle_materials: &mut ResMut<Assets<ParticleMaterial>>,
     sky_materials: &mut ResMut<Assets<SkyMaterial>>,
+    standard_materials: &mut ResMut<Assets<StandardMaterial>>,
     static_mesh_materials: &mut ResMut<Assets<StaticMeshMaterial>>,
     water_materials: &mut ResMut<Assets<WaterMaterial>>,
     texture_arrays: &mut ResMut<Assets<TextureArray>>,
@@ -285,6 +289,26 @@ fn load_zone(
             NoFrustumCulling,
         ));
     }
+
+    let pbr_material = standard_materials.add(StandardMaterial {
+        base_color: Color::rgb(1.0, 1.0, 1.0),
+        base_color_texture: Some(asset_server.load("3DDATA/TERRAIN/TILES/JUNON/JG/T026_03.dds")),
+        emissive: Color::BLACK,
+        emissive_texture: None,
+        perceptual_roughness: 1.0,
+        metallic: 0.0,
+        metallic_roughness_texture:Some(asset_server.load("3DDATA/TERRAIN/TILES/JUNON/JG/T026_03_smoothness.dds")),
+        reflectance: 0.5,
+        normal_map_texture: Some(asset_server.load("3DDATA/TERRAIN/TILES/JUNON/JG/T026_03_normal.dds")),
+        flip_normal_map_y: false,
+        occlusion_texture: Some(asset_server.load("3DDATA/TERRAIN/TILES/JUNON/JG/T026_03_ao.dds")),
+        double_sided: false,
+        cull_mode: Some(Face::Back),
+        unlit: false,
+        alpha_mode: AlphaMode::Opaque,
+    });
+    // asset_server.load("3DDATA/TERRAIN/TILES/JUNON/JG/T026_03_smoothness.dds");
+    // asset_server.load("3DDATA/TERRAIN/TILES/JUNON/JG/T026_03_edge.dds");
 
     // Load zone tile array
     let mut tile_texture_array_builder = TextureArrayBuilder::new();
@@ -340,6 +364,7 @@ fn load_zone(
                     tilemap,
                     &zone_file.tiles,
                     block_terrain_material,
+                    pbr_material.clone(),
                     block_x,
                     block_y,
                 );
@@ -509,6 +534,7 @@ fn load_block_heightmap(
     tilemap: TilFile,
     tile_info: &[ZonTile],
     material: Handle<TerrainMaterial>,
+    pbr_material: Handle<StandardMaterial>,
     block_x: u32,
     block_y: u32,
 ) {
@@ -589,9 +615,9 @@ fn load_block_heightmap(
     mesh.set_indices(Some(Indices::U16(indices)));
     mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
     mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
-    mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, uvs_lightmap);
-    mesh.insert_attribute(MESH_ATTRIBUTE_UV_1, uvs_tile);
-    mesh.insert_attribute(TERRAIN_MESH_ATTRIBUTE_TILE_INFO, tile_ids);
+    mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, uvs_tile);
+    // mesh.insert_attribute(MESH_ATTRIBUTE_UV_1, uvs_tile);
+    // mesh.insert_attribute(TERRAIN_MESH_ATTRIBUTE_TILE_INFO, tile_ids);
 
     let mut collider_verts = Vec::new();
     let mut collider_indices = Vec::new();
@@ -639,12 +665,12 @@ fn load_block_heightmap(
         .spawn_bundle((
             ZoneObject::Terrain(ZoneObjectTerrain { block_x, block_y }),
             meshes.add(mesh),
-            material,
+            pbr_material,
             Transform::from_xyz(offset_x, 0.0, -offset_y),
             GlobalTransform::default(),
             Visibility::default(),
             ComputedVisibility::default(),
-            NotShadowCaster {},
+            // NotShadowCaster {},
             ColliderEntity::new(terrain_collider_entity),
         ))
         .add_child(terrain_collider_entity)
@@ -883,6 +909,7 @@ fn load_block_object(
 
             let mut part_commands = object_commands.spawn_bundle((
                 part_object_type(ZoneObjectPart {
+                    object_id,
                     mesh_path: zsc.meshes[mesh_id].path().to_string_lossy().into(),
                     // collision_shape.is_none(): cannot be hit with any raycast
                     // collision_shape.is_some(): can be hit with forward raycast
@@ -910,7 +937,7 @@ fn load_block_object(
                 GlobalTransform::default(),
                 Visibility::default(),
                 ComputedVisibility::default(),
-                NotShadowCaster {},
+                NotShadowReceiver {},
             ));
 
             part_commands.with_children(|builder| {
