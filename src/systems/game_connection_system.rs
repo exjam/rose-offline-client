@@ -7,7 +7,7 @@ use bevy::{
     },
 };
 
-use rose_data::{EquipmentItem, ItemReference, ItemSlotBehaviour, ItemType};
+use rose_data::{AbilityType, EquipmentItem, ItemReference, ItemSlotBehaviour, ItemType};
 use rose_game_common::{
     components::{
         AbilityValues, BasicStatType, BasicStats, CharacterInfo, DroppedItem, Equipment,
@@ -78,7 +78,11 @@ pub fn game_connection_system(
     mut query_pending_damage_list: Query<&mut PendingDamageList>,
     mut query_pending_skill_effect_list: Query<&mut PendingSkillEffectList>,
     mut query_pending_skill_target_list: Query<&mut PendingSkillTargetList>,
-    mut query_set_client_entity: ParamSet<(Query<QueryCharacter>, Query<QueryPlayer>)>,
+    mut query_set_client_entity: ParamSet<(
+        Query<QueryCharacter>,
+        Query<QueryPlayer>,
+        Query<(&AbilityValues, &mut HealthPoints)>,
+    )>,
     mut query_command: Query<(&mut Command, &mut NextCommand)>,
     (mut app_state, mut client_entity_list, game_connection, game_data): (
         ResMut<State<AppState>>,
@@ -1298,6 +1302,56 @@ pub fn game_connection_system(
                         if let Command::CastSkill(command_cast_skill) = command.as_mut() {
                             if command_cast_skill.skill_id == skill_id {
                                 command_cast_skill.ready_action = true;
+                            }
+                        }
+                    }
+
+                    if let Some(skill_data) = game_data.skills.get_skill(skill_id) {
+                        if Some(entity) == client_entity_list.player_entity {
+                            if let Ok(mut player) = query_set_client_entity.p1().get_mut(entity) {
+                                for &(use_ability_type, mut use_ability_value) in
+                                    skill_data.use_ability.iter()
+                                {
+                                    if use_ability_type == AbilityType::Mana {
+                                        let use_mana_rate =
+                                            (100 - player.ability_values.get_save_mana()) as f32
+                                                / 100.0;
+                                        use_ability_value =
+                                            (use_ability_value as f32 * use_mana_rate) as i32;
+                                    }
+
+                                    ability_values_add_value(
+                                        use_ability_type,
+                                        -use_ability_value,
+                                        player.ability_values,
+                                        &mut player.basic_stats,
+                                        &mut player.experience_points,
+                                        &mut player.health_points,
+                                        &mut player.inventory,
+                                        &mut player.level,
+                                        &mut player.mana_points,
+                                        &mut player.skill_points,
+                                        &mut player.stamina,
+                                        &mut player.stat_points,
+                                        &mut player.union_membership,
+                                    );
+                                }
+                            }
+                        } else if let Ok((ability_values, mut health_points)) =
+                            query_set_client_entity.p2().get_mut(entity)
+                        {
+                            for &(use_ability_type, use_ability_value) in
+                                skill_data.use_ability.iter()
+                            {
+                                if use_ability_type == AbilityType::Health {
+                                    health_points.hp = i32::max(
+                                        0,
+                                        i32::min(
+                                            health_points.hp - use_ability_value,
+                                            ability_values.get_max_health(),
+                                        ),
+                                    );
+                                }
                             }
                         }
                     }
