@@ -238,7 +238,7 @@ pub fn model_viewer_enter_system(
     // Reset ambient light
     commands.insert_resource(AmbientLight {
         color: Color::WHITE,
-        brightness: 0.1,
+        brightness: 0.15,
     });
 
     // Open relevant debug windows

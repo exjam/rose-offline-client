@@ -691,7 +691,7 @@ fn load_game_data(
                 ..Default::default()
             },
             shadows_enabled: true,
-            illuminance: 35000.0,
+            illuminance: 10000.0,
             ..Default::default()
         },
         transform: Transform {
