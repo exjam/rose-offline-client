@@ -120,7 +120,7 @@ fn load_block_object(
                     emissive: Color::BLACK,
                     emissive_texture: None,
                     perceptual_roughness: 1.0,
-                    metallic: 0.0,
+                    metallic: 1.0,
                     metallic_roughness_texture: Some(
                         asset_server.load(
                             texture_path.with_file_name(format!("{}_smoothness.dds", filename)),
@@ -136,8 +136,8 @@ fn load_block_object(
                         asset_server
                             .load(texture_path.with_file_name(format!("{}_ao.dds", filename))),
                     ),
-                    double_sided: false,
-                    cull_mode: Some(Face::Back),
+                    double_sided: true,
+                    cull_mode: None, // Some(Face::Back),
                     unlit: false,
                     alpha_mode: AlphaMode::Opaque,
                 });
@@ -229,7 +229,7 @@ pub fn model_viewer_enter_system(
         max_num_npcs: game_data.npcs.iter().count(),
 
         characters: Vec::new(),
-        num_characters: 0,
+        num_characters: 10,
         max_num_characters: 500,
 
         last_effect_entity: None,
@@ -238,14 +238,14 @@ pub fn model_viewer_enter_system(
     // Reset ambient light
     commands.insert_resource(AmbientLight {
         color: Color::WHITE,
-        brightness: 1.0,
+        brightness: 0.1,
     });
 
     // Open relevant debug windows
     ui_state_debug_windows.debug_ui_open = true;
-    ui_state_debug_windows.debug_render_open = true;
-    ui_state_debug_windows.npc_list_open = true;
-    ui_state_debug_windows.item_list_open = true;
+    ui_state_debug_windows.debug_render_open = false;
+    ui_state_debug_windows.npc_list_open = false;
+    ui_state_debug_windows.item_list_open = false;
 
     // Load model
     let zone_list_entry = game_data
@@ -289,7 +289,7 @@ pub fn model_viewer_system(
         commands
             .entity(entity)
             .insert(Transform::from_rotation(Quat::from_rotation_y(
-                std::f32::consts::PI * time.seconds_since_startup() as f32 / 5.0,
+                std::f32::consts::PI * time.seconds_since_startup() as f32 / 10.0,
             )));
     }
 
@@ -398,9 +398,9 @@ pub fn model_viewer_system(
                             equipment,
                             GlobalTransform::default(),
                             Transform::default().with_translation(Vec3::new(
-                                -2.5 + (count / 25) as f32 * -5.0,
-                                0.0,
-                                (count % 25) as f32 * -5.0,
+                                2.5 + (count / 5) as f32 * -5.0,
+                                3.0,
+                                5.0 + (count % 5) as f32 * -5.0,
                             )),
                         ))
                         .id();

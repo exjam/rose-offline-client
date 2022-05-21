@@ -677,7 +677,7 @@ fn load_game_data(
         &mut damage_digit_materials,
     ));
 
-    const HALF_SIZE: f32 = 100.0;
+    const HALF_SIZE: f32 = 50.0;
     commands.spawn_bundle(DirectionalLightBundle {
         directional_light: DirectionalLight {
             // Configure the projection to better fit the scene
@@ -691,11 +691,13 @@ fn load_game_data(
                 ..Default::default()
             },
             shadows_enabled: true,
+            illuminance: 35000.0,
             ..Default::default()
         },
         transform: Transform {
             translation: Vec3::new(0.0, 0.0, 0.0),
-            rotation: Quat::from_rotation_x(-std::f32::consts::FRAC_PI_4),
+            rotation: Quat::from_rotation_y(-std::f32::consts::FRAC_PI_2)
+                * Quat::from_rotation_x(-std::f32::consts::FRAC_PI_4),
             ..Default::default()
         },
         ..Default::default()
