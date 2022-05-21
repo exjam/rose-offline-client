@@ -3,7 +3,8 @@ use std::cmp::Ordering;
 use bevy_inspector_egui::egui;
 
 use rose_data::{
-    BaseItemData, EquipmentItem, Item, ItemClass, ItemGradeData, ItemType, SkillId, StackableItem,
+    BaseItemData, EquipmentItem, Item, ItemClass, ItemGradeData, ItemType, SkillData, SkillId,
+    SkillType, StackableItem,
 };
 
 use crate::resources::GameData;
@@ -18,14 +19,17 @@ fn add_equipment_item_name(
     equipment_item: &EquipmentItem,
     item_data: &BaseItemData,
 ) {
-    if equipment_item.grade > 0 {
-        ui.colored_label(
-            get_item_name_color(item_data),
-            format!("{} ({})", &item_data.name, equipment_item.grade),
-        );
+    let text = if equipment_item.grade > 0 {
+        format!("{} ({})", &item_data.name, equipment_item.grade)
     } else {
-        ui.colored_label(get_item_name_color(item_data), &item_data.name);
-    }
+        item_data.name.clone()
+    };
+
+    ui.add(egui::Label::new(
+        egui::RichText::new(text)
+            .color(get_item_name_color(item_data))
+            .strong(),
+    ));
 }
 
 fn add_stackable_item_name(
@@ -33,7 +37,11 @@ fn add_stackable_item_name(
     _stackable_item: &StackableItem,
     item_data: &BaseItemData,
 ) {
-    ui.colored_label(get_item_name_color(item_data), &item_data.name);
+    ui.add(egui::Label::new(
+        egui::RichText::new(&item_data.name)
+            .color(get_item_name_color(item_data))
+            .strong(),
+    ));
 }
 
 fn add_equipment_item_life_durability(ui: &mut egui::Ui, equipment_item: &EquipmentItem) {
@@ -378,7 +386,89 @@ pub fn ui_add_item_tooltip(ui: &mut egui::Ui, game_data: &GameData, item: &Item)
     }
 }
 
-pub fn ui_add_skill_tooltip(ui: &mut egui::Ui, game_data: &GameData, skill_id: SkillId) {
+fn add_skill_name(ui: &mut egui::Ui, skill_data: &SkillData) {
+    let text = if skill_data.name.is_empty() {
+        format!("??? [Skill ID: {}]", skill_data.id.get())
+    } else if skill_data.level > 1 {
+        format!("{} (Level: {})", &skill_data.name, skill_data.level)
+    } else {
+        skill_data.name.clone()
+    };
+
+    ui.add(egui::Label::new(
+        egui::RichText::new(text)
+            .color(egui::Color32::YELLOW)
+            .strong(),
+    ));
+}
+
+fn add_skill_aoe_range(ui: &mut egui::Ui, skill_data: &SkillData) {
+    ui.label(format!("Area: {}m", skill_data.scope / 100));
+}
+
+fn add_skill_cast_range(ui: &mut egui::Ui, skill_data: &SkillData) {
+    ui.label(format!("Cast Range: {}m", skill_data.cast_range / 100));
+}
+
+fn add_skill_description(_ui: &mut egui::Ui, _skill_data: &SkillData) {
+    // TODO: add_skill_description
+}
+
+fn add_skill_power(ui: &mut egui::Ui, skill_data: &SkillData) {
+    ui.label(format!("Power: {}", skill_data.power));
+}
+
+fn add_skill_recover_xp(ui: &mut egui::Ui, skill_data: &SkillData) {
+    ui.label(format!("Recover XP: {}%", skill_data.power));
+}
+
+fn add_skill_requirements(_ui: &mut egui::Ui, _skill_data: &SkillData) {
+    // TODO: add_skill_require_job
+    // TODO: add_skill_require_ability
+    // TODO: add_skill_require_skill
+    // TODO: add_skill_require_skill_point
+    // TODO: add_skill_require_equipment
+}
+
+fn add_skill_status_effects(_ui: &mut egui::Ui, _skill_data: &SkillData) {
+    // TODO: add_skill_status_effects
+}
+
+fn add_skill_steal_ability_value(ui: &mut egui::Ui, skill_data: &SkillData) {
+    for skill_add_ability in skill_data.add_ability.iter().filter_map(|x| x.as_ref()) {
+        ui.label(format!(
+            "Steal: {} {:?}",
+            skill_add_ability.value, skill_add_ability.ability_type
+        ));
+    }
+}
+
+fn add_skill_summon_points(_ui: &mut egui::Ui, _skill_data: &SkillData) {
+    // TODO: add_skill_summon_points
+}
+
+fn add_skill_type(ui: &mut egui::Ui, skill_data: &SkillData) {
+    ui.label(format!("Type: {:?}", skill_data.skill_type));
+}
+
+fn add_skill_target(ui: &mut egui::Ui, skill_data: &SkillData) {
+    ui.label(format!("Target: {:?}", skill_data.target_filter));
+}
+
+fn add_skill_use_ability_value(ui: &mut egui::Ui, skill_data: &SkillData) {
+    for (ability_type, value) in skill_data.use_ability.iter() {
+        // TODO: Colour based on if condition is met
+        // TODO: Adjust mana cost for ability_values.save_mana
+        ui.label(format!("Cost: {} {:?}", value, ability_type));
+    }
+}
+
+pub fn ui_add_skill_tooltip(
+    ui: &mut egui::Ui,
+    summary: bool,
+    game_data: &GameData,
+    skill_id: SkillId,
+) {
     let skill_data = game_data.skills.get_skill(skill_id);
     if skill_data.is_none() {
         ui.label(format!("Unknown Skill\nSkill ID: {}", skill_id.get()));
@@ -386,5 +476,163 @@ pub fn ui_add_skill_tooltip(ui: &mut egui::Ui, game_data: &GameData, skill_id: S
     }
     let skill_data = skill_data.unwrap();
 
-    ui.label(format!("{}\nSkill ID: {}", skill_data.name, skill_id.get()));
+    if summary {
+        add_skill_name(ui, skill_data);
+        add_skill_use_ability_value(ui, skill_data);
+    } else {
+        match skill_data.skill_type {
+            SkillType::BasicAction => {
+                add_skill_name(ui, skill_data);
+                add_skill_type(ui, skill_data);
+                add_skill_target(ui, skill_data);
+                add_skill_description(ui, skill_data);
+            }
+            SkillType::CreateWindow => {
+                add_skill_name(ui, skill_data);
+                add_skill_type(ui, skill_data);
+                add_skill_target(ui, skill_data);
+                add_skill_use_ability_value(ui, skill_data);
+
+                add_skill_requirements(ui, skill_data);
+                add_skill_description(ui, skill_data);
+            }
+            SkillType::Immediate | SkillType::EnforceWeapon | SkillType::EnforceBullet => {
+                add_skill_name(ui, skill_data);
+                add_skill_type(ui, skill_data);
+                add_skill_target(ui, skill_data);
+                add_skill_use_ability_value(ui, skill_data);
+
+                add_skill_power(ui, skill_data);
+                add_skill_status_effects(ui, skill_data);
+
+                add_skill_requirements(ui, skill_data);
+                add_skill_description(ui, skill_data);
+            }
+            SkillType::FireBullet => {
+                add_skill_name(ui, skill_data);
+                add_skill_type(ui, skill_data);
+                add_skill_target(ui, skill_data);
+                add_skill_use_ability_value(ui, skill_data);
+
+                add_skill_power(ui, skill_data);
+                add_skill_cast_range(ui, skill_data);
+                add_skill_status_effects(ui, skill_data);
+
+                add_skill_requirements(ui, skill_data);
+                add_skill_description(ui, skill_data);
+            }
+            SkillType::AreaTarget => {
+                add_skill_name(ui, skill_data);
+                add_skill_type(ui, skill_data);
+                add_skill_target(ui, skill_data);
+                add_skill_use_ability_value(ui, skill_data);
+
+                add_skill_power(ui, skill_data);
+                add_skill_cast_range(ui, skill_data);
+                add_skill_aoe_range(ui, skill_data);
+                add_skill_status_effects(ui, skill_data);
+
+                add_skill_requirements(ui, skill_data);
+                add_skill_description(ui, skill_data);
+            }
+            SkillType::SelfBound | SkillType::SelfBoundDuration | SkillType::SelfStateDuration => {
+                add_skill_name(ui, skill_data);
+                add_skill_type(ui, skill_data);
+                add_skill_target(ui, skill_data);
+                add_skill_use_ability_value(ui, skill_data);
+
+                add_skill_aoe_range(ui, skill_data);
+                add_skill_status_effects(ui, skill_data);
+
+                add_skill_requirements(ui, skill_data);
+                add_skill_description(ui, skill_data);
+            }
+            SkillType::TargetBound
+            | SkillType::TargetBoundDuration
+            | SkillType::TargetStateDuration => {
+                add_skill_name(ui, skill_data);
+                add_skill_type(ui, skill_data);
+                add_skill_target(ui, skill_data);
+                add_skill_use_ability_value(ui, skill_data);
+
+                add_skill_cast_range(ui, skill_data);
+                add_skill_aoe_range(ui, skill_data);
+                add_skill_status_effects(ui, skill_data);
+
+                add_skill_requirements(ui, skill_data);
+                add_skill_description(ui, skill_data);
+            }
+            SkillType::SummonPet => {
+                add_skill_name(ui, skill_data);
+                add_skill_type(ui, skill_data);
+                add_skill_use_ability_value(ui, skill_data);
+
+                add_skill_summon_points(ui, skill_data);
+
+                add_skill_requirements(ui, skill_data);
+                add_skill_description(ui, skill_data);
+            }
+            SkillType::Passive => {
+                add_skill_name(ui, skill_data);
+                add_skill_type(ui, skill_data);
+                add_skill_use_ability_value(ui, skill_data);
+
+                add_skill_status_effects(ui, skill_data);
+
+                add_skill_requirements(ui, skill_data);
+                add_skill_description(ui, skill_data);
+            }
+            SkillType::Emote => {
+                add_skill_name(ui, skill_data);
+                add_skill_type(ui, skill_data);
+                add_skill_use_ability_value(ui, skill_data);
+
+                add_skill_description(ui, skill_data);
+            }
+            SkillType::SelfDamage => {
+                add_skill_name(ui, skill_data);
+                add_skill_type(ui, skill_data);
+                add_skill_target(ui, skill_data);
+                add_skill_use_ability_value(ui, skill_data);
+
+                add_skill_power(ui, skill_data);
+                add_skill_aoe_range(ui, skill_data);
+                add_skill_status_effects(ui, skill_data);
+
+                add_skill_requirements(ui, skill_data);
+                add_skill_description(ui, skill_data);
+            }
+            SkillType::SelfAndTarget => {
+                add_skill_name(ui, skill_data);
+                add_skill_type(ui, skill_data);
+                add_skill_target(ui, skill_data);
+                add_skill_use_ability_value(ui, skill_data);
+
+                add_skill_power(ui, skill_data);
+                add_skill_steal_ability_value(ui, skill_data);
+                add_skill_status_effects(ui, skill_data);
+
+                add_skill_requirements(ui, skill_data);
+                add_skill_description(ui, skill_data);
+            }
+            SkillType::Resurrection => {
+                add_skill_name(ui, skill_data);
+                add_skill_type(ui, skill_data);
+                add_skill_target(ui, skill_data);
+                add_skill_use_ability_value(ui, skill_data);
+
+                add_skill_cast_range(ui, skill_data);
+                add_skill_aoe_range(ui, skill_data);
+                add_skill_recover_xp(ui, skill_data);
+
+                add_skill_requirements(ui, skill_data);
+                add_skill_description(ui, skill_data);
+            }
+            SkillType::Warp => {
+                add_skill_name(ui, skill_data);
+                add_skill_type(ui, skill_data);
+                add_skill_description(ui, skill_data);
+            }
+        }
+    }
 }

@@ -83,7 +83,7 @@ pub fn ui_debug_skill_list_system(
                                         egui::Image::new(icon_texture_id, [40.0, 40.0]).uv(icon_uv),
                                     )
                                     .on_hover_ui(|ui| {
-                                        ui_add_skill_tooltip(ui, &game_data, skill_data.id);
+                                        ui_add_skill_tooltip(ui, false, &game_data, skill_data.id);
                                     });
                                 }
                             });

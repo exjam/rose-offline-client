@@ -58,7 +58,7 @@ fn ui_add_skill_list_slot(
 
     if let Some(skill_id) = skill {
         response.on_hover_ui(|ui| {
-            ui_add_skill_tooltip(ui, game_data, skill_id);
+            ui_add_skill_tooltip(ui, false, game_data, skill_id);
         });
     }
 }

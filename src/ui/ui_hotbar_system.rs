@@ -116,7 +116,7 @@ fn ui_add_hotbar_slot(
         }
         Some(HotbarSlot::Skill(skill_slot)) => {
             if let Some(skill) = player_skill_list.get_skill(*skill_slot) {
-                ui_add_skill_tooltip(ui, game_data, skill);
+                ui_add_skill_tooltip(ui, false, game_data, skill);
             }
         }
         _ => {}
