@@ -82,6 +82,10 @@ impl AssetLoader for ZmsAssetLoader {
                         mesh.insert_attribute(MESH_ATTRIBUTE_UV_3, zms.uv4);
                     }
 
+                    if mesh.attribute(Mesh::ATTRIBUTE_TANGENT).is_none() {
+                        mesh.generate_tangents().ok();
+                    }
+
                     load_context.set_default_asset(LoadedAsset::new(mesh));
                     Ok(())
                 }
