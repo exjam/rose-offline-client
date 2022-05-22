@@ -296,30 +296,6 @@ fn load_zone(
         ));
     }
 
-    let pbr_material = standard_materials.add(StandardMaterial {
-        base_color: Color::rgb(1.0, 1.0, 1.0),
-        base_color_texture: Some(asset_server.load("3DDATA/TERRAIN/TILES/JUNON/JG/T026_03.dds")),
-        emissive: Color::BLACK,
-        emissive_texture: None,
-        perceptual_roughness: 1.0,
-        metallic: 0.0,
-        metallic_roughness_texture: Some(
-            asset_server.load("3DDATA/TERRAIN/TILES/JUNON/JG/T026_03_smoothness.dds"),
-        ),
-        reflectance: 0.5,
-        normal_map_texture: Some(
-            asset_server.load("3DDATA/TERRAIN/TILES/JUNON/JG/T026_03_normal.dds"),
-        ),
-        flip_normal_map_y: false,
-        occlusion_texture: Some(asset_server.load("3DDATA/TERRAIN/TILES/JUNON/JG/T026_03_ao.dds")),
-        double_sided: false,
-        cull_mode: Some(Face::Back),
-        unlit: false,
-        alpha_mode: AlphaMode::Opaque,
-    });
-    // asset_server.load("3DDATA/TERRAIN/TILES/JUNON/JG/T026_03_smoothness.dds");
-    // asset_server.load("3DDATA/TERRAIN/TILES/JUNON/JG/T026_03_edge.dds");
-
     // Load zone tile array
     let mut tile_texture_array_builder = TextureArrayBuilder::new();
     for path in zone_file.tile_textures.iter() {
@@ -374,7 +350,6 @@ fn load_zone(
                     tilemap,
                     &zone_file.tiles,
                     block_terrain_material,
-                    pbr_material.clone(),
                     block_x,
                     block_y,
                 );
@@ -401,6 +376,7 @@ fn load_zone(
                             vfs_resource,
                             effect_mesh_materials.as_mut(),
                             particle_materials.as_mut(),
+                            standard_materials.as_mut(),
                             static_mesh_materials.as_mut(),
                             zsc_event_object,
                             &lightmap_path,
@@ -427,6 +403,7 @@ fn load_zone(
                             vfs_resource,
                             effect_mesh_materials.as_mut(),
                             particle_materials.as_mut(),
+                            standard_materials.as_mut(),
                             static_mesh_materials.as_mut(),
                             zsc_special_object,
                             &lightmap_path,
@@ -466,6 +443,7 @@ fn load_zone(
                             vfs_resource,
                             effect_mesh_materials.as_mut(),
                             particle_materials.as_mut(),
+                            standard_materials.as_mut(),
                             static_mesh_materials.as_mut(),
                             zsc_cnst,
                             &lightmap_path,
@@ -501,6 +479,7 @@ fn load_zone(
                             vfs_resource,
                             effect_mesh_materials.as_mut(),
                             particle_materials.as_mut(),
+                            standard_materials.as_mut(),
                             static_mesh_materials.as_mut(),
                             zsc_deco,
                             &lightmap_path,
@@ -544,7 +523,6 @@ fn load_block_heightmap(
     tilemap: TilFile,
     tile_info: &[ZonTile],
     material: Handle<TerrainMaterial>,
-    pbr_material: Handle<StandardMaterial>,
     block_x: u32,
     block_y: u32,
 ) {
@@ -625,9 +603,9 @@ fn load_block_heightmap(
     mesh.set_indices(Some(Indices::U16(indices)));
     mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
     mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
-    mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, uvs_tile);
-    // mesh.insert_attribute(MESH_ATTRIBUTE_UV_1, uvs_tile);
-    // mesh.insert_attribute(TERRAIN_MESH_ATTRIBUTE_TILE_INFO, tile_ids);
+    mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, uvs_lightmap);
+    mesh.insert_attribute(MESH_ATTRIBUTE_UV_1, uvs_tile);
+    mesh.insert_attribute(TERRAIN_MESH_ATTRIBUTE_TILE_INFO, tile_ids);
 
     let mut collider_verts = Vec::new();
     let mut collider_indices = Vec::new();
@@ -675,12 +653,12 @@ fn load_block_heightmap(
         .spawn_bundle((
             ZoneObject::Terrain(ZoneObjectTerrain { block_x, block_y }),
             meshes.add(mesh),
-            pbr_material,
+            material,
             Transform::from_xyz(offset_x, 0.0, -offset_y),
             GlobalTransform::default(),
             Visibility::default(),
             ComputedVisibility::default(),
-            // NotShadowCaster {},
+            NotShadowReceiver {},
             ColliderEntity::new(terrain_collider_entity),
         ))
         .add_child(terrain_collider_entity)
@@ -779,6 +757,7 @@ fn load_block_object(
     vfs_resource: &VfsResource,
     effect_mesh_materials: &mut Assets<EffectMeshMaterial>,
     particle_materials: &mut Assets<ParticleMaterial>,
+    standard_materials: &mut Assets<StandardMaterial>,
     static_mesh_materials: &mut Assets<StaticMeshMaterial>,
     zsc: &ZscFile,
     lightmap_path: &Path,
@@ -811,8 +790,13 @@ fn load_block_object(
             object_instance.scale.y,
         ));
 
-    let mut material_cache: Vec<Option<Handle<StaticMeshMaterial>>> =
-        vec![None; zsc.materials.len()];
+    #[derive(Clone)]
+    enum LoadedMaterial {
+        Static(Handle<StaticMeshMaterial>),
+        Standard(Handle<StandardMaterial>),
+    }
+
+    let mut material_cache: Vec<Option<LoadedMaterial>> = vec![None; zsc.materials.len()];
     let mut mesh_cache: Vec<Option<Handle<Mesh>>> = vec![None; zsc.meshes.len()];
 
     let mut part_entities: ArrayVec<Entity, 32> = ArrayVec::new();
@@ -874,33 +858,74 @@ fn load_block_object(
             let material_id = object_part.material_id as usize;
             let material = material_cache[material_id].clone().unwrap_or_else(|| {
                 let zsc_material = &zsc.materials[material_id];
-                let handle = static_mesh_materials.add(StaticMeshMaterial {
-                    base_texture: Some(
-                        asset_server.load(RgbTextureLoader::convert_path(zsc_material.path.path())),
-                    ),
-                    lightmap_texture,
-                    alpha_value: if zsc_material.alpha != 1.0 {
-                        Some(zsc_material.alpha)
-                    } else {
-                        None
-                    },
-                    alpha_enabled: zsc_material.alpha_enabled,
-                    alpha_test: zsc_material.alpha_test,
-                    two_sided: zsc_material.two_sided,
-                    z_write_enabled: zsc_material.z_write_enabled,
-                    z_test_enabled: zsc_material.z_test_enabled,
-                    specular_enabled: zsc_material.specular_enabled,
-                    skinned: zsc_material.is_skin,
-                    lightmap_uv_offset,
-                    lightmap_uv_scale,
-                });
 
-                /*
-                pub blend_mode: SceneBlendMode,
-                pub glow: Option<ZscMaterialGlow>,
-                */
-                material_cache.insert(material_id, Some(handle.clone()));
-                handle
+                let texture_path = zsc_material.path.path();
+                let filename = texture_path
+                    .with_extension("")
+                    .file_name()
+                    .unwrap()
+                    .to_string_lossy()
+                    .to_string();
+
+                let diffuse_texture_path = zsc_material.path.path();
+                let normal_texture =
+                    texture_path.with_file_name(format!("{}_normal.dds", filename));
+                let smoothness_texture =
+                    texture_path.with_file_name(format!("{}_smoothness.dds", filename));
+                let occlusion_texture = texture_path.with_file_name(format!("{}_ao.dds", filename));
+
+                if vfs_resource.vfs.exists(normal_texture.clone()) {
+                    let handle = standard_materials.add(StandardMaterial {
+                        base_color: Color::WHITE,
+                        base_color_texture: Some(asset_server.load(diffuse_texture_path)),
+                        emissive: Color::BLACK,
+                        emissive_texture: None,
+                        perceptual_roughness: 1.0,
+                        metallic: 1.0,
+                        metallic_roughness_texture: Some(asset_server.load(smoothness_texture)),
+                        reflectance: 0.05,
+                        normal_map_texture: Some(asset_server.load(normal_texture)),
+                        flip_normal_map_y: false,
+                        occlusion_texture: Some(asset_server.load(occlusion_texture)),
+                        double_sided: false,
+                        cull_mode: Some(Face::Back),
+                        unlit: false,
+                        alpha_mode: AlphaMode::Opaque,
+                    });
+                    material_cache
+                        .insert(material_id, Some(LoadedMaterial::Standard(handle.clone())));
+                    LoadedMaterial::Standard(handle)
+                } else {
+                    let handle = static_mesh_materials.add(StaticMeshMaterial {
+                        base_texture: Some(
+                            asset_server
+                                .load(RgbTextureLoader::convert_path(zsc_material.path.path())),
+                        ),
+                        lightmap_texture,
+                        alpha_value: if zsc_material.alpha != 1.0 {
+                            Some(zsc_material.alpha)
+                        } else {
+                            None
+                        },
+                        alpha_enabled: zsc_material.alpha_enabled,
+                        alpha_test: zsc_material.alpha_test,
+                        two_sided: zsc_material.two_sided,
+                        z_write_enabled: zsc_material.z_write_enabled,
+                        z_test_enabled: zsc_material.z_test_enabled,
+                        specular_enabled: zsc_material.specular_enabled,
+                        skinned: zsc_material.is_skin,
+                        lightmap_uv_offset,
+                        lightmap_uv_scale,
+                        /*
+                        pub blend_mode: SceneBlendMode,
+                        pub glow: Option<ZscMaterialGlow>,
+                        */
+                    });
+
+                    material_cache
+                        .insert(material_id, Some(LoadedMaterial::Static(handle.clone())));
+                    LoadedMaterial::Static(handle)
+                }
             });
 
             let mut collision_filter = COLLISION_FILTER_INSPECTABLE;
@@ -942,13 +967,18 @@ fn load_block_object(
                         .contains(ZscCollisionFlags::NOT_CAMERA_COLLISION),
                 }),
                 mesh.clone(),
-                material,
                 part_transform,
                 GlobalTransform::default(),
                 Visibility::default(),
                 ComputedVisibility::default(),
-                NotShadowReceiver {},
             ));
+
+            match material {
+                LoadedMaterial::Static(handle) => {
+                    part_commands.insert_bundle((handle, NotShadowReceiver {}))
+                }
+                LoadedMaterial::Standard(handle) => part_commands.insert(handle),
+            };
 
             part_commands.with_children(|builder| {
                 // Transform for collider must be absolute

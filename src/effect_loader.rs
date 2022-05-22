@@ -1,6 +1,7 @@
 use bevy::{
     hierarchy::BuildChildren,
     math::{Quat, Vec3},
+    pbr::{NotShadowCaster, NotShadowReceiver},
     prelude::{
         AssetServer, Assets, Commands, ComputedVisibility, Entity, GlobalTransform, Mesh,
         Transform, Visibility,
@@ -152,6 +153,8 @@ fn spawn_mesh(
                     ComputedVisibility::default(),
                     Transform::default(),
                     GlobalTransform::default(),
+                    NotShadowCaster {},
+                    NotShadowReceiver {},
                 ));
 
                 /*

@@ -77,7 +77,7 @@ pub fn zone_time_system(
             (state_ticks as f32 + partial_tick) / state_length as f32;
 
         if let Some(skybox_data) = skybox_data {
-            ambient_light.brightness = 1.0;
+            ambient_light.brightness = 0.2;
             ambient_light.color = skybox_data.map_ambient_color[SkyboxState::Night].into();
         }
     } else if day_time >= zone_data.evening_time {
@@ -95,7 +95,7 @@ pub fn zone_time_system(
             (state_ticks as f32 + partial_tick) / state_length as f32;
 
         if let Some(skybox_data) = skybox_data {
-            ambient_light.brightness = 1.0;
+            ambient_light.brightness = 0.2;
             if zone_time.state_percent_complete < 0.5 {
                 ambient_light.color = skybox_data.map_ambient_color[SkyboxState::Day]
                     .lerp(
@@ -127,7 +127,7 @@ pub fn zone_time_system(
             (state_ticks as f32 + partial_tick) / state_length as f32;
 
         if let Some(skybox_data) = skybox_data {
-            ambient_light.brightness = 1.0;
+            ambient_light.brightness = 0.2;
             ambient_light.color = skybox_data.map_ambient_color[SkyboxState::Day].into();
         }
     } else if day_time >= zone_data.morning_time {
@@ -145,7 +145,7 @@ pub fn zone_time_system(
             (state_ticks as f32 + partial_tick) / state_length as f32;
 
         if let Some(skybox_data) = skybox_data {
-            ambient_light.brightness = 1.0;
+            ambient_light.brightness = 0.2;
             if zone_time.state_percent_complete < 0.5 {
                 ambient_light.color = skybox_data.map_ambient_color[SkyboxState::Night]
                     .lerp(

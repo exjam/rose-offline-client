@@ -677,7 +677,7 @@ fn load_game_data(
         &mut damage_digit_materials,
     ));
 
-    const HALF_SIZE: f32 = 50.0;
+    const HALF_SIZE: f32 = 30.0;
     commands.spawn_bundle(DirectionalLightBundle {
         directional_light: DirectionalLight {
             // Configure the projection to better fit the scene
