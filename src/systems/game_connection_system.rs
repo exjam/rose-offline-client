@@ -16,9 +16,9 @@ use rose_game_common::{
         StatusEffects, Team, UnionMembership,
     },
     messages::server::{
-        CommandState, LearnSkillError, LevelUpSkillError, PickupItemDropContent,
-        PickupItemDropError, QuestDeleteResult, QuestTriggerResult, ServerMessage,
-        UpdateAbilityValue,
+        CommandState, LearnSkillError, LevelUpSkillError, PartyMemberInfo, PartyMemberInfoOffline,
+        PartyMemberLeave, PartyMemberList, PickupItemDropContent, PickupItemDropError,
+        QuestDeleteResult, QuestTriggerResult, ServerMessage, UpdateAbilityValue,
     },
 };
 use rose_network_common::ConnectionError;
@@ -27,18 +27,19 @@ use crate::{
     bundles::{ability_values_add_value, ability_values_set_value},
     components::{
         ClientEntity, ClientEntityName, ClientEntityType, CollisionRayCastSource, Command,
-        CommandCastSkillTarget, Cooldowns, MovementCollisionEntities, NextCommand,
-        PassiveRecoveryTime, PendingDamageList, PendingSkillEffectList, PendingSkillTargetList,
-        PersonalStore, PlayerCharacter, Position, VisibleStatusEffects,
+        CommandCastSkillTarget, Cooldowns, MovementCollisionEntities, NextCommand, PartyInfo,
+        PartyMembership, PartyOwner, PassiveRecoveryTime, PendingDamageList,
+        PendingSkillEffectList, PendingSkillTargetList, PersonalStore, PlayerCharacter, Position,
+        VisibleStatusEffects,
     },
-    events::{ChatboxEvent, ClientEntityEvent, GameConnectionEvent, QuestTriggerEvent},
+    events::{ChatboxEvent, ClientEntityEvent, GameConnectionEvent, PartyEvent, QuestTriggerEvent},
     resources::{AppState, ClientEntityList, GameConnection, GameData, WorldRates, WorldTime},
 };
 
 #[derive(WorldQuery)]
 #[world_query(mutable)]
 pub struct QueryCharacter<'w> {
-    pub basic_stats: &'w BasicStats,
+    pub basic_stats: &'w mut BasicStats,
     pub character_info: &'w CharacterInfo,
     pub equipment: &'w mut Equipment,
     pub health_points: &'w mut HealthPoints,
@@ -61,6 +62,7 @@ pub struct QueryPlayer<'w> {
     pub inventory: &'w mut Inventory,
     pub level: &'w mut Level,
     pub mana_points: &'w mut ManaPoints,
+    pub party_membership: &'w mut PartyMembership,
     pub quest_state: &'w mut QuestState,
     pub skill_list: &'w mut SkillList,
     pub skill_points: &'w mut SkillPoints,
@@ -94,11 +96,13 @@ pub fn game_connection_system(
         mut chatbox_events,
         mut game_connection_events,
         mut client_entity_events,
+        mut party_events,
         mut quest_trigger_events,
     ): (
         EventWriter<ChatboxEvent>,
         EventWriter<GameConnectionEvent>,
         EventWriter<ClientEntityEvent>,
+        EventWriter<PartyEvent>,
         EventWriter<QuestTriggerEvent>,
     ),
 ) {
@@ -158,6 +162,7 @@ pub fn game_connection_system(
                             move_mode,
                             move_speed,
                             Cooldowns::default(),
+                            PartyMembership::default(),
                             PassiveRecoveryTime::default(),
                             PendingSkillTargetList::default(),
                             PendingDamageList::default(),
@@ -934,7 +939,7 @@ pub fn game_connection_system(
                             character.character_info,
                             &message.level,
                             &character.equipment,
-                            character.basic_stats,
+                            &character.basic_stats,
                             character.skill_list,
                             character.status_effects,
                         );
@@ -1386,6 +1391,195 @@ pub fn game_connection_system(
                     "Store transation failed with error {:?}",
                     error
                 )));
+            }
+            Ok(ServerMessage::PartyCreate(client_entity_id)) => {
+                if let Some(inviter_entity) = client_entity_list.get(client_entity_id) {
+                    party_events.send(PartyEvent::InvitedCreate(inviter_entity));
+                }
+            }
+            Ok(ServerMessage::PartyInvite(client_entity_id)) => {
+                if let Some(inviter_entity) = client_entity_list.get(client_entity_id) {
+                    party_events.send(PartyEvent::InvitedJoin(inviter_entity));
+                }
+            }
+            Ok(ServerMessage::PartyAcceptCreate(_)) => {
+                if let Some(player_entity) = client_entity_list.player_entity {
+                    if let Ok(mut player) = query_set_client_entity.p1().get_mut(player_entity) {
+                        *player.party_membership = PartyMembership::Member(PartyInfo {
+                            owner: PartyOwner::Player,
+                            members: vec![],
+                        });
+                    }
+                }
+            }
+            Ok(ServerMessage::PartyAcceptInvite(_)) => {
+                if let Some(player_entity) = client_entity_list.player_entity {
+                    if let Ok(mut player) = query_set_client_entity.p1().get_mut(player_entity) {
+                        *player.party_membership = PartyMembership::Member(PartyInfo {
+                            owner: PartyOwner::Unknown,
+                            members: vec![],
+                        });
+                    }
+                }
+            }
+            Ok(ServerMessage::PartyRejectInvite(_reason, client_entity_id)) => {
+                if let Some(invited_entity) = client_entity_list.get(client_entity_id) {
+                    if let Ok(entity_name) = query_name.get(invited_entity) {
+                        chatbox_events.send(ChatboxEvent::System(format!(
+                            "{} rejected your party invite.",
+                            entity_name.name
+                        )));
+                    }
+                }
+            }
+            Ok(ServerMessage::PartyChangeOwner(client_entity_id)) => {
+                if let Some(player_entity) = client_entity_list.player_entity {
+                    if let Ok(mut player) = query_set_client_entity.p1().get_mut(player_entity) {
+                        if let PartyMembership::Member(ref mut party_info) =
+                            &mut *player.party_membership
+                        {
+                            if Some(client_entity_id) == client_entity_list.player_entity_id {
+                                party_info.owner = PartyOwner::Player;
+                            } else {
+                                party_info.owner = PartyOwner::Unknown;
+
+                                for member in party_info.members.iter() {
+                                    if let PartyMemberInfo::Online(member_info_online) = member {
+                                        if member_info_online.entity_id == client_entity_id {
+                                            party_info.owner = PartyOwner::Character(
+                                                member_info_online.character_id,
+                                            );
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            Ok(ServerMessage::PartyDelete) => {
+                if let Some(player_entity) = client_entity_list.player_entity {
+                    if let Ok(mut player) = query_set_client_entity.p1().get_mut(player_entity) {
+                        *player.party_membership = PartyMembership::None;
+                    }
+                }
+            }
+            Ok(ServerMessage::PartyMemberList(PartyMemberList { mut members, .. })) => {
+                if let Some(player_entity) = client_entity_list.player_entity {
+                    if let Ok(mut player) = query_set_client_entity.p1().get_mut(player_entity) {
+                        if player.party_membership.is_none() {
+                            *player.party_membership = PartyMembership::Member(PartyInfo {
+                                owner: PartyOwner::Unknown,
+                                members: vec![],
+                            });
+                        }
+
+                        if let PartyMembership::Member(ref mut party_info) =
+                            &mut *player.party_membership
+                        {
+                            if matches!(party_info.owner, PartyOwner::Unknown) {
+                                party_info.owner =
+                                    PartyOwner::Character(members[0].get_character_id());
+                            }
+
+                            party_info.members.append(&mut members);
+                        }
+                    }
+                }
+            }
+            Ok(ServerMessage::PartyMemberLeave(PartyMemberLeave {
+                leaver_character_id,
+                owner_character_id,
+            })) => {
+                if let Some(player_entity) = client_entity_list.player_entity {
+                    if let Ok(mut player) = query_set_client_entity.p1().get_mut(player_entity) {
+                        if let PartyMembership::Member(ref mut party_info) =
+                            &mut *player.party_membership
+                        {
+                            if player.character_info.unique_id == owner_character_id {
+                                party_info.owner = PartyOwner::Player;
+                            } else {
+                                party_info.owner = PartyOwner::Character(owner_character_id);
+                            }
+
+                            if let Some(index) = party_info
+                                .members
+                                .iter()
+                                .position(|x| x.get_character_id() == leaver_character_id)
+                            {
+                                party_info.members.remove(index);
+                            }
+                        }
+                    }
+                }
+            }
+            Ok(ServerMessage::PartyMemberDisconnect(character_unique_id)) => {
+                if let Some(player_entity) = client_entity_list.player_entity {
+                    if let Ok(mut player) = query_set_client_entity.p1().get_mut(player_entity) {
+                        if let PartyMembership::Member(ref mut party_info) =
+                            &mut *player.party_membership
+                        {
+                            if let Some(party_member) = party_info
+                                .members
+                                .iter_mut()
+                                .find(|x| x.get_character_id() == character_unique_id)
+                            {
+                                if let PartyMemberInfo::Online(party_member_online) = party_member {
+                                    *party_member =
+                                        PartyMemberInfo::Offline(PartyMemberInfoOffline {
+                                            character_id: party_member_online.character_id,
+                                            name: party_member_online.name.clone(),
+                                        });
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            Ok(ServerMessage::PartyMemberKicked(character_unique_id)) => {
+                if let Some(player_entity) = client_entity_list.player_entity {
+                    if let Ok(mut player) = query_set_client_entity.p1().get_mut(player_entity) {
+                        if player.character_info.unique_id == character_unique_id {
+                            *player.party_membership = PartyMembership::None;
+                        } else if let PartyMembership::Member(ref mut party_info) =
+                            &mut *player.party_membership
+                        {
+                            if let Some(index) = party_info
+                                .members
+                                .iter()
+                                .position(|x| x.get_character_id() == character_unique_id)
+                            {
+                                party_info.members.remove(index);
+                            }
+                        }
+                    }
+                }
+            }
+            Ok(ServerMessage::PartyMemberUpdateInfo(party_member_info)) => {
+                if let Some(entity) = client_entity_list.get(party_member_info.entity_id) {
+                    if let Ok(mut character) = query_set_client_entity.p0().get_mut(entity) {
+                        // TODO: Set ability values max_health, health_recovery, mana_recovery, stamina
+                        character.basic_stats.concentration = party_member_info.concentration;
+                        character.health_points.hp = party_member_info.health_points.hp;
+                    }
+                }
+
+                if let Some(player_entity) = client_entity_list.player_entity {
+                    if let Ok(mut player) = query_set_client_entity.p1().get_mut(player_entity) {
+                        if let PartyMembership::Member(ref mut party_info) =
+                            &mut *player.party_membership
+                        {
+                            if let Some(party_member) = party_info
+                                .members
+                                .iter_mut()
+                                .find(|x| x.get_character_id() == party_member_info.character_id)
+                            {
+                                *party_member = PartyMemberInfo::Online(party_member_info);
+                            }
+                        }
+                    }
+                }
             }
             Ok(message) => {
                 log::warn!("Received unimplemented game server message: {:#?}", message);

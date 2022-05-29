@@ -13,7 +13,8 @@ use rose_game_common::{
 
 use crate::{
     components::{
-        ClientEntity, ConsumableCooldownGroup, Cooldowns, PlayerCharacter, Position, SelectedTarget,
+        ClientEntity, ConsumableCooldownGroup, Cooldowns, PartyMembership, PlayerCharacter,
+        Position, SelectedTarget,
     },
     events::{ChatboxEvent, PlayerCommandEvent},
     resources::{GameConnection, GameData},
@@ -31,6 +32,7 @@ pub fn player_command_system(
             &Position,
             &SkillList,
             &Team,
+            &PartyMembership,
             Option<&SelectedTarget>,
         ),
         With<PlayerCharacter>,
@@ -54,6 +56,7 @@ pub fn player_command_system(
         player_position,
         player_skill_list,
         player_team,
+        player_party_membership,
         player_selected_target,
     ) = query_player_result.unwrap();
 
@@ -174,11 +177,37 @@ pub fn player_command_system(
                                     }
                                 }
                             }
+                            Some(SkillBasicCommand::PartyInvite) => {
+                                if let Some(player_selected_target) = player_selected_target {
+                                    if let Ok((target_client_entity, target_team)) =
+                                        query_team.get(player_selected_target.entity)
+                                    {
+                                        if target_team.id == player_team.id {
+                                            if let Some(game_connection) = game_connection.as_ref()
+                                            {
+                                                let message = if player_party_membership.is_none() {
+                                                    ClientMessage::PartyCreate(
+                                                        target_client_entity.id,
+                                                    )
+                                                } else {
+                                                    ClientMessage::PartyInvite(
+                                                        target_client_entity.id,
+                                                    )
+                                                };
+
+                                                game_connection
+                                                    .client_message_tx
+                                                    .send(message)
+                                                    .ok();
+                                            }
+                                        }
+                                    }
+                                }
+                            }
                             /*
                             Some(SkillBasicCommand::AutoTarget) => {}
                             Some(SkillBasicCommand::DriveVehicle) => {}
                             Some(SkillBasicCommand::AddFriend) => {}
-                            Some(SkillBasicCommand::PartyInvite) => {}
                             Some(SkillBasicCommand::Trade) => {}
                             Some(SkillBasicCommand::PrivateStore) => {}
                             Some(SkillBasicCommand::SelfTarget) => {}

@@ -14,6 +14,7 @@ mod model_height;
 mod night_time_effect;
 mod npc_model;
 mod particle_sequence;
+mod party_membership;
 mod passive_recovery_time;
 mod pending_damage_list;
 mod pending_skill_effect_list;
@@ -50,6 +51,7 @@ pub use model_height::ModelHeight;
 pub use night_time_effect::NightTimeEffect;
 pub use npc_model::NpcModel;
 pub use particle_sequence::{ActiveParticle, ParticleSequence};
+pub use party_membership::{PartyInfo, PartyMembership, PartyOwner};
 pub use passive_recovery_time::PassiveRecoveryTime;
 pub use pending_damage_list::PendingDamageList;
 pub use pending_skill_effect_list::{

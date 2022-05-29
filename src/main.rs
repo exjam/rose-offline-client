@@ -41,7 +41,7 @@ use rose_file_readers::{LtbFile, StlFile, StlReadOptions, VfsIndex};
 
 use events::{
     AnimationFrameEvent, ChatboxEvent, ClientEntityEvent, ConversationDialogEvent,
-    GameConnectionEvent, HitEvent, LoadZoneEvent, NpcStoreEvent, PlayerCommandEvent,
+    GameConnectionEvent, HitEvent, LoadZoneEvent, NpcStoreEvent, PartyEvent, PlayerCommandEvent,
     QuestTriggerEvent, SpawnEffectEvent, SpawnProjectileEvent, SystemFuncEvent,
     WorldConnectionEvent, ZoneEvent,
 };
@@ -80,9 +80,9 @@ use ui::{
     ui_debug_npc_list_system, ui_debug_render_system, ui_debug_skill_list_system,
     ui_debug_zone_list_system, ui_debug_zone_time_system, ui_diagnostics_system,
     ui_drag_and_drop_system, ui_hotbar_system, ui_inventory_system, ui_minimap_system,
-    ui_npc_store_system, ui_player_info_system, ui_quest_list_system, ui_selected_target_system,
-    ui_skill_list_system, ui_window_system, UiStateDebugWindows, UiStateDragAndDrop,
-    UiStateWindows,
+    ui_npc_store_system, ui_party_system, ui_player_info_system, ui_quest_list_system,
+    ui_selected_target_system, ui_skill_list_system, ui_window_system, UiStateDebugWindows,
+    UiStateDragAndDrop, UiStateWindows,
 };
 use vfs_asset_io::VfsAssetIo;
 use zmo_asset_loader::{ZmoAsset, ZmoAssetLoader};
@@ -344,21 +344,22 @@ fn main() {
         load_zone_events.send(LoadZoneEvent::new(view_zone_id));
     }
 
-    app.insert_resource(Events::<ChatboxEvent>::default())
-        .insert_resource(load_zone_events)
-        .insert_resource(Events::<ZoneEvent>::default())
-        .insert_resource(Events::<ClientEntityEvent>::default())
-        .insert_resource(Events::<GameConnectionEvent>::default())
-        .insert_resource(Events::<WorldConnectionEvent>::default())
+    app.insert_resource(load_zone_events)
         .insert_resource(Events::<AnimationFrameEvent>::default())
+        .insert_resource(Events::<ChatboxEvent>::default())
+        .insert_resource(Events::<ClientEntityEvent>::default())
         .insert_resource(Events::<ConversationDialogEvent>::default())
+        .insert_resource(Events::<GameConnectionEvent>::default())
+        .insert_resource(Events::<HitEvent>::default())
         .insert_resource(Events::<NpcStoreEvent>::default())
+        .insert_resource(Events::<PartyEvent>::default())
         .insert_resource(Events::<PlayerCommandEvent>::default())
         .insert_resource(Events::<QuestTriggerEvent>::default())
         .insert_resource(Events::<SystemFuncEvent>::default())
         .insert_resource(Events::<SpawnEffectEvent>::default())
         .insert_resource(Events::<SpawnProjectileEvent>::default())
-        .insert_resource(Events::<HitEvent>::default());
+        .insert_resource(Events::<WorldConnectionEvent>::default())
+        .insert_resource(Events::<ZoneEvent>::default());
 
     app.add_system(character_model_system)
         .add_system(character_model_add_collider_system.after(character_model_system))
@@ -521,10 +522,11 @@ fn main() {
                 .with_system(ui_inventory_system.label("ui_system"))
                 .with_system(ui_hotbar_system.label("ui_system"))
                 .with_system(ui_minimap_system.label("ui_minimap_system"))
-                .with_system(ui_skill_list_system.label("ui_system"))
-                .with_system(ui_quest_list_system.label("ui_system"))
+                .with_system(ui_party_system.label("ui_system"))
                 .with_system(ui_player_info_system.label("ui_system"))
+                .with_system(ui_quest_list_system.label("ui_system"))
                 .with_system(ui_selected_target_system.label("ui_system"))
+                .with_system(ui_skill_list_system.label("ui_system"))
                 .with_system(ui_window_system.label("ui_system"))
                 .with_system(conversation_dialog_system.label("ui_system")),
         );

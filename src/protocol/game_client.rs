@@ -29,10 +29,10 @@ use rose_network_irose::{
         PacketClientChangeVehiclePart, PacketClientChat, PacketClientConnectRequest,
         PacketClientDropItemFromInventory, PacketClientEmote, PacketClientIncreaseBasicStat,
         PacketClientJoinZone, PacketClientLevelUpSkill, PacketClientMove, PacketClientMoveToggle,
-        PacketClientMoveToggleType, PacketClientNpcStoreTransaction,
-        PacketClientPersonalStoreListItems, PacketClientPickupItemDrop, PacketClientQuestRequest,
-        PacketClientQuestRequestType, PacketClientReviveRequest, PacketClientSetHotbarSlot,
-        PacketClientUseItem, PacketClientWarpGateRequest,
+        PacketClientMoveToggleType, PacketClientNpcStoreTransaction, PacketClientPartyReply,
+        PacketClientPartyRequest, PacketClientPersonalStoreListItems, PacketClientPickupItemDrop,
+        PacketClientQuestRequest, PacketClientQuestRequestType, PacketClientReviveRequest,
+        PacketClientSetHotbarSlot, PacketClientUseItem, PacketClientWarpGateRequest,
     },
     game_server_packets::{
         ConnectResult, PacketConnectionReply, PacketServerAnnounceChat,
@@ -43,11 +43,12 @@ use rose_network_irose::{
         PacketServerDamageEntity, PacketServerFinishCastingSkill, PacketServerJoinZone,
         PacketServerLearnSkillResult, PacketServerLevelUpSkillResult, PacketServerLocalChat,
         PacketServerMoveEntity, PacketServerMoveToggle, PacketServerMoveToggleType,
-        PacketServerNpcStoreTransactionError, PacketServerPickupItemDropResult,
-        PacketServerQuestResult, PacketServerQuestResultType, PacketServerRemoveEntities,
-        PacketServerRewardItems, PacketServerRewardMoney, PacketServerRunNpcDeathTrigger,
-        PacketServerSelectCharacter, PacketServerSetHotbarSlot, PacketServerShoutChat,
-        PacketServerSpawnEntityCharacter, PacketServerSpawnEntityItemDrop,
+        PacketServerNpcStoreTransactionError, PacketServerPartyMemberUpdateInfo,
+        PacketServerPartyMembers, PacketServerPartyReply, PacketServerPartyRequest,
+        PacketServerPickupItemDropResult, PacketServerQuestResult, PacketServerQuestResultType,
+        PacketServerRemoveEntities, PacketServerRewardItems, PacketServerRewardMoney,
+        PacketServerRunNpcDeathTrigger, PacketServerSelectCharacter, PacketServerSetHotbarSlot,
+        PacketServerShoutChat, PacketServerSpawnEntityCharacter, PacketServerSpawnEntityItemDrop,
         PacketServerSpawnEntityMonster, PacketServerSpawnEntityNpc, PacketServerStartCastingSkill,
         PacketServerStopMoveEntity, PacketServerTeleport, PacketServerUpdateAbilityValue,
         PacketServerUpdateAmmo, PacketServerUpdateBasicStat, PacketServerUpdateEquipment,
@@ -720,6 +721,58 @@ impl GameClient {
                     .send(ServerMessage::NpcStoreTransactionError(message.error))
                     .ok();
             }
+            Some(ServerPackets::PartyRequest) => {
+                let message = match PacketServerPartyRequest::try_from(&packet)? {
+                    PacketServerPartyRequest::Create(client_entity_id) => {
+                        ServerMessage::PartyCreate(client_entity_id)
+                    }
+                    PacketServerPartyRequest::Invite(client_entity_id) => {
+                        ServerMessage::PartyInvite(client_entity_id)
+                    }
+                };
+                self.server_message_tx.send(message).ok();
+            }
+            Some(ServerPackets::PartyReply) => {
+                let message = match PacketServerPartyReply::try_from(&packet)? {
+                    PacketServerPartyReply::AcceptCreate(client_entity_id) => {
+                        ServerMessage::PartyAcceptCreate(client_entity_id)
+                    }
+                    PacketServerPartyReply::AcceptInvite(client_entity_id) => {
+                        ServerMessage::PartyAcceptInvite(client_entity_id)
+                    }
+                    PacketServerPartyReply::RejectInvite(reason, client_entity_id) => {
+                        ServerMessage::PartyRejectInvite(reason, client_entity_id)
+                    }
+                    PacketServerPartyReply::Delete => ServerMessage::PartyDelete,
+                    PacketServerPartyReply::ChangeOwner(client_entity_id) => {
+                        ServerMessage::PartyChangeOwner(client_entity_id)
+                    }
+                    PacketServerPartyReply::MemberKicked(character_unique_id) => {
+                        ServerMessage::PartyMemberKicked(character_unique_id)
+                    }
+                    PacketServerPartyReply::MemberDisconnect(character_unique_id) => {
+                        ServerMessage::PartyMemberDisconnect(character_unique_id)
+                    }
+                };
+                self.server_message_tx.send(message).ok();
+            }
+            Some(ServerPackets::PartyMembers) => {
+                let message = match PacketServerPartyMembers::try_from(&packet)? {
+                    PacketServerPartyMembers::Leave(party_member_leave) => {
+                        ServerMessage::PartyMemberLeave(party_member_leave)
+                    }
+                    PacketServerPartyMembers::List(party_member_list) => {
+                        ServerMessage::PartyMemberList(party_member_list)
+                    }
+                };
+                self.server_message_tx.send(message).ok();
+            }
+            Some(ServerPackets::PartyMemberUpdateInfo) => {
+                let message = PacketServerPartyMemberUpdateInfo::try_from(&packet)?;
+                self.server_message_tx
+                    .send(ServerMessage::PartyMemberUpdateInfo(message.member_info))
+                    .ok();
+            }
             _ => log::info!("Unhandled game packet {:x}", packet.command),
         }
 
@@ -944,6 +997,61 @@ impl GameClient {
                         buy_items: message.buy_items,
                         sell_items: message.sell_items,
                     }))
+                    .await?
+            }
+            ClientMessage::PartyCreate(client_entity_id) => {
+                connection
+                    .write_packet(Packet::from(&PacketClientPartyRequest::Create(
+                        client_entity_id,
+                    )))
+                    .await?
+            }
+            ClientMessage::PartyInvite(client_entity_id) => {
+                connection
+                    .write_packet(Packet::from(&PacketClientPartyRequest::Invite(
+                        client_entity_id,
+                    )))
+                    .await?
+            }
+            ClientMessage::PartyLeave => {
+                connection
+                    .write_packet(Packet::from(&PacketClientPartyRequest::Leave))
+                    .await?
+            }
+            ClientMessage::PartyChangeOwner(client_entity_id) => {
+                connection
+                    .write_packet(Packet::from(&PacketClientPartyRequest::ChangeOwner(
+                        client_entity_id,
+                    )))
+                    .await?
+            }
+            ClientMessage::PartyKick(character_unique_id) => {
+                connection
+                    .write_packet(Packet::from(&PacketClientPartyRequest::Kick(
+                        character_unique_id,
+                    )))
+                    .await?
+            }
+            ClientMessage::PartyAcceptCreateInvite(client_entity_id) => {
+                connection
+                    .write_packet(Packet::from(&PacketClientPartyReply::AcceptCreate(
+                        client_entity_id,
+                    )))
+                    .await?
+            }
+            ClientMessage::PartyAcceptJoinInvite(client_entity_id) => {
+                connection
+                    .write_packet(Packet::from(&PacketClientPartyReply::AcceptJoin(
+                        client_entity_id,
+                    )))
+                    .await?
+            }
+            ClientMessage::PartyRejectInvite(reason, client_entity_id) => {
+                connection
+                    .write_packet(Packet::from(&PacketClientPartyReply::Reject(
+                        reason,
+                        client_entity_id,
+                    )))
                     .await?
             }
             unimplemented => {
