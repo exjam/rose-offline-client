@@ -10,10 +10,10 @@ use bevy::{
         prelude::Shader,
         render_asset::{PrepareAssetError, RenderAsset, RenderAssets},
         render_resource::{
-            std140::{AsStd140, Std140},
+            encase::{self, ShaderType, Size},
             BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayoutDescriptor,
             BindGroupLayoutEntry, BindingResource, BindingType, Buffer, BufferBindingType,
-            BufferInitDescriptor, BufferSize, BufferUsages, CompareFunction, FilterMode,
+            BufferInitDescriptor, BufferUsages, CompareFunction, FilterMode,
             RenderPipelineDescriptor, Sampler, SamplerBindingType, SamplerDescriptor, ShaderStages,
             SpecializedMeshPipelineError, TextureSampleType, TextureViewDimension,
         },
@@ -72,7 +72,7 @@ bitflags::bitflags! {
     }
 }
 
-#[derive(Clone, AsStd140)]
+#[derive(Clone, ShaderType)]
 pub struct StaticMeshMaterialUniformData {
     pub flags: u32,
     pub alpha_cutoff: f32,
@@ -217,11 +217,15 @@ impl RenderAsset for StaticMeshMaterial {
             lightmap_uv_offset: material.lightmap_uv_offset,
             lightmap_uv_scale: material.lightmap_uv_scale,
         };
-        let value_std140 = value.as_std140();
+
+        let byte_buffer = [0u8; StaticMeshMaterialUniformData::SIZE.get() as usize];
+        let mut buffer = encase::UniformBuffer::new(byte_buffer);
+        buffer.write(&value).unwrap();
+
         let uniform_buffer = render_device.create_buffer_with_data(&BufferInitDescriptor {
             label: Some("static_mesh_material_uniform_buffer"),
             usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
-            contents: value_std140.as_bytes(),
+            contents: buffer.as_ref(),
         });
 
         let bind_group = render_device.create_bind_group(&BindGroupDescriptor {
@@ -375,9 +379,7 @@ impl SpecializedMaterial for StaticMeshMaterial {
                     ty: BindingType::Buffer {
                         ty: BufferBindingType::Uniform,
                         has_dynamic_offset: false,
-                        min_binding_size: BufferSize::new(
-                            StaticMeshMaterialUniformData::std140_size_static() as u64,
-                        ),
+                        min_binding_size: Some(StaticMeshMaterialUniformData::min_size()),
                     },
                     count: None,
                 },

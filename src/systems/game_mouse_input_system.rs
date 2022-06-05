@@ -2,10 +2,10 @@ use bevy::{
     input::Input,
     math::Vec3,
     prelude::{
-        Camera, Commands, Entity, EventWriter, GlobalTransform, MouseButton, PerspectiveProjection,
-        Query, Res, ResMut, With,
+        Camera, Camera3d, Commands, Entity, EventWriter, GlobalTransform, MouseButton, Query, Res,
+        ResMut, With,
     },
-    render::camera::Camera3d,
+    render::camera::Projection,
     window::Windows,
 };
 use bevy_egui::EguiContext;
@@ -28,7 +28,7 @@ pub fn game_mouse_input_system(
     mut commands: Commands,
     mouse_button_input: Res<Input<MouseButton>>,
     windows: Res<Windows>,
-    query_camera: Query<(&Camera, &PerspectiveProjection, &GlobalTransform), With<Camera3d>>,
+    query_camera: Query<(&Camera, &Projection, &GlobalTransform), With<Camera3d>>,
     rapier_context: Res<RapierContext>,
     mut egui_ctx: ResMut<EguiContext>,
     query_collider_parent: Query<&ColliderParent>,

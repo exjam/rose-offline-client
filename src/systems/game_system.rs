@@ -1,10 +1,9 @@
 use bevy::{
     math::Vec3,
     prelude::{
-        Commands, Entity, EventReader, EventWriter, PerspectiveCameraBundle, Query, Res, State,
+        Camera3d, Camera3dBundle, Commands, Entity, EventReader, EventWriter, Query, Res, State,
         Transform, With,
     },
-    render::camera::Camera3d,
 };
 use rose_game_common::messages::client::ClientMessage;
 
@@ -35,7 +34,7 @@ pub fn game_state_enter_system(
                     follow_distance: 15.0,
                     ..Default::default()
                 },
-                PerspectiveCameraBundle::default(),
+                Camera3dBundle::default(),
                 player_transform.translation + Vec3::new(10.0, 10.0, 10.0),
                 player_transform.translation,
             ));

@@ -9,7 +9,7 @@ use bevy::{
         prelude::*,
     },
     math::prelude::*,
-    render::{camera::Camera3d, prelude::*},
+    prelude::Camera3dBundle,
     transform::components::Transform,
 };
 
@@ -30,13 +30,13 @@ pub struct FollowCameraBundle {
     #[bundle]
     look_transform: LookTransformBundle,
     #[bundle]
-    perspective: PerspectiveCameraBundle<Camera3d>,
+    perspective: Camera3dBundle,
 }
 
 impl FollowCameraBundle {
     pub fn new(
         controller: FollowCameraController,
-        mut perspective: PerspectiveCameraBundle<Camera3d>,
+        mut perspective: Camera3dBundle,
         eye: Vec3,
         target: Vec3,
     ) -> Self {

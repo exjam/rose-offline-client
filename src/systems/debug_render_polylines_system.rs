@@ -1,5 +1,5 @@
 use bevy::prelude::{Assets, Color, Commands, ResMut};
-use bevy_polyline::{Polyline, PolylineBundle, PolylineMaterial};
+use bevy_polyline::prelude::{Polyline, PolylineBundle, PolylineMaterial};
 
 use crate::resources::{DebugRenderColliderData, DebugRenderPolyline, DebugRenderSkeletonData};
 

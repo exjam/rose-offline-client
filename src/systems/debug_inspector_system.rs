@@ -2,10 +2,10 @@ use bevy::{
     hierarchy::Parent,
     input::Input,
     prelude::{
-        App, Camera, GlobalTransform, Handle, MouseButton, PerspectiveProjection, Plugin, Query,
-        Res, ResMut, With,
+        App, Camera, Camera3d, GlobalTransform, Handle, MouseButton, Plugin, Query, Res, ResMut,
+        With,
     },
-    render::camera::Camera3d,
+    render::camera::Projection,
     window::Windows,
 };
 use bevy_egui::EguiContext;
@@ -56,7 +56,7 @@ fn debug_inspector_picking_system(
     mouse_button_input: Res<Input<MouseButton>>,
     rapier_context: Res<RapierContext>,
     windows: Res<Windows>,
-    query_camera: Query<(&Camera, &PerspectiveProjection, &GlobalTransform), With<Camera3d>>,
+    query_camera: Query<(&Camera, &Projection, &GlobalTransform), With<Camera3d>>,
     query_parent: Query<&Parent>,
 ) {
     if !debug_inspector_state.enable_picking {

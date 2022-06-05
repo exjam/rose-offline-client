@@ -1,10 +1,7 @@
 use bevy::{
-    core::Time,
     math::Vec3,
-    prelude::{
-        Assets, Commands, Entity, EventWriter, PerspectiveProjection, Query, Res, Transform,
-    },
-    render::{camera::Camera3d, mesh::skinning::SkinnedMesh},
+    prelude::{Assets, Camera3d, Commands, Entity, EventWriter, Query, Res, Time, Transform},
+    render::{camera::Projection, mesh::skinning::SkinnedMesh},
 };
 
 use crate::{
@@ -15,7 +12,7 @@ use crate::{
 pub fn animation_system(
     mut commands: Commands,
     mut query_transform: Query<&mut Transform>,
-    mut query_projection: Query<&mut PerspectiveProjection>,
+    mut query_projection: Query<&mut Projection>,
     mut query_active_motions: Query<(
         Entity,
         &mut ActiveMotion,
@@ -159,10 +156,14 @@ pub fn animation_system(
             }
 
             if let Some(fov_near_far) = fov_near_far {
-                if let Ok(mut perspective_projection) = query_projection.get_mut(entity) {
-                    perspective_projection.fov = (fov_near_far.x * 100.0).to_radians();
-                    perspective_projection.near = -fov_near_far.z;
-                    perspective_projection.far = fov_near_far.y * 10.0;
+                if let Ok(mut projection) = query_projection.get_mut(entity) {
+                    if let Projection::Perspective(ref mut perspective_projection) =
+                        &mut *projection
+                    {
+                        perspective_projection.fov = (fov_near_far.x * 100.0).to_radians();
+                        perspective_projection.near = -fov_near_far.z;
+                        perspective_projection.far = fov_near_far.y * 10.0;
+                    }
                 }
             }
         } else if let Ok(mut entity_transform) = query_transform.get_mut(entity) {

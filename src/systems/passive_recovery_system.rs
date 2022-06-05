@@ -1,9 +1,6 @@
 use std::time::Duration;
 
-use bevy::{
-    core::Time,
-    prelude::{Query, Res},
-};
+use bevy::prelude::{Query, Res, Time};
 use rose_game_common::{
     components::{AbilityValues, HealthPoints, ManaPoints},
     data::PassiveRecoveryState,

@@ -5,10 +5,9 @@ use bevy::{
     math::Vec3,
     pbr::AmbientLight,
     prelude::{
-        Color, Commands, ComputedVisibility, Entity, EventWriter, GlobalTransform,
-        PerspectiveCameraBundle, Query, Res, ResMut, Transform, Visibility, With,
+        Camera3d, Camera3dBundle, Color, Commands, ComputedVisibility, Entity, EventWriter,
+        GlobalTransform, Query, Res, ResMut, Transform, Visibility, With,
     },
-    render::camera::Camera3d,
 };
 use bevy_egui::{egui, EguiContext};
 use enum_map::{enum_map, EnumMap};
@@ -57,7 +56,7 @@ pub fn model_viewer_enter_system(
             .remove::<ActiveMotion>()
             .insert_bundle(FlyCameraBundle::new(
                 FlyCameraController::default(),
-                PerspectiveCameraBundle::default(),
+                Camera3dBundle::default(),
                 Vec3::new(10.0, 10.0, 10.0),
                 Vec3::new(0.0, 0.0, 0.0),
             ));

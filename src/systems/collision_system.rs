@@ -1,11 +1,7 @@
 use bevy::{
-    core::Time,
     math::{Mat4, Vec2, Vec3},
-    prelude::{
-        Camera, EventWriter, GlobalTransform, Parent, PerspectiveProjection, Query, Res, Transform,
-        With,
-    },
-    render::camera::RenderTarget,
+    prelude::{Camera, EventWriter, GlobalTransform, Parent, Query, Res, Time, Transform, With},
+    render::camera::{Projection, RenderTarget},
     window::{Window, Windows},
 };
 use bevy_rapier3d::prelude::{InteractionGroups, RapierContext};
@@ -35,13 +31,13 @@ pub fn ray_from_screenspace(
     cursor_pos_screen: Vec2,
     windows: &Res<Windows>,
     camera: &Camera,
-    camera_projection: &PerspectiveProjection,
+    camera_projection: &Projection,
     camera_transform: &GlobalTransform,
 ) -> Option<(Vec3, Vec3)> {
     let view = camera_transform.compute_matrix();
     let window = get_window_for_camera(windows, camera)?;
     let screen_size = Vec2::from([window.width() as f32, window.height() as f32]);
-    let projection = camera.projection_matrix;
+    let projection = camera.projection_matrix();
 
     // 2D Normalized device coordinate cursor position from (-1, -1) to (1, 1)
     let cursor_ndc = (cursor_pos_screen / screen_size) * 2.0 - Vec2::from([1.0, 1.0]);
@@ -50,9 +46,11 @@ pub fn ray_from_screenspace(
     let is_orthographic = projection.w_axis[3] == 1.0;
 
     // Compute the cursor position at the near plane. The bevy camera looks at -Z.
-    let ndc_near = world_to_ndc
-        .transform_point3(-Vec3::Z * camera_projection.near)
-        .z;
+    let camera_near = match camera_projection {
+        Projection::Perspective(perspective_projection) => perspective_projection.near,
+        Projection::Orthographic(orthographic_projection) => orthographic_projection.near,
+    };
+    let ndc_near = world_to_ndc.transform_point3(-Vec3::Z * camera_near).z;
     let cursor_pos_near = ndc_to_world.transform_point3(cursor_ndc.extend(ndc_near));
 
     // Compute the ray's direction depending on the projection used.

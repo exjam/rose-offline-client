@@ -1,9 +1,8 @@
 use std::ops::RangeInclusive;
 
 use bevy::{
-    core::Time,
     math::{Vec3, Vec4},
-    prelude::{GlobalTransform, Query, Res, Transform},
+    prelude::{GlobalTransform, Query, Res, Time, Transform},
 };
 use rand::Rng;
 

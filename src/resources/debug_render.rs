@@ -2,7 +2,7 @@ use bevy::{
     math::Vec3,
     prelude::{Entity, Handle},
 };
-use bevy_polyline::Polyline;
+use bevy_polyline::prelude::Polyline;
 
 #[derive(Default)]
 pub struct DebugRenderConfig {

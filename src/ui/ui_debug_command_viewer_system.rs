@@ -1,7 +1,4 @@
-use bevy::{
-    core::Time,
-    prelude::{Local, Query, Res, ResMut, With},
-};
+use bevy::prelude::{Local, Query, Res, ResMut, Time, With};
 use bevy_egui::{egui, EguiContext};
 use std::collections::VecDeque;
 use std::fmt::Write;

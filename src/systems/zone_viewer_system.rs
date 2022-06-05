@@ -1,7 +1,6 @@
 use bevy::{
     math::Vec3,
-    prelude::{Commands, Entity, PerspectiveCameraBundle, Query, ResMut, With},
-    render::camera::Camera3d,
+    prelude::{Camera3d, Camera3dBundle, Commands, Entity, Query, ResMut, With},
 };
 
 use crate::{
@@ -24,7 +23,7 @@ pub fn zone_viewer_enter_system(
             .remove::<ActiveMotion>()
             .insert_bundle(FlyCameraBundle::new(
                 FlyCameraController::default(),
-                PerspectiveCameraBundle::default(),
+                Camera3dBundle::default(),
                 Vec3::new(5120.0, 50.0, -5120.0),
                 Vec3::new(5200.0, 0.0, -5200.0),
             ));

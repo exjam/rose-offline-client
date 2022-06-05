@@ -4,8 +4,8 @@ use bevy::{
     prelude::{AddAsset, App, AssetServer, FromWorld, Handle, Image, Plugin, World},
     reflect::TypeUuid,
     render::{
+        extract_component::ExtractComponentPlugin,
         render_asset::{PrepareAssetError, RenderAsset, RenderAssetPlugin, RenderAssets},
-        render_component::ExtractComponentPlugin,
         render_resource::{
             CommandEncoderDescriptor, Extent3d, ImageCopyTexture, Origin3d, Texture, TextureAspect,
             TextureDescriptor, TextureDimension, TextureFormat, TextureUsages, TextureView,
@@ -188,22 +188,6 @@ fn image_to_texture(dyn_img: DynamicImage) -> Image {
 
             data = i.into_raw();
         }
-        DynamicImage::ImageBgr8(i) => {
-            let i = DynamicImage::ImageBgr8(i).into_bgra8();
-
-            width = i.width();
-            height = i.height();
-            format = TextureFormat::Bgra8Unorm;
-
-            data = i.into_raw();
-        }
-        DynamicImage::ImageBgra8(i) => {
-            width = i.width();
-            height = i.height();
-            format = TextureFormat::Bgra8Unorm;
-
-            data = i.into_raw();
-        }
         DynamicImage::ImageLuma16(i) => {
             width = i.width();
             height = i.height();
@@ -255,6 +239,9 @@ fn image_to_texture(dyn_img: DynamicImage) -> Image {
 
             data = cast_slice(&raw_data).to_owned();
         }
+        DynamicImage::ImageRgb32F(_) => todo!(),
+        DynamicImage::ImageRgba32F(_) => todo!(),
+        _ => todo!(),
     }
 
     Image::new(

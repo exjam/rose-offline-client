@@ -1,10 +1,9 @@
 use bevy::{
     math::Vec3,
     prelude::{
-        AssetServer, Commands, Entity, EventWriter, FromWorld, Query, Res, ResMut, Transform, With,
-        World,
+        AssetServer, Camera3d, Commands, Entity, EventWriter, FromWorld, Query, Res, ResMut,
+        Transform, With, World,
     },
-    render::camera::Camera3d,
     window::Windows,
 };
 use bevy_egui::{egui, EguiContext};

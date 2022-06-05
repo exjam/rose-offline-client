@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 
 use bevy::{
     asset::Handle,
-    core_pipeline::Opaque3d,
+    core_pipeline::core_3d::Opaque3d,
     ecs::system::{
         lifetimeless::{Read, SQuery, SRes},
         SystemParamItem,
@@ -17,22 +17,22 @@ use bevy::{
     },
     reflect::TypeUuid,
     render::{
+        extract_component::ExtractComponentPlugin,
         mesh::MeshVertexBufferLayout,
         prelude::Shader,
         render_asset::{PrepareAssetError, RenderAsset, RenderAssetPlugin, RenderAssets},
-        render_component::ExtractComponentPlugin,
         render_phase::{
             AddRenderCommand, DrawFunctions, EntityRenderCommand, RenderCommandResult, RenderPhase,
             SetItemPipeline, TrackedRenderPass,
         },
         render_resource::{
-            std140::{AsStd140, Std140},
+            encase::{self, ShaderType, Size},
             AddressMode, BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout,
             BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingResource, BindingType, Buffer,
-            BufferBindingType, BufferDescriptor, BufferSize, BufferUsages, FilterMode,
-            PipelineCache, RenderPipelineDescriptor, Sampler, SamplerBindingType,
-            SamplerDescriptor, ShaderStages, SpecializedMeshPipeline, SpecializedMeshPipelineError,
-            SpecializedMeshPipelines, TextureSampleType, TextureViewDimension,
+            BufferBindingType, BufferDescriptor, BufferUsages, FilterMode, PipelineCache,
+            RenderPipelineDescriptor, Sampler, SamplerBindingType, SamplerDescriptor, ShaderStages,
+            SpecializedMeshPipeline, SpecializedMeshPipelineError, SpecializedMeshPipelines,
+            TextureSampleType, TextureViewDimension,
         },
         renderer::{RenderDevice, RenderQueue},
         view::{ExtractedView, VisibleEntities},
@@ -58,7 +58,7 @@ impl Plugin for SkyMaterialPlugin {
 
         let render_device = app.world.resource::<RenderDevice>();
         let buffer = render_device.create_buffer(&BufferDescriptor {
-            size: SkyUniformData::std140_size_static() as u64,
+            size: SkyUniformData::min_size().get(),
             usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
             mapped_at_creation: false,
             label: Some("sky_data_uniform_buffer"),
@@ -84,7 +84,7 @@ impl Plugin for SkyMaterialPlugin {
     }
 }
 
-#[derive(Clone, AsStd140)]
+#[derive(Clone, ShaderType)]
 pub struct SkyUniformData {
     pub day_weight: f32,
 }
@@ -110,8 +110,11 @@ fn prepare_sky_uniform_data(
     sky_uniform_meta: ResMut<SkyUniformMeta>,
     render_queue: Res<RenderQueue>,
 ) {
-    let value_std140 = sky_uniform_data.as_std140();
-    render_queue.write_buffer(&sky_uniform_meta.buffer, 0, value_std140.as_bytes());
+    let byte_buffer = [0u8; SkyUniformData::SIZE.get() as usize];
+    let mut buffer = encase::UniformBuffer::new(byte_buffer);
+    buffer.write(sky_uniform_data.as_ref()).unwrap();
+
+    render_queue.write_buffer(&sky_uniform_meta.buffer, 0, buffer.as_ref());
 }
 
 fn queue_sky_uniform_bind_group(
@@ -232,9 +235,7 @@ impl FromWorld for SkyMaterialPipeline {
                     ty: BindingType::Buffer {
                         ty: BufferBindingType::Uniform,
                         has_dynamic_offset: false,
-                        min_binding_size: BufferSize::new(
-                            SkyUniformData::std140_size_static() as u64
-                        ),
+                        min_binding_size: Some(SkyUniformData::min_size()),
                     },
                     count: None,
                 }],

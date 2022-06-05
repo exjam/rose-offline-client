@@ -1,7 +1,7 @@
 use bevy::{
     app::prelude::*,
     asset::{Assets, Handle, HandleUntyped},
-    core_pipeline::Transparent3d,
+    core_pipeline::core_3d::Transparent3d,
     ecs::{
         prelude::*,
         system::{lifetimeless::*, SystemParamItem},
@@ -24,7 +24,6 @@ use bevy::{
         },
         RenderApp, RenderStage, RenderWorld,
     },
-    tasks::ComputeTaskPool,
 };
 use bytemuck::Pod;
 use num_traits::FromPrimitive;
@@ -365,11 +364,8 @@ impl SpecializedRenderPipeline for ParticlePipeline {
     }
 }
 
-fn compute_particles_aabb(
-    compute_task_pool: Res<ComputeTaskPool>,
-    mut query: Query<(&mut Aabb, &ParticleRenderData)>,
-) {
-    query.par_for_each_mut(&compute_task_pool, 8, |(mut aabb, particles)| {
+fn compute_particles_aabb(mut query: Query<(&mut Aabb, &ParticleRenderData)>) {
+    query.par_for_each_mut(8, |(mut aabb, particles)| {
         if let Some(bounding_box) = particles.compute_aabb() {
             *aabb = bounding_box;
         }

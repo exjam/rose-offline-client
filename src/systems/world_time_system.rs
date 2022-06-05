@@ -1,8 +1,8 @@
 use std::time::Duration;
 
 use bevy::{
-    core::Time,
     ecs::prelude::{Res, ResMut},
+    prelude::Time,
 };
 
 use rose_data::{WorldTicks, WORLD_TICK_DURATION};

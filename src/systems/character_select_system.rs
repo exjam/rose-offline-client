@@ -5,11 +5,11 @@ use bevy::{
     input::Input,
     math::{Quat, Vec3},
     prelude::{
-        AssetServer, Assets, Camera, Commands, Component, DespawnRecursiveExt, Entity, EventReader,
-        EventWriter, GlobalTransform, Image, MouseButton, PerspectiveProjection, Query, Res,
-        ResMut, State, Transform, With,
+        AssetServer, Camera, Camera3d, Commands, Component, DespawnRecursiveExt, Entity,
+        EventReader, EventWriter, GlobalTransform, MouseButton, Query, Res, ResMut, State,
+        Transform, With,
     },
-    render::{camera::Camera3d, mesh::skinning::SkinnedMesh},
+    render::{camera::Projection, mesh::skinning::SkinnedMesh},
     window::Windows,
 };
 use bevy_egui::{egui, EguiContext};
@@ -209,12 +209,7 @@ pub fn character_select_system(
     game_connection: Option<Res<GameConnection>>,
     world_connection: Option<Res<WorldConnection>>,
     character_list: Option<Res<CharacterList>>,
-    (server_configuration, asset_server, windows, images): (
-        Res<ServerConfiguration>,
-        Res<AssetServer>,
-        Res<Windows>,
-        Res<Assets<Image>>,
-    ),
+    (server_configuration, asset_server): (Res<ServerConfiguration>, Res<AssetServer>),
     mut app_exit_events: EventWriter<AppExit>,
 ) {
     if world_connection.is_none() {
@@ -649,9 +644,7 @@ pub fn character_select_system(
                 .as_ref()
                 .and_then(|character_list| character_list.characters.get(index))
             {
-                if let Some(screen_pos) = camera.world_to_screen(
-                    &windows,
-                    &images,
+                if let Some(screen_pos) = camera.world_to_viewport(
                     camera_transform,
                     Vec3::new(
                         CHARACTER_POSITIONS[index][0],
@@ -693,7 +686,7 @@ pub fn character_select_input_system(
     mouse_button_input: Res<Input<MouseButton>>,
     rapier_context: Res<RapierContext>,
     windows: Res<Windows>,
-    query_camera: Query<(&Camera, &PerspectiveProjection, &GlobalTransform), With<Camera3d>>,
+    query_camera: Query<(&Camera, &Projection, &GlobalTransform), With<Camera3d>>,
     query_collider_parent: Query<&ColliderParent>,
     query_select_character: Query<&CharacterSelectCharacter>,
 ) {

@@ -1,7 +1,8 @@
 use bevy::{
     math::{Vec2, Vec3Swizzles},
-    prelude::{AssetServer, Assets, Handle, Image, Local, Query, Res, ResMut, Transform, With},
-    render::camera::Camera3d,
+    prelude::{
+        AssetServer, Assets, Camera3d, Handle, Image, Local, Query, Res, ResMut, Transform, With,
+    },
 };
 use bevy_egui::{egui, EguiContext};
 

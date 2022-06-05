@@ -3,14 +3,13 @@
 
 use bevy::{
     asset::AssetServerSettings,
-    core_pipeline::ClearColor,
+    core_pipeline::clear_color::ClearColor,
     ecs::{event::Events, schedule::ShouldRun},
     log::{Level, LogSettings},
     prelude::{
-        AddAsset, App, AssetServer, Assets, Color, Commands, CoreStage,
+        AddAsset, App, AssetServer, Assets, Camera3dBundle, Color, Commands, CoreStage,
         ExclusiveSystemDescriptorCoercion, IntoExclusiveSystem, Msaa,
-        ParallelSystemDescriptorCoercion, PerspectiveCameraBundle, Res, ResMut, StageLabel, State,
-        SystemSet, SystemStage,
+        ParallelSystemDescriptorCoercion, Res, ResMut, StageLabel, State, SystemSet, SystemStage,
     },
     render::{render_resource::WgpuFeatures, settings::WgpuSettings},
     window::WindowDescriptor,
@@ -281,6 +280,7 @@ fn main() {
         })
         .add_plugin(bevy::log::LogPlugin::default())
         .add_plugin(bevy::core::CorePlugin::default())
+        .add_plugin(bevy::time::TimePlugin::default())
         .add_plugin(bevy::diagnostic::EntityCountDiagnosticsPlugin::default())
         .add_plugin(bevy::diagnostic::FrameTimeDiagnosticsPlugin::default())
         .add_plugin(bevy::transform::TransformPlugin::default())
@@ -641,7 +641,7 @@ fn load_game_data(
         .expect("Failed to create model loader"),
     );
 
-    commands.spawn_bundle(PerspectiveCameraBundle::default());
+    commands.spawn_bundle(Camera3dBundle::default());
 
     // Load icons
     let mut item_pages = Vec::new();

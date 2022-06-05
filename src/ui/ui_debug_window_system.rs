@@ -1,8 +1,7 @@
 use bevy::{
     input::Input,
     math::Vec3,
-    prelude::{Commands, Entity, KeyCode, Local, Query, Res, ResMut, With},
-    render::camera::Camera3d,
+    prelude::{Camera3d, Commands, Entity, KeyCode, Local, Query, Res, ResMut, With},
 };
 use bevy_egui::{egui, EguiContext};
 use rose_game_common::messages::client::ClientMessage;

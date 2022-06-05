@@ -1,7 +1,7 @@
 use bevy::{
     app::prelude::*,
     asset::{Assets, Handle, HandleUntyped},
-    core_pipeline::Transparent3d,
+    core_pipeline::core_3d::Transparent3d,
     ecs::{
         prelude::*,
         system::{lifetimeless::*, SystemParamItem},

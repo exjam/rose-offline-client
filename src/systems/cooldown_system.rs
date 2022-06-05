@@ -1,7 +1,4 @@
-use bevy::{
-    core::Time,
-    prelude::{Query, Res},
-};
+use bevy::prelude::{Query, Res, Time};
 
 use crate::components::Cooldowns;
 
