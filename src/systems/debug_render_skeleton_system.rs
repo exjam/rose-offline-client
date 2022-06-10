@@ -35,9 +35,11 @@ pub fn debug_render_skeleton_system(
                 }
 
                 if debug_render_config.bone_up {
+                    // Our bones seem to be in -Z up space
                     bone_up_vertices.push(transform.translation);
                     bone_up_vertices.push(
-                        transform.translation + transform.rotation.mul_vec3([0.0, 0.2, 0.0].into()),
+                        transform.translation
+                            + transform.rotation.mul_vec3([0.0, 0.0, -0.2].into()),
                     );
                     bone_up_vertices.push(Vec3::new(f32::NAN, f32::NAN, f32::NAN));
                 }
