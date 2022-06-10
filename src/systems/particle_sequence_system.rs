@@ -1,7 +1,7 @@
 use std::ops::RangeInclusive;
 
 use bevy::{
-    math::{Vec3, Vec4},
+    math::{Quat, Vec3, Vec4},
     prelude::{GlobalTransform, Query, Res, Time, Transform},
 };
 use rand::Rng;
@@ -41,7 +41,11 @@ fn apply_timestep(
 
     particle.keyframe_timer += timestep;
 
-    particle.position += particle.velocity * timestep;
+    if let Some(world_direction) = particle.world_direction {
+        particle.position += world_direction.mul_vec3(particle.velocity) * timestep;
+    } else {
+        particle.position += particle.velocity * timestep;
+    }
 
     particle.rotation += particle.rotation_step * timestep;
     while particle.rotation > 360.0 {
@@ -301,11 +305,15 @@ pub fn particle_sequence_system(
         // Apply particle keyframes
         for particle_index in 0..particle_sequence.particles.len() {
             if apply_timestep(&mut particle_sequence, particle_index, 4.8 * delta_time) {
-                let gravity = Vec3::new(
-                    rng_gen_range(&mut rng, &particle_sequence.gravity_x),
-                    rng_gen_range(&mut rng, &particle_sequence.gravity_y),
-                    rng_gen_range(&mut rng, &particle_sequence.gravity_z),
-                );
+                let gravity = if matches!(particle_sequence.update_coords, PtlUpdateCoords::World) {
+                    particle_sequence.particles[particle_index].gravity_local
+                } else {
+                    Vec3::new(
+                        rng_gen_range(&mut rng, &particle_sequence.gravity_x),
+                        rng_gen_range(&mut rng, &particle_sequence.gravity_y),
+                        rng_gen_range(&mut rng, &particle_sequence.gravity_z),
+                    )
+                };
                 particle_sequence.particles[particle_index].velocity += gravity * delta_time;
 
                 apply_keyframes(&mut rng, &mut particle_sequence, particle_index);
@@ -340,7 +348,22 @@ pub fn particle_sequence_system(
                     rng_gen_range(&mut rng, &particle_sequence.emit_radius_y),
                     rng_gen_range(&mut rng, &particle_sequence.emit_radius_z),
                 );
+                let mut gravity_local = Vec3::default();
+                let mut world_direction = None;
                 if matches!(particle_sequence.update_coords, PtlUpdateCoords::World) {
+                    let rotation = Quat::from_xyzw(
+                        global_transform.rotation.x,
+                        -global_transform.rotation.z,
+                        global_transform.rotation.y,
+                        global_transform.rotation.w,
+                    );
+                    world_direction = Some(rotation);
+                    gravity_local = rotation.mul_vec3(Vec3::new(
+                        rng_gen_range(&mut rng, &particle_sequence.gravity_x),
+                        rng_gen_range(&mut rng, &particle_sequence.gravity_y),
+                        rng_gen_range(&mut rng, &particle_sequence.gravity_z),
+                    ));
+                    position = rotation.mul_vec3(position);
                     position.x += global_transform.translation.x * 100.0;
                     position.y += global_transform.translation.z * -100.0;
                     position.z += global_transform.translation.y * 100.0;
@@ -348,9 +371,12 @@ pub fn particle_sequence_system(
 
                 let life = rng_gen_range(&mut rng, &particle_sequence.particle_life);
                 let particle_index = particle_sequence.particles.len();
-                particle_sequence
-                    .particles
-                    .push(ActiveParticle::new(life, position));
+                particle_sequence.particles.push(ActiveParticle::new(
+                    life,
+                    position,
+                    gravity_local,
+                    world_direction,
+                ));
 
                 // Apply initial keyframes
                 apply_keyframes(&mut rng, &mut particle_sequence, particle_index);

@@ -1,7 +1,7 @@
 use std::ops::RangeInclusive;
 
 use bevy::{
-    math::{Vec2, Vec3, Vec4},
+    math::{Quat, Vec2, Vec3, Vec4},
     prelude::Component,
 };
 use rand::Rng;
@@ -13,6 +13,8 @@ pub struct ActiveParticle {
     pub keyframe_timer: f32,
     pub life: f32,
     pub next_keyframe_index: usize,
+    pub gravity_local: Vec3,
+    pub world_direction: Option<Quat>,
 
     pub position: Vec3,
 
@@ -33,12 +35,19 @@ pub struct ActiveParticle {
 }
 
 impl ActiveParticle {
-    pub fn new(life: f32, position: Vec3) -> Self {
+    pub fn new(
+        life: f32,
+        position: Vec3,
+        gravity_local: Vec3,
+        world_direction: Option<Quat>,
+    ) -> Self {
         Self {
             age: 0.0,
             keyframe_timer: 0.0,
             life,
             next_keyframe_index: 0,
+            gravity_local,
+            world_direction,
             position,
 
             rotation: 0.0,
