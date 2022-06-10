@@ -60,9 +60,8 @@ fn vs_main(model: VertexInput) -> VertexOutput {
     normalize(vec3<f32>(view.view_proj.x.y, view.view_proj.y.y, view.view_proj.z.y));
 #else
 
-  // TODO: Not sure how the sprite should be rendered with 0 billboarding
-  let camera_right = vec3<f32>(0.0, 0.0, 1.0);
-  let camera_up = vec3<f32>(0.0, 1.0, 0.0);
+  let camera_right = vec3<f32>(1.0, 0.0, 0.0);
+  let camera_up = vec3<f32>(0.0, 0.0, 1.0);
 
 #endif
 
