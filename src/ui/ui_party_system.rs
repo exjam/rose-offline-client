@@ -7,7 +7,8 @@ use bevy_egui::{egui, EguiContext};
 use rose_game_common::{
     components::{AbilityValues, CharacterInfo, HealthPoints, Level},
     messages::{
-        client::ClientMessage, server::PartyMemberInfo, ClientEntityId, PartyRejectInviteReason,
+        client::ClientMessage, server::PartyMemberInfo, ClientEntityId, PartyItemSharing,
+        PartyRejectInviteReason, PartyXpSharing,
     },
 };
 
@@ -169,8 +170,9 @@ pub fn ui_party_system(
             style.visuals.widgets.noninteractive.bg_fill.r(),
             style.visuals.widgets.noninteractive.bg_fill.g(),
             style.visuals.widgets.noninteractive.bg_fill.b(),
-            128,
+            180,
         ));
+        let player_is_owner = matches!(party_info.owner, PartyOwner::Player);
 
         egui::Window::new("Party")
             .anchor(egui::Align2::LEFT_CENTER, [10.0, -100.0])
@@ -178,6 +180,82 @@ pub fn ui_party_system(
             .title_bar(false)
             .frame(window_frame)
             .show(egui_context.ctx_mut(), |ui| {
+                ui.group(|ui| {
+                    ui.add_enabled_ui(player_is_owner, |ui| {
+                        egui::Grid::new("party_info").num_columns(2).show(ui, |ui| {
+                            let mut item_sharing = party_info.item_sharing;
+                            let mut xp_sharing = party_info.xp_sharing;
+
+                            ui.colored_label(egui::Color32::WHITE, "Item Sharing:");
+                            egui::ComboBox::from_id_source("Item Sharing")
+                                .selected_text(format!("{:?}", party_info.item_sharing))
+                                .show_ui(ui, |ui| {
+                                    ui.selectable_value(
+                                        &mut item_sharing,
+                                        PartyItemSharing::EqualLootDistribution,
+                                        "Equal Loot Distribution",
+                                    );
+                                    ui.selectable_value(
+                                        &mut item_sharing,
+                                        PartyItemSharing::AcquisitionOrder,
+                                        "Acquisition Order",
+                                    );
+                                });
+                            ui.end_row();
+
+                            ui.colored_label(egui::Color32::WHITE, "XP Sharing:");
+                            egui::ComboBox::from_id_source("XP Sharing")
+                                .selected_text(format!("{:?}", party_info.xp_sharing))
+                                .show_ui(ui, |ui| {
+                                    ui.selectable_value(
+                                        &mut xp_sharing,
+                                        PartyXpSharing::EqualShare,
+                                        "Equal Share",
+                                    );
+                                    ui.selectable_value(
+                                        &mut xp_sharing,
+                                        PartyXpSharing::DistributedByLevel,
+                                        "Distributed By Level",
+                                    );
+                                });
+                            ui.end_row();
+
+                            let party_level = 1;
+                            let party_xp = 50;
+                            let party_need_xp = 100;
+
+                            ui.colored_label(
+                                egui::Color32::WHITE,
+                                format!("Party Level: {}", party_level),
+                            );
+                            ui.scope(|ui| {
+                                ui.style_mut().visuals.selection.bg_fill =
+                                    egui::Color32::from_rgb(145, 133, 0);
+                                ui.add(
+                                    egui::ProgressBar::new(party_xp as f32 / party_need_xp as f32)
+                                        .show_percentage(),
+                                )
+                                .on_hover_text(format!("{} / {}", party_xp, party_need_xp));
+                            });
+                            ui.end_row();
+
+                            if item_sharing != party_info.item_sharing
+                                || xp_sharing != party_info.xp_sharing
+                            {
+                                if let Some(game_connection) = &game_connection {
+                                    game_connection
+                                        .client_message_tx
+                                        .send(ClientMessage::PartyUpdateRules(
+                                            item_sharing,
+                                            xp_sharing,
+                                        ))
+                                        .ok();
+                                }
+                            }
+                        });
+                    });
+                });
+
                 ui.group(|ui| {
                     ui.horizontal(|ui| {
                         ui.colored_label(egui::Color32::WHITE, &player.character_info.name);
@@ -222,9 +300,7 @@ pub fn ui_party_system(
                                     ui.colored_label(egui::Color32::WHITE, &member_info.name);
 
                                     ui.with_layout(egui::Layout::right_to_left(), |ui| {
-                                        if matches!(party_info.owner, PartyOwner::Player)
-                                            && ui.button("Kick").clicked()
-                                        {
+                                        if player_is_owner && ui.button("Kick").clicked() {
                                             if let Some(game_connection) = &game_connection {
                                                 game_connection
                                                     .client_message_tx
@@ -270,9 +346,7 @@ pub fn ui_party_system(
                                     ui.colored_label(egui::Color32::WHITE, &member_info.name);
 
                                     ui.with_layout(egui::Layout::right_to_left(), |ui| {
-                                        if matches!(party_info.owner, PartyOwner::Player)
-                                            && ui.button("Kick").clicked()
-                                        {
+                                        if player_is_owner && ui.button("Kick").clicked() {
                                             if let Some(game_connection) = &game_connection {
                                                 game_connection
                                                     .client_message_tx

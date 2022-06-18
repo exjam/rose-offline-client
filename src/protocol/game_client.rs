@@ -30,9 +30,10 @@ use rose_network_irose::{
         PacketClientDropItemFromInventory, PacketClientEmote, PacketClientIncreaseBasicStat,
         PacketClientJoinZone, PacketClientLevelUpSkill, PacketClientMove, PacketClientMoveToggle,
         PacketClientMoveToggleType, PacketClientNpcStoreTransaction, PacketClientPartyReply,
-        PacketClientPartyRequest, PacketClientPersonalStoreListItems, PacketClientPickupItemDrop,
-        PacketClientQuestRequest, PacketClientQuestRequestType, PacketClientReviveRequest,
-        PacketClientSetHotbarSlot, PacketClientUseItem, PacketClientWarpGateRequest,
+        PacketClientPartyRequest, PacketClientPartyUpdateRules, PacketClientPersonalStoreListItems,
+        PacketClientPickupItemDrop, PacketClientQuestRequest, PacketClientQuestRequestType,
+        PacketClientReviveRequest, PacketClientSetHotbarSlot, PacketClientUseItem,
+        PacketClientWarpGateRequest,
     },
     game_server_packets::{
         ConnectResult, PacketConnectionReply, PacketServerAnnounceChat,
@@ -45,15 +46,16 @@ use rose_network_irose::{
         PacketServerMoveEntity, PacketServerMoveToggle, PacketServerMoveToggleType,
         PacketServerNpcStoreTransactionError, PacketServerPartyMemberUpdateInfo,
         PacketServerPartyMembers, PacketServerPartyReply, PacketServerPartyRequest,
-        PacketServerPickupItemDropResult, PacketServerQuestResult, PacketServerQuestResultType,
-        PacketServerRemoveEntities, PacketServerRewardItems, PacketServerRewardMoney,
-        PacketServerRunNpcDeathTrigger, PacketServerSelectCharacter, PacketServerSetHotbarSlot,
-        PacketServerShoutChat, PacketServerSpawnEntityCharacter, PacketServerSpawnEntityItemDrop,
-        PacketServerSpawnEntityMonster, PacketServerSpawnEntityNpc, PacketServerStartCastingSkill,
-        PacketServerStopMoveEntity, PacketServerTeleport, PacketServerUpdateAbilityValue,
-        PacketServerUpdateAmmo, PacketServerUpdateBasicStat, PacketServerUpdateEquipment,
-        PacketServerUpdateInventory, PacketServerUpdateLevel, PacketServerUpdateMoney,
-        PacketServerUpdateSpeed, PacketServerUpdateStatusEffects, PacketServerUpdateVehiclePart,
+        PacketServerPartyUpdateRules, PacketServerPickupItemDropResult, PacketServerQuestResult,
+        PacketServerQuestResultType, PacketServerRemoveEntities, PacketServerRewardItems,
+        PacketServerRewardMoney, PacketServerRunNpcDeathTrigger, PacketServerSelectCharacter,
+        PacketServerSetHotbarSlot, PacketServerShoutChat, PacketServerSpawnEntityCharacter,
+        PacketServerSpawnEntityItemDrop, PacketServerSpawnEntityMonster,
+        PacketServerSpawnEntityNpc, PacketServerStartCastingSkill, PacketServerStopMoveEntity,
+        PacketServerTeleport, PacketServerUpdateAbilityValue, PacketServerUpdateAmmo,
+        PacketServerUpdateBasicStat, PacketServerUpdateEquipment, PacketServerUpdateInventory,
+        PacketServerUpdateLevel, PacketServerUpdateMoney, PacketServerUpdateSpeed,
+        PacketServerUpdateStatusEffects, PacketServerUpdateVehiclePart,
         PacketServerUpdateXpStamina, PacketServerUseEmote, PacketServerUseItem,
         PacketServerWhisper, ServerPackets,
     },
@@ -773,6 +775,15 @@ impl GameClient {
                     .send(ServerMessage::PartyMemberUpdateInfo(message.member_info))
                     .ok();
             }
+            Some(ServerPackets::PartyUpdateRules) => {
+                let message = PacketServerPartyUpdateRules::try_from(&packet)?;
+                self.server_message_tx
+                    .send(ServerMessage::PartyUpdateRules(
+                        message.item_sharing,
+                        message.xp_sharing,
+                    ))
+                    .ok();
+            }
             _ => log::info!("Unhandled game packet {:x}", packet.command),
         }
 
@@ -1052,6 +1063,14 @@ impl GameClient {
                         reason,
                         client_entity_id,
                     )))
+                    .await?
+            }
+            ClientMessage::PartyUpdateRules(item_sharing, xp_sharing) => {
+                connection
+                    .write_packet(Packet::from(&PacketClientPartyUpdateRules {
+                        item_sharing,
+                        xp_sharing,
+                    }))
                     .await?
             }
             unimplemented => {

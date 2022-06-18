@@ -927,7 +927,7 @@ pub fn game_connection_system(
             Ok(ServerMessage::UpdateLevel(message)) => {
                 if let Some(entity) = client_entity_list.get(message.entity_id) {
                     commands.entity(entity).insert_bundle((
-                        message.level.clone(),
+                        message.level,
                         message.experience_points,
                         message.stat_points,
                         message.skill_points,
@@ -1407,7 +1407,7 @@ pub fn game_connection_system(
                     if let Ok(mut player) = query_set_client_entity.p1().get_mut(player_entity) {
                         *player.party_membership = PartyMembership::Member(PartyInfo {
                             owner: PartyOwner::Player,
-                            members: vec![],
+                            ..Default::default()
                         });
                     }
                 }
@@ -1415,10 +1415,7 @@ pub fn game_connection_system(
             Ok(ServerMessage::PartyAcceptInvite(_)) => {
                 if let Some(player_entity) = client_entity_list.player_entity {
                     if let Ok(mut player) = query_set_client_entity.p1().get_mut(player_entity) {
-                        *player.party_membership = PartyMembership::Member(PartyInfo {
-                            owner: PartyOwner::Unknown,
-                            members: vec![],
-                        });
+                        *player.party_membership = PartyMembership::Member(PartyInfo::default());
                     }
                 }
             }
@@ -1469,10 +1466,8 @@ pub fn game_connection_system(
                 if let Some(player_entity) = client_entity_list.player_entity {
                     if let Ok(mut player) = query_set_client_entity.p1().get_mut(player_entity) {
                         if player.party_membership.is_none() {
-                            *player.party_membership = PartyMembership::Member(PartyInfo {
-                                owner: PartyOwner::Unknown,
-                                members: vec![],
-                            });
+                            *player.party_membership =
+                                PartyMembership::Member(PartyInfo::default());
                         }
 
                         if let PartyMembership::Member(ref mut party_info) =
@@ -1577,6 +1572,18 @@ pub fn game_connection_system(
                             {
                                 *party_member = PartyMemberInfo::Online(party_member_info);
                             }
+                        }
+                    }
+                }
+            }
+            Ok(ServerMessage::PartyUpdateRules(item_sharing, xp_sharing)) => {
+                if let Some(player_entity) = client_entity_list.player_entity {
+                    if let Ok(mut player) = query_set_client_entity.p1().get_mut(player_entity) {
+                        if let PartyMembership::Member(ref mut party_info) =
+                            &mut *player.party_membership
+                        {
+                            party_info.item_sharing = item_sharing;
+                            party_info.xp_sharing = xp_sharing;
                         }
                     }
                 }
