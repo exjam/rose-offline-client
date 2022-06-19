@@ -1,9 +1,9 @@
 use bevy::{
-    ecs::query::WorldQuery,
+    ecs::{event::Events, query::WorldQuery},
     math::{Quat, Vec3},
     prelude::{
         BuildChildren, Commands, ComputedVisibility, DespawnRecursiveExt, Entity, EventWriter,
-        GlobalTransform, ParamSet, Query, Res, ResMut, State, Transform, Visibility,
+        GlobalTransform, Mut, Res, ResMut, State, Transform, Visibility, World,
     },
 };
 
@@ -24,7 +24,7 @@ use rose_game_common::{
 use rose_network_common::ConnectionError;
 
 use crate::{
-    bundles::{ability_values_add_value, ability_values_set_value},
+    bundles::{ability_values_add_value_exclusive, ability_values_set_value_exclusive},
     components::{
         ClientEntity, ClientEntityName, ClientEntityType, CollisionRayCastSource, Command,
         CommandCastSkillTarget, Cooldowns, MovementCollisionEntities, NextCommand, PartyInfo,
@@ -35,18 +35,6 @@ use crate::{
     events::{ChatboxEvent, ClientEntityEvent, GameConnectionEvent, PartyEvent, QuestTriggerEvent},
     resources::{AppState, ClientEntityList, GameConnection, GameData, WorldRates, WorldTime},
 };
-
-#[derive(WorldQuery)]
-#[world_query(mutable)]
-pub struct QueryCharacter<'w> {
-    pub basic_stats: &'w mut BasicStats,
-    pub character_info: &'w CharacterInfo,
-    pub equipment: &'w mut Equipment,
-    pub health_points: &'w mut HealthPoints,
-    pub mana_points: &'w mut ManaPoints,
-    pub skill_list: &'w SkillList,
-    pub status_effects: &'w StatusEffects,
-}
 
 #[derive(WorldQuery)]
 #[world_query(mutable)]
@@ -75,36 +63,15 @@ pub struct QueryPlayer<'w> {
 
 pub fn game_connection_system(
     mut commands: Commands,
-    query_name: Query<&ClientEntityName>,
-    query_movement_collision_entities: Query<&MovementCollisionEntities>,
-    mut query_pending_damage_list: Query<&mut PendingDamageList>,
-    mut query_pending_skill_effect_list: Query<&mut PendingSkillEffectList>,
-    mut query_pending_skill_target_list: Query<&mut PendingSkillTargetList>,
-    mut query_set_client_entity: ParamSet<(
-        Query<QueryCharacter>,
-        Query<QueryPlayer>,
-        Query<(&AbilityValues, &mut HealthPoints)>,
-    )>,
-    mut query_command: Query<(&mut Command, &mut NextCommand)>,
-    (mut app_state, mut client_entity_list, game_connection, game_data): (
-        ResMut<State<AppState>>,
-        ResMut<ClientEntityList>,
-        Option<Res<GameConnection>>,
-        Res<GameData>,
-    ),
-    (
-        mut chatbox_events,
-        mut game_connection_events,
-        mut client_entity_events,
-        mut party_events,
-        mut quest_trigger_events,
-    ): (
-        EventWriter<ChatboxEvent>,
-        EventWriter<GameConnectionEvent>,
-        EventWriter<ClientEntityEvent>,
-        EventWriter<PartyEvent>,
-        EventWriter<QuestTriggerEvent>,
-    ),
+    game_connection: Option<Res<GameConnection>>,
+    game_data: Res<GameData>,
+    mut app_state: ResMut<State<AppState>>,
+    mut client_entity_list: ResMut<ClientEntityList>,
+    mut chatbox_events: EventWriter<ChatboxEvent>,
+    mut game_connection_events: EventWriter<GameConnectionEvent>,
+    mut client_entity_events: EventWriter<ClientEntityEvent>,
+    mut party_events: EventWriter<PartyEvent>,
+    mut quest_trigger_events: EventWriter<QuestTriggerEvent>,
 ) {
     if game_connection.is_none() {
         return;
@@ -587,41 +554,26 @@ pub fn game_connection_system(
                     let target_entity = message
                         .target_entity_id
                         .and_then(|id| client_entity_list.get(id));
-                    let new_command = NextCommand::with_move(
+
+                    commands.entity(entity).insert(NextCommand::with_move(
                         Vec3::new(message.x, message.y, message.z as f32),
                         target_entity,
                         message.move_mode,
-                    );
-
-                    if let Ok((_, mut next_command)) = query_command.get_mut(entity) {
-                        *next_command = new_command;
-                    } else {
-                        commands.entity(entity).insert(new_command);
-                    }
+                    ));
                 }
             }
             Ok(ServerMessage::StopMoveEntity(message)) => {
                 if let Some(entity) = client_entity_list.get(message.entity_id) {
                     // TODO: Apply the stop entity message.xyz ?
-                    let new_command = NextCommand::with_stop();
-
-                    if let Ok((_, mut next_command)) = query_command.get_mut(entity) {
-                        *next_command = new_command;
-                    } else {
-                        commands.entity(entity).insert(new_command);
-                    }
+                    commands.entity(entity).insert(NextCommand::with_stop());
                 }
             }
             Ok(ServerMessage::AttackEntity(message)) => {
                 if let Some(entity) = client_entity_list.get(message.entity_id) {
                     if let Some(target_entity) = client_entity_list.get(message.target_entity_id) {
-                        let new_command = NextCommand::with_attack(target_entity);
-
-                        if let Ok((_, mut next_command)) = query_command.get_mut(entity) {
-                            *next_command = new_command;
-                        } else {
-                            commands.entity(entity).insert(new_command);
-                        }
+                        commands
+                            .entity(entity)
+                            .insert(NextCommand::with_attack(target_entity));
                     }
                 }
             }
@@ -635,51 +587,56 @@ pub fn game_connection_system(
             }
             Ok(ServerMessage::DamageEntity(message)) => {
                 if let Some(defender_entity) = client_entity_list.get(message.defender_entity_id) {
-                    if let Ok(mut pending_damage_list) =
-                        query_pending_damage_list.get_mut(defender_entity)
-                    {
-                        pending_damage_list.add(
-                            message.attacker_entity_id,
-                            message.damage,
-                            message.is_killed,
-                            message.is_immediate,
-                        );
-                    }
-                }
+                    let killed_by_player = client_entity_list.player_entity
+                        == client_entity_list.get(message.attacker_entity_id);
 
-                if message.is_killed
-                    && client_entity_list.player_entity
-                        == client_entity_list.get(message.attacker_entity_id)
-                {
-                    if let Some(entity_name) = client_entity_list
-                        .get(message.defender_entity_id)
-                        .and_then(|entity| query_name.get(entity).ok())
-                    {
-                        chatbox_events.send(ChatboxEvent::System(format!(
-                            "You have succeeded in hunting {}",
-                            entity_name.name
-                        )));
-                    }
+                    commands.add(move |world: &mut World| {
+                        let mut defender = world.entity_mut(defender_entity);
+                        if let Some(mut pending_damage_list) =
+                            defender.get_mut::<PendingDamageList>()
+                        {
+                            pending_damage_list.add(
+                                message.attacker_entity_id,
+                                message.damage,
+                                message.is_killed,
+                                message.is_immediate,
+                            );
+                        }
+
+                        if killed_by_player {
+                            if let Some(name) = defender.get::<ClientEntityName>() {
+                                let chat_message =
+                                    format!("You have succeeded in hunting {}", name.name);
+                                world
+                                    .resource_mut::<Events<ChatboxEvent>>()
+                                    .send(ChatboxEvent::System(chat_message));
+                            }
+                        }
+                    });
                 }
             }
             Ok(ServerMessage::Teleport(message)) => {
                 if let Some(player_entity) = client_entity_list.player_entity {
                     // Remove colliders, we do not want to process collision until next zone has loaded
-                    if let Ok(movement_collision_entities) =
-                        query_movement_collision_entities.get(player_entity)
-                    {
-                        if let Some(down_ray_cast_source) =
-                            movement_collision_entities.down_ray_cast_source
-                        {
-                            commands.entity(down_ray_cast_source).despawn();
-                        }
+                    commands.add(move |world: &mut World| {
+                        if let Some(movement_collision_entities) = world
+                            .entity(player_entity)
+                            .get::<MovementCollisionEntities>(
+                        ) {
+                            let down_ray_cast_source =
+                                movement_collision_entities.down_ray_cast_source;
+                            let forward_ray_cast_source =
+                                movement_collision_entities.forward_ray_cast_source;
 
-                        if let Some(forward_ray_cast_source) =
-                            movement_collision_entities.forward_ray_cast_source
-                        {
-                            commands.entity(forward_ray_cast_source).despawn();
+                            if let Some(down_ray_cast_source) = down_ray_cast_source {
+                                world.despawn(down_ray_cast_source);
+                            }
+
+                            if let Some(forward_ray_cast_source) = forward_ray_cast_source {
+                                world.despawn(forward_ray_cast_source);
+                            }
                         }
-                    }
+                    });
 
                     // Update player position
                     commands
@@ -712,10 +669,15 @@ pub fn game_connection_system(
                 }
             }
             Ok(ServerMessage::LocalChat(message)) => {
-                if let Some(entity) = client_entity_list.get(message.entity_id) {
-                    if let Ok(name) = query_name.get(entity) {
-                        chatbox_events.send(ChatboxEvent::Say(name.name.clone(), message.text));
-                    }
+                if let Some(chat_entity) = client_entity_list.get(message.entity_id) {
+                    commands.add(move |world: &mut World| {
+                        if let Some(name) = world.entity(chat_entity).get::<ClientEntityName>() {
+                            let name = name.name.clone();
+                            world
+                                .resource_mut::<Events<ChatboxEvent>>()
+                                .send(ChatboxEvent::Say(name, message.text));
+                        }
+                    });
                 }
             }
             Ok(ServerMessage::ShoutChat(message)) => {
@@ -729,203 +691,241 @@ pub fn game_connection_system(
             }
             Ok(ServerMessage::UpdateAbilityValue(message)) => {
                 if let Some(player_entity) = client_entity_list.player_entity {
-                    if let Ok(mut player) = query_set_client_entity.p1().get_mut(player_entity) {
-                        match message {
-                            UpdateAbilityValue::RewardAdd(ability_type, add_value) => {
-                                ability_values_add_value(
-                                    ability_type,
-                                    add_value,
-                                    player.ability_values,
-                                    &mut player.basic_stats,
-                                    &mut player.experience_points,
-                                    &mut player.health_points,
-                                    &mut player.inventory,
-                                    &mut player.level,
-                                    &mut player.mana_points,
-                                    &mut player.skill_points,
-                                    &mut player.stamina,
-                                    &mut player.stat_points,
-                                    &mut player.union_membership,
-                                );
-
-                                chatbox_events.send(ChatboxEvent::System(format!(
-                                    "Ability {:?} has increased by {}.",
-                                    ability_type, add_value,
-                                )));
-                            }
-                            UpdateAbilityValue::RewardSet(ability_type, set_value) => {
-                                ability_values_set_value(
-                                    ability_type,
-                                    set_value,
-                                    player.ability_values,
-                                    &mut player.basic_stats,
-                                    &mut player.character_info,
-                                    &mut player.health_points,
-                                    &mut player.mana_points,
-                                    &mut player.experience_points,
-                                    &mut player.level,
-                                    &mut player.team,
-                                    &mut player.union_membership,
-                                );
-
-                                chatbox_events.send(ChatboxEvent::System(format!(
-                                    "Ability {:?} has been changed to {}.",
-                                    ability_type, set_value,
-                                )));
-                            }
+                    match message {
+                        UpdateAbilityValue::RewardAdd(ability_type, add_value) => {
+                            chatbox_events.send(ChatboxEvent::System(format!(
+                                "Ability {:?} has {} by {}.",
+                                ability_type,
+                                if add_value < 0 {
+                                    "decreased"
+                                } else {
+                                    "increased"
+                                },
+                                add_value.abs(),
+                            )));
+                        }
+                        UpdateAbilityValue::RewardSet(ability_type, set_value) => {
+                            chatbox_events.send(ChatboxEvent::System(format!(
+                                "Ability {:?} has been changed to {}.",
+                                ability_type, set_value,
+                            )));
                         }
                     }
+
+                    commands.add(move |world: &mut World| {
+                        let mut player = world.entity_mut(player_entity);
+                        match message {
+                            UpdateAbilityValue::RewardAdd(ability_type, add_value) => {
+                                ability_values_add_value_exclusive(
+                                    ability_type,
+                                    add_value,
+                                    &mut player,
+                                );
+                            }
+                            UpdateAbilityValue::RewardSet(ability_type, set_value) => {
+                                ability_values_set_value_exclusive(
+                                    ability_type,
+                                    set_value,
+                                    &mut player,
+                                );
+                            }
+                        }
+                    });
                 }
             }
             Ok(ServerMessage::UpdateAmmo(entity_id, ammo_index, item)) => {
                 if let Some(entity) = client_entity_list.get(entity_id) {
-                    if let Ok(mut character) = query_set_client_entity.p0().get_mut(entity) {
-                        if let Some(equipped_ammo) =
-                            character.equipment.equipped_ammo[ammo_index].as_mut()
+                    commands.add(move |world: &mut World| {
+                        if let Some(mut equipment) = world.entity_mut(entity).get_mut::<Equipment>()
                         {
-                            if let Some(item) = item {
-                                equipped_ammo.item = item.item;
-                            } else {
-                                character.equipment.equipped_ammo[ammo_index] = None;
+                            if let Some(equipped_ammo) =
+                                equipment.equipped_ammo[ammo_index].as_mut()
+                            {
+                                if let Some(item) = item {
+                                    equipped_ammo.item = item.item;
+                                } else {
+                                    equipment.equipped_ammo[ammo_index] = None;
+                                }
                             }
                         }
-                    }
+                    });
                 }
             }
             Ok(ServerMessage::UpdateEquipment(message)) => {
                 if let Some(entity) = client_entity_list.get(message.entity_id) {
-                    if let Ok(mut character) = query_set_client_entity.p0().get_mut(entity) {
-                        if let Some(equipped_item) =
-                            character.equipment.equipped_items[message.equipment_index].as_mut()
+                    commands.add(move |world: &mut World| {
+                        if let Some(mut equipment) = world.entity_mut(entity).get_mut::<Equipment>()
                         {
-                            if let Some(item) = message.item {
-                                // Only update visual related data
-                                equipped_item.item = item.item;
-                                equipped_item.has_socket = item.has_socket;
-                                equipped_item.gem = item.gem;
-                                equipped_item.grade = item.grade;
+                            if let Some(equipped_item) =
+                                equipment.equipped_items[message.equipment_index].as_mut()
+                            {
+                                if let Some(item) = message.item {
+                                    // Only update visual related data
+                                    equipped_item.item = item.item;
+                                    equipped_item.has_socket = item.has_socket;
+                                    equipped_item.gem = item.gem;
+                                    equipped_item.grade = item.grade;
+                                } else {
+                                    equipment.equipped_items[message.equipment_index] = None;
+                                }
                             } else {
-                                character.equipment.equipped_items[message.equipment_index] = None;
+                                equipment.equipped_items[message.equipment_index] = message.item;
                             }
-                        } else {
-                            character.equipment.equipped_items[message.equipment_index] =
-                                message.item;
                         }
-                    }
+                    });
                 }
             }
             Ok(ServerMessage::UpdateVehiclePart(message)) => {
                 if let Some(entity) = client_entity_list.get(message.entity_id) {
-                    if let Ok(mut character) = query_set_client_entity.p0().get_mut(entity) {
-                        if let Some(equipped_item) = character.equipment.equipped_vehicle
-                            [message.vehicle_part_index]
-                            .as_mut()
+                    commands.add(move |world: &mut World| {
+                        if let Some(mut equipment) = world.entity_mut(entity).get_mut::<Equipment>()
                         {
-                            if let Some(item) = message.item {
-                                // Only update visual related data
-                                equipped_item.item = item.item;
-                                equipped_item.has_socket = item.has_socket;
-                                equipped_item.gem = item.gem;
-                                equipped_item.grade = item.grade;
+                            if let Some(equipped_item) =
+                                equipment.equipped_vehicle[message.vehicle_part_index].as_mut()
+                            {
+                                if let Some(item) = message.item {
+                                    // Only update visual related data
+                                    equipped_item.item = item.item;
+                                    equipped_item.has_socket = item.has_socket;
+                                    equipped_item.gem = item.gem;
+                                    equipped_item.grade = item.grade;
+                                } else {
+                                    equipment.equipped_vehicle[message.vehicle_part_index] = None;
+                                }
                             } else {
-                                character.equipment.equipped_vehicle[message.vehicle_part_index] =
-                                    None;
+                                equipment.equipped_vehicle[message.vehicle_part_index] =
+                                    message.item;
                             }
-                        } else {
-                            character.equipment.equipped_vehicle[message.vehicle_part_index] =
-                                message.item;
                         }
-                    }
+                    });
                 }
             }
             Ok(ServerMessage::UpdateInventory(update_items, update_money)) => {
                 if let Some(player_entity) = client_entity_list.player_entity {
-                    if let Ok(mut player) = query_set_client_entity.p1().get_mut(player_entity) {
-                        for (item_slot, item) in update_items {
-                            match item_slot {
-                                ItemSlot::Inventory(_, _) => {
-                                    if let Some(item_slot) =
-                                        player.inventory.get_item_slot_mut(item_slot)
+                    commands.add(move |world: &mut World| {
+                        let mut player = world.entity_mut(player_entity);
+
+                        if let Some(mut inventory) = player.get_mut::<Inventory>() {
+                            for (item_slot, item) in update_items.iter() {
+                                if let ItemSlot::Inventory(_, _) = item_slot {
+                                    if let Some(item_slot) = inventory.get_item_slot_mut(*item_slot)
                                     {
-                                        *item_slot = item;
+                                        *item_slot = item.clone();
                                     }
                                 }
-                                ItemSlot::Ammo(ammo_index) => {
-                                    *player.equipment.get_ammo_slot_mut(ammo_index) =
-                                        item.and_then(|x| x.as_stackable().cloned())
-                                }
-                                ItemSlot::Equipment(equipment_index) => {
-                                    *player.equipment.get_equipment_slot_mut(equipment_index) =
-                                        item.and_then(|x| x.as_equipment().cloned())
-                                }
-                                ItemSlot::Vehicle(vehicle_part_index) => {
-                                    *player.equipment.get_vehicle_slot_mut(vehicle_part_index) =
-                                        item.and_then(|x| x.as_equipment().cloned())
-                                }
+                            }
+
+                            if let Some(money) = update_money {
+                                inventory.money = money;
                             }
                         }
 
-                        if let Some(money) = update_money {
-                            player.inventory.money = money;
+                        if let Some(mut equipment) = player.get_mut::<Equipment>() {
+                            for (item_slot, item) in update_items.iter() {
+                                match *item_slot {
+                                    ItemSlot::Ammo(ammo_index) => {
+                                        *equipment.get_ammo_slot_mut(ammo_index) =
+                                            item.as_ref().and_then(|x| x.as_stackable().cloned())
+                                    }
+                                    ItemSlot::Equipment(equipment_index) => {
+                                        *equipment.get_equipment_slot_mut(equipment_index) =
+                                            item.as_ref().and_then(|x| x.as_equipment().cloned())
+                                    }
+                                    ItemSlot::Vehicle(vehicle_part_index) => {
+                                        *equipment.get_vehicle_slot_mut(vehicle_part_index) =
+                                            item.as_ref().and_then(|x| x.as_equipment().cloned())
+                                    }
+                                    _ => {}
+                                }
+                            }
                         }
-                    }
+                    });
                 }
             }
             Ok(ServerMessage::UseInventoryItem(message)) => {
                 if let Some(player_entity) = client_entity_list.player_entity {
-                    if let Ok(mut player) = query_set_client_entity.p1().get_mut(player_entity) {
-                        if let Some(item_slot) =
-                            player.inventory.get_item_slot_mut(message.inventory_slot)
+                    commands.add(move |world: &mut World| {
+                        if let Some(mut inventory) =
+                            world.entity_mut(player_entity).get_mut::<Inventory>()
                         {
-                            item_slot.try_take_quantity(1);
+                            if let Some(item_slot) =
+                                inventory.get_item_slot_mut(message.inventory_slot)
+                            {
+                                item_slot.try_take_quantity(1);
+                            }
                         }
-                    }
+                    });
                 }
             }
             Ok(ServerMessage::UpdateMoney(money)) => {
                 if let Some(player_entity) = client_entity_list.player_entity {
-                    if let Ok(mut player) = query_set_client_entity.p1().get_mut(player_entity) {
-                        player.inventory.money = money;
-                    }
+                    commands.add(move |world: &mut World| {
+                        if let Some(mut inventory) =
+                            world.entity_mut(player_entity).get_mut::<Inventory>()
+                        {
+                            inventory.money = money;
+                        }
+                    });
                 }
             }
             Ok(ServerMessage::UpdateBasicStat(message)) => {
                 if let Some(player_entity) = client_entity_list.player_entity {
-                    if let Ok(mut player) = query_set_client_entity.p1().get_mut(player_entity) {
-                        // Update stat points if this was a user requested stat increase
-                        let current_value = player.basic_stats.get(message.basic_stat_type);
-                        if message.value == current_value + 1 {
-                            if let Some(cost) = game_data
-                                .ability_value_calculator
-                                .calculate_basic_stat_increase_cost(
-                                    &player.basic_stats,
-                                    message.basic_stat_type,
-                                )
-                            {
-                                player.stat_points.points -= player.stat_points.points.min(cost);
-                            }
-                        }
+                    commands.add(move |world: &mut World| {
+                        world.resource_scope(|world, game_data: Mut<GameData>| {
+                            let mut stat_point_cost = None;
+                            let mut player = world.entity_mut(player_entity);
 
-                        // Update stats
-                        match message.basic_stat_type {
-                            BasicStatType::Strength => player.basic_stats.strength = message.value,
-                            BasicStatType::Dexterity => {
-                                player.basic_stats.dexterity = message.value
+                            if let Some(mut basic_stats) = player.get_mut::<BasicStats>() {
+                                let current_value = basic_stats.get(message.basic_stat_type);
+
+                                // Calculate stat point cost if this looked like a user requested stat increase
+                                if message.value == current_value + 1 {
+                                    if let Some(cost) = game_data
+                                        .ability_value_calculator
+                                        .calculate_basic_stat_increase_cost(
+                                            &basic_stats,
+                                            message.basic_stat_type,
+                                        )
+                                    {
+                                        stat_point_cost = Some(cost);
+                                    }
+                                }
+
+                                // Update stats
+                                match message.basic_stat_type {
+                                    BasicStatType::Strength => basic_stats.strength = message.value,
+                                    BasicStatType::Dexterity => {
+                                        basic_stats.dexterity = message.value
+                                    }
+                                    BasicStatType::Intelligence => {
+                                        basic_stats.intelligence = message.value
+                                    }
+                                    BasicStatType::Concentration => {
+                                        basic_stats.concentration = message.value
+                                    }
+                                    BasicStatType::Charm => basic_stats.charm = message.value,
+                                    BasicStatType::Sense => basic_stats.sense = message.value,
+                                }
                             }
-                            BasicStatType::Intelligence => {
-                                player.basic_stats.intelligence = message.value
+
+                            // Update stat points
+                            if let Some(subtract_stat_points) = stat_point_cost {
+                                if let Some(mut stat_points) = player.get_mut::<StatPoints>() {
+                                    stat_points.points -=
+                                        stat_points.points.min(subtract_stat_points);
+                                }
                             }
-                            BasicStatType::Concentration => {
-                                player.basic_stats.concentration = message.value
-                            }
-                            BasicStatType::Charm => player.basic_stats.charm = message.value,
-                            BasicStatType::Sense => player.basic_stats.sense = message.value,
-                        }
-                    }
+                        });
+                    });
                 }
             }
             Ok(ServerMessage::UpdateLevel(message)) => {
                 if let Some(entity) = client_entity_list.get(message.entity_id) {
+                    client_entity_events.send(ClientEntityEvent::LevelUp(
+                        message.entity_id,
+                        message.level.level,
+                    ));
+
                     commands.entity(entity).insert_bundle((
                         message.level,
                         message.experience_points,
@@ -933,25 +933,44 @@ pub fn game_connection_system(
                         message.skill_points,
                     ));
 
-                    // Update hp / mp to new max
-                    if let Ok(mut character) = query_set_client_entity.p0().get_mut(entity) {
-                        let ability_values = game_data.ability_value_calculator.calculate(
-                            character.character_info,
-                            &message.level,
-                            &character.equipment,
-                            &character.basic_stats,
-                            character.skill_list,
-                            character.status_effects,
-                        );
+                    // Update HP / MP to max for new level
+                    commands.add(move |world: &mut World| {
+                        world.resource_scope(|world, game_data: Mut<GameData>| {
+                            let mut character = world.entity_mut(entity);
 
-                        character.health_points.hp = ability_values.get_max_health();
-                        character.mana_points.mp = ability_values.get_max_mana();
-                    }
+                            if let (
+                                Some(basic_stats),
+                                Some(character_info),
+                                Some(equipment),
+                                Some(skill_list),
+                                Some(status_effects),
+                            ) = (
+                                character.get::<BasicStats>(),
+                                character.get::<CharacterInfo>(),
+                                character.get::<Equipment>(),
+                                character.get::<SkillList>(),
+                                character.get::<StatusEffects>(),
+                            ) {
+                                let ability_values = game_data.ability_value_calculator.calculate(
+                                    character_info,
+                                    &message.level,
+                                    equipment,
+                                    basic_stats,
+                                    skill_list,
+                                    status_effects,
+                                );
 
-                    client_entity_events.send(ClientEntityEvent::LevelUp(
-                        message.entity_id,
-                        message.level.level,
-                    ));
+                                if let Some(mut health_points) = character.get_mut::<HealthPoints>()
+                                {
+                                    health_points.hp = ability_values.get_max_health();
+                                }
+
+                                if let Some(mut mana_points) = character.get_mut::<ManaPoints>() {
+                                    mana_points.mp = ability_values.get_max_health();
+                                }
+                            }
+                        });
+                    });
                 }
             }
             Ok(ServerMessage::UpdateSpeed(message)) => {
@@ -971,51 +990,65 @@ pub fn game_connection_system(
             }
             Ok(ServerMessage::UpdateXpStamina(message)) => {
                 if let Some(player_entity) = client_entity_list.player_entity {
-                    if let Ok(mut player) = query_set_client_entity.p1().get_mut(player_entity) {
-                        if message.xp > player.experience_points.xp {
-                            chatbox_events.send(ChatboxEvent::System(format!(
-                                "You have earned {} experience points.",
-                                message.xp - player.experience_points.xp
-                            )));
+                    commands.add(move |world: &mut World| {
+                        let mut player = world.entity_mut(player_entity);
+
+                        if let Some(mut stamina) = player.get_mut::<Stamina>() {
+                            stamina.stamina = message.stamina;
                         }
 
-                        player.experience_points.xp = message.xp;
-                        player.stamina.stamina = message.stamina;
-                    }
+                        if let Some(mut experience_points) = player.get_mut::<ExperiencePoints>() {
+                            let previous_xp = experience_points.xp;
+                            experience_points.xp = message.xp;
+
+                            if message.xp > previous_xp {
+                                world.resource_mut::<Events<ChatboxEvent>>().send(
+                                    ChatboxEvent::System(format!(
+                                        "You have earned {} experience points.",
+                                        message.xp - previous_xp
+                                    )),
+                                );
+                            }
+                        }
+                    });
                 }
             }
             Ok(ServerMessage::PickupItemDropResult(message)) => match message.result {
                 Ok(PickupItemDropContent::Item(item_slot, item)) => {
                     if let Some(player_entity) = client_entity_list.player_entity {
-                        if let Ok(mut player) = query_set_client_entity.p1().get_mut(player_entity)
+                        if let Some(item_data) =
+                            game_data.items.get_base_item(item.get_item_reference())
                         {
-                            if let Some(inventory_slot) =
-                                player.inventory.get_item_slot_mut(item_slot)
-                            {
-                                if let Some(item_data) =
-                                    game_data.items.get_base_item(item.get_item_reference())
-                                {
-                                    chatbox_events.send(ChatboxEvent::System(format!(
-                                        "You have earned {}.",
-                                        item_data.name
-                                    )));
-                                }
-
-                                *inventory_slot = Some(item);
-                            }
+                            chatbox_events.send(ChatboxEvent::System(format!(
+                                "You have earned {}.",
+                                item_data.name
+                            )));
                         }
+
+                        commands.add(move |world: &mut World| {
+                            let mut player = world.entity_mut(player_entity);
+                            if let Some(mut inventory) = player.get_mut::<Inventory>() {
+                                if let Some(inventory_slot) = inventory.get_item_slot_mut(item_slot)
+                                {
+                                    *inventory_slot = Some(item);
+                                }
+                            }
+                        });
                     }
                 }
                 Ok(PickupItemDropContent::Money(money)) => {
                     if let Some(player_entity) = client_entity_list.player_entity {
-                        if let Ok(mut player) = query_set_client_entity.p1().get_mut(player_entity)
-                        {
-                            chatbox_events.send(ChatboxEvent::System(format!(
-                                "You have earned {} zuly.",
-                                money.0
-                            )));
-                            player.inventory.try_add_money(money).ok();
-                        }
+                        chatbox_events.send(ChatboxEvent::System(format!(
+                            "You have earned {} Zuly.",
+                            money.0
+                        )));
+
+                        commands.add(move |world: &mut World| {
+                            let mut player = world.entity_mut(player_entity);
+                            if let Some(mut inventory) = player.get_mut::<Inventory>() {
+                                inventory.try_add_money(money).ok();
+                            }
+                        });
                     }
                 }
                 Err(PickupItemDropError::InventoryFull) => {
@@ -1032,35 +1065,43 @@ pub fn game_connection_system(
             },
             Ok(ServerMessage::RewardItems(items)) => {
                 if let Some(player_entity) = client_entity_list.player_entity {
-                    if let Ok(mut player) = query_set_client_entity.p1().get_mut(player_entity) {
-                        for (item_slot, item) in items.into_iter() {
-                            if let Some(inventory_slot) =
-                                player.inventory.get_item_slot_mut(item_slot)
-                            {
-                                if let Some(item_data) = item.as_ref().and_then(|item| {
-                                    game_data.items.get_base_item(item.get_item_reference())
-                                }) {
-                                    chatbox_events.send(ChatboxEvent::System(format!(
-                                        "You have earned {}.",
-                                        item_data.name
-                                    )));
-                                }
-
-                                *inventory_slot = item;
-                            }
+                    for (_, item) in items.iter() {
+                        if let Some(item_data) = item.as_ref().and_then(|item| {
+                            game_data.items.get_base_item(item.get_item_reference())
+                        }) {
+                            chatbox_events.send(ChatboxEvent::System(format!(
+                                "You have earned {}.",
+                                item_data.name
+                            )));
                         }
                     }
+
+                    commands.add(move |world: &mut World| {
+                        let mut player = world.entity_mut(player_entity);
+                        if let Some(mut inventory) = player.get_mut::<Inventory>() {
+                            for (item_slot, item) in items.into_iter() {
+                                if let Some(inventory_slot) = inventory.get_item_slot_mut(item_slot)
+                                {
+                                    *inventory_slot = item;
+                                }
+                            }
+                        }
+                    });
                 }
             }
             Ok(ServerMessage::RewardMoney(money)) => {
                 if let Some(player_entity) = client_entity_list.player_entity {
-                    if let Ok(mut player) = query_set_client_entity.p1().get_mut(player_entity) {
-                        chatbox_events.send(ChatboxEvent::System(format!(
-                            "You have earned {} zuly.",
-                            money.0
-                        )));
-                        player.inventory.try_add_money(money).ok();
-                    }
+                    chatbox_events.send(ChatboxEvent::System(format!(
+                        "You have earned {} Zuly.",
+                        money.0
+                    )));
+
+                    commands.add(move |world: &mut World| {
+                        let mut player = world.entity_mut(player_entity);
+                        if let Some(mut inventory) = player.get_mut::<Inventory>() {
+                            inventory.try_add_money(money).ok();
+                        }
+                    });
                 }
             }
             Ok(ServerMessage::QuestDeleteResult(QuestDeleteResult {
@@ -1070,16 +1111,17 @@ pub fn game_connection_system(
             })) => {
                 if success {
                     if let Some(player_entity) = client_entity_list.player_entity {
-                        if let Ok(mut player) = query_set_client_entity.p1().get_mut(player_entity)
-                        {
-                            if let Some(active_quest) =
-                                player.quest_state.active_quests[slot].as_ref()
-                            {
-                                if active_quest.quest_id == quest_id {
-                                    player.quest_state.active_quests[slot] = None;
+                        commands.add(move |world: &mut World| {
+                            let mut player = world.entity_mut(player_entity);
+                            if let Some(mut quest_state) = player.get_mut::<QuestState>() {
+                                if let Some(active_quest) = quest_state.active_quests[slot].as_ref()
+                                {
+                                    if active_quest.quest_id == quest_id {
+                                        quest_state.active_quests[slot] = None;
+                                    }
                                 }
                             }
-                        }
+                        });
                     }
                 }
             }
@@ -1100,26 +1142,31 @@ pub fn game_connection_system(
             }
             Ok(ServerMessage::SetHotbarSlot(slot_index, slot)) => {
                 if let Some(player_entity) = client_entity_list.player_entity {
-                    if let Ok(mut player) = query_set_client_entity.p1().get_mut(player_entity) {
-                        player.hotbar.set_slot(slot_index, slot);
-                    }
+                    commands.add(move |world: &mut World| {
+                        let mut player = world.entity_mut(player_entity);
+                        if let Some(mut hotbar) = player.get_mut::<Hotbar>() {
+                            hotbar.set_slot(slot_index, slot);
+                        }
+                    });
                 }
             }
             Ok(ServerMessage::LearnSkillResult(result)) => match result {
                 Ok(message) => {
                     if let Some(player_entity) = client_entity_list.player_entity {
-                        if let Ok(mut player) = query_set_client_entity.p1().get_mut(player_entity)
-                        {
-                            if let Some(skill_slot) =
-                                player.skill_list.get_slot_mut(message.skill_slot)
-                            {
-                                *skill_slot = message.skill_id;
+                        commands.add(move |world: &mut World| {
+                            let mut player = world.entity_mut(player_entity);
+                            if let Some(mut skill_list) = player.get_mut::<SkillList>() {
+                                if let Some(skill_slot) =
+                                    skill_list.get_slot_mut(message.skill_slot)
+                                {
+                                    *skill_slot = message.skill_id;
+                                }
                             }
+                        });
 
-                            commands
-                                .entity(player.entity)
-                                .insert_bundle((message.updated_skill_points,));
-                        }
+                        commands
+                            .entity(player_entity)
+                            .insert_bundle((message.updated_skill_points,));
                     }
                 }
                 Err(LearnSkillError::AlreadyLearnt) => chatbox_events.send(ChatboxEvent::System(
@@ -1156,14 +1203,14 @@ pub fn game_connection_system(
                 match message.result {
                     Ok((skill_slot, skill_id)) => {
                         if let Some(player_entity) = client_entity_list.player_entity {
-                            if let Ok(mut player) =
-                                query_set_client_entity.p1().get_mut(player_entity)
-                            {
-                                if let Some(skill_slot) = player.skill_list.get_slot_mut(skill_slot)
-                                {
-                                    *skill_slot = Some(skill_id);
+                            commands.add(move |world: &mut World| {
+                                let mut player = world.entity_mut(player_entity);
+                                if let Some(mut skill_list) = player.get_mut::<SkillList>() {
+                                    if let Some(skill_slot) = skill_list.get_slot_mut(skill_slot) {
+                                        *skill_slot = Some(skill_id);
+                                    }
                                 }
-                            }
+                            });
                         }
                     }
                     Err(LevelUpSkillError::Failed) => chatbox_events.send(ChatboxEvent::System(
@@ -1208,28 +1255,29 @@ pub fn game_connection_system(
             Ok(ServerMessage::UseEmote(message)) => {
                 if let Some(entity) = client_entity_list.get(message.entity_id) {
                     let new_command = NextCommand::with_emote(message.motion_id, message.is_stop);
-
-                    if let Ok((_, mut next_command)) = query_command.get_mut(entity) {
-                        *next_command = new_command;
-                    } else {
-                        commands.entity(entity).insert(new_command);
-                    }
+                    commands.entity(entity).insert(new_command);
                 }
             }
             Ok(ServerMessage::SitToggle(entity_id)) => {
                 if let Some(entity) = client_entity_list.get(entity_id) {
-                    if let Ok((command, mut next_command)) = query_command.get_mut(entity) {
-                        if matches!(*command, Command::Sit(_)) {
-                            // If next command is already set then the command system will make the
-                            // entity stand up before performing next command. So we only need to
-                            // explicitly start to stand up if next command is not set.
-                            if next_command.is_none() {
-                                *next_command = NextCommand::with_standing();
+                    commands.add(move |world: &mut World| {
+                        let mut character = world.entity_mut(entity);
+                        let is_sitting =
+                            matches!(character.get::<Command>(), Some(Command::Sit(_)));
+
+                        if let Some(mut next_command) = character.get_mut::<NextCommand>() {
+                            if is_sitting {
+                                // If next command is already set then the command system will make the
+                                // entity stand up before performing next command. So we only need to
+                                // explicitly start to stand up if next command is not set.
+                                if next_command.is_none() {
+                                    *next_command = NextCommand::with_standing();
+                                }
+                            } else {
+                                *next_command = NextCommand::with_sitting();
                             }
-                        } else {
-                            *next_command = NextCommand::with_sitting();
                         }
-                    }
+                    });
                 }
             }
             Ok(ServerMessage::UseItem(message)) => {
@@ -1238,64 +1286,50 @@ pub fn game_connection_system(
             }
             Ok(ServerMessage::CastSkillSelf(message)) => {
                 if let Some(entity) = client_entity_list.get(message.entity_id) {
-                    let new_command = NextCommand::with_cast_skill(
+                    commands.entity(entity).insert(NextCommand::with_cast_skill(
                         message.skill_id,
                         None,
                         message.cast_motion_id,
                         None,
                         None,
-                    );
-
-                    if let Ok((_, mut next_command)) = query_command.get_mut(entity) {
-                        *next_command = new_command;
-                    } else {
-                        commands.entity(entity).insert(new_command);
-                    }
+                    ));
                 }
             }
             Ok(ServerMessage::CastSkillTargetEntity(message)) => {
                 if let Some(entity) = client_entity_list.get(message.entity_id) {
                     if let Some(target_entity) = client_entity_list.get(message.target_entity_id) {
-                        let new_command = NextCommand::with_cast_skill(
+                        commands.entity(entity).insert(NextCommand::with_cast_skill(
                             message.skill_id,
                             Some(CommandCastSkillTarget::Entity(target_entity)),
                             message.cast_motion_id,
                             None,
                             None,
-                        );
-
-                        if let Ok((_, mut next_command)) = query_command.get_mut(entity) {
-                            *next_command = new_command;
-                        } else {
-                            commands.entity(entity).insert(new_command);
-                        }
+                        ));
                     }
                 }
             }
             Ok(ServerMessage::CastSkillTargetPosition(message)) => {
                 if let Some(entity) = client_entity_list.get(message.entity_id) {
-                    let new_command = NextCommand::with_cast_skill(
+                    commands.entity(entity).insert(NextCommand::with_cast_skill(
                         message.skill_id,
                         Some(CommandCastSkillTarget::Position(message.target_position)),
                         message.cast_motion_id,
                         None,
                         None,
-                    );
-
-                    if let Ok((_, mut next_command)) = query_command.get_mut(entity) {
-                        *next_command = new_command;
-                    } else {
-                        commands.entity(entity).insert(new_command);
-                    }
+                    ));
                 }
             }
             Ok(ServerMessage::CancelCastingSkill(entity_id, _)) => {
                 if let Some(entity) = client_entity_list.get(entity_id) {
-                    if let Ok((mut command, _)) = query_command.get_mut(entity) {
-                        if let Command::CastSkill(_) = command.as_mut() {
-                            *command = Command::with_stop();
+                    commands.add(move |world: &mut World| {
+                        let mut character = world.entity_mut(entity);
+
+                        if let Some(mut command) = character.get_mut::<Command>() {
+                            if matches!(*command, Command::CastSkill(_)) {
+                                *command = Command::with_stop();
+                            }
                         }
-                    }
+                    });
                 }
             }
             Ok(ServerMessage::StartCastingSkill(_entity_id)) => {
@@ -1303,62 +1337,50 @@ pub fn game_connection_system(
             }
             Ok(ServerMessage::FinishCastingSkill(entity_id, skill_id)) => {
                 if let Some(entity) = client_entity_list.get(entity_id) {
-                    if let Ok((mut command, _)) = query_command.get_mut(entity) {
-                        if let Command::CastSkill(command_cast_skill) = command.as_mut() {
-                            if command_cast_skill.skill_id == skill_id {
-                                command_cast_skill.ready_action = true;
+                    commands.add(move |world: &mut World| {
+                        let mut character = world.entity_mut(entity);
+
+                        if let Some(mut command) = character.get_mut::<Command>() {
+                            if let Command::CastSkill(command_cast_skill) = command.as_mut() {
+                                if command_cast_skill.skill_id == skill_id {
+                                    command_cast_skill.ready_action = true;
+                                }
                             }
                         }
-                    }
+                    });
 
-                    if let Some(skill_data) = game_data.skills.get_skill(skill_id) {
-                        if Some(entity) == client_entity_list.player_entity {
-                            if let Ok(mut player) = query_set_client_entity.p1().get_mut(entity) {
-                                for &(use_ability_type, mut use_ability_value) in
-                                    skill_data.use_ability.iter()
-                                {
-                                    if use_ability_type == AbilityType::Mana {
+                    if let Some(use_ability) = game_data
+                        .skills
+                        .get_skill(skill_id)
+                        .map(|skill_data| skill_data.use_ability.clone())
+                    {
+                        let is_player = client_entity_list.player_entity == Some(entity);
+                        commands.add(move |world: &mut World| {
+                            let mut target = world.entity_mut(entity);
+
+                            for (use_ability_type, mut use_ability_value) in use_ability {
+                                // We only apply health point modification to other entities
+                                if !is_player && use_ability_type != AbilityType::Health {
+                                    continue;
+                                }
+
+                                if use_ability_type == AbilityType::Mana {
+                                    if let Some(ability_values) = target.get::<AbilityValues>() {
                                         let use_mana_rate =
-                                            (100 - player.ability_values.get_save_mana()) as f32
-                                                / 100.0;
+                                            (100 - ability_values.get_save_mana()) as f32 / 100.0;
+
                                         use_ability_value =
                                             (use_ability_value as f32 * use_mana_rate) as i32;
                                     }
+                                }
 
-                                    ability_values_add_value(
-                                        use_ability_type,
-                                        -use_ability_value,
-                                        player.ability_values,
-                                        &mut player.basic_stats,
-                                        &mut player.experience_points,
-                                        &mut player.health_points,
-                                        &mut player.inventory,
-                                        &mut player.level,
-                                        &mut player.mana_points,
-                                        &mut player.skill_points,
-                                        &mut player.stamina,
-                                        &mut player.stat_points,
-                                        &mut player.union_membership,
-                                    );
-                                }
+                                ability_values_add_value_exclusive(
+                                    use_ability_type,
+                                    -use_ability_value,
+                                    &mut target,
+                                );
                             }
-                        } else if let Ok((ability_values, mut health_points)) =
-                            query_set_client_entity.p2().get_mut(entity)
-                        {
-                            for &(use_ability_type, use_ability_value) in
-                                skill_data.use_ability.iter()
-                            {
-                                if use_ability_type == AbilityType::Health {
-                                    health_points.hp = i32::max(
-                                        0,
-                                        i32::min(
-                                            health_points.hp - use_ability_value,
-                                            ability_values.get_max_health(),
-                                        ),
-                                    );
-                                }
-                            }
-                        }
+                        });
                     }
                 }
             }
@@ -1366,24 +1388,30 @@ pub fn game_connection_system(
                 if let Some(defender_entity) = client_entity_list.get(message.entity_id) {
                     let caster_entity = client_entity_list.get(message.caster_entity_id);
 
-                    if let Ok(mut pending_skill_effect_list) =
-                        query_pending_skill_effect_list.get_mut(defender_entity)
-                    {
-                        pending_skill_effect_list.add_effect(
-                            message.skill_id,
-                            caster_entity,
-                            message.caster_intelligence,
-                            message.effect_success,
-                        );
-                    }
+                    commands.add(move |world: &mut World| {
+                        let mut defender = world.entity_mut(defender_entity);
 
-                    if let Some(caster_entity) = caster_entity {
-                        if let Ok(mut pending_skill_target_list) =
-                            query_pending_skill_target_list.get_mut(caster_entity)
+                        if let Some(mut pending_skill_effect_list) =
+                            defender.get_mut::<PendingSkillEffectList>()
                         {
-                            pending_skill_target_list.add_target(message.skill_id, defender_entity);
+                            pending_skill_effect_list.add_effect(
+                                message.skill_id,
+                                caster_entity,
+                                message.caster_intelligence,
+                                message.effect_success,
+                            );
                         }
-                    }
+
+                        if let Some(caster_entity) = caster_entity {
+                            if let Some(mut pending_skill_target_list) = world
+                                .entity_mut(caster_entity)
+                                .get_mut::<PendingSkillTargetList>()
+                            {
+                                pending_skill_target_list
+                                    .add_target(message.skill_id, defender_entity);
+                            }
+                        }
+                    });
                 }
             }
             Ok(ServerMessage::NpcStoreTransactionError(error)) => {
@@ -1404,83 +1432,105 @@ pub fn game_connection_system(
             }
             Ok(ServerMessage::PartyAcceptCreate(_)) => {
                 if let Some(player_entity) = client_entity_list.player_entity {
-                    if let Ok(mut player) = query_set_client_entity.p1().get_mut(player_entity) {
-                        *player.party_membership = PartyMembership::Member(PartyInfo {
-                            owner: PartyOwner::Player,
-                            ..Default::default()
-                        });
-                    }
+                    commands.add(move |world: &mut World| {
+                        if let Some(mut party_membership) =
+                            world.entity_mut(player_entity).get_mut::<PartyMembership>()
+                        {
+                            *party_membership = PartyMembership::Member(PartyInfo {
+                                owner: PartyOwner::Player,
+                                ..Default::default()
+                            });
+                        }
+                    });
                 }
             }
             Ok(ServerMessage::PartyAcceptInvite(_)) => {
                 if let Some(player_entity) = client_entity_list.player_entity {
-                    if let Ok(mut player) = query_set_client_entity.p1().get_mut(player_entity) {
-                        *player.party_membership = PartyMembership::Member(PartyInfo::default());
-                    }
+                    commands.add(move |world: &mut World| {
+                        if let Some(mut party_membership) =
+                            world.entity_mut(player_entity).get_mut::<PartyMembership>()
+                        {
+                            *party_membership = PartyMembership::Member(PartyInfo::default());
+                        }
+                    });
                 }
             }
             Ok(ServerMessage::PartyRejectInvite(_reason, client_entity_id)) => {
                 if let Some(invited_entity) = client_entity_list.get(client_entity_id) {
-                    if let Ok(entity_name) = query_name.get(invited_entity) {
-                        chatbox_events.send(ChatboxEvent::System(format!(
-                            "{} rejected your party invite.",
-                            entity_name.name
-                        )));
-                    }
+                    commands.add(move |world: &mut World| {
+                        if let Some(invited_entity_name) =
+                            world.entity(invited_entity).get::<ClientEntityName>()
+                        {
+                            let message =
+                                format!("{} rejected your party invite.", invited_entity_name.name);
+                            world
+                                .resource_mut::<Events<ChatboxEvent>>()
+                                .send(ChatboxEvent::System(message));
+                        }
+                    });
                 }
             }
             Ok(ServerMessage::PartyChangeOwner(client_entity_id)) => {
                 if let Some(player_entity) = client_entity_list.player_entity {
-                    if let Ok(mut player) = query_set_client_entity.p1().get_mut(player_entity) {
-                        if let PartyMembership::Member(ref mut party_info) =
-                            &mut *player.party_membership
-                        {
-                            if Some(client_entity_id) == client_entity_list.player_entity_id {
-                                party_info.owner = PartyOwner::Player;
-                            } else {
-                                party_info.owner = PartyOwner::Unknown;
+                    let is_player_owner =
+                        Some(client_entity_id) == client_entity_list.player_entity_id;
 
-                                for member in party_info.members.iter() {
-                                    if let PartyMemberInfo::Online(member_info_online) = member {
-                                        if member_info_online.entity_id == client_entity_id {
-                                            party_info.owner = PartyOwner::Character(
-                                                member_info_online.character_id,
-                                            );
-                                            break;
+                    commands.add(move |world: &mut World| {
+                        if let Some(mut party_membership) =
+                            world.entity_mut(player_entity).get_mut::<PartyMembership>()
+                        {
+                            if let PartyMembership::Member(ref mut party_info) =
+                                &mut *party_membership
+                            {
+                                if is_player_owner {
+                                    party_info.owner = PartyOwner::Player;
+                                } else {
+                                    party_info.owner = PartyOwner::Unknown;
+
+                                    for member in party_info.members.iter() {
+                                        if let PartyMemberInfo::Online(member_info_online) = member
+                                        {
+                                            if member_info_online.entity_id == client_entity_id {
+                                                party_info.owner = PartyOwner::Character(
+                                                    member_info_online.character_id,
+                                                );
+                                                break;
+                                            }
                                         }
                                     }
                                 }
                             }
                         }
-                    }
+                    });
                 }
             }
             Ok(ServerMessage::PartyDelete) => {
                 if let Some(player_entity) = client_entity_list.player_entity {
-                    if let Ok(mut player) = query_set_client_entity.p1().get_mut(player_entity) {
-                        *player.party_membership = PartyMembership::None;
-                    }
+                    commands.entity(player_entity).insert(PartyMembership::None);
                 }
             }
             Ok(ServerMessage::PartyMemberList(PartyMemberList { mut members, .. })) => {
                 if let Some(player_entity) = client_entity_list.player_entity {
-                    if let Ok(mut player) = query_set_client_entity.p1().get_mut(player_entity) {
-                        if player.party_membership.is_none() {
-                            *player.party_membership =
-                                PartyMembership::Member(PartyInfo::default());
-                        }
-
-                        if let PartyMembership::Member(ref mut party_info) =
-                            &mut *player.party_membership
+                    commands.add(move |world: &mut World| {
+                        if let Some(mut party_membership) =
+                            world.entity_mut(player_entity).get_mut::<PartyMembership>()
                         {
-                            if matches!(party_info.owner, PartyOwner::Unknown) {
-                                party_info.owner =
-                                    PartyOwner::Character(members[0].get_character_id());
+                            if party_membership.is_none() {
+                                *party_membership = PartyMembership::Member(PartyInfo::default());
                             }
 
-                            party_info.members.append(&mut members);
+                            if let PartyMembership::Member(ref mut party_info) =
+                                &mut *party_membership
+                            {
+                                if matches!(party_info.owner, PartyOwner::Unknown) {
+                                    party_info.owner =
+                                        PartyOwner::Character(members[0].get_character_id());
+                                }
+
+                                party_info.members.append(&mut members);
+                            }
                         }
-                    }
+                    });
                 }
             }
             Ok(ServerMessage::PartyMemberLeave(PartyMemberLeave {
@@ -1488,104 +1538,136 @@ pub fn game_connection_system(
                 owner_character_id,
             })) => {
                 if let Some(player_entity) = client_entity_list.player_entity {
-                    if let Ok(mut player) = query_set_client_entity.p1().get_mut(player_entity) {
-                        if let PartyMembership::Member(ref mut party_info) =
-                            &mut *player.party_membership
-                        {
-                            if player.character_info.unique_id == owner_character_id {
-                                party_info.owner = PartyOwner::Player;
-                            } else {
-                                party_info.owner = PartyOwner::Character(owner_character_id);
-                            }
+                    commands.add(move |world: &mut World| {
+                        let mut player = world.entity_mut(player_entity);
+                        let player_unique_id =
+                            player.get::<CharacterInfo>().map(|info| info.unique_id);
 
-                            if let Some(index) = party_info
-                                .members
-                                .iter()
-                                .position(|x| x.get_character_id() == leaver_character_id)
+                        if let Some(mut party_membership) = player.get_mut::<PartyMembership>() {
+                            if let PartyMembership::Member(ref mut party_info) =
+                                &mut *party_membership
                             {
-                                party_info.members.remove(index);
+                                if player_unique_id == Some(owner_character_id) {
+                                    party_info.owner = PartyOwner::Player;
+                                } else {
+                                    party_info.owner = PartyOwner::Character(owner_character_id);
+                                }
+
+                                if let Some(index) = party_info
+                                    .members
+                                    .iter()
+                                    .position(|x| x.get_character_id() == leaver_character_id)
+                                {
+                                    party_info.members.remove(index);
+                                }
                             }
                         }
-                    }
+                    });
                 }
             }
             Ok(ServerMessage::PartyMemberDisconnect(character_unique_id)) => {
                 if let Some(player_entity) = client_entity_list.player_entity {
-                    if let Ok(mut player) = query_set_client_entity.p1().get_mut(player_entity) {
-                        if let PartyMembership::Member(ref mut party_info) =
-                            &mut *player.party_membership
+                    commands.add(move |world: &mut World| {
+                        if let Some(mut party_membership) =
+                            world.entity_mut(player_entity).get_mut::<PartyMembership>()
                         {
-                            if let Some(party_member) = party_info
-                                .members
-                                .iter_mut()
-                                .find(|x| x.get_character_id() == character_unique_id)
+                            if let PartyMembership::Member(ref mut party_info) =
+                                &mut *party_membership
                             {
-                                if let PartyMemberInfo::Online(party_member_online) = party_member {
-                                    *party_member =
-                                        PartyMemberInfo::Offline(PartyMemberInfoOffline {
-                                            character_id: party_member_online.character_id,
-                                            name: party_member_online.name.clone(),
-                                        });
+                                if let Some(party_member) = party_info
+                                    .members
+                                    .iter_mut()
+                                    .find(|x| x.get_character_id() == character_unique_id)
+                                {
+                                    if let PartyMemberInfo::Online(party_member_online) =
+                                        party_member
+                                    {
+                                        *party_member =
+                                            PartyMemberInfo::Offline(PartyMemberInfoOffline {
+                                                character_id: party_member_online.character_id,
+                                                name: party_member_online.name.clone(),
+                                            });
+                                    }
                                 }
                             }
                         }
-                    }
+                    });
                 }
             }
             Ok(ServerMessage::PartyMemberKicked(character_unique_id)) => {
                 if let Some(player_entity) = client_entity_list.player_entity {
-                    if let Ok(mut player) = query_set_client_entity.p1().get_mut(player_entity) {
-                        if player.character_info.unique_id == character_unique_id {
-                            *player.party_membership = PartyMembership::None;
-                        } else if let PartyMembership::Member(ref mut party_info) =
-                            &mut *player.party_membership
+                    commands.add(move |world: &mut World| {
+                        if let Some(mut party_membership) =
+                            world.entity_mut(player_entity).get_mut::<PartyMembership>()
                         {
-                            if let Some(index) = party_info
-                                .members
-                                .iter()
-                                .position(|x| x.get_character_id() == character_unique_id)
+                            if let PartyMembership::Member(ref mut party_info) =
+                                &mut *party_membership
                             {
-                                party_info.members.remove(index);
+                                if let Some(index) = party_info
+                                    .members
+                                    .iter()
+                                    .position(|x| x.get_character_id() == character_unique_id)
+                                {
+                                    party_info.members.remove(index);
+                                }
                             }
                         }
-                    }
+                    });
                 }
             }
             Ok(ServerMessage::PartyMemberUpdateInfo(party_member_info)) => {
-                if let Some(entity) = client_entity_list.get(party_member_info.entity_id) {
-                    if let Ok(mut character) = query_set_client_entity.p0().get_mut(entity) {
-                        // TODO: Set ability values max_health, health_recovery, mana_recovery, stamina
-                        character.basic_stats.concentration = party_member_info.concentration;
-                        character.health_points.hp = party_member_info.health_points.hp;
-                    }
-                }
+                let member_entity = client_entity_list.get(party_member_info.entity_id);
+                let player_entity = client_entity_list.player_entity;
 
-                if let Some(player_entity) = client_entity_list.player_entity {
-                    if let Ok(mut player) = query_set_client_entity.p1().get_mut(player_entity) {
-                        if let PartyMembership::Member(ref mut party_info) =
-                            &mut *player.party_membership
+                if member_entity.is_some() || player_entity.is_some() {
+                    commands.add(move |world: &mut World| {
+                        if let Some(mut member) = member_entity
+                            .and_then(|member_entity| world.get_entity_mut(member_entity))
                         {
-                            if let Some(party_member) = party_info
-                                .members
-                                .iter_mut()
-                                .find(|x| x.get_character_id() == party_member_info.character_id)
-                            {
-                                *party_member = PartyMemberInfo::Online(party_member_info);
+                            if let Some(mut basic_stats) = member.get_mut::<BasicStats>() {
+                                basic_stats.concentration = party_member_info.concentration;
+                            }
+
+                            if let Some(mut health_points) = member.get_mut::<HealthPoints>() {
+                                health_points.hp = party_member_info.health_points.hp;
                             }
                         }
-                    }
+
+                        if let Some(mut player) = player_entity
+                            .and_then(|player_entity| world.get_entity_mut(player_entity))
+                        {
+                            if let Some(mut party_membership) = player.get_mut::<PartyMembership>()
+                            {
+                                if let PartyMembership::Member(ref mut party_info) =
+                                    &mut *party_membership
+                                {
+                                    if let Some(party_member) =
+                                        party_info.members.iter_mut().find(|x| {
+                                            x.get_character_id() == party_member_info.character_id
+                                        })
+                                    {
+                                        *party_member = PartyMemberInfo::Online(party_member_info);
+                                    }
+                                }
+                            }
+                        }
+                    });
                 }
             }
             Ok(ServerMessage::PartyUpdateRules(item_sharing, xp_sharing)) => {
                 if let Some(player_entity) = client_entity_list.player_entity {
-                    if let Ok(mut player) = query_set_client_entity.p1().get_mut(player_entity) {
-                        if let PartyMembership::Member(ref mut party_info) =
-                            &mut *player.party_membership
+                    commands.add(move |world: &mut World| {
+                        if let Some(mut party_membership) =
+                            world.entity_mut(player_entity).get_mut::<PartyMembership>()
                         {
-                            party_info.item_sharing = item_sharing;
-                            party_info.xp_sharing = xp_sharing;
+                            if let PartyMembership::Member(ref mut party_info) =
+                                &mut *party_membership
+                            {
+                                party_info.item_sharing = item_sharing;
+                                party_info.xp_sharing = xp_sharing;
+                            }
                         }
-                    }
+                    });
                 }
             }
             Ok(message) => {

@@ -1,6 +1,6 @@
 use std::num::NonZeroUsize;
 
-use bevy::prelude::Mut;
+use bevy::{ecs::world::EntityMut, prelude::Mut};
 use num_traits::{AsPrimitive, Saturating, Signed};
 use rose_data::AbilityType;
 
@@ -218,6 +218,162 @@ pub fn ability_values_add_value(
     true
 }
 
+pub fn ability_values_add_value_exclusive(
+    ability_type: AbilityType,
+    value: i32,
+    entity: &mut EntityMut,
+) -> bool {
+    match ability_type {
+        AbilityType::Strength => {
+            if let Some(mut basic_stats) = entity.get_mut::<BasicStats>() {
+                basic_stats.strength = add_value(basic_stats.strength, value);
+            }
+        }
+        AbilityType::Dexterity => {
+            if let Some(mut basic_stats) = entity.get_mut::<BasicStats>() {
+                basic_stats.dexterity = add_value(basic_stats.dexterity, value);
+            }
+        }
+        AbilityType::Intelligence => {
+            if let Some(mut basic_stats) = entity.get_mut::<BasicStats>() {
+                basic_stats.intelligence = add_value(basic_stats.intelligence, value);
+            }
+        }
+        AbilityType::Concentration => {
+            if let Some(mut basic_stats) = entity.get_mut::<BasicStats>() {
+                basic_stats.concentration = add_value(basic_stats.concentration, value);
+            }
+        }
+        AbilityType::Charm => {
+            if let Some(mut basic_stats) = entity.get_mut::<BasicStats>() {
+                basic_stats.charm = add_value(basic_stats.charm, value);
+            }
+        }
+        AbilityType::Sense => {
+            if let Some(mut basic_stats) = entity.get_mut::<BasicStats>() {
+                basic_stats.sense = add_value(basic_stats.sense, value);
+            }
+        }
+        AbilityType::BonusPoint => {
+            if let Some(mut stat_points) = entity.get_mut::<StatPoints>() {
+                stat_points.points = add_value(stat_points.points, value);
+            }
+        }
+        AbilityType::Skillpoint => {
+            if let Some(mut skill_points) = entity.get_mut::<SkillPoints>() {
+                skill_points.points = add_value(skill_points.points, value);
+            }
+        }
+        AbilityType::Money => {
+            if let Some(mut inventory) = entity.get_mut::<Inventory>() {
+                inventory.try_add_money(Money(value as i64)).ok();
+            }
+        }
+        AbilityType::UnionPoint1 => {
+            if let Some(mut union_membership) = entity.get_mut::<UnionMembership>() {
+                union_membership.points[0] = add_value(union_membership.points[0], value);
+            }
+        }
+        AbilityType::UnionPoint2 => {
+            if let Some(mut union_membership) = entity.get_mut::<UnionMembership>() {
+                union_membership.points[1] = add_value(union_membership.points[1], value);
+            }
+        }
+        AbilityType::UnionPoint3 => {
+            if let Some(mut union_membership) = entity.get_mut::<UnionMembership>() {
+                union_membership.points[2] = add_value(union_membership.points[2], value);
+            }
+        }
+        AbilityType::UnionPoint4 => {
+            if let Some(mut union_membership) = entity.get_mut::<UnionMembership>() {
+                union_membership.points[3] = add_value(union_membership.points[3], value);
+            }
+        }
+        AbilityType::UnionPoint5 => {
+            if let Some(mut union_membership) = entity.get_mut::<UnionMembership>() {
+                union_membership.points[4] = add_value(union_membership.points[4], value);
+            }
+        }
+        AbilityType::UnionPoint6 => {
+            if let Some(mut union_membership) = entity.get_mut::<UnionMembership>() {
+                union_membership.points[5] = add_value(union_membership.points[5], value);
+            }
+        }
+        AbilityType::UnionPoint7 => {
+            if let Some(mut union_membership) = entity.get_mut::<UnionMembership>() {
+                union_membership.points[6] = add_value(union_membership.points[6], value);
+            }
+        }
+        AbilityType::UnionPoint8 => {
+            if let Some(mut union_membership) = entity.get_mut::<UnionMembership>() {
+                union_membership.points[7] = add_value(union_membership.points[7], value);
+            }
+        }
+        AbilityType::UnionPoint9 => {
+            if let Some(mut union_membership) = entity.get_mut::<UnionMembership>() {
+                union_membership.points[8] = add_value(union_membership.points[8], value);
+            }
+        }
+        AbilityType::UnionPoint10 => {
+            if let Some(mut union_membership) = entity.get_mut::<UnionMembership>() {
+                union_membership.points[9] = add_value(union_membership.points[9], value);
+            }
+        }
+        AbilityType::Stamina => {
+            if let Some(mut stamina) = entity.get_mut::<Stamina>() {
+                stamina.stamina = u32::min(add_value(stamina.stamina, value), MAX_STAMINA);
+            }
+        }
+        AbilityType::Health => {
+            let max_hp = entity
+                .get::<AbilityValues>()
+                .map(|ability_values| ability_values.get_max_health());
+
+            if let Some(mut health_points) = entity.get_mut::<HealthPoints>() {
+                let mut new_hp = add_value(health_points.hp, value);
+                if let Some(max_hp) = max_hp {
+                    new_hp = new_hp.min(max_hp);
+                }
+
+                health_points.hp = new_hp;
+            }
+        }
+        AbilityType::Mana => {
+            let max_mp = entity
+                .get::<AbilityValues>()
+                .map(|ability_values| ability_values.get_max_mana());
+
+            if let Some(mut mana_points) = entity.get_mut::<ManaPoints>() {
+                let mut new_mp = add_value(mana_points.mp, value);
+                if let Some(max_mp) = max_mp {
+                    new_mp = new_mp.min(max_mp);
+                }
+
+                mana_points.mp = new_mp;
+            }
+        }
+        AbilityType::Experience => {
+            if let Some(mut experience_points) = entity.get_mut::<ExperiencePoints>() {
+                experience_points.xp = add_value(experience_points.xp, value);
+            }
+        }
+        AbilityType::Level => {
+            if let Some(mut level) = entity.get_mut::<Level>() {
+                level.level = add_value(level.level, value);
+            }
+        }
+        _ => {
+            log::warn!(
+                "ability_values_add_value unimplemented for ability type {:?}",
+                ability_type
+            );
+            return false;
+        }
+    }
+
+    true
+}
+
 pub fn ability_values_set_value(
     ability_type: AbilityType,
     value: i32,
@@ -312,6 +468,184 @@ pub fn ability_values_set_value(
         AbilityType::Experience => experience_points.xp = value as u64,
         AbilityType::Level => level.level = value as u32,
         AbilityType::TeamNumber => team.id = value as u32,
+        /*
+        TODO: Implement remaining set ability types
+        AbilityType::PvpFlag => false,
+        */
+        _ => {
+            log::warn!(
+                "ability_values_set_value unimplemented for ability type {:?}",
+                ability_type
+            );
+            return false;
+        }
+    }
+
+    true
+}
+
+pub fn ability_values_set_value_exclusive(
+    ability_type: AbilityType,
+    value: i32,
+    entity: &mut EntityMut,
+) -> bool {
+    match ability_type {
+        AbilityType::Gender => {
+            if let Some(mut character_info) = entity.get_mut::<CharacterInfo>() {
+                if value == 0 {
+                    character_info.gender = CharacterGender::Male;
+                } else {
+                    character_info.gender = CharacterGender::Female;
+                }
+            }
+        }
+        AbilityType::Face => {
+            if let Some(mut character_info) = entity.get_mut::<CharacterInfo>() {
+                character_info.face = value as u8;
+            }
+        }
+        AbilityType::Hair => {
+            if let Some(mut character_info) = entity.get_mut::<CharacterInfo>() {
+                character_info.hair = value as u8;
+            }
+        }
+        AbilityType::Class => {
+            if let Some(mut character_info) = entity.get_mut::<CharacterInfo>() {
+                character_info.job = value as u16;
+            }
+        }
+        AbilityType::Strength => {
+            if let Some(mut basic_stats) = entity.get_mut::<BasicStats>() {
+                basic_stats.strength = value;
+            }
+        }
+        AbilityType::Dexterity => {
+            if let Some(mut basic_stats) = entity.get_mut::<BasicStats>() {
+                basic_stats.dexterity = value;
+            }
+        }
+        AbilityType::Intelligence => {
+            if let Some(mut basic_stats) = entity.get_mut::<BasicStats>() {
+                basic_stats.intelligence = value;
+            }
+        }
+        AbilityType::Concentration => {
+            if let Some(mut basic_stats) = entity.get_mut::<BasicStats>() {
+                basic_stats.concentration = value;
+            }
+        }
+        AbilityType::Charm => {
+            if let Some(mut basic_stats) = entity.get_mut::<BasicStats>() {
+                basic_stats.charm = value;
+            }
+        }
+        AbilityType::Sense => {
+            if let Some(mut basic_stats) = entity.get_mut::<BasicStats>() {
+                basic_stats.sense = value;
+            }
+        }
+        AbilityType::Union => {
+            if let Some(mut union_membership) = entity.get_mut::<UnionMembership>() {
+                if value == 0 {
+                    union_membership.current_union = None;
+                } else {
+                    union_membership.current_union = NonZeroUsize::new(value as usize);
+                }
+            }
+        }
+        AbilityType::UnionPoint1 => {
+            if let Some(mut union_membership) = entity.get_mut::<UnionMembership>() {
+                union_membership.points[0] = value as u32;
+            }
+        }
+        AbilityType::UnionPoint2 => {
+            if let Some(mut union_membership) = entity.get_mut::<UnionMembership>() {
+                union_membership.points[1] = value as u32;
+            }
+        }
+        AbilityType::UnionPoint3 => {
+            if let Some(mut union_membership) = entity.get_mut::<UnionMembership>() {
+                union_membership.points[2] = value as u32;
+            }
+        }
+        AbilityType::UnionPoint4 => {
+            if let Some(mut union_membership) = entity.get_mut::<UnionMembership>() {
+                union_membership.points[3] = value as u32;
+            }
+        }
+        AbilityType::UnionPoint5 => {
+            if let Some(mut union_membership) = entity.get_mut::<UnionMembership>() {
+                union_membership.points[4] = value as u32;
+            }
+        }
+        AbilityType::UnionPoint6 => {
+            if let Some(mut union_membership) = entity.get_mut::<UnionMembership>() {
+                union_membership.points[5] = value as u32;
+            }
+        }
+        AbilityType::UnionPoint7 => {
+            if let Some(mut union_membership) = entity.get_mut::<UnionMembership>() {
+                union_membership.points[6] = value as u32;
+            }
+        }
+        AbilityType::UnionPoint8 => {
+            if let Some(mut union_membership) = entity.get_mut::<UnionMembership>() {
+                union_membership.points[7] = value as u32;
+            }
+        }
+        AbilityType::UnionPoint9 => {
+            if let Some(mut union_membership) = entity.get_mut::<UnionMembership>() {
+                union_membership.points[8] = value as u32;
+            }
+        }
+        AbilityType::UnionPoint10 => {
+            if let Some(mut union_membership) = entity.get_mut::<UnionMembership>() {
+                union_membership.points[9] = value as u32;
+            }
+        }
+        AbilityType::Health => {
+            let max_hp = entity
+                .get::<AbilityValues>()
+                .map(|ability_values| ability_values.get_max_health());
+
+            if let Some(mut health_points) = entity.get_mut::<HealthPoints>() {
+                let mut new_hp = value;
+                if let Some(max_hp) = max_hp {
+                    new_hp = new_hp.min(max_hp);
+                }
+
+                health_points.hp = new_hp;
+            }
+        }
+        AbilityType::Mana => {
+            let max_mp = entity
+                .get::<AbilityValues>()
+                .map(|ability_values| ability_values.get_max_mana());
+
+            if let Some(mut mana_points) = entity.get_mut::<ManaPoints>() {
+                let mut new_mp = value;
+                if let Some(max_mp) = max_mp {
+                    new_mp = new_mp.min(max_mp);
+                }
+
+                mana_points.mp = new_mp;
+            }
+        }
+        AbilityType::Experience => {
+            if let Some(mut experience_points) = entity.get_mut::<ExperiencePoints>() {
+                experience_points.xp = value as u64;
+            }
+        }
+        AbilityType::Level => {
+            if let Some(mut level) = entity.get_mut::<Level>() {
+                level.level = value as u32;
+            }
+        }
+        AbilityType::TeamNumber => {
+            if let Some(mut team) = entity.get_mut::<Team>() {
+                team.id = value as u32;
+            }
+        }
         /*
         TODO: Implement remaining set ability types
         AbilityType::PvpFlag => false,
