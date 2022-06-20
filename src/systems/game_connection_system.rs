@@ -1,8 +1,8 @@
 use bevy::{
-    ecs::{event::Events, query::WorldQuery},
+    ecs::event::Events,
     math::{Quat, Vec3},
     prelude::{
-        BuildChildren, Commands, ComputedVisibility, DespawnRecursiveExt, Entity, EventWriter,
+        BuildChildren, Commands, ComputedVisibility, DespawnRecursiveExt, EventWriter,
         GlobalTransform, Mut, Res, ResMut, State, Transform, Visibility, World,
     },
 };
@@ -12,8 +12,7 @@ use rose_game_common::{
     components::{
         AbilityValues, BasicStatType, BasicStats, CharacterInfo, DroppedItem, Equipment,
         ExperiencePoints, HealthPoints, Hotbar, Inventory, ItemDrop, ItemSlot, Level, ManaPoints,
-        MoveMode, MoveSpeed, QuestState, SkillList, SkillPoints, Stamina, StatPoints,
-        StatusEffects, Team, UnionMembership,
+        MoveMode, MoveSpeed, QuestState, SkillList, Stamina, StatPoints, StatusEffects,
     },
     messages::server::{
         CommandState, LearnSkillError, LevelUpSkillError, PartyMemberInfo, PartyMemberInfoOffline,
@@ -35,31 +34,6 @@ use crate::{
     events::{ChatboxEvent, ClientEntityEvent, GameConnectionEvent, PartyEvent, QuestTriggerEvent},
     resources::{AppState, ClientEntityList, GameConnection, GameData, WorldRates, WorldTime},
 };
-
-#[derive(WorldQuery)]
-#[world_query(mutable)]
-pub struct QueryPlayer<'w> {
-    pub entity: Entity,
-    pub ability_values: &'w AbilityValues,
-    pub character_info: &'w mut CharacterInfo,
-    pub basic_stats: &'w mut BasicStats,
-    pub equipment: &'w mut Equipment,
-    pub experience_points: &'w mut ExperiencePoints,
-    pub health_points: &'w mut HealthPoints,
-    pub hotbar: &'w mut Hotbar,
-    pub inventory: &'w mut Inventory,
-    pub level: &'w mut Level,
-    pub mana_points: &'w mut ManaPoints,
-    pub party_membership: &'w mut PartyMembership,
-    pub quest_state: &'w mut QuestState,
-    pub skill_list: &'w mut SkillList,
-    pub skill_points: &'w mut SkillPoints,
-    pub stamina: &'w mut Stamina,
-    pub stat_points: &'w mut StatPoints,
-    pub status_effects: &'w StatusEffects,
-    pub team: &'w mut Team,
-    pub union_membership: &'w mut UnionMembership,
-}
 
 pub fn game_connection_system(
     mut commands: Commands,
