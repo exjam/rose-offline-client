@@ -1,6 +1,7 @@
 use std::time::Duration;
 
 use bevy::{
+    ecs::query::WorldQuery,
     math::Vec3Swizzles,
     prelude::{Entity, EventReader, EventWriter, Query, Res, With},
 };
@@ -20,23 +21,25 @@ use crate::{
     resources::{GameConnection, GameData},
 };
 
+#[derive(WorldQuery)]
+#[world_query(mutable)]
+pub struct PlayerQuery<'w> {
+    entity: Entity,
+    cooldowns: &'w mut Cooldowns,
+    hotbar: &'w mut Hotbar,
+    inventory: &'w Inventory,
+    position: &'w Position,
+    skill_list: &'w SkillList,
+    team: &'w Team,
+    party_membership: &'w PartyMembership,
+    selected_target: Option<&'w SelectedTarget>,
+    _player_character: With<PlayerCharacter>,
+}
+
 #[allow(clippy::too_many_arguments)]
 pub fn player_command_system(
     mut player_command_events: EventReader<PlayerCommandEvent>,
-    mut query_player: Query<
-        (
-            Entity,
-            &mut Cooldowns,
-            &mut Hotbar,
-            &Inventory,
-            &Position,
-            &SkillList,
-            &Team,
-            &PartyMembership,
-            Option<&SelectedTarget>,
-        ),
-        With<PlayerCharacter>,
-    >,
+    mut query_player: Query<PlayerQuery>,
     query_client_entity: Query<&ClientEntity>,
     query_dropped_items: Query<(&ClientEntity, &Position), With<ItemDrop>>,
     query_team: Query<(&ClientEntity, &Team)>,
@@ -48,23 +51,14 @@ pub fn player_command_system(
     if query_player_result.is_err() {
         return;
     }
-    let (
-        _player_entity,
-        mut player_cooldowns,
-        mut player_hotbar,
-        player_inventory,
-        player_position,
-        player_skill_list,
-        player_team,
-        player_party_membership,
-        player_selected_target,
-    ) = query_player_result.unwrap();
+    let mut player = query_player_result.unwrap();
 
     for event in player_command_events.iter() {
         let mut event = event.clone();
 
         if let PlayerCommandEvent::UseHotbar(page, index) = event {
-            if let Some(hotbar_slot) = player_hotbar
+            if let Some(hotbar_slot) = player
+                .hotbar
                 .pages
                 .get(page)
                 .and_then(|page| page.get(index))
@@ -86,17 +80,20 @@ pub fn player_command_system(
 
         match event {
             PlayerCommandEvent::UseSkill(skill_slot) => {
-                if let Some(skill_data) = player_skill_list
+                if let Some(skill_data) = player
+                    .skill_list
                     .get_skill(skill_slot)
                     .and_then(|skill_id| game_data.skills.get_skill(skill_id))
                 {
                     // TODO: Check skill cooldown
-                    if player_cooldowns.has_global_cooldown() {
+                    if player.cooldowns.has_global_cooldown() {
                         chatbox_events.send(ChatboxEvent::System("Waiting...".to_string()));
                         continue;
                     }
 
-                    player_cooldowns.set_global_cooldown(Duration::from_millis(250));
+                    player
+                        .cooldowns
+                        .set_global_cooldown(Duration::from_millis(250));
 
                     match skill_data.skill_type {
                         SkillType::BasicAction => match &skill_data.basic_command {
@@ -117,7 +114,7 @@ pub fn player_command_system(
                                     let distance = item_position
                                         .position
                                         .xy()
-                                        .distance_squared(player_position.xy());
+                                        .distance_squared(player.position.xy());
 
                                     if nearest_item_drop
                                         .as_ref()
@@ -147,12 +144,12 @@ pub fn player_command_system(
                                 }
                             }
                             Some(SkillBasicCommand::Attack) => {
-                                if let Some(player_selected_target) = player_selected_target {
+                                if let Some(selected_target) = player.selected_target {
                                     if let Ok((target_client_entity, target_team)) =
-                                        query_team.get(player_selected_target.entity)
+                                        query_team.get(selected_target.entity)
                                     {
                                         if target_team.id != Team::DEFAULT_NPC_TEAM_ID
-                                            && target_team.id != player_team.id
+                                            && target_team.id != player.team.id
                                         {
                                             if let Some(game_connection) = game_connection.as_ref()
                                             {
@@ -178,14 +175,14 @@ pub fn player_command_system(
                                 }
                             }
                             Some(SkillBasicCommand::PartyInvite) => {
-                                if let Some(player_selected_target) = player_selected_target {
+                                if let Some(selected_target) = player.selected_target {
                                     if let Ok((target_client_entity, target_team)) =
-                                        query_team.get(player_selected_target.entity)
+                                        query_team.get(selected_target.entity)
                                     {
-                                        if target_team.id == player_team.id {
+                                        if target_team.id == player.team.id {
                                             if let Some(game_connection) = game_connection.as_ref()
                                             {
-                                                let message = if player_party_membership.is_none() {
+                                                let message = if player.party_membership.is_none() {
                                                     ClientMessage::PartyCreate(
                                                         target_client_entity.id,
                                                     )
@@ -267,7 +264,8 @@ pub fn player_command_system(
                         | SkillType::EnforceBullet
                         | SkillType::FireBullet => {
                             // TODO: Check target team
-                            if let Some((target_client_entity, _)) = player_selected_target
+                            if let Some((target_client_entity, _)) = player
+                                .selected_target
                                 .and_then(|target| query_team.get(target.entity).ok())
                             {
                                 if let Some(game_connection) = game_connection.as_ref() {
@@ -292,7 +290,7 @@ pub fn player_command_system(
                 }
             }
             PlayerCommandEvent::UseItem(item_slot) => {
-                if let Some(item) = player_inventory.get_item(item_slot) {
+                if let Some(item) = player.inventory.get_item(item_slot) {
                     if item.get_item_type() == ItemType::Consumable {
                         let consumable_item_data =
                             game_data.items.get_consumable_item(item.get_item_number());
@@ -330,7 +328,9 @@ pub fn player_command_system(
                             // Check if item is on cooldown
                             if cooldown_group
                                 .and_then(|cooldown_group| {
-                                    player_cooldowns.get_consumable_cooldown_percent(cooldown_group)
+                                    player
+                                        .cooldowns
+                                        .get_consumable_cooldown_percent(cooldown_group)
                                 })
                                 .is_some()
                             {
@@ -352,10 +352,9 @@ pub fn player_command_system(
                                             | SkillType::TargetBound
                                             | SkillType::TargetStateDuration
                                     ) {
-                                        if let Some((target_client_entity, _)) =
-                                            player_selected_target.and_then(|target| {
-                                                query_team.get(target.entity).ok()
-                                            })
+                                        if let Some((target_client_entity, _)) = player
+                                            .selected_target
+                                            .and_then(|target| query_team.get(target.entity).ok())
                                         {
                                             // TODO: Check target team
                                             use_item_target = Some(target_client_entity.id);
@@ -372,7 +371,8 @@ pub fn player_command_system(
                             if let (Some(cooldown_group), Some(cooldown_duration)) =
                                 (cooldown_group, cooldown_duration)
                             {
-                                player_cooldowns
+                                player
+                                    .cooldowns
                                     .set_consumable_cooldown(cooldown_group, cooldown_duration);
                             }
 
@@ -391,7 +391,7 @@ pub fn player_command_system(
             PlayerCommandEvent::Attack(entity) => {
                 if let Ok((target_client_entity, target_team)) = query_team.get(entity) {
                     if target_team.id != Team::DEFAULT_NPC_TEAM_ID
-                        && target_team.id != player_team.id
+                        && target_team.id != player.team.id
                     {
                         if let Some(game_connection) = game_connection.as_ref() {
                             game_connection
@@ -422,7 +422,7 @@ pub fn player_command_system(
                 }
             }
             PlayerCommandEvent::SetHotbar(page, page_index, hotbar_slot) => {
-                if let Some(hotbar_page) = player_hotbar.pages.get_mut(page) {
+                if let Some(hotbar_page) = player.hotbar.pages.get_mut(page) {
                     if let Some(hotbar_page_slot) = hotbar_page.get_mut(page_index) {
                         *hotbar_page_slot = hotbar_slot.clone();
                     }
@@ -432,7 +432,7 @@ pub fn player_command_system(
                     game_connection
                         .client_message_tx
                         .send(ClientMessage::SetHotbarSlot(SetHotbarSlot {
-                            slot_index: page * player_hotbar.pages[0].len() + page_index,
+                            slot_index: page * player.hotbar.pages[0].len() + page_index,
                             slot: hotbar_slot,
                         }))
                         .ok();
