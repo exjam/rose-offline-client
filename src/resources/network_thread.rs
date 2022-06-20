@@ -68,7 +68,6 @@ impl NetworkThread {
         )
     }
 
-    #[allow(dead_code)]
     pub fn connect_game(
         &self,
         ip: &str,

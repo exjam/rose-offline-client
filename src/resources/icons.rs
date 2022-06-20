@@ -71,7 +71,6 @@ impl Icons {
         ))
     }
 
-    #[allow(dead_code)]
     pub fn get_skill_icon(&self, index: usize) -> Option<(egui::TextureId, egui::Rect)> {
         let page_index = index / ICONS_PER_PAGE;
         let (_, item_texture_id) = self.skill_pages.get(page_index)?;

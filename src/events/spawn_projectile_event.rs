@@ -3,9 +3,9 @@ use bevy::{math::Vec3, prelude::Entity};
 use rose_data::{EffectBulletMoveType, EffectId, SkillId};
 use rose_game_common::components::MoveSpeed;
 
-#[allow(dead_code)]
 pub enum SpawnProjectileTarget {
     Entity(Entity),
+    #[allow(dead_code)]
     Position(Vec3),
 }
 

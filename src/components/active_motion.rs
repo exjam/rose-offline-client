@@ -32,17 +32,6 @@ impl ActiveMotion {
         }
     }
 
-    #[allow(dead_code)]
-    pub fn new_repeat_n(motion: Handle<ZmoAsset>, repeat_count: usize) -> Self {
-        Self {
-            motion,
-            repeat_limit: Some(repeat_count),
-            animation_speed: 1.0,
-            start_time: None,
-            previous_frame: None,
-        }
-    }
-
     pub fn with_animation_speed(mut self, animation_speed: f32) -> Self {
         self.animation_speed = animation_speed;
         self

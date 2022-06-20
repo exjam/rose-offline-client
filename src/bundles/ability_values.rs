@@ -112,6 +112,7 @@ fn add_value<T: Saturating + Copy + 'static, U: Signed + AsPrimitive<T>>(
     }
 }
 
+#[allow(dead_code)]
 pub fn ability_values_add_value(
     ability_type: AbilityType,
     value: i32,
@@ -374,6 +375,7 @@ pub fn ability_values_add_value_exclusive(
     true
 }
 
+#[allow(dead_code)]
 pub fn ability_values_set_value(
     ability_type: AbilityType,
     value: i32,

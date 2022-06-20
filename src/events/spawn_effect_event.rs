@@ -33,7 +33,6 @@ impl SpawnEffectData {
     }
 }
 
-#[allow(dead_code)]
 pub enum SpawnEffectEvent {
     // Spawns an effect at the same location than Entity, but does not attach to entity
     AtEntity(Entity, SpawnEffectData),
@@ -45,5 +44,6 @@ pub enum SpawnEffectEvent {
     OnEntity(Entity, Option<usize>, SpawnEffectData),
 
     // Spawns an effect with the given transform
+    #[allow(dead_code)]
     WithTransform(Transform, SpawnEffectData),
 }

@@ -71,7 +71,6 @@ pub enum GameClientError {
 pub struct GameClient {
     server_address: SocketAddr,
     client_message_rx: tokio::sync::mpsc::UnboundedReceiver<ClientMessage>,
-    #[allow(dead_code)]
     server_message_tx: crossbeam_channel::Sender<ServerMessage>,
     packet_codec: Box<dyn PacketCodec + Send + Sync>,
 }
