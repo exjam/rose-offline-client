@@ -13,38 +13,38 @@ use rose_game_common::{
 };
 
 use crate::{
-    components::{ClientEntity, ClientEntityName, PartyMembership, PartyOwner, PlayerCharacter},
+    components::{ClientEntity, ClientEntityName, PartyInfo, PartyOwner, PlayerCharacter},
     events::PartyEvent,
     resources::{ClientEntityList, GameConnection},
 };
 
 #[derive(WorldQuery)]
 pub struct PlayerQuery<'w> {
-    pub _player_character: With<PlayerCharacter>,
-    pub ability_values: &'w AbilityValues,
-    pub character_info: &'w CharacterInfo,
-    pub health_points: &'w HealthPoints,
-    pub level: &'w Level,
-    pub party_membership: &'w PartyMembership,
+    _player_character: With<PlayerCharacter>,
+    ability_values: &'w AbilityValues,
+    character_info: &'w CharacterInfo,
+    health_points: &'w HealthPoints,
+    level: &'w Level,
+    party_info: Option<&'w PartyInfo>,
 }
 
 #[derive(WorldQuery)]
 pub struct PartyMemberQuery<'w> {
-    pub character_info: &'w CharacterInfo,
-    pub ability_values: &'w AbilityValues,
-    pub health_points: &'w HealthPoints,
-    pub level: &'w Level,
+    character_info: &'w CharacterInfo,
+    ability_values: &'w AbilityValues,
+    health_points: &'w HealthPoints,
+    level: &'w Level,
 }
 
 pub struct PendingPartyInvite {
-    pub is_create: bool,
-    pub client_entity_id: ClientEntityId,
-    pub name: String,
+    is_create: bool,
+    client_entity_id: ClientEntityId,
+    name: String,
 }
 
 #[derive(Default)]
 pub struct UiStatePartySystem {
-    pub pending_invites: Vec<PendingPartyInvite>,
+    pending_invites: Vec<PendingPartyInvite>,
 }
 
 pub fn ui_party_system(
@@ -90,7 +90,7 @@ pub fn ui_party_system(
         let mut rejected = false;
         let pending_invite = &ui_state.pending_invites[i];
 
-        if player.party_membership.is_none() {
+        if player.party_info.is_none() {
             egui::Window::new("Party Invite")
                 .id(egui::Id::new(format!(
                     "party_invite_{}",
@@ -164,7 +164,7 @@ pub fn ui_party_system(
         i += 1;
     }
 
-    if let PartyMembership::Member(party_info) = player.party_membership {
+    if let Some(party_info) = player.party_info {
         let style = egui_context.ctx_mut().style();
         let window_frame = egui::Frame::window(&style).fill(egui::Color32::from_rgba_unmultiplied(
             style.visuals.widgets.noninteractive.bg_fill.r(),

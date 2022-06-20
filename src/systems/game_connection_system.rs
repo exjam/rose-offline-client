@@ -27,9 +27,9 @@ use crate::{
     components::{
         ClientEntity, ClientEntityName, ClientEntityType, CollisionRayCastSource, Command,
         CommandCastSkillTarget, Cooldowns, MovementCollisionEntities, NextCommand, PartyInfo,
-        PartyMembership, PartyOwner, PassiveRecoveryTime, PendingDamage, PendingDamageList,
-        PendingSkillEffect, PendingSkillEffectList, PendingSkillTarget, PendingSkillTargetList,
-        PersonalStore, PlayerCharacter, Position, VisibleStatusEffects,
+        PartyOwner, PassiveRecoveryTime, PendingDamage, PendingDamageList, PendingSkillEffect,
+        PendingSkillEffectList, PendingSkillTarget, PendingSkillTargetList, PersonalStore,
+        PlayerCharacter, Position, VisibleStatusEffects,
     },
     events::{ChatboxEvent, ClientEntityEvent, GameConnectionEvent, PartyEvent, QuestTriggerEvent},
     resources::{AppState, ClientEntityList, GameConnection, GameData, WorldRates, WorldTime},
@@ -103,7 +103,6 @@ pub fn game_connection_system(
                             move_mode,
                             move_speed,
                             Cooldowns::default(),
-                            PartyMembership::default(),
                             PassiveRecoveryTime::default(),
                             PendingSkillTargetList::default(),
                             PendingDamageList::default(),
@@ -1408,26 +1407,17 @@ pub fn game_connection_system(
             }
             Ok(ServerMessage::PartyAcceptCreate(_)) => {
                 if let Some(player_entity) = client_entity_list.player_entity {
-                    commands.add(move |world: &mut World| {
-                        if let Some(mut party_membership) =
-                            world.entity_mut(player_entity).get_mut::<PartyMembership>()
-                        {
-                            *party_membership = PartyMembership::Member(PartyInfo {
-                                owner: PartyOwner::Player,
-                                ..Default::default()
-                            });
-                        }
+                    commands.entity(player_entity).insert(PartyInfo {
+                        owner: PartyOwner::Player,
+                        ..Default::default()
                     });
                 }
             }
             Ok(ServerMessage::PartyAcceptInvite(_)) => {
                 if let Some(player_entity) = client_entity_list.player_entity {
-                    commands.add(move |world: &mut World| {
-                        if let Some(mut party_membership) =
-                            world.entity_mut(player_entity).get_mut::<PartyMembership>()
-                        {
-                            *party_membership = PartyMembership::Member(PartyInfo::default());
-                        }
+                    commands.entity(player_entity).insert(PartyInfo {
+                        owner: PartyOwner::Unknown,
+                        ..Default::default()
                     });
                 }
             }
@@ -1454,26 +1444,21 @@ pub fn game_connection_system(
                         Some(client_entity_id) == client_entity_list.player_entity_id;
 
                     commands.add(move |world: &mut World| {
-                        if let Some(mut party_membership) =
-                            world.entity_mut(player_entity).get_mut::<PartyMembership>()
+                        if let Some(mut party_info) =
+                            world.entity_mut(player_entity).get_mut::<PartyInfo>()
                         {
-                            if let PartyMembership::Member(ref mut party_info) =
-                                &mut *party_membership
-                            {
-                                if is_player_owner {
-                                    party_info.owner = PartyOwner::Player;
-                                } else {
-                                    party_info.owner = PartyOwner::Unknown;
+                            if is_player_owner {
+                                party_info.owner = PartyOwner::Player;
+                            } else {
+                                party_info.owner = PartyOwner::Unknown;
 
-                                    for member in party_info.members.iter() {
-                                        if let PartyMemberInfo::Online(member_info_online) = member
-                                        {
-                                            if member_info_online.entity_id == client_entity_id {
-                                                party_info.owner = PartyOwner::Character(
-                                                    member_info_online.character_id,
-                                                );
-                                                break;
-                                            }
+                                for member in party_info.members.iter() {
+                                    if let PartyMemberInfo::Online(member_info_online) = member {
+                                        if member_info_online.entity_id == client_entity_id {
+                                            party_info.owner = PartyOwner::Character(
+                                                member_info_online.character_id,
+                                            );
+                                            break;
                                         }
                                     }
                                 }
@@ -1484,30 +1469,24 @@ pub fn game_connection_system(
             }
             Ok(ServerMessage::PartyDelete) => {
                 if let Some(player_entity) = client_entity_list.player_entity {
-                    commands.entity(player_entity).insert(PartyMembership::None);
+                    commands.entity(player_entity).remove::<PartyInfo>();
                 }
             }
             Ok(ServerMessage::PartyMemberList(PartyMemberList { mut members, .. })) => {
                 if let Some(player_entity) = client_entity_list.player_entity {
                     commands.add(move |world: &mut World| {
-                        if let Some(mut party_membership) =
-                            world.entity_mut(player_entity).get_mut::<PartyMembership>()
-                        {
-                            if party_membership.is_none() {
-                                *party_membership = PartyMembership::Member(PartyInfo::default());
-                            }
+                        let mut player = world.entity_mut(player_entity);
 
-                            if let PartyMembership::Member(ref mut party_info) =
-                                &mut *party_membership
-                            {
-                                if matches!(party_info.owner, PartyOwner::Unknown) {
-                                    party_info.owner =
-                                        PartyOwner::Character(members[0].get_character_id());
-                                }
-
-                                party_info.members.append(&mut members);
-                            }
+                        if !player.contains::<PartyInfo>() {
+                            player.insert(PartyInfo::default());
                         }
+
+                        let mut party_info = player.get_mut::<PartyInfo>().unwrap();
+                        if matches!(party_info.owner, PartyOwner::Unknown) {
+                            party_info.owner = PartyOwner::Character(members[0].get_character_id());
+                        }
+
+                        party_info.members.append(&mut members);
                     });
                 }
             }
@@ -1521,23 +1500,19 @@ pub fn game_connection_system(
                         let player_unique_id =
                             player.get::<CharacterInfo>().map(|info| info.unique_id);
 
-                        if let Some(mut party_membership) = player.get_mut::<PartyMembership>() {
-                            if let PartyMembership::Member(ref mut party_info) =
-                                &mut *party_membership
-                            {
-                                if player_unique_id == Some(owner_character_id) {
-                                    party_info.owner = PartyOwner::Player;
-                                } else {
-                                    party_info.owner = PartyOwner::Character(owner_character_id);
-                                }
+                        if let Some(mut party_info) = player.get_mut::<PartyInfo>() {
+                            if player_unique_id == Some(owner_character_id) {
+                                party_info.owner = PartyOwner::Player;
+                            } else {
+                                party_info.owner = PartyOwner::Character(owner_character_id);
+                            }
 
-                                if let Some(index) = party_info
-                                    .members
-                                    .iter()
-                                    .position(|x| x.get_character_id() == leaver_character_id)
-                                {
-                                    party_info.members.remove(index);
-                                }
+                            if let Some(index) = party_info
+                                .members
+                                .iter()
+                                .position(|x| x.get_character_id() == leaver_character_id)
+                            {
+                                party_info.members.remove(index);
                             }
                         }
                     });
@@ -1546,26 +1521,20 @@ pub fn game_connection_system(
             Ok(ServerMessage::PartyMemberDisconnect(character_unique_id)) => {
                 if let Some(player_entity) = client_entity_list.player_entity {
                     commands.add(move |world: &mut World| {
-                        if let Some(mut party_membership) =
-                            world.entity_mut(player_entity).get_mut::<PartyMembership>()
+                        if let Some(mut party_info) =
+                            world.entity_mut(player_entity).get_mut::<PartyInfo>()
                         {
-                            if let PartyMembership::Member(ref mut party_info) =
-                                &mut *party_membership
+                            if let Some(party_member) = party_info
+                                .members
+                                .iter_mut()
+                                .find(|x| x.get_character_id() == character_unique_id)
                             {
-                                if let Some(party_member) = party_info
-                                    .members
-                                    .iter_mut()
-                                    .find(|x| x.get_character_id() == character_unique_id)
-                                {
-                                    if let PartyMemberInfo::Online(party_member_online) =
-                                        party_member
-                                    {
-                                        *party_member =
-                                            PartyMemberInfo::Offline(PartyMemberInfoOffline {
-                                                character_id: party_member_online.character_id,
-                                                name: party_member_online.name.clone(),
-                                            });
-                                    }
+                                if let PartyMemberInfo::Online(party_member_online) = party_member {
+                                    *party_member =
+                                        PartyMemberInfo::Offline(PartyMemberInfoOffline {
+                                            character_id: party_member_online.character_id,
+                                            name: party_member_online.name.clone(),
+                                        });
                                 }
                             }
                         }
@@ -1575,19 +1544,15 @@ pub fn game_connection_system(
             Ok(ServerMessage::PartyMemberKicked(character_unique_id)) => {
                 if let Some(player_entity) = client_entity_list.player_entity {
                     commands.add(move |world: &mut World| {
-                        if let Some(mut party_membership) =
-                            world.entity_mut(player_entity).get_mut::<PartyMembership>()
+                        if let Some(mut party_info) =
+                            world.entity_mut(player_entity).get_mut::<PartyInfo>()
                         {
-                            if let PartyMembership::Member(ref mut party_info) =
-                                &mut *party_membership
+                            if let Some(index) = party_info
+                                .members
+                                .iter()
+                                .position(|x| x.get_character_id() == character_unique_id)
                             {
-                                if let Some(index) = party_info
-                                    .members
-                                    .iter()
-                                    .position(|x| x.get_character_id() == character_unique_id)
-                                {
-                                    party_info.members.remove(index);
-                                }
+                                party_info.members.remove(index);
                             }
                         }
                     });
@@ -1614,18 +1579,13 @@ pub fn game_connection_system(
                         if let Some(mut player) = player_entity
                             .and_then(|player_entity| world.get_entity_mut(player_entity))
                         {
-                            if let Some(mut party_membership) = player.get_mut::<PartyMembership>()
-                            {
-                                if let PartyMembership::Member(ref mut party_info) =
-                                    &mut *party_membership
+                            if let Some(mut party_info) = player.get_mut::<PartyInfo>() {
+                                if let Some(party_member) =
+                                    party_info.members.iter_mut().find(|x| {
+                                        x.get_character_id() == party_member_info.character_id
+                                    })
                                 {
-                                    if let Some(party_member) =
-                                        party_info.members.iter_mut().find(|x| {
-                                            x.get_character_id() == party_member_info.character_id
-                                        })
-                                    {
-                                        *party_member = PartyMemberInfo::Online(party_member_info);
-                                    }
+                                    *party_member = PartyMemberInfo::Online(party_member_info);
                                 }
                             }
                         }
@@ -1635,15 +1595,11 @@ pub fn game_connection_system(
             Ok(ServerMessage::PartyUpdateRules(item_sharing, xp_sharing)) => {
                 if let Some(player_entity) = client_entity_list.player_entity {
                     commands.add(move |world: &mut World| {
-                        if let Some(mut party_membership) =
-                            world.entity_mut(player_entity).get_mut::<PartyMembership>()
+                        if let Some(mut party_info) =
+                            world.entity_mut(player_entity).get_mut::<PartyInfo>()
                         {
-                            if let PartyMembership::Member(ref mut party_info) =
-                                &mut *party_membership
-                            {
-                                party_info.item_sharing = item_sharing;
-                                party_info.xp_sharing = xp_sharing;
-                            }
+                            party_info.item_sharing = item_sharing;
+                            party_info.xp_sharing = xp_sharing;
                         }
                     });
                 }

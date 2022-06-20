@@ -11,6 +11,7 @@ pub enum PartyOwner {
     Character(CharacterUniqueId),
 }
 
+#[derive(Component)]
 pub struct PartyInfo {
     pub owner: PartyOwner,
     pub members: Vec<PartyMemberInfo>,
@@ -26,23 +27,5 @@ impl Default for PartyInfo {
             item_sharing: PartyItemSharing::EqualLootDistribution,
             xp_sharing: PartyXpSharing::EqualShare,
         }
-    }
-}
-
-#[derive(Component)]
-pub enum PartyMembership {
-    None,
-    Member(PartyInfo),
-}
-
-impl PartyMembership {
-    pub fn is_none(&self) -> bool {
-        matches!(self, PartyMembership::None)
-    }
-}
-
-impl Default for PartyMembership {
-    fn default() -> Self {
-        Self::None
     }
 }

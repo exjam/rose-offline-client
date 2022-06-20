@@ -14,8 +14,8 @@ use rose_game_common::{
 
 use crate::{
     components::{
-        ClientEntity, ConsumableCooldownGroup, Cooldowns, PartyMembership, PlayerCharacter,
-        Position, SelectedTarget,
+        ClientEntity, ConsumableCooldownGroup, Cooldowns, PartyInfo, PlayerCharacter, Position,
+        SelectedTarget,
     },
     events::{ChatboxEvent, PlayerCommandEvent},
     resources::{GameConnection, GameData},
@@ -24,6 +24,7 @@ use crate::{
 #[derive(WorldQuery)]
 #[world_query(mutable)]
 pub struct PlayerQuery<'w> {
+    _player_character: With<PlayerCharacter>,
     entity: Entity,
     cooldowns: &'w mut Cooldowns,
     hotbar: &'w mut Hotbar,
@@ -31,9 +32,8 @@ pub struct PlayerQuery<'w> {
     position: &'w Position,
     skill_list: &'w SkillList,
     team: &'w Team,
-    party_membership: &'w PartyMembership,
+    party_info: Option<&'w PartyInfo>,
     selected_target: Option<&'w SelectedTarget>,
-    _player_character: With<PlayerCharacter>,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -182,7 +182,7 @@ pub fn player_command_system(
                                         if target_team.id == player.team.id {
                                             if let Some(game_connection) = game_connection.as_ref()
                                             {
-                                                let message = if player.party_membership.is_none() {
+                                                let message = if player.party_info.is_none() {
                                                     ClientMessage::PartyCreate(
                                                         target_client_entity.id,
                                                     )
