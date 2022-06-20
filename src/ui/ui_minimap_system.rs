@@ -93,9 +93,9 @@ pub fn ui_minimap_system(
     let player_position = player_position.get_single().ok();
     let player_position_changed = if let Some(player_position) = player_position {
         if ui_state.minimap_image_size.is_some()
-            && ui_state.last_player_position != player_position.position.xy()
+            && ui_state.last_player_position != player_position.xy()
         {
-            ui_state.last_player_position = player_position.position.xy();
+            ui_state.last_player_position = player_position.xy();
             true
         } else {
             false
@@ -126,14 +126,14 @@ pub fn ui_minimap_system(
                     + MAP_OUTLINE_PIXELS
                     + f32::max(
                         0.0,
-                        (player_position.position.x - ui_state.min_world_pos.x)
+                        (player_position.x - ui_state.min_world_pos.x)
                             / ui_state.distance_per_pixel,
                     );
                 let minimap_player_y = minimap_min_rect.top()
                     + MAP_OUTLINE_PIXELS
                     + f32::max(
                         0.0,
-                        (ui_state.min_world_pos.y - player_position.position.y)
+                        (ui_state.min_world_pos.y - player_position.y)
                             / ui_state.distance_per_pixel,
                     );
                 Some(egui::pos2(minimap_player_x, minimap_player_y))

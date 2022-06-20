@@ -28,9 +28,9 @@ use crate::{
     components::{
         ClientEntity, ClientEntityName, ClientEntityType, CollisionRayCastSource, Command,
         CommandCastSkillTarget, Cooldowns, MovementCollisionEntities, NextCommand, PartyInfo,
-        PartyMembership, PartyOwner, PassiveRecoveryTime, PendingDamageList,
-        PendingSkillEffectList, PendingSkillTargetList, PersonalStore, PlayerCharacter, Position,
-        VisibleStatusEffects,
+        PartyMembership, PartyOwner, PassiveRecoveryTime, PendingDamage, PendingDamageList,
+        PendingSkillEffect, PendingSkillEffectList, PendingSkillTarget, PendingSkillTargetList,
+        PersonalStore, PlayerCharacter, Position, VisibleStatusEffects,
     },
     events::{ChatboxEvent, ClientEntityEvent, GameConnectionEvent, PartyEvent, QuestTriggerEvent},
     resources::{AppState, ClientEntityList, GameConnection, GameData, WorldRates, WorldTime},
@@ -595,18 +595,18 @@ pub fn game_connection_system(
                         if let Some(mut pending_damage_list) =
                             defender.get_mut::<PendingDamageList>()
                         {
-                            pending_damage_list.add(
+                            pending_damage_list.push(PendingDamage::new(
                                 message.attacker_entity_id,
                                 message.damage,
                                 message.is_killed,
                                 message.is_immediate,
-                            );
+                            ));
                         }
 
                         if killed_by_player {
                             if let Some(name) = defender.get::<ClientEntityName>() {
                                 let chat_message =
-                                    format!("You have succeeded in hunting {}", name.name);
+                                    format!("You have succeeded in hunting {}", name.as_str());
                                 world
                                     .resource_mut::<Events<ChatboxEvent>>()
                                     .send(ChatboxEvent::System(chat_message));
@@ -672,7 +672,7 @@ pub fn game_connection_system(
                 if let Some(chat_entity) = client_entity_list.get(message.entity_id) {
                     commands.add(move |world: &mut World| {
                         if let Some(name) = world.entity(chat_entity).get::<ClientEntityName>() {
-                            let name = name.name.clone();
+                            let name = name.to_string();
                             world
                                 .resource_mut::<Events<ChatboxEvent>>()
                                 .send(ChatboxEvent::Say(name, message.text));
@@ -1394,12 +1394,12 @@ pub fn game_connection_system(
                         if let Some(mut pending_skill_effect_list) =
                             defender.get_mut::<PendingSkillEffectList>()
                         {
-                            pending_skill_effect_list.add_effect(
+                            pending_skill_effect_list.push(PendingSkillEffect::new(
                                 message.skill_id,
                                 caster_entity,
                                 message.caster_intelligence,
                                 message.effect_success,
-                            );
+                            ));
                         }
 
                         if let Some(caster_entity) = caster_entity {
@@ -1407,8 +1407,10 @@ pub fn game_connection_system(
                                 .entity_mut(caster_entity)
                                 .get_mut::<PendingSkillTargetList>()
                             {
-                                pending_skill_target_list
-                                    .add_target(message.skill_id, defender_entity);
+                                pending_skill_target_list.push(PendingSkillTarget::new(
+                                    message.skill_id,
+                                    defender_entity,
+                                ));
                             }
                         }
                     });
@@ -1461,8 +1463,10 @@ pub fn game_connection_system(
                         if let Some(invited_entity_name) =
                             world.entity(invited_entity).get::<ClientEntityName>()
                         {
-                            let message =
-                                format!("{} rejected your party invite.", invited_entity_name.name);
+                            let message = format!(
+                                "{} rejected your party invite.",
+                                invited_entity_name.as_str()
+                            );
                             world
                                 .resource_mut::<Events<ChatboxEvent>>()
                                 .send(ChatboxEvent::System(message));

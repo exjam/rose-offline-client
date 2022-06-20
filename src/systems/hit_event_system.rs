@@ -105,11 +105,11 @@ pub fn hit_event_system(
         if event.apply_damage {
             let mut i = 0;
             let mut is_killed = false;
-            while i < defender.pending_damage_list.pending_damage.len() {
-                if client_entity_list.get(defender.pending_damage_list.pending_damage[i].attacker)
+            while i < defender.pending_damage_list.len() {
+                if client_entity_list.get(defender.pending_damage_list[i].attacker)
                     == Some(event.attacker)
                 {
-                    let pending_damage = defender.pending_damage_list.pending_damage.remove(i);
+                    let pending_damage = defender.pending_damage_list.remove(i);
                     damage.amount += pending_damage.damage.amount;
                     damage.is_critical |= pending_damage.damage.is_critical;
                     damage.apply_hit_stun |= pending_damage.damage.apply_hit_stun;

@@ -510,21 +510,16 @@ pub fn command_system(
                         };
 
                         if let Some(required_distance) = required_distance {
-                            let distance = position
-                                .position
-                                .xy()
-                                .distance(target_position.position.xy());
+                            let distance = position.position.xy().distance(target_position.xy());
                             if distance < required_distance {
                                 // We are already within required distance, so no need to move further
                                 *destination = position.position;
                             } else {
-                                let offset = (target_position.position.xy()
-                                    - position.position.xy())
-                                .normalize()
+                                let offset = (target_position.xy() - position.xy()).normalize()
                                     * required_distance;
-                                destination.x = target_position.position.x - offset.x;
-                                destination.y = target_position.position.y - offset.y;
-                                destination.z = target_position.position.z;
+                                destination.x = target_position.x - offset.x;
+                                destination.y = target_position.y - offset.y;
+                                destination.z = target_position.z;
                             }
                         } else {
                             *destination = target_position.position;
@@ -560,7 +555,7 @@ pub fn command_system(
                     None => {}
                 }
 
-                let distance = position.position.xy().distance(destination.xy());
+                let distance = position.xy().distance(destination.xy());
                 if distance < 0.1 {
                     // Reached destination, stop moving
                     *next_command = NextCommand::with_stop();
@@ -574,8 +569,8 @@ pub fn command_system(
                         )) = pickup_item_entity
                         {
                             // Update rotation to face item
-                            let dx = pickup_item_position.x - position.position.x;
-                            let dy = pickup_item_position.y - position.position.y;
+                            let dx = pickup_item_position.x - position.x;
+                            let dy = pickup_item_position.y - position.y;
                             transform.rotation = Quat::from_axis_angle(
                                 Vec3::Y,
                                 dy.atan2(dx) + std::f32::consts::PI / 2.0,
@@ -594,8 +589,8 @@ pub fn command_system(
                         if let Some((talk_to_npc_entity, talk_to_npc_position)) = talk_to_npc_entity
                         {
                             // Update rotation to face NPC
-                            let dx = talk_to_npc_position.x - position.position.x;
-                            let dy = talk_to_npc_position.y - position.position.y;
+                            let dx = talk_to_npc_position.x - position.x;
+                            let dy = talk_to_npc_position.y - position.y;
                             transform.rotation = Quat::from_axis_angle(
                                 Vec3::Y,
                                 dy.atan2(dx) + std::f32::consts::PI / 2.0,
@@ -656,10 +651,7 @@ pub fn command_system(
                 }
 
                 let mut entity_commands = commands.entity(entity);
-                let distance = position
-                    .position
-                    .xy()
-                    .distance(target_position.position.xy());
+                let distance = position.position.xy().distance(target_position.xy());
 
                 let attack_range = ability_values.get_attack_range() as f32;
                 if distance < attack_range {
@@ -667,8 +659,8 @@ pub fn command_system(
                     if let Some(motion) = get_attack_animation(&mut rng, character_model, npc_model)
                     {
                         // Update rotation to ensure facing enemy
-                        let dx = target_position.position.x - position.position.x;
-                        let dy = target_position.position.y - position.position.y;
+                        let dx = target_position.x - position.x;
+                        let dy = target_position.y - position.y;
                         transform.rotation = Quat::from_axis_angle(
                             Vec3::Y,
                             dy.atan2(dx) + std::f32::consts::PI / 2.0,
@@ -734,8 +726,8 @@ pub fn command_system(
             &mut Command::PickupItem(item_entity) => {
                 if let Ok((target_position, _)) = query_move_target.get(item_entity) {
                     // Update rotation to face pickup item
-                    let dx = target_position.position.x - position.position.x;
-                    let dy = target_position.position.y - position.position.y;
+                    let dx = target_position.x - position.x;
+                    let dy = target_position.y - position.y;
                     transform.rotation =
                         Quat::from_axis_angle(Vec3::Y, dy.atan2(dx) + std::f32::consts::PI / 2.0);
                 }
@@ -842,15 +834,14 @@ pub fn command_system(
 
                     let in_range = target_position
                         .map(|target_position| {
-                            position.position.xy().distance(target_position.xy())
-                                < cast_range as f32
+                            position.xy().distance(target_position.xy()) < cast_range as f32
                         })
                         .unwrap_or(true);
                     if in_range {
                         // Update rotation to face target
                         if let Some(target_position) = target_position.as_ref() {
-                            let dx = target_position.x - position.position.x;
-                            let dy = target_position.y - position.position.y;
+                            let dx = target_position.x - position.x;
+                            let dy = target_position.y - position.y;
                             transform.rotation = Quat::from_axis_angle(
                                 Vec3::Y,
                                 dy.atan2(dx) + std::f32::consts::PI / 2.0,

@@ -117,7 +117,7 @@ pub fn player_command_system(
                                     let distance = item_position
                                         .position
                                         .xy()
-                                        .distance_squared(player_position.position.xy());
+                                        .distance_squared(player_position.xy());
 
                                     if nearest_item_drop
                                         .as_ref()
@@ -138,9 +138,9 @@ pub fn player_command_system(
                                             .client_message_tx
                                             .send(ClientMessage::Move(Move {
                                                 target_entity_id: Some(target_entity_id),
-                                                x: target_position.position.x,
-                                                y: target_position.position.y,
-                                                z: target_position.position.z as u16,
+                                                x: target_position.x,
+                                                y: target_position.y,
+                                                z: target_position.z as u16,
                                             }))
                                             .ok();
                                     }
@@ -414,9 +414,9 @@ pub fn player_command_system(
                         .client_message_tx
                         .send(ClientMessage::Move(Move {
                             target_entity_id,
-                            x: position.position.x,
-                            y: position.position.y,
-                            z: position.position.z as u16,
+                            x: position.x,
+                            y: position.y,
+                            z: position.z as u16,
                         }))
                         .ok();
                 }

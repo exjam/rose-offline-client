@@ -22,7 +22,7 @@ pub fn ui_selected_target_system(
                 .collapsible(false)
                 .title_bar(false)
                 .show(egui_context.ctx_mut(), |ui| {
-                    ui.label(&client_entity_name.name);
+                    ui.label(client_entity_name.as_str());
                     ui.label(format!("Level: {}", ability_values.level));
 
                     ui.scope(|ui| {

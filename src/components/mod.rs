@@ -53,9 +53,9 @@ pub use npc_model::NpcModel;
 pub use particle_sequence::{ActiveParticle, ParticleSequence};
 pub use party_membership::{PartyInfo, PartyMembership, PartyOwner};
 pub use passive_recovery_time::PassiveRecoveryTime;
-pub use pending_damage_list::PendingDamageList;
+pub use pending_damage_list::{PendingDamage, PendingDamageList};
 pub use pending_skill_effect_list::{
-    PendingSkillEffect, PendingSkillEffectList, PendingSkillTargetList,
+    PendingSkillEffect, PendingSkillEffectList, PendingSkillTarget, PendingSkillTargetList,
 };
 pub use personal_store::{PersonalStore, PersonalStoreModel};
 pub use player_character::PlayerCharacter;

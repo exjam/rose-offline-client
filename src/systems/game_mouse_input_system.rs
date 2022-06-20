@@ -90,7 +90,7 @@ pub fn game_mouse_input_system(
                             egui_ctx.ctx_mut(),
                             egui::Id::new("entity_mouse_tooltip"),
                             |ui| {
-                                ui.label(&hit_client_entity_name.name);
+                                ui.label(hit_client_entity_name.as_str());
                             },
                         );
                     }

@@ -1,4 +1,5 @@
-use bevy::prelude::Component;
+use bevy::prelude::{Component, Deref, DerefMut};
+
 use rose_game_common::{data::Damage, messages::ClientEntityId};
 
 pub struct PendingDamage {
@@ -9,7 +10,24 @@ pub struct PendingDamage {
     pub is_immediate: bool,
 }
 
-#[derive(Component)]
+impl PendingDamage {
+    pub fn new(
+        attacker: ClientEntityId,
+        damage: Damage,
+        is_kill: bool,
+        is_immediate: bool,
+    ) -> Self {
+        Self {
+            age: 0.0,
+            attacker,
+            damage,
+            is_kill,
+            is_immediate,
+        }
+    }
+}
+
+#[derive(Component, Deref, DerefMut)]
 pub struct PendingDamageList {
     pub pending_damage: Vec<PendingDamage>,
 }
@@ -19,23 +37,5 @@ impl Default for PendingDamageList {
         Self {
             pending_damage: Vec::with_capacity(32),
         }
-    }
-}
-
-impl PendingDamageList {
-    pub fn add(
-        &mut self,
-        attacker: ClientEntityId,
-        damage: Damage,
-        is_kill: bool,
-        is_immediate: bool,
-    ) {
-        self.pending_damage.push(PendingDamage {
-            age: 0.0,
-            attacker,
-            damage,
-            is_kill,
-            is_immediate,
-        });
     }
 }

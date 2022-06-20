@@ -1,6 +1,9 @@
-use bevy::prelude::{Commands, Entity, Query, Res, ResMut, Time};
+use bevy::{
+    ecs::query::WorldQuery,
+    prelude::{Commands, Entity, Query, Res, ResMut, Time},
+};
 
-use rose_game_common::{components::HealthPoints, data::Damage, messages::ClientEntityId};
+use rose_game_common::{components::HealthPoints, data::Damage};
 
 use crate::{
     components::{ClientEntity, NextCommand, PendingDamageList},
@@ -10,53 +13,49 @@ use crate::{
 // After 5 seconds, expire pending damage and apply immediately
 const MAX_DAMAGE_AGE: f32 = 5.0;
 
+#[derive(WorldQuery)]
+#[world_query(mutable)]
+pub struct DamageTarget<'w> {
+    entity: Entity,
+    client_entity: &'w ClientEntity,
+    health_points: &'w mut HealthPoints,
+    pending_damage_list: &'w mut PendingDamageList,
+}
+
 fn apply_damage(
     commands: &mut Commands,
-    defender_entity: Entity,
-    defender_client_entity_id: ClientEntityId,
-    defender_health_points: &mut HealthPoints,
+    target: &mut DamageTargetItem,
     damage: Damage,
     is_killed: bool,
     client_entity_list: &mut ClientEntityList,
 ) {
-    if defender_health_points.hp < damage.amount as i32 {
-        defender_health_points.hp = 0;
+    if target.health_points.hp < damage.amount as i32 {
+        target.health_points.hp = 0;
     } else {
-        defender_health_points.hp -= damage.amount as i32;
+        target.health_points.hp -= damage.amount as i32;
     }
 
     if is_killed {
         commands
-            .entity(defender_entity)
+            .entity(target.entity)
             .insert(NextCommand::with_die())
             .remove::<ClientEntity>();
-        client_entity_list.remove(defender_client_entity_id);
+        client_entity_list.remove(target.client_entity.id);
     }
 }
 
 pub fn pending_damage_system(
     mut commands: Commands,
-    mut query_defender: Query<(
-        Entity,
-        &mut PendingDamageList,
-        &ClientEntity,
-        &mut HealthPoints,
-    )>,
+    mut query_target: Query<DamageTarget>,
     time: Res<Time>,
     mut client_entity_list: ResMut<ClientEntityList>,
 ) {
     let delta_time = time.delta_seconds();
 
-    for (
-        defender_entity,
-        mut pending_damage_list,
-        defender_client_entity,
-        mut defender_health_points,
-    ) in query_defender.iter_mut()
-    {
+    for mut target in query_target.iter_mut() {
         let mut i = 0;
-        while i < pending_damage_list.pending_damage.len() {
-            let mut pending_damage = &mut pending_damage_list.pending_damage[i];
+        while i < target.pending_damage_list.len() {
+            let mut pending_damage = &mut target.pending_damage_list[i];
             pending_damage.age += delta_time;
 
             let attacker_entity = client_entity_list.get(pending_damage.attacker);
@@ -64,12 +63,10 @@ pub fn pending_damage_system(
                 || pending_damage.age > MAX_DAMAGE_AGE
                 || attacker_entity.is_none()
             {
-                let pending_damage = pending_damage_list.pending_damage.remove(i);
+                let pending_damage = target.pending_damage_list.remove(i);
                 apply_damage(
                     &mut commands,
-                    defender_entity,
-                    defender_client_entity.id,
-                    defender_health_points.as_mut(),
+                    &mut target,
                     pending_damage.damage,
                     pending_damage.is_kill,
                     &mut client_entity_list,

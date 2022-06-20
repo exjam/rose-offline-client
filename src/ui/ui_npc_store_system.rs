@@ -346,13 +346,7 @@ pub fn ui_npc_store_system(
 
     // If player has moved away from NPC, close the dialog
     if let (Some(player), Some(npc)) = (player.as_ref(), npc.as_ref()) {
-        if player
-            .position
-            .position
-            .xy()
-            .distance(npc.position.position.xy())
-            > 600.0
-        {
+        if player.position.position.xy().distance(npc.position.xy()) > 600.0 {
             ui_state.owner_entity = None;
             return;
         }

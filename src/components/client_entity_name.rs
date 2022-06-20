@@ -1,6 +1,6 @@
-use bevy::prelude::Component;
+use bevy::prelude::{Component, Deref, DerefMut};
 
-#[derive(Component)]
+#[derive(Component, Deref, DerefMut)]
 pub struct ClientEntityName {
     pub name: String,
 }

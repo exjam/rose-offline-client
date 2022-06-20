@@ -67,7 +67,7 @@ pub fn ui_party_system(
                     ui_state.pending_invites.push(PendingPartyInvite {
                         is_create: true,
                         client_entity_id: client_entity.id,
-                        name: client_entity_name.name.clone(),
+                        name: client_entity_name.to_string(),
                     });
                 }
             }
@@ -76,7 +76,7 @@ pub fn ui_party_system(
                     ui_state.pending_invites.push(PendingPartyInvite {
                         is_create: false,
                         client_entity_id: client_entity.id,
-                        name: client_entity_name.name.clone(),
+                        name: client_entity_name.to_string(),
                     });
                 }
             }

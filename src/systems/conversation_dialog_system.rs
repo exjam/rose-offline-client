@@ -414,12 +414,7 @@ pub fn conversation_dialog_system(
                 .owner_entity
                 .and_then(|entity| query_position.get(entity).ok()),
         ) {
-            if npc_position
-                .position
-                .xy()
-                .distance(player_position.position.xy())
-                > 400.0
-            {
+            if npc_position.position.xy().distance(player_position.xy()) > 400.0 {
                 *current_dialog_state = None;
                 return;
             }
@@ -428,7 +423,7 @@ pub fn conversation_dialog_system(
         let title = dialog_state
             .owner_entity
             .and_then(|entity| query_name.get(entity).ok())
-            .map(|name| name.name.as_str())
+            .map(|name| name.as_str())
             .unwrap_or("Event Dialog");
 
         egui::Window::new(title)

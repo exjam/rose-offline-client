@@ -1,7 +1,6 @@
-use bevy::ecs::prelude::Component;
-use bevy::math::Vec3;
+use bevy::prelude::{Component, Deref, DerefMut, Vec3};
 
-#[derive(Component, Clone, Debug)]
+#[derive(Component, Clone, Debug, Deref, DerefMut)]
 pub struct Position {
     pub position: Vec3,
 }
