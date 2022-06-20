@@ -560,8 +560,9 @@ pub fn game_connection_system(
             }
             Ok(ServerMessage::DamageEntity(message)) => {
                 if let Some(defender_entity) = client_entity_list.get(message.defender_entity_id) {
-                    let killed_by_player = client_entity_list.player_entity
-                        == client_entity_list.get(message.attacker_entity_id);
+                    let killed_by_player = message.is_killed
+                        && client_entity_list.player_entity
+                            == client_entity_list.get(message.attacker_entity_id);
 
                     commands.add(move |world: &mut World| {
                         let mut defender = world.entity_mut(defender_entity);
