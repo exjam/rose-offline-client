@@ -1473,13 +1473,22 @@ pub fn game_connection_system(
                     commands.entity(player_entity).remove::<PartyInfo>();
                 }
             }
-            Ok(ServerMessage::PartyMemberList(PartyMemberList { mut members, .. })) => {
+            Ok(ServerMessage::PartyMemberList(PartyMemberList {
+                mut members,
+                item_sharing,
+                xp_sharing,
+                ..
+            })) => {
                 if let Some(player_entity) = client_entity_list.player_entity {
                     commands.add(move |world: &mut World| {
                         let mut player = world.entity_mut(player_entity);
 
                         if !player.contains::<PartyInfo>() {
-                            player.insert(PartyInfo::default());
+                            player.insert(PartyInfo {
+                                item_sharing,
+                                xp_sharing,
+                                ..Default::default()
+                            });
                         }
 
                         let mut party_info = player.get_mut::<PartyInfo>().unwrap();
