@@ -7,12 +7,15 @@ use bevy::{
         extract_component::ExtractComponentPlugin,
         render_asset::{PrepareAssetError, RenderAsset, RenderAssetPlugin, RenderAssets},
         render_resource::{
-            CommandEncoderDescriptor, Extent3d, ImageCopyTexture, Origin3d, Texture, TextureAspect,
-            TextureDescriptor, TextureDimension, TextureFormat, TextureUsages, TextureView,
-            TextureViewDescriptor,
+            CommandEncoderDescriptor, Extent3d, ImageCopyTexture, Origin3d, Sampler, Texture,
+            TextureAspect, TextureDescriptor, TextureDimension, TextureFormat, TextureUsages,
+            TextureView, TextureViewDescriptor,
         },
         renderer::{RenderDevice, RenderQueue},
-        texture::{CompressedImageFormats, ImageType, TextureError, TextureFormatPixelInfo},
+        texture::{
+            CompressedImageFormats, DefaultImageSampler, ImageType, TextureError,
+            TextureFormatPixelInfo,
+        },
     },
 };
 use image::DynamicImage;
@@ -55,6 +58,7 @@ impl TextureArrayBuilder {
 pub struct GpuTextureArray {
     pub texture: Texture,
     pub texture_view: TextureView,
+    pub sampler: Sampler,
 }
 
 impl RenderAsset for TextureArray {
@@ -64,6 +68,7 @@ impl RenderAsset for TextureArray {
         SRes<RenderDevice>,
         SRes<RenderAssets<Image>>,
         SRes<RenderQueue>,
+        SRes<DefaultImageSampler>,
     );
 
     fn extract_asset(&self) -> Self::ExtractedAsset {
@@ -72,7 +77,9 @@ impl RenderAsset for TextureArray {
 
     fn prepare_asset(
         texture_array: Self::ExtractedAsset,
-        (render_device, gpu_images, render_queue): &mut SystemParamItem<Self::Param>,
+        (render_device, gpu_images, render_queue, default_sampler): &mut SystemParamItem<
+            Self::Param,
+        >,
     ) -> Result<Self::PreparedAsset, PrepareAssetError<Self::ExtractedAsset>> {
         let mut texture_array_gpu_images = Vec::with_capacity(texture_array.images.len());
 
@@ -139,6 +146,7 @@ impl RenderAsset for TextureArray {
         Ok(GpuTextureArray {
             texture: array_texture,
             texture_view,
+            sampler: (***default_sampler).clone(),
         })
     }
 }

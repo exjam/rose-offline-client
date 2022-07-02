@@ -1,25 +1,18 @@
 use bevy::{
-    asset::{AssetServer, Handle},
-    ecs::system::{lifetimeless::SRes, SystemParamItem},
+    asset::Handle,
     math::Vec2,
-    pbr::{AlphaMode, MaterialPipeline, MaterialPlugin, SpecializedMaterial},
+    pbr::{AlphaMode, Material, MaterialPipeline, MaterialPipelineKey, MaterialPlugin},
     prelude::{App, Assets, HandleUntyped, Mesh, Plugin},
     reflect::TypeUuid,
     render::{
         mesh::MeshVertexBufferLayout,
         prelude::Shader,
-        render_asset::{PrepareAssetError, RenderAsset, RenderAssets},
+        render_asset::RenderAssets,
         render_resource::{
-            encase::{self, ShaderType, Size},
-            BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayoutDescriptor,
-            BindGroupLayoutEntry, BindingResource, BindingType, Buffer, BufferBindingType,
-            BufferInitDescriptor, BufferUsages, CompareFunction, FilterMode,
-            RenderPipelineDescriptor, Sampler, SamplerBindingType, SamplerDescriptor, ShaderStages,
-            SpecializedMeshPipelineError, TextureSampleType, TextureViewDimension,
+            encase::ShaderType, AsBindGroup, AsBindGroupShaderType, CompareFunction,
+            RenderPipelineDescriptor, ShaderRef, SpecializedMeshPipelineError,
         },
-        renderer::RenderDevice,
         texture::Image,
-        RenderApp,
     },
 };
 use bevy_inspector_egui::Inspectable;
@@ -41,22 +34,7 @@ impl Plugin for StaticMeshMaterialPlugin {
         );
 
         app.add_plugin(MaterialPlugin::<StaticMeshMaterial>::default());
-
-        let render_device = app.world.resource::<RenderDevice>();
-        let linear_sampler = render_device.create_sampler(&SamplerDescriptor {
-            mag_filter: FilterMode::Linear,
-            min_filter: FilterMode::Linear,
-            ..Default::default()
-        });
-
-        if let Ok(render_app) = app.get_sub_app_mut(RenderApp) {
-            render_app.insert_resource(StaticMeshMaterialSamplers { linear_sampler });
-        }
     }
-}
-
-pub struct StaticMeshMaterialSamplers {
-    linear_sampler: Sampler,
 }
 
 // NOTE: These must match the bit flags in shaders/static_mesh_material.wgsl!
@@ -81,10 +59,15 @@ pub struct StaticMeshMaterialUniformData {
     pub lightmap_uv_scale: f32,
 }
 
-#[derive(Debug, Clone, TypeUuid, Inspectable)]
+#[derive(AsBindGroup, Debug, Clone, TypeUuid, Inspectable)]
 #[uuid = "62a496fa-33e8-41a8-9a44-237d70214227"]
+#[bind_group_data(StaticMeshMaterialKey)]
+#[uniform(0, StaticMeshMaterialUniformData)]
 pub struct StaticMeshMaterial {
+    #[texture(1)]
+    #[sampler(2)]
     pub base_texture: Option<Handle<Image>>,
+
     pub alpha_value: Option<f32>,
     pub alpha_enabled: bool,
     pub alpha_test: Option<f32>,
@@ -95,6 +78,8 @@ pub struct StaticMeshMaterial {
     pub skinned: bool,
 
     // lightmap texture, uv offset, uv scale
+    #[texture(3)]
+    #[sampler(4)]
     pub lightmap_texture: Option<Handle<Image>>,
     pub lightmap_uv_offset: Vec2,
     pub lightmap_uv_scale: f32,
@@ -119,154 +104,47 @@ impl Default for StaticMeshMaterial {
     }
 }
 
-/// The GPU representation of a [`StaticMeshMaterial`].
-#[derive(Debug, Clone)]
-pub struct GpuStaticMeshMaterial {
-    pub bind_group: BindGroup,
-
-    pub uniform_buffer: Buffer,
-    pub base_texture: Option<Handle<Image>>,
-    pub lightmap_texture: Option<Handle<Image>>,
-
-    pub flags: StaticMeshMaterialFlags,
-    pub alpha_mode: AlphaMode,
-    pub two_sided: bool,
-    pub z_test_enabled: bool,
-    pub z_write_enabled: bool,
-
-    pub skinned: bool,
-}
-
-impl RenderAsset for StaticMeshMaterial {
-    type ExtractedAsset = StaticMeshMaterial;
-    type PreparedAsset = GpuStaticMeshMaterial;
-    type Param = (
-        SRes<RenderDevice>,
-        SRes<MaterialPipeline<StaticMeshMaterial>>,
-        SRes<RenderAssets<Image>>,
-        SRes<StaticMeshMaterialSamplers>,
-    );
-
-    fn extract_asset(&self) -> Self::ExtractedAsset {
-        self.clone()
-    }
-
-    fn prepare_asset(
-        material: Self::ExtractedAsset,
-        (render_device, material_pipeline, gpu_images, samplers): &mut SystemParamItem<Self::Param>,
-    ) -> Result<Self::PreparedAsset, PrepareAssetError<Self::ExtractedAsset>> {
-        let (base_texture_view, _) = if let Some(result) = material_pipeline
-            .mesh_pipeline
-            .get_image_texture(gpu_images, &material.base_texture)
-        {
-            result
-        } else {
-            return Err(PrepareAssetError::RetryNextUpdate(material));
-        };
-        let base_texture_sampler = &samplers.linear_sampler;
-
-        let (lightmap_texture_view, _) = if let Some(result) = material_pipeline
-            .mesh_pipeline
-            .get_image_texture(gpu_images, &material.lightmap_texture)
-        {
-            result
-        } else {
-            return Err(PrepareAssetError::RetryNextUpdate(material));
-        };
-        let lightmap_texture_sampler = &samplers.linear_sampler;
-
+impl AsBindGroupShaderType<StaticMeshMaterialUniformData> for StaticMeshMaterial {
+    fn as_bind_group_shader_type(
+        &self,
+        _images: &RenderAssets<Image>,
+    ) -> StaticMeshMaterialUniformData {
         let mut flags = StaticMeshMaterialFlags::NONE;
         let mut alpha_cutoff = 0.5;
         let mut alpha_value = 1.0;
-        let mut alpha_mode = AlphaMode::Opaque;
 
-        if material.specular_enabled {
+        if self.specular_enabled {
             flags |= StaticMeshMaterialFlags::ALPHA_MODE_OPAQUE | StaticMeshMaterialFlags::SPECULAR;
-            alpha_mode = AlphaMode::Opaque;
             alpha_cutoff = 1.0;
         } else {
-            if material.alpha_enabled {
+            if self.alpha_enabled {
                 flags |= StaticMeshMaterialFlags::ALPHA_MODE_BLEND;
-                alpha_mode = AlphaMode::Blend;
 
-                if let Some(alpha_ref) = material.alpha_test {
+                if let Some(alpha_ref) = self.alpha_test {
                     flags |= StaticMeshMaterialFlags::ALPHA_MODE_MASK;
                     alpha_cutoff = alpha_ref;
-                    alpha_mode = AlphaMode::Mask(alpha_cutoff);
                 }
             } else {
                 flags |= StaticMeshMaterialFlags::ALPHA_MODE_OPAQUE;
             }
 
-            if let Some(material_alpha_value) = material.alpha_value {
+            if let Some(material_alpha_value) = self.alpha_value {
                 if material_alpha_value == 1.0 {
                     flags |= StaticMeshMaterialFlags::ALPHA_MODE_OPAQUE;
-                    alpha_mode = AlphaMode::Opaque;
                 } else {
                     flags |= StaticMeshMaterialFlags::HAS_ALPHA_VALUE;
-                    alpha_mode = AlphaMode::Blend;
                     alpha_value = material_alpha_value;
                 }
             }
         }
 
-        let value = StaticMeshMaterialUniformData {
+        StaticMeshMaterialUniformData {
             flags: flags.bits(),
             alpha_cutoff,
             alpha_value,
-            lightmap_uv_offset: material.lightmap_uv_offset,
-            lightmap_uv_scale: material.lightmap_uv_scale,
-        };
-
-        let byte_buffer = [0u8; StaticMeshMaterialUniformData::SIZE.get() as usize];
-        let mut buffer = encase::UniformBuffer::new(byte_buffer);
-        buffer.write(&value).unwrap();
-
-        let uniform_buffer = render_device.create_buffer_with_data(&BufferInitDescriptor {
-            label: Some("static_mesh_material_uniform_buffer"),
-            usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
-            contents: buffer.as_ref(),
-        });
-
-        let bind_group = render_device.create_bind_group(&BindGroupDescriptor {
-            entries: &[
-                BindGroupEntry {
-                    binding: 0,
-                    resource: uniform_buffer.as_entire_binding(),
-                },
-                BindGroupEntry {
-                    binding: 1,
-                    resource: BindingResource::TextureView(base_texture_view),
-                },
-                BindGroupEntry {
-                    binding: 2,
-                    resource: BindingResource::Sampler(base_texture_sampler),
-                },
-                BindGroupEntry {
-                    binding: 3,
-                    resource: BindingResource::TextureView(lightmap_texture_view),
-                },
-                BindGroupEntry {
-                    binding: 4,
-                    resource: BindingResource::Sampler(lightmap_texture_sampler),
-                },
-            ],
-            label: Some("static_mesh_material_bind_group"),
-            layout: &material_pipeline.material_layout,
-        });
-
-        Ok(GpuStaticMeshMaterial {
-            bind_group,
-            uniform_buffer,
-            base_texture: material.base_texture,
-            lightmap_texture: material.lightmap_texture,
-            skinned: material.skinned,
-            flags,
-            alpha_mode,
-            two_sided: material.two_sided,
-            z_test_enabled: material.z_test_enabled,
-            z_write_enabled: material.z_write_enabled,
-        })
+            lightmap_uv_offset: self.lightmap_uv_offset,
+            lightmap_uv_scale: self.lightmap_uv_scale,
+        }
     }
 }
 
@@ -279,31 +157,31 @@ pub struct StaticMeshMaterialKey {
     skinned: bool,
 }
 
-impl SpecializedMaterial for StaticMeshMaterial {
-    type Key = StaticMeshMaterialKey;
-
-    fn key(render_asset: &<Self as RenderAsset>::PreparedAsset) -> Self::Key {
+impl From<&StaticMeshMaterial> for StaticMeshMaterialKey {
+    fn from(material: &StaticMeshMaterial) -> Self {
         StaticMeshMaterialKey {
-            has_lightmap: render_asset.lightmap_texture.is_some(),
-            two_sided: render_asset.two_sided,
-            z_test_enabled: render_asset.z_test_enabled,
-            z_write_enabled: render_asset.z_write_enabled,
-            skinned: render_asset.skinned,
+            has_lightmap: material.lightmap_texture.is_some(),
+            two_sided: material.two_sided,
+            z_test_enabled: material.z_test_enabled,
+            z_write_enabled: material.z_write_enabled,
+            skinned: material.skinned,
         }
     }
+}
 
+impl Material for StaticMeshMaterial {
     fn specialize(
         _pipeline: &MaterialPipeline<Self>,
         descriptor: &mut RenderPipelineDescriptor,
-        key: Self::Key,
         layout: &MeshVertexBufferLayout,
+        key: MaterialPipelineKey<Self>,
     ) -> Result<(), SpecializedMeshPipelineError> {
         let mut vertex_attributes = vec![
             Mesh::ATTRIBUTE_POSITION.at_shader_location(0),
             Mesh::ATTRIBUTE_UV_0.at_shader_location(1),
         ];
 
-        if key.has_lightmap {
+        if key.bind_group_data.has_lightmap {
             descriptor
                 .vertex
                 .shader_defs
@@ -331,13 +209,13 @@ impl SpecializedMaterial for StaticMeshMaterial {
 
             vertex_attributes.push(Mesh::ATTRIBUTE_JOINT_INDEX.at_shader_location(3));
             vertex_attributes.push(Mesh::ATTRIBUTE_JOINT_WEIGHT.at_shader_location(4));
-        } else if key.skinned {
+        } else if key.bind_group_data.skinned {
             panic!("strange");
         }
 
         descriptor.vertex.buffers = vec![layout.get_layout(&vertex_attributes)?];
 
-        if key.two_sided {
+        if key.bind_group_data.two_sided {
             descriptor.primitive.cull_mode = None;
         }
 
@@ -345,94 +223,52 @@ impl SpecializedMaterial for StaticMeshMaterial {
             .depth_stencil
             .as_mut()
             .unwrap()
-            .depth_write_enabled = key.z_write_enabled;
+            .depth_write_enabled = key.bind_group_data.z_write_enabled;
 
-        if !key.z_test_enabled {
+        if !key.bind_group_data.z_test_enabled {
             descriptor.depth_stencil.as_mut().unwrap().depth_compare = CompareFunction::Always;
         }
 
         Ok(())
     }
 
-    fn vertex_shader(_asset_server: &AssetServer) -> Option<Handle<Shader>> {
-        Some(STATIC_MESH_MATERIAL_SHADER_HANDLE.typed())
+    fn vertex_shader() -> ShaderRef {
+        ShaderRef::Handle(STATIC_MESH_MATERIAL_SHADER_HANDLE.typed())
     }
 
-    fn fragment_shader(_asset_server: &AssetServer) -> Option<Handle<Shader>> {
-        Some(STATIC_MESH_MATERIAL_SHADER_HANDLE.typed())
-    }
-
-    #[inline]
-    fn bind_group(render_asset: &<Self as RenderAsset>::PreparedAsset) -> &BindGroup {
-        &render_asset.bind_group
-    }
-
-    fn bind_group_layout(
-        render_device: &RenderDevice,
-    ) -> bevy::render::render_resource::BindGroupLayout {
-        render_device.create_bind_group_layout(&BindGroupLayoutDescriptor {
-            entries: &[
-                // Uniform data
-                BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: ShaderStages::FRAGMENT,
-                    ty: BindingType::Buffer {
-                        ty: BufferBindingType::Uniform,
-                        has_dynamic_offset: false,
-                        min_binding_size: Some(StaticMeshMaterialUniformData::min_size()),
-                    },
-                    count: None,
-                },
-                // Base Texture
-                BindGroupLayoutEntry {
-                    binding: 1,
-                    visibility: ShaderStages::FRAGMENT,
-                    ty: BindingType::Texture {
-                        multisampled: false,
-                        sample_type: TextureSampleType::Float { filterable: true },
-                        view_dimension: TextureViewDimension::D2,
-                    },
-                    count: None,
-                },
-                // Base Texture Sampler
-                BindGroupLayoutEntry {
-                    binding: 2,
-                    visibility: ShaderStages::FRAGMENT,
-                    ty: BindingType::Sampler(SamplerBindingType::Filtering),
-                    count: None,
-                },
-                // Lightmap Texture
-                BindGroupLayoutEntry {
-                    binding: 3,
-                    visibility: ShaderStages::FRAGMENT,
-                    ty: BindingType::Texture {
-                        multisampled: false,
-                        sample_type: TextureSampleType::Float { filterable: true },
-                        view_dimension: TextureViewDimension::D2,
-                    },
-                    count: None,
-                },
-                // Lightmap Texture Sampler
-                BindGroupLayoutEntry {
-                    binding: 4,
-                    visibility: ShaderStages::FRAGMENT,
-                    ty: BindingType::Sampler(SamplerBindingType::Filtering),
-                    count: None,
-                },
-            ],
-            label: Some("static_mesh_material_layout"),
-        })
+    fn fragment_shader() -> ShaderRef {
+        ShaderRef::Handle(STATIC_MESH_MATERIAL_SHADER_HANDLE.typed())
     }
 
     #[inline]
-    fn alpha_mode(render_asset: &<Self as RenderAsset>::PreparedAsset) -> AlphaMode {
-        if !render_asset.z_write_enabled {
+    fn alpha_mode(&self) -> AlphaMode {
+        let mut alpha_mode = AlphaMode::Opaque;
+
+        if !self.z_write_enabled {
             // When no depth write we need back to front rendering which only happens
             // in the the transparent pass, by returning AlphaMode::Blend here we tell
             // pbr::MeshPipeline to use the transparent pass
-            AlphaMode::Blend
+            alpha_mode = AlphaMode::Blend;
+        } else if self.specular_enabled {
+            alpha_mode = AlphaMode::Opaque;
         } else {
-            render_asset.alpha_mode
+            if self.alpha_enabled {
+                alpha_mode = AlphaMode::Blend;
+
+                if let Some(alpha_ref) = self.alpha_test {
+                    alpha_mode = AlphaMode::Mask(alpha_ref);
+                }
+            }
+
+            if let Some(material_alpha_value) = self.alpha_value {
+                if material_alpha_value == 1.0 {
+                    alpha_mode = AlphaMode::Opaque;
+                } else {
+                    alpha_mode = AlphaMode::Blend;
+                }
+            }
         }
+
+        alpha_mode
     }
 }

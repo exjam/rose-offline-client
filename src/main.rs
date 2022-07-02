@@ -289,9 +289,8 @@ fn main() {
         .add_plugin(bevy::input::InputPlugin::default())
         .add_plugin(bevy::window::WindowPlugin::default());
 
-    let task_pool = app.world.resource::<bevy::tasks::IoTaskPool>().0.clone();
     app.insert_resource(VfsResource { vfs: vfs.clone() })
-        .insert_resource(AssetServer::new(VfsAssetIo::new(vfs), task_pool))
+        .insert_resource(AssetServer::new(VfsAssetIo::new(vfs)))
         .add_plugin(bevy::asset::AssetPlugin::default());
 
     app.add_plugin(bevy::scene::ScenePlugin::default())

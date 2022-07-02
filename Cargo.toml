@@ -36,10 +36,10 @@ rose-network-common = { git = "https://github.com/exjam/rose-offline", rev = "21
 rose-network-irose = { git = "https://github.com/exjam/rose-offline", rev = "2100e2792be73961da1669a52e2188b18653fa9b" }
 
 [patch.crates-io]
-bevy = { git = "https://github.com/exjam/bevy", rev = "bad8af0b3a7294df585b92e7d5f07c1ac1f28d6d" }
+bevy = { git = "https://github.com/exjam/bevy", rev = "e349913479ed740276e063803f4210d65519153e" }
 bevy_polyline = { git = "https://github.com/exjam/bevy_polyline", rev = "e9b615164f25c9a1ad6e6b69ed67918a6d3d5b3c" }
 bevy_egui = { git = "https://github.com/exjam/bevy_egui", rev = "173f2df393f88b5001e73ca82c67314327133771" }
-bevy-inspector-egui = { git = "https://github.com/exjam/bevy-inspector-egui", rev = "ff17b3785c3e57cf460b2fc98436b42a2050a9bf" }
+bevy-inspector-egui = { git = "https://github.com/exjam/bevy-inspector-egui", rev = "8569f5486640e7a70c5d75167eb91362c0d8085d" }
 bevy_rapier3d = { git = "https://github.com/exjam/bevy_rapier", rev = "cbff5b15462b8203089be1e94c2234f2a87e1bc5" }
 smooth-bevy-cameras = { git = "https://github.com/exjam/smooth-bevy-cameras", rev = "20558e21b2c8f5e1807956887721a63be722440f" }
 
