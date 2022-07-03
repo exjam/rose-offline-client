@@ -30,7 +30,9 @@ var water_array_texture: texture_2d_array<f32>;
 var water_array_sampler: sampler;
 
 struct WaterTextureIndex {
-    index: i32;
+    current_index: i32;
+    next_index: i32;
+    next_weight: f32;
 };
 [[group(1), binding(2)]]
 var<uniform> water_texture_index: WaterTextureIndex;
@@ -42,7 +44,9 @@ struct FragmentInput {
 
 [[stage(fragment)]]
 fn fragment(in: FragmentInput) -> [[location(0)]] vec4<f32> {
-    var output_color: vec4<f32> = textureSample(water_array_texture, water_array_sampler, in.uv0, water_texture_index.index);
-    output_color = pow(output_color * 2.0, vec4<f32>(2.2)) * lights.ambient_color;
+    let color1 = textureSample(water_array_texture, water_array_sampler, in.uv0, water_texture_index.current_index);
+    let color2 = textureSample(water_array_texture, water_array_sampler, in.uv0, water_texture_index.next_index);
+    let current = mix(color1, color2, water_texture_index.next_weight);
+    let output_color = pow(current * 2.0, vec4<f32>(2.2)) * lights.ambient_color;
     return output_color;
 }

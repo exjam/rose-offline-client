@@ -26,11 +26,11 @@ use bevy::{
             SetItemPipeline, TrackedRenderPass,
         },
         render_resource::{
-            AddressMode, BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout,
+            encase, AddressMode, BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout,
             BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingResource, BindingType,
             BlendComponent, BlendFactor, BlendOperation, BlendState, Buffer, BufferBindingType,
-            BufferDescriptor, BufferSize, BufferUsages, FilterMode, PipelineCache,
-            RenderPipelineDescriptor, Sampler, SamplerBindingType, SamplerDescriptor, ShaderStages,
+            BufferDescriptor, BufferUsages, FilterMode, PipelineCache, RenderPipelineDescriptor,
+            Sampler, SamplerBindingType, SamplerDescriptor, ShaderSize, ShaderStages, ShaderType,
             SpecializedMeshPipeline, SpecializedMeshPipelineError, SpecializedMeshPipelines,
             TextureSampleType, TextureViewDimension,
         },
@@ -58,7 +58,7 @@ impl Plugin for WaterMaterialPlugin {
 
         let render_device = app.world.resource::<RenderDevice>();
         let buffer = render_device.create_buffer(&BufferDescriptor {
-            size: std::mem::size_of::<i32>() as u64,
+            size: WaterUniformData::min_size().get(),
             usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
             mapped_at_creation: false,
             label: Some("water_texture_index"),
@@ -71,40 +71,49 @@ impl Plugin for WaterMaterialPlugin {
             render_app
                 .add_render_command::<Transparent3d, DrawWaterMaterial>()
                 .init_resource::<WaterMaterialPipeline>()
-                .insert_resource(WaterTextureIndex { buffer })
+                .insert_resource(WaterUniformMeta { buffer })
                 .init_resource::<SpecializedMeshPipelines<WaterMaterialPipeline>>()
-                .add_system_to_stage(RenderStage::Extract, extract_time)
+                .add_system_to_stage(RenderStage::Extract, extract_water_uniform_data)
                 .add_system_to_stage(RenderStage::Prepare, prepare_water_texture_index)
                 .add_system_to_stage(RenderStage::Queue, queue_water_material_meshes);
         }
     }
 }
 
-#[derive(Default)]
-struct ExtractedTime {
-    seconds_since_startup: f64,
+#[derive(Clone, ShaderType)]
+pub struct WaterUniformData {
+    pub current_index: i32,
+    pub next_index: i32,
+    pub next_weight: f32,
 }
 
-fn extract_time(mut commands: Commands, time: Res<Time>) {
-    commands.insert_resource(ExtractedTime {
-        seconds_since_startup: time.seconds_since_startup(),
+fn extract_water_uniform_data(mut commands: Commands, time: Res<Time>) {
+    let time = time.seconds_since_startup() * 10.0;
+    let current_index = (time as i32) % 25;
+    let next_index = (current_index + 1) % 25;
+    let next_weight = time.fract() as f32;
+
+    commands.insert_resource(WaterUniformData {
+        current_index,
+        next_index,
+        next_weight,
     });
 }
 
-pub struct WaterTextureIndex {
+pub struct WaterUniformMeta {
     buffer: Buffer,
 }
 
 fn prepare_water_texture_index(
-    time: Res<ExtractedTime>,
-    water_texture_index: ResMut<WaterTextureIndex>,
+    water_uniform_data: Res<WaterUniformData>,
+    water_uniform_meta: ResMut<WaterUniformMeta>,
     render_queue: Res<RenderQueue>,
 ) {
-    render_queue.write_buffer(
-        &water_texture_index.buffer,
-        0,
-        bevy::core::cast_slice(&[(time.seconds_since_startup * 10.0) as i32 % 25]),
-    );
+    let byte_buffer = [0u8; WaterUniformData::SIZE.get() as usize];
+    let mut buffer = encase::UniformBuffer::new(byte_buffer);
+    buffer.write(water_uniform_data.as_ref()).unwrap();
+
+    render_queue.write_buffer(&water_uniform_meta.buffer, 0, buffer.as_ref());
 }
 
 pub struct WaterMaterialPipeline {
@@ -190,14 +199,14 @@ impl FromWorld for WaterMaterialPipeline {
                     ty: BindingType::Sampler(SamplerBindingType::Filtering),
                     count: None,
                 },
-                // Water Texture Index
+                // Water Uniform Meta
                 BindGroupLayoutEntry {
                     binding: 2,
                     visibility: ShaderStages::FRAGMENT,
                     ty: BindingType::Buffer {
                         ty: BufferBindingType::Uniform,
-                        min_binding_size: BufferSize::new(std::mem::size_of::<i32>() as u64),
                         has_dynamic_offset: false,
+                        min_binding_size: Some(WaterUniformData::min_size()),
                     },
                     count: None,
                 },
@@ -240,7 +249,7 @@ impl RenderAsset for WaterMaterial {
         SRes<RenderDevice>,
         SRes<WaterMaterialPipeline>,
         SRes<RenderAssets<TextureArray>>,
-        SRes<WaterTextureIndex>,
+        SRes<WaterUniformMeta>,
     );
 
     fn extract_asset(&self) -> Self::ExtractedAsset {
@@ -253,7 +262,7 @@ impl RenderAsset for WaterMaterial {
             render_device,
             material_pipeline,
             gpu_texture_arrays,
-            water_texture_index,
+            water_uniform_meta,
         ): &mut SystemParamItem<Self::Param>,
     ) -> Result<Self::PreparedAsset, PrepareAssetError<Self::ExtractedAsset>> {
         let water_texture_gpu_image = gpu_texture_arrays.get(&material.water_texture_array);
@@ -278,7 +287,7 @@ impl RenderAsset for WaterMaterial {
                 // Water Texture Index
                 BindGroupEntry {
                     binding: 2,
-                    resource: water_texture_index.buffer.as_entire_binding(),
+                    resource: water_uniform_meta.buffer.as_entire_binding(),
                 },
             ],
             label: Some("water_material_bind_group"),
