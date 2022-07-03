@@ -21,7 +21,7 @@ use crate::{
         COLLISION_FILTER_INSPECTABLE, COLLISION_GROUP_CHARACTER,
     },
     model_loader::ModelLoader,
-    render::StaticMeshMaterial,
+    render::ObjectMaterial,
 };
 
 #[derive(Component)]
@@ -157,7 +157,7 @@ pub fn character_model_system(
     >,
     asset_server: Res<AssetServer>,
     model_loader: Res<ModelLoader>,
-    mut static_mesh_materials: ResMut<Assets<StaticMeshMaterial>>,
+    mut object_materials: ResMut<Assets<ObjectMaterial>>,
     mut skinned_mesh_inverse_bindposes_assets: ResMut<Assets<SkinnedMeshInverseBindposes>>,
 ) {
     for (
@@ -177,7 +177,7 @@ pub fn character_model_system(
                 model_loader.update_character_equipment(
                     &mut commands,
                     &asset_server,
-                    &mut static_mesh_materials,
+                    &mut object_materials,
                     entity,
                     character_info,
                     equipment,
@@ -225,7 +225,7 @@ pub fn character_model_system(
             let personal_store_model = model_loader.spawn_personal_store_model(
                 &mut commands,
                 &asset_server,
-                &mut static_mesh_materials,
+                &mut object_materials,
                 entity,
                 personal_store.skin,
             );
@@ -244,7 +244,7 @@ pub fn character_model_system(
                 .spawn_character_model(
                     &mut commands,
                     &asset_server,
-                    &mut static_mesh_materials,
+                    &mut object_materials,
                     &mut skinned_mesh_inverse_bindposes_assets,
                     entity,
                     character_info,

@@ -19,28 +19,28 @@ use bevy_inspector_egui::Inspectable;
 
 use crate::render::MESH_ATTRIBUTE_UV_1;
 
-pub const STATIC_MESH_MATERIAL_SHADER_HANDLE: HandleUntyped =
+pub const OBJECT_MATERIAL_SHADER_HANDLE: HandleUntyped =
     HandleUntyped::weak_from_u64(Shader::TYPE_UUID, 0xb7ebbc00ea16d3c7);
 
 #[derive(Default)]
-pub struct StaticMeshMaterialPlugin;
+pub struct ObjectMaterialPlugin;
 
-impl Plugin for StaticMeshMaterialPlugin {
+impl Plugin for ObjectMaterialPlugin {
     fn build(&self, app: &mut App) {
         let mut shader_assets = app.world.resource_mut::<Assets<Shader>>();
         shader_assets.set_untracked(
-            STATIC_MESH_MATERIAL_SHADER_HANDLE,
-            Shader::from_wgsl(include_str!("shaders/static_mesh_material.wgsl")),
+            OBJECT_MATERIAL_SHADER_HANDLE,
+            Shader::from_wgsl(include_str!("shaders/object_material.wgsl")),
         );
 
-        app.add_plugin(MaterialPlugin::<StaticMeshMaterial>::default());
+        app.add_plugin(MaterialPlugin::<ObjectMaterial>::default());
     }
 }
 
-// NOTE: These must match the bit flags in shaders/static_mesh_material.wgsl!
+// NOTE: These must match the bit flags in shaders/object_material.wgsl!
 bitflags::bitflags! {
     #[repr(transparent)]
-    pub struct StaticMeshMaterialFlags: u32 {
+    pub struct ObjectMaterialFlags: u32 {
         const ALPHA_MODE_OPAQUE          = (1 << 0);
         const ALPHA_MODE_MASK            = (1 << 1);
         const ALPHA_MODE_BLEND           = (1 << 2);
@@ -51,7 +51,7 @@ bitflags::bitflags! {
 }
 
 #[derive(Clone, ShaderType)]
-pub struct StaticMeshMaterialUniformData {
+pub struct ObjectMaterialUniformData {
     pub flags: u32,
     pub alpha_cutoff: f32,
     pub alpha_value: f32,
@@ -61,9 +61,9 @@ pub struct StaticMeshMaterialUniformData {
 
 #[derive(AsBindGroup, Debug, Clone, TypeUuid, Inspectable)]
 #[uuid = "62a496fa-33e8-41a8-9a44-237d70214227"]
-#[bind_group_data(StaticMeshMaterialKey)]
-#[uniform(0, StaticMeshMaterialUniformData)]
-pub struct StaticMeshMaterial {
+#[bind_group_data(ObjectMaterialKey)]
+#[uniform(0, ObjectMaterialUniformData)]
+pub struct ObjectMaterial {
     #[texture(1)]
     #[sampler(2)]
     pub base_texture: Option<Handle<Image>>,
@@ -85,7 +85,7 @@ pub struct StaticMeshMaterial {
     pub lightmap_uv_scale: f32,
 }
 
-impl Default for StaticMeshMaterial {
+impl Default for ObjectMaterial {
     fn default() -> Self {
         Self {
             base_texture: None,
@@ -104,41 +104,41 @@ impl Default for StaticMeshMaterial {
     }
 }
 
-impl AsBindGroupShaderType<StaticMeshMaterialUniformData> for StaticMeshMaterial {
+impl AsBindGroupShaderType<ObjectMaterialUniformData> for ObjectMaterial {
     fn as_bind_group_shader_type(
         &self,
         _images: &RenderAssets<Image>,
-    ) -> StaticMeshMaterialUniformData {
-        let mut flags = StaticMeshMaterialFlags::NONE;
+    ) -> ObjectMaterialUniformData {
+        let mut flags = ObjectMaterialFlags::NONE;
         let mut alpha_cutoff = 0.5;
         let mut alpha_value = 1.0;
 
         if self.specular_enabled {
-            flags |= StaticMeshMaterialFlags::ALPHA_MODE_OPAQUE | StaticMeshMaterialFlags::SPECULAR;
+            flags |= ObjectMaterialFlags::ALPHA_MODE_OPAQUE | ObjectMaterialFlags::SPECULAR;
             alpha_cutoff = 1.0;
         } else {
             if self.alpha_enabled {
-                flags |= StaticMeshMaterialFlags::ALPHA_MODE_BLEND;
+                flags |= ObjectMaterialFlags::ALPHA_MODE_BLEND;
 
                 if let Some(alpha_ref) = self.alpha_test {
-                    flags |= StaticMeshMaterialFlags::ALPHA_MODE_MASK;
+                    flags |= ObjectMaterialFlags::ALPHA_MODE_MASK;
                     alpha_cutoff = alpha_ref;
                 }
             } else {
-                flags |= StaticMeshMaterialFlags::ALPHA_MODE_OPAQUE;
+                flags |= ObjectMaterialFlags::ALPHA_MODE_OPAQUE;
             }
 
             if let Some(material_alpha_value) = self.alpha_value {
                 if material_alpha_value == 1.0 {
-                    flags |= StaticMeshMaterialFlags::ALPHA_MODE_OPAQUE;
+                    flags |= ObjectMaterialFlags::ALPHA_MODE_OPAQUE;
                 } else {
-                    flags |= StaticMeshMaterialFlags::HAS_ALPHA_VALUE;
+                    flags |= ObjectMaterialFlags::HAS_ALPHA_VALUE;
                     alpha_value = material_alpha_value;
                 }
             }
         }
 
-        StaticMeshMaterialUniformData {
+        ObjectMaterialUniformData {
             flags: flags.bits(),
             alpha_cutoff,
             alpha_value,
@@ -149,7 +149,7 @@ impl AsBindGroupShaderType<StaticMeshMaterialUniformData> for StaticMeshMaterial
 }
 
 #[derive(Clone, PartialEq, Eq, Hash)]
-pub struct StaticMeshMaterialKey {
+pub struct ObjectMaterialKey {
     has_lightmap: bool,
     two_sided: bool,
     z_test_enabled: bool,
@@ -157,9 +157,9 @@ pub struct StaticMeshMaterialKey {
     skinned: bool,
 }
 
-impl From<&StaticMeshMaterial> for StaticMeshMaterialKey {
-    fn from(material: &StaticMeshMaterial) -> Self {
-        StaticMeshMaterialKey {
+impl From<&ObjectMaterial> for ObjectMaterialKey {
+    fn from(material: &ObjectMaterial) -> Self {
+        ObjectMaterialKey {
             has_lightmap: material.lightmap_texture.is_some(),
             two_sided: material.two_sided,
             z_test_enabled: material.z_test_enabled,
@@ -169,7 +169,7 @@ impl From<&StaticMeshMaterial> for StaticMeshMaterialKey {
     }
 }
 
-impl Material for StaticMeshMaterial {
+impl Material for ObjectMaterial {
     fn specialize(
         _pipeline: &MaterialPipeline<Self>,
         descriptor: &mut RenderPipelineDescriptor,
@@ -185,13 +185,13 @@ impl Material for StaticMeshMaterial {
             descriptor
                 .vertex
                 .shader_defs
-                .push(String::from("HAS_STATIC_MESH_LIGHTMAP"));
+                .push(String::from("HAS_OBJECT_LIGHTMAP"));
             descriptor
                 .fragment
                 .as_mut()
                 .unwrap()
                 .shader_defs
-                .push(String::from("HAS_STATIC_MESH_LIGHTMAP"));
+                .push(String::from("HAS_OBJECT_LIGHTMAP"));
 
             vertex_attributes.push(MESH_ATTRIBUTE_UV_1.at_shader_location(2));
         }
@@ -233,11 +233,11 @@ impl Material for StaticMeshMaterial {
     }
 
     fn vertex_shader() -> ShaderRef {
-        ShaderRef::Handle(STATIC_MESH_MATERIAL_SHADER_HANDLE.typed())
+        ShaderRef::Handle(OBJECT_MATERIAL_SHADER_HANDLE.typed())
     }
 
     fn fragment_shader() -> ShaderRef {
-        ShaderRef::Handle(STATIC_MESH_MATERIAL_SHADER_HANDLE.typed())
+        ShaderRef::Handle(OBJECT_MATERIAL_SHADER_HANDLE.typed())
     }
 
     #[inline]

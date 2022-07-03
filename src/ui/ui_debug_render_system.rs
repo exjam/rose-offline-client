@@ -6,7 +6,7 @@ use bevy_egui::{egui, EguiContext};
 
 use crate::{
     components::{EventObject, WarpObject},
-    render::StaticMeshMaterial,
+    render::ObjectMaterial,
     resources::DebugRenderConfig,
     ui::UiStateDebugWindows,
 };
@@ -24,8 +24,8 @@ pub fn ui_debug_render_system(
     mut debug_render_config: ResMut<DebugRenderConfig>,
     query_event_objects: Query<&Children, With<EventObject>>,
     query_warp_objects: Query<&Children, With<WarpObject>>,
-    query_static_mesh_material: Query<&Handle<StaticMeshMaterial>>,
-    mut static_mesh_materials: ResMut<Assets<StaticMeshMaterial>>,
+    query_object_material: Query<&Handle<ObjectMaterial>>,
+    mut object_materials: ResMut<Assets<ObjectMaterial>>,
 ) {
     if !ui_state_debug_windows.debug_ui_open {
         return;
@@ -48,8 +48,8 @@ pub fn ui_debug_render_system(
                 if ui_state_debug_render.render_event_objects {
                     for children in query_event_objects.iter() {
                         for child_entity in children.iter() {
-                            if let Ok(handle) = query_static_mesh_material.get(*child_entity) {
-                                if let Some(mut material) = static_mesh_materials.get_mut(handle) {
+                            if let Ok(handle) = query_object_material.get(*child_entity) {
+                                if let Some(mut material) = object_materials.get_mut(handle) {
                                     material.alpha_value = Some(0.75);
                                 }
                             }
@@ -58,8 +58,8 @@ pub fn ui_debug_render_system(
                 } else {
                     for children in query_event_objects.iter() {
                         for child_entity in children.iter() {
-                            if let Ok(handle) = query_static_mesh_material.get(*child_entity) {
-                                if let Some(mut material) = static_mesh_materials.get_mut(handle) {
+                            if let Ok(handle) = query_object_material.get(*child_entity) {
+                                if let Some(mut material) = object_materials.get_mut(handle) {
                                     material.alpha_value = None;
                                 }
                             }
@@ -78,8 +78,8 @@ pub fn ui_debug_render_system(
                 if ui_state_debug_render.render_warp_objects {
                     for children in query_warp_objects.iter() {
                         for child_entity in children.iter() {
-                            if let Ok(handle) = query_static_mesh_material.get(*child_entity) {
-                                if let Some(mut material) = static_mesh_materials.get_mut(handle) {
+                            if let Ok(handle) = query_object_material.get(*child_entity) {
+                                if let Some(mut material) = object_materials.get_mut(handle) {
                                     material.alpha_value = Some(0.75);
                                 }
                             }
@@ -88,8 +88,8 @@ pub fn ui_debug_render_system(
                 } else {
                     for children in query_warp_objects.iter() {
                         for child_entity in children.iter() {
-                            if let Ok(handle) = query_static_mesh_material.get(*child_entity) {
-                                if let Some(mut material) = static_mesh_materials.get_mut(handle) {
+                            if let Ok(handle) = query_object_material.get(*child_entity) {
+                                if let Some(mut material) = object_materials.get_mut(handle) {
                                     material.alpha_value = None;
                                 }
                             }

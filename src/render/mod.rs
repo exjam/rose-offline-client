@@ -7,12 +7,12 @@ mod damage_digit_material;
 mod damage_digit_pipeline;
 mod damage_digit_render_data;
 mod effect_mesh_material;
+mod object_material;
 mod particle_material;
 mod particle_pipeline;
 mod particle_render_data;
 mod rgb_texture_loader;
 mod sky_material;
-mod static_mesh_material;
 mod terrain_material;
 mod texture_array;
 mod water_material;
@@ -29,11 +29,11 @@ pub const MESH_ATTRIBUTE_UV_3: MeshVertexAttribute =
 pub use damage_digit_material::DamageDigitMaterial;
 pub use damage_digit_render_data::DamageDigitRenderData;
 pub use effect_mesh_material::EffectMeshMaterial;
+pub use object_material::ObjectMaterial;
 pub use particle_material::ParticleMaterial;
 pub use particle_render_data::{ParticleRenderBillboardType, ParticleRenderData};
 pub use rgb_texture_loader::RgbTextureLoader;
 pub use sky_material::SkyMaterial;
-pub use static_mesh_material::StaticMeshMaterial;
 pub use terrain_material::{TerrainMaterial, TERRAIN_MESH_ATTRIBUTE_TILE_INFO};
 pub use texture_array::{GpuTextureArray, TextureArray, TextureArrayBuilder};
 pub use water_material::WaterMaterial;
@@ -41,10 +41,10 @@ pub use water_material::WaterMaterial;
 use damage_digit_material::DamageDigitMaterialPlugin;
 use damage_digit_pipeline::DamageDigitRenderPlugin;
 use effect_mesh_material::EffectMeshMaterialPlugin;
+use object_material::ObjectMaterialPlugin;
 use particle_material::ParticleMaterialPlugin;
 use particle_pipeline::ParticleRenderPlugin;
 use sky_material::SkyMaterialPlugin;
-use static_mesh_material::StaticMeshMaterialPlugin;
 use terrain_material::TerrainMaterialPlugin;
 use texture_array::TextureArrayPlugin;
 use water_material::WaterMaterialPlugin;
@@ -57,7 +57,7 @@ impl Plugin for RoseRenderPlugin {
         app.add_plugin(TextureArrayPlugin)
             .add_plugin(TerrainMaterialPlugin)
             .add_plugin(EffectMeshMaterialPlugin)
-            .add_plugin(StaticMeshMaterialPlugin)
+            .add_plugin(ObjectMaterialPlugin)
             .add_plugin(WaterMaterialPlugin)
             .add_plugin(ParticleMaterialPlugin)
             .add_plugin(ParticleRenderPlugin)

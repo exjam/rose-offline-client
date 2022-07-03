@@ -13,7 +13,7 @@ use bevy_inspector_egui::{InspectableRegistry, WorldInspectorParams};
 use bevy_rapier3d::prelude::{InteractionGroups, RapierContext};
 
 use crate::{
-    components::COLLISION_FILTER_INSPECTABLE, render::StaticMeshMaterial, resources::DebugInspector,
+    components::COLLISION_FILTER_INSPECTABLE, render::ObjectMaterial, resources::DebugInspector,
 };
 
 use super::{
@@ -34,8 +34,8 @@ impl Plugin for DebugInspectorPlugin {
         let mut inspectable_registry = app
             .world
             .get_resource_or_insert_with(InspectableRegistry::default);
-        inspectable_registry.register::<StaticMeshMaterial>();
-        inspectable_registry.register::<Handle<StaticMeshMaterial>>();
+        inspectable_registry.register::<ObjectMaterial>();
+        inspectable_registry.register::<Handle<ObjectMaterial>>();
         inspectable_registry.register::<ZoneObject>();
         inspectable_registry.register::<ZoneObjectTerrain>();
         inspectable_registry.register::<ZoneObjectAnimatedObject>();

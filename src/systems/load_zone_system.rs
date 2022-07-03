@@ -31,7 +31,7 @@ use crate::{
     effect_loader::spawn_effect,
     events::{LoadZoneEvent, ZoneEvent},
     render::{
-        EffectMeshMaterial, ParticleMaterial, RgbTextureLoader, SkyMaterial, StaticMeshMaterial,
+        EffectMeshMaterial, ObjectMaterial, ParticleMaterial, RgbTextureLoader, SkyMaterial,
         TerrainMaterial, TextureArray, TextureArrayBuilder, WaterMaterial, MESH_ATTRIBUTE_UV_1,
         TERRAIN_MESH_ATTRIBUTE_TILE_INFO,
     },
@@ -132,7 +132,7 @@ pub fn load_zone_system(
     mut effect_mesh_materials: ResMut<Assets<EffectMeshMaterial>>,
     mut particle_materials: ResMut<Assets<ParticleMaterial>>,
     mut sky_materials: ResMut<Assets<SkyMaterial>>,
-    mut static_mesh_materials: ResMut<Assets<StaticMeshMaterial>>,
+    mut object_materials: ResMut<Assets<ObjectMaterial>>,
     mut water_materials: ResMut<Assets<WaterMaterial>>,
     mut texture_arrays: ResMut<Assets<TextureArray>>,
     mut load_zone_state: Local<LoadZoneState>,
@@ -212,7 +212,7 @@ pub fn load_zone_system(
             &mut effect_mesh_materials,
             &mut particle_materials,
             &mut sky_materials,
-            &mut static_mesh_materials,
+            &mut object_materials,
             &mut water_materials,
             &mut texture_arrays,
             zone_list_entry,
@@ -232,7 +232,7 @@ fn load_zone(
     effect_mesh_materials: &mut ResMut<Assets<EffectMeshMaterial>>,
     particle_materials: &mut ResMut<Assets<ParticleMaterial>>,
     sky_materials: &mut ResMut<Assets<SkyMaterial>>,
-    static_mesh_materials: &mut ResMut<Assets<StaticMeshMaterial>>,
+    object_materials: &mut ResMut<Assets<ObjectMaterial>>,
     water_materials: &mut ResMut<Assets<WaterMaterial>>,
     texture_arrays: &mut ResMut<Assets<TextureArray>>,
     zone_list_entry: &ZoneListEntry,
@@ -366,7 +366,7 @@ fn load_zone(
                             vfs_resource,
                             effect_mesh_materials.as_mut(),
                             particle_materials.as_mut(),
-                            static_mesh_materials.as_mut(),
+                            object_materials.as_mut(),
                             zsc_event_object,
                             &lightmap_path,
                             None,
@@ -392,7 +392,7 @@ fn load_zone(
                             vfs_resource,
                             effect_mesh_materials.as_mut(),
                             particle_materials.as_mut(),
-                            static_mesh_materials.as_mut(),
+                            object_materials.as_mut(),
                             zsc_special_object,
                             &lightmap_path,
                             None,
@@ -431,7 +431,7 @@ fn load_zone(
                             vfs_resource,
                             effect_mesh_materials.as_mut(),
                             particle_materials.as_mut(),
-                            static_mesh_materials.as_mut(),
+                            object_materials.as_mut(),
                             zsc_cnst,
                             &lightmap_path,
                             lit_object,
@@ -466,7 +466,7 @@ fn load_zone(
                             vfs_resource,
                             effect_mesh_materials.as_mut(),
                             particle_materials.as_mut(),
-                            static_mesh_materials.as_mut(),
+                            object_materials.as_mut(),
                             zsc_deco,
                             &lightmap_path,
                             lit_object,
@@ -484,7 +484,7 @@ fn load_zone(
                         load_animated_object(
                             commands,
                             asset_server,
-                            static_mesh_materials.as_mut(),
+                            object_materials.as_mut(),
                             stb_morph_object,
                             object_instance,
                         );
@@ -743,7 +743,7 @@ fn load_block_object(
     vfs_resource: &VfsResource,
     effect_mesh_materials: &mut Assets<EffectMeshMaterial>,
     particle_materials: &mut Assets<ParticleMaterial>,
-    static_mesh_materials: &mut Assets<StaticMeshMaterial>,
+    object_materials: &mut Assets<ObjectMaterial>,
     zsc: &ZscFile,
     lightmap_path: &Path,
     lit_object: Option<&LitObject>,
@@ -775,8 +775,7 @@ fn load_block_object(
             object_instance.scale.y,
         ));
 
-    let mut material_cache: Vec<Option<Handle<StaticMeshMaterial>>> =
-        vec![None; zsc.materials.len()];
+    let mut material_cache: Vec<Option<Handle<ObjectMaterial>>> = vec![None; zsc.materials.len()];
     let mut mesh_cache: Vec<Option<Handle<Mesh>>> = vec![None; zsc.meshes.len()];
 
     let mut part_entities: ArrayVec<Entity, 32> = ArrayVec::new();
@@ -838,7 +837,7 @@ fn load_block_object(
             let material_id = object_part.material_id as usize;
             let material = material_cache[material_id].clone().unwrap_or_else(|| {
                 let zsc_material = &zsc.materials[material_id];
-                let handle = static_mesh_materials.add(StaticMeshMaterial {
+                let handle = object_materials.add(ObjectMaterial {
                     base_texture: Some(
                         asset_server.load(RgbTextureLoader::convert_path(zsc_material.path.path())),
                     ),
@@ -993,7 +992,7 @@ fn load_block_object(
 fn load_animated_object(
     commands: &mut Commands,
     asset_server: &AssetServer,
-    static_mesh_materials: &mut Assets<StaticMeshMaterial>,
+    object_materials: &mut Assets<ObjectMaterial>,
     stb_morph_object: &StbFile,
     object_instance: &IfoObject,
 ) {
@@ -1035,7 +1034,7 @@ fn load_animated_object(
         ));
 
     let mesh = asset_server.load::<Mesh, _>(mesh_path);
-    let material = static_mesh_materials.add(StaticMeshMaterial {
+    let material = object_materials.add(ObjectMaterial {
         base_texture: Some(
             asset_server.load(RgbTextureLoader::convert_path(Path::new(texture_path))),
         ),

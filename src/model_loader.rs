@@ -23,7 +23,7 @@ use crate::{
         PersonalStoreModel,
     },
     effect_loader::spawn_effect,
-    render::{EffectMeshMaterial, ParticleMaterial, RgbTextureLoader, StaticMeshMaterial},
+    render::{EffectMeshMaterial, ObjectMaterial, ParticleMaterial, RgbTextureLoader},
     zmo_asset_loader::ZmoAsset,
 };
 
@@ -164,7 +164,7 @@ impl ModelLoader {
         asset_server: &AssetServer,
         effect_mesh_materials: &mut Assets<EffectMeshMaterial>,
         particle_materials: &mut Assets<ParticleMaterial>,
-        static_mesh_materials: &mut Assets<StaticMeshMaterial>,
+        object_materials: &mut Assets<ObjectMaterial>,
         skinned_mesh_inverse_bindposes_assets: &mut Assets<SkinnedMeshInverseBindposes>,
         model_entity: Entity,
         npc_id: NpcId,
@@ -194,7 +194,7 @@ impl ModelLoader {
             let (_model_id, mut parts) = spawn_model(
                 commands,
                 asset_server,
-                static_mesh_materials,
+                object_materials,
                 model_entity,
                 &self.npc_zsc,
                 *model_id as usize,
@@ -233,7 +233,7 @@ impl ModelLoader {
                 let (_model_id, mut parts) = spawn_model(
                     commands,
                     asset_server,
-                    static_mesh_materials,
+                    object_materials,
                     model_entity,
                     &self.weapon,
                     npc_data.right_hand_part_index as usize,
@@ -248,7 +248,7 @@ impl ModelLoader {
                 let (_model_id, mut parts) = spawn_model(
                     commands,
                     asset_server,
-                    static_mesh_materials,
+                    object_materials,
                     model_entity,
                     &self.sub_weapon,
                     npc_data.left_hand_part_index as usize,
@@ -285,7 +285,7 @@ impl ModelLoader {
         &self,
         commands: &mut Commands,
         asset_server: &AssetServer,
-        static_mesh_materials: &mut Assets<StaticMeshMaterial>,
+        object_materials: &mut Assets<ObjectMaterial>,
         model_entity: Entity,
         skin: usize,
     ) -> PersonalStoreModel {
@@ -297,7 +297,7 @@ impl ModelLoader {
         spawn_model(
             commands,
             asset_server,
-            static_mesh_materials,
+            object_materials,
             root_bone,
             &self.field_item,
             260 + skin,
@@ -316,7 +316,7 @@ impl ModelLoader {
         &self,
         commands: &mut Commands,
         asset_server: &AssetServer,
-        static_mesh_materials: &mut Assets<StaticMeshMaterial>,
+        object_materials: &mut Assets<ObjectMaterial>,
         model_entity: Entity,
         dropped_item: Option<&DroppedItem>,
     ) -> (ItemDropModel, Handle<ZmoAsset>) {
@@ -342,7 +342,7 @@ impl ModelLoader {
                 model_parts: spawn_model(
                     commands,
                     asset_server,
-                    static_mesh_materials,
+                    object_materials,
                     root_bone,
                     &self.field_item,
                     model_id,
@@ -417,7 +417,7 @@ impl ModelLoader {
         &self,
         commands: &mut Commands,
         asset_server: &AssetServer,
-        static_mesh_materials: &mut Assets<StaticMeshMaterial>,
+        object_materials: &mut Assets<ObjectMaterial>,
         skinned_mesh_inverse_bindposes_assets: &mut Assets<SkinnedMeshInverseBindposes>,
         model_entity: Entity,
         character_info: &CharacterInfo,
@@ -449,7 +449,7 @@ impl ModelLoader {
                 model_parts[model_part] = spawn_model(
                     commands,
                     asset_server,
-                    static_mesh_materials,
+                    object_materials,
                     model_entity,
                     self.get_model_list(character_info.gender, model_part),
                     model_id,
@@ -480,7 +480,7 @@ impl ModelLoader {
         &self,
         commands: &mut Commands,
         asset_server: &AssetServer,
-        static_mesh_materials: &mut Assets<StaticMeshMaterial>,
+        object_materials: &mut Assets<ObjectMaterial>,
         model_entity: Entity,
         character_info: &CharacterInfo,
         equipment: &Equipment,
@@ -521,7 +521,7 @@ impl ModelLoader {
                     character_model.model_parts[model_part] = spawn_model(
                         commands,
                         asset_server,
-                        static_mesh_materials,
+                        object_materials,
                         model_entity,
                         self.get_model_list(character_info.gender, model_part),
                         model_id,
@@ -653,7 +653,7 @@ fn spawn_skeleton(
 fn spawn_model(
     commands: &mut Commands,
     asset_server: &AssetServer,
-    static_mesh_materials: &mut Assets<StaticMeshMaterial>,
+    object_materials: &mut Assets<ObjectMaterial>,
     model_entity: Entity,
     model_list: &ZscFile,
     model_id: usize,
@@ -673,7 +673,7 @@ fn spawn_model(
         let mesh = asset_server.load::<Mesh, _>(model_list.meshes[mesh_id].path());
         let material_id = object_part.material_id as usize;
         let zsc_material = &model_list.materials[material_id];
-        let material = static_mesh_materials.add(StaticMeshMaterial {
+        let material = object_materials.add(ObjectMaterial {
             base_texture: Some(
                 asset_server.load(RgbTextureLoader::convert_path(zsc_material.path.path())),
             ),

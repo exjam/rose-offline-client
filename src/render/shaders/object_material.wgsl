@@ -14,7 +14,7 @@ struct Vertex {
     [[location(0)]] position: vec3<f32>;
     [[location(1)]] uv: vec2<f32>;
 
-#ifdef HAS_STATIC_MESH_LIGHTMAP
+#ifdef HAS_OBJECT_LIGHTMAP
     [[location(2)]] lightmap_uv: vec2<f32>;
 #endif
 
@@ -29,7 +29,7 @@ struct VertexOutput {
     [[location(0)]] world_position: vec4<f32>;
     [[location(1)]] uv: vec2<f32>;
 
-#ifdef HAS_STATIC_MESH_LIGHTMAP
+#ifdef HAS_OBJECT_LIGHTMAP
     [[location(2)]] lightmap_uv: vec2<f32>;
 #endif
 };
@@ -40,7 +40,7 @@ fn vertex(vertex: Vertex) -> VertexOutput {
     var out: VertexOutput;
     out.uv = vertex.uv;
 
-#ifdef HAS_STATIC_MESH_LIGHTMAP
+#ifdef HAS_OBJECT_LIGHTMAP
     out.lightmap_uv = vertex.lightmap_uv;
 #endif
 
@@ -63,11 +63,11 @@ struct StaticMeshMaterialData {
     lightmap_uv_scale: f32;
 };
 
-let STATIC_MESH_MATERIAL_FLAGS_ALPHA_MODE_OPAQUE: u32              = 1u;
-let STATIC_MESH_MATERIAL_FLAGS_ALPHA_MODE_MASK: u32                = 2u;
-let STATIC_MESH_MATERIAL_FLAGS_ALPHA_MODE_BLEND: u32               = 4u;
-let STATIC_MESH_MATERIAL_FLAGS_HAS_ALPHA_VALUE: u32                = 8u;
-let STATIC_MESH_MATERIAL_FLAGS_SPECULAR: u32                       = 16u;
+let OBJECT_MATERIAL_FLAGS_ALPHA_MODE_OPAQUE: u32              = 1u;
+let OBJECT_MATERIAL_FLAGS_ALPHA_MODE_MASK: u32                = 2u;
+let OBJECT_MATERIAL_FLAGS_ALPHA_MODE_BLEND: u32               = 4u;
+let OBJECT_MATERIAL_FLAGS_HAS_ALPHA_VALUE: u32                = 8u;
+let OBJECT_MATERIAL_FLAGS_SPECULAR: u32                       = 16u;
 
 [[group(1), binding(0)]]
 var<uniform> material: StaticMeshMaterialData;
@@ -84,7 +84,7 @@ struct FragmentInput {
     [[builtin(position)]] frag_coord: vec4<f32>;
     [[location(0)]] world_position: vec4<f32>;
     [[location(1)]] uv: vec2<f32>;
-#ifdef HAS_STATIC_MESH_LIGHTMAP
+#ifdef HAS_OBJECT_LIGHTMAP
     [[location(2)]] lightmap_uv: vec2<f32>;
 #endif
 };
@@ -92,17 +92,17 @@ struct FragmentInput {
 [[stage(fragment)]]
 fn fragment(in: FragmentInput) -> [[location(0)]] vec4<f32> {
     var output_color: vec4<f32> = textureSample(base_texture, base_sampler, in.uv);
-#ifdef HAS_STATIC_MESH_LIGHTMAP
+#ifdef HAS_OBJECT_LIGHTMAP
     output_color = output_color * textureSample(lightmap_texture, lightmap_sampler, (in.lightmap_uv + material.lightmap_uv_offset) * material.lightmap_uv_scale) * 2.0;
 #endif
     output_color = pow(output_color, vec4<f32>(2.2)) * lights.ambient_color;
 
-    if ((material.flags & STATIC_MESH_MATERIAL_FLAGS_HAS_ALPHA_VALUE) != 0u) {
+    if ((material.flags & OBJECT_MATERIAL_FLAGS_HAS_ALPHA_VALUE) != 0u) {
         output_color.a = material.alpha_value;
-    } else if ((material.flags & STATIC_MESH_MATERIAL_FLAGS_ALPHA_MODE_OPAQUE) != 0u) {
+    } else if ((material.flags & OBJECT_MATERIAL_FLAGS_ALPHA_MODE_OPAQUE) != 0u) {
         // NOTE: If rendering as opaque, alpha should be ignored so set to 1.0
         output_color.a = 1.0;
-    } else if ((material.flags & STATIC_MESH_MATERIAL_FLAGS_ALPHA_MODE_MASK) != 0u) {
+    } else if ((material.flags & OBJECT_MATERIAL_FLAGS_ALPHA_MODE_MASK) != 0u) {
         if (output_color.a >= material.alpha_cutoff) {
             // NOTE: If rendering as masked alpha and >= the cutoff, render as fully opaque
             output_color.a = 1.0;
