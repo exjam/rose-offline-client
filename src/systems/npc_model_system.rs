@@ -1,8 +1,8 @@
 use bevy::{
     math::{Quat, Vec3, Vec3A},
     prelude::{
-        AssetServer, Assets, BuildChildren, Changed, Commands, Component, Entity, GlobalTransform,
-        Query, Res, ResMut, Transform, With, Without,
+        AssetServer, Assets, BuildChildren, Changed, Commands, Entity, GlobalTransform, Query, Res,
+        ResMut, Transform, With, Without,
     },
     render::{
         mesh::skinning::{SkinnedMesh, SkinnedMeshInverseBindposes},
@@ -107,18 +107,10 @@ pub fn npc_model_system(
     }
 }
 
-#[derive(Component)]
-pub struct NpcColliderRootBoneOffset {
-    pub offset: Vec3,
-}
-
 pub fn npc_model_add_collider_system(
     mut commands: Commands,
     query_models: Query<(Entity, &NpcModel, &SkinnedMesh), Without<ColliderEntity>>,
-    query_collider: Query<(&SkinnedMesh, &NpcColliderRootBoneOffset, &ColliderEntity)>,
     query_aabb: Query<Option<&Aabb>, With<SkinnedMesh>>,
-    query_global_transform: Query<&GlobalTransform>,
-    mut query_transform: Query<&mut Transform>,
     inverse_bindposes: Res<Assets<SkinnedMeshInverseBindposes>>,
 ) {
     // Add colliders to NPC models without one
@@ -141,25 +133,17 @@ pub fn npc_model_add_collider_system(
         }
 
         let inverse_bindpose = inverse_bindposes.get(&skinned_mesh.inverse_bindposes);
-        let root_bone_global_transform = query_global_transform.get(skinned_mesh.joints[0]).ok();
-        if min.is_none()
-            || max.is_none()
-            || !all_parts_loaded
-            || inverse_bindpose.is_none()
-            || root_bone_global_transform.is_none()
-        {
+        let root_bone_entity = skinned_mesh.joints[0];
+        if min.is_none() || max.is_none() || !all_parts_loaded || inverse_bindpose.is_none() {
             continue;
         }
-        let root_bone_global_transform = root_bone_global_transform.unwrap();
-        let inverse_bindpose = inverse_bindpose.unwrap();
-        let root_bone_local_transform = Transform::from_matrix(inverse_bindpose[0].inverse());
+        let root_bone_inverse_bindpose = Transform::from_matrix(inverse_bindpose.unwrap()[0]);
 
-        let min = Vec3::from(min.unwrap()) * root_bone_global_transform.scale;
-        let max = Vec3::from(max.unwrap()) * root_bone_global_transform.scale;
+        let min = Vec3::from(min.unwrap());
+        let max = Vec3::from(max.unwrap());
         let local_bound_center = 0.5 * (min + max);
         let half_extents = 0.5 * (max - min);
-        let root_bone_offset = local_bound_center
-            - root_bone_local_transform.translation * root_bone_global_transform.scale;
+        let root_bone_offset = root_bone_inverse_bindpose.mul_vec3(local_bound_center);
 
         let collider_entity = commands
             .spawn_bundle((
@@ -169,37 +153,16 @@ pub fn npc_model_add_collider_system(
                     COLLISION_GROUP_NPC,
                     COLLISION_FILTER_INSPECTABLE | COLLISION_FILTER_CLICKABLE,
                 ),
-                Transform::from_translation(
-                    root_bone_global_transform.translation + root_bone_offset,
-                )
-                .with_rotation(
-                    root_bone_global_transform.rotation
-                        * Quat::from_axis_angle(Vec3::Z, std::f32::consts::PI / 2.0),
-                ),
+                Transform::from_translation(root_bone_offset)
+                    .with_rotation(Quat::from_axis_angle(Vec3::Z, std::f32::consts::PI / 2.0)),
                 GlobalTransform::default(),
             ))
             .id();
 
+        commands.entity(root_bone_entity).add_child(collider_entity);
+
         commands
             .entity(entity)
-            .insert_bundle((
-                NpcColliderRootBoneOffset {
-                    offset: root_bone_offset,
-                },
-                ColliderEntity::new(collider_entity),
-            ))
-            .add_child(collider_entity);
-    }
-
-    // Update any existing collider's position
-    for (skinned_mesh, root_bone_offset, collider_entity) in query_collider.iter() {
-        if let Ok(root_bone_global_transform) = query_global_transform.get(skinned_mesh.joints[0]) {
-            if let Ok(mut collider_transform) = query_transform.get_mut(collider_entity.entity) {
-                collider_transform.translation =
-                    root_bone_global_transform.translation + root_bone_offset.offset;
-                collider_transform.rotation = root_bone_global_transform.rotation
-                    * Quat::from_axis_angle(Vec3::Z, std::f32::consts::PI / 2.0);
-            }
-        }
+            .insert_bundle((ColliderEntity::new(collider_entity),));
     }
 }

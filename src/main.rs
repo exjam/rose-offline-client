@@ -57,7 +57,8 @@ use systems::{
     ability_values_system, animation_effect_system, animation_system,
     character_model_add_collider_system, character_model_system, character_select_enter_system,
     character_select_exit_system, character_select_input_system, character_select_models_system,
-    character_select_system, client_entity_event_system, collision_system, command_system,
+    character_select_system, client_entity_event_system, collision_height_only_system,
+    collision_player_system, collision_player_system_join_zoin, command_system,
     conversation_dialog_system, cooldown_system, damage_digit_render_system,
     debug_render_collider_system, debug_render_polylines_setup_system,
     debug_render_polylines_update_system, debug_render_skeleton_system, effect_system,
@@ -366,7 +367,6 @@ fn main() {
         .add_system(npc_model_add_collider_system.after(npc_model_system))
         .add_system(item_drop_model_system)
         .add_system(item_drop_model_add_collider_system.after(item_drop_model_system))
-        .add_system(collision_system)
         .add_system(animation_system)
         .add_system(particle_sequence_system)
         .add_system(effect_system)
@@ -506,6 +506,13 @@ fn main() {
                 .with_system(ability_values_system)
                 .with_system(command_system.after(animation_system))
                 .with_system(update_position_system)
+                .with_system(
+                    collision_player_system_join_zoin
+                        .after(update_position_system)
+                        .before(collision_player_system),
+                )
+                .with_system(collision_height_only_system.after(update_position_system))
+                .with_system(collision_player_system.after(update_position_system))
                 .with_system(client_entity_event_system)
                 .with_system(passive_recovery_system)
                 .with_system(quest_trigger_system)

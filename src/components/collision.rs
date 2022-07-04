@@ -23,25 +23,10 @@ impl ColliderParent {
 }
 
 #[derive(Component)]
-pub struct MovementCollisionEntities {
-    pub down_ray_cast_source: Option<Entity>,
-    pub forward_ray_cast_source: Option<Entity>,
-}
-
-impl MovementCollisionEntities {
-    pub fn new(
-        down_ray_cast_source: Option<Entity>,
-        forward_ray_cast_source: Option<Entity>,
-    ) -> Self {
-        Self {
-            down_ray_cast_source,
-            forward_ray_cast_source,
-        }
-    }
-}
+pub struct CollisionPlayer;
 
 #[derive(Component)]
-pub struct CollisionRayCastSource;
+pub struct CollisionHeightOnly;
 
 pub const COLLISION_GROUP_ZONE_OBJECT: u32 = 1 << 0;
 pub const COLLISION_GROUP_ZONE_TERRAIN: u32 = 1 << 1;
@@ -56,3 +41,4 @@ pub const COLLISION_GROUP_ITEM_DROP: u32 = 1 << 12;
 pub const COLLISION_FILTER_INSPECTABLE: u32 = 1 << 16;
 pub const COLLISION_FILTER_COLLIDABLE: u32 = 1 << 17;
 pub const COLLISION_FILTER_CLICKABLE: u32 = 1 << 18;
+pub const COLLISION_FILTER_MOVEABLE: u32 = 1 << 19;

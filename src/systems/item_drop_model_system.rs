@@ -1,8 +1,8 @@
 use bevy::{
-    math::{Quat, Vec3, Vec3A},
+    math::{Vec3, Vec3A},
     prelude::{
-        AssetServer, Assets, BuildChildren, Changed, Commands, Component, Entity, GlobalTransform,
-        Handle, Mesh, Query, Res, ResMut, Transform, With, Without,
+        AssetServer, Assets, BuildChildren, Changed, Commands, Entity, GlobalTransform, Handle,
+        Mesh, Query, Res, ResMut, Transform, With, Without,
     },
     render::primitives::Aabb,
 };
@@ -56,20 +56,14 @@ pub fn item_drop_model_system(
     }
 }
 
-#[derive(Component)]
-pub struct ItemDropColliderOffset {
-    pub offset: Vec3,
-}
-
 pub fn item_drop_model_add_collider_system(
     mut commands: Commands,
-    query_models: Query<(Entity, &ItemDropModel, &GlobalTransform), Without<ColliderEntity>>,
-    query_collider: Query<(&GlobalTransform, &ItemDropColliderOffset, &ColliderEntity)>,
-    mut query_transform: Query<&mut Transform>,
+    query_models: Query<(Entity, &ItemDropModel), Without<ColliderEntity>>,
+    query_transform: Query<&Transform>,
     query_aabb: Query<Option<&Aabb>, With<Handle<Mesh>>>,
 ) {
     // Add colliders to NPC models without one
-    for (entity, item_drop_model, global_transform) in query_models.iter() {
+    for (entity, item_drop_model) in query_models.iter() {
         let mut min: Option<Vec3A> = None;
         let mut max: Option<Vec3A> = None;
         let mut all_parts_loaded = true;
@@ -87,14 +81,18 @@ pub fn item_drop_model_add_collider_system(
             }
         }
 
-        if min.is_none() || max.is_none() || !all_parts_loaded {
+        let root_bone_entity = item_drop_model.root_bone;
+        let root_bone_transform = query_transform.get(root_bone_entity).ok();
+        if !all_parts_loaded || min.is_none() || max.is_none() || root_bone_transform.is_none() {
             continue;
         }
-        let min = min.unwrap();
-        let max = max.unwrap();
+        let min = Vec3::from(min.unwrap());
+        let max = Vec3::from(max.unwrap());
+        let root_bone_transform = root_bone_transform.unwrap();
+
         let local_bound_center = 0.5 * (min + max);
-        let half_extents = Vec3::from(0.5 * (max - min));
-        let collider_offset = Vec3::from(local_bound_center);
+        let half_extents = 0.5 * (max - min);
+        let root_bone_offset = local_bound_center - root_bone_transform.translation;
 
         let collider_entity = commands
             .spawn_bundle((
@@ -104,32 +102,15 @@ pub fn item_drop_model_add_collider_system(
                     COLLISION_GROUP_ITEM_DROP,
                     COLLISION_FILTER_INSPECTABLE | COLLISION_FILTER_CLICKABLE,
                 ),
-                Transform::from_translation(global_transform.translation + collider_offset)
-                    .with_rotation(
-                        global_transform.rotation
-                            * Quat::from_axis_angle(Vec3::Z, std::f32::consts::PI / 2.0),
-                    ),
+                Transform::from_translation(root_bone_offset),
                 GlobalTransform::default(),
             ))
             .id();
 
         commands
             .entity(entity)
-            .insert_bundle((
-                ColliderEntity::new(collider_entity),
-                ItemDropColliderOffset {
-                    offset: collider_offset,
-                },
-            ))
-            .add_child(collider_entity);
-    }
+            .insert(ColliderEntity::new(collider_entity));
 
-    // Update any existing collider's position
-    for (global_transform, collider_offset, collider_entity) in query_collider.iter() {
-        if let Ok(mut collider_transform) = query_transform.get_mut(collider_entity.entity) {
-            collider_transform.translation = global_transform.translation + collider_offset.offset;
-            collider_transform.rotation = global_transform.rotation
-                * Quat::from_axis_angle(Vec3::Z, std::f32::consts::PI / 2.0);
-        }
+        commands.entity(root_bone_entity).add_child(collider_entity);
     }
 }

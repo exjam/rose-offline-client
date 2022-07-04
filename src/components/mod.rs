@@ -31,11 +31,11 @@ pub use character_model::{CharacterModel, CharacterModelPart};
 pub use client_entity::{ClientEntity, ClientEntityId, ClientEntityType};
 pub use client_entity_name::ClientEntityName;
 pub use collision::{
-    ColliderEntity, ColliderParent, CollisionRayCastSource, MovementCollisionEntities,
+    ColliderEntity, ColliderParent, CollisionHeightOnly, CollisionPlayer,
     COLLISION_FILTER_CLICKABLE, COLLISION_FILTER_COLLIDABLE, COLLISION_FILTER_INSPECTABLE,
-    COLLISION_GROUP_CHARACTER, COLLISION_GROUP_ITEM_DROP, COLLISION_GROUP_NPC,
-    COLLISION_GROUP_ZONE_EVENT_OBJECT, COLLISION_GROUP_ZONE_OBJECT, COLLISION_GROUP_ZONE_TERRAIN,
-    COLLISION_GROUP_ZONE_WARP_OBJECT, COLLISION_GROUP_ZONE_WATER,
+    COLLISION_FILTER_MOVEABLE, COLLISION_GROUP_CHARACTER, COLLISION_GROUP_ITEM_DROP,
+    COLLISION_GROUP_NPC, COLLISION_GROUP_ZONE_EVENT_OBJECT, COLLISION_GROUP_ZONE_OBJECT,
+    COLLISION_GROUP_ZONE_TERRAIN, COLLISION_GROUP_ZONE_WARP_OBJECT, COLLISION_GROUP_ZONE_WATER,
 };
 pub use command::{
     Command, CommandAttack, CommandCastSkill, CommandCastSkillState, CommandCastSkillTarget,

@@ -12,7 +12,9 @@ use bevy::{
     render::{mesh::Indices, render_resource::PrimitiveTopology, view::NoFrustumCulling},
 };
 use bevy_inspector_egui::Inspectable;
-use bevy_rapier3d::prelude::{AsyncCollider, Collider, CollisionGroups};
+use bevy_rapier3d::prelude::{
+    AsyncCollider, Collider, CollisionGroups, ComputedColliderShape, RigidBody,
+};
 use std::path::Path;
 
 use rose_data::{WarpGateId, ZoneId, ZoneListEntry};
@@ -23,9 +25,9 @@ use rose_file_readers::{
 
 use crate::{
     components::{
-        ActiveMotion, ColliderEntity, ColliderParent, EventObject, NightTimeEffect, WarpObject,
+        ActiveMotion, ColliderParent, EventObject, NightTimeEffect, WarpObject,
         COLLISION_FILTER_CLICKABLE, COLLISION_FILTER_COLLIDABLE, COLLISION_FILTER_INSPECTABLE,
-        COLLISION_GROUP_ZONE_EVENT_OBJECT, COLLISION_GROUP_ZONE_OBJECT,
+        COLLISION_FILTER_MOVEABLE, COLLISION_GROUP_ZONE_EVENT_OBJECT, COLLISION_GROUP_ZONE_OBJECT,
         COLLISION_GROUP_ZONE_TERRAIN, COLLISION_GROUP_ZONE_WARP_OBJECT, COLLISION_GROUP_ZONE_WATER,
     },
     effect_loader::spawn_effect,
@@ -313,6 +315,8 @@ fn load_zone(
         .parent()
         .unwrap_or_else(|| Path::new(""));
 
+    let mut heightmaps = vec![None; 64 * 64];
+
     for block_y in 0..64u32 {
         for block_x in 0..64u32 {
             let tilemap = vfs_resource
@@ -336,13 +340,15 @@ fn load_zone(
                 load_block_heightmap(
                     commands,
                     meshes.as_mut(),
-                    heightmap,
-                    tilemap,
+                    &heightmap,
+                    &tilemap,
                     &zone_file.tiles,
                     block_terrain_material,
                     block_x,
                     block_y,
                 );
+
+                heightmaps[block_x as usize + block_y as usize * 64] = Some(heightmap);
             }
 
             let ifo = vfs_resource
@@ -498,6 +504,7 @@ fn load_zone(
         id: zone_list_entry.id,
         grid_per_patch: zone_file.grid_per_patch,
         grid_size: zone_file.grid_size,
+        heightmaps,
     })
 }
 
@@ -505,8 +512,8 @@ fn load_zone(
 fn load_block_heightmap(
     commands: &mut Commands,
     meshes: &mut Assets<Mesh>,
-    heightmap: HimFile,
-    tilemap: TilFile,
+    heightmap: &HimFile,
+    tilemap: &TilFile,
     tile_info: &[ZonTile],
     material: Handle<TerrainMaterial>,
     block_x: u32,
@@ -600,9 +607,9 @@ fn load_block_heightmap(
         for x in 0..heightmap.width as i32 {
             collider_verts.push(
                 [
-                    offset_x + x as f32 * 2.5,
+                    x as f32 * 2.5,
                     heightmap.get_clamped(x, y) / 100.0,
-                    -offset_y + y as f32 * 2.5,
+                    y as f32 * 2.5,
                 ]
                 .into(),
             );
@@ -621,38 +628,25 @@ fn load_block_heightmap(
         }
     }
 
-    let terrain_collider_entity = commands
-        .spawn_bundle((
-            Collider::trimesh(collider_verts, collider_indices),
-            CollisionGroups::new(
-                COLLISION_GROUP_ZONE_TERRAIN,
-                COLLISION_FILTER_INSPECTABLE
-                    | COLLISION_FILTER_COLLIDABLE
-                    | COLLISION_FILTER_CLICKABLE,
-            ),
-            Transform::default(),
-            GlobalTransform::default(),
-        ))
-        .id();
-
-    let entity = commands
-        .spawn_bundle((
-            ZoneObject::Terrain(ZoneObjectTerrain { block_x, block_y }),
-            meshes.add(mesh),
-            material,
-            Transform::from_xyz(offset_x, 0.0, -offset_y),
-            GlobalTransform::default(),
-            Visibility::default(),
-            ComputedVisibility::default(),
-            NotShadowCaster {},
-            ColliderEntity::new(terrain_collider_entity),
-        ))
-        .add_child(terrain_collider_entity)
-        .id();
-
-    commands
-        .entity(terrain_collider_entity)
-        .insert(ColliderParent::new(entity));
+    commands.spawn_bundle((
+        ZoneObject::Terrain(ZoneObjectTerrain { block_x, block_y }),
+        meshes.add(mesh),
+        material,
+        Transform::from_xyz(offset_x, 0.0, -offset_y),
+        GlobalTransform::default(),
+        Visibility::default(),
+        ComputedVisibility::default(),
+        NotShadowCaster {},
+        RigidBody::Fixed,
+        Collider::trimesh(collider_verts, collider_indices),
+        CollisionGroups::new(
+            COLLISION_GROUP_ZONE_TERRAIN,
+            COLLISION_FILTER_INSPECTABLE
+                | COLLISION_FILTER_COLLIDABLE
+                | COLLISION_FILTER_MOVEABLE
+                | COLLISION_FILTER_CLICKABLE,
+        ),
+    ));
 }
 
 fn load_block_waterplanes(
@@ -705,35 +699,20 @@ fn load_block_waterplanes(
         mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
         mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, uvs);
 
-        let water_collider_entity = commands
-            .spawn_bundle((
-                Collider::trimesh(collider_verts, collider_indices),
-                CollisionGroups::new(COLLISION_GROUP_ZONE_WATER, COLLISION_FILTER_INSPECTABLE),
-                Transform::default(),
-                GlobalTransform::default(),
-            ))
-            .id();
-
-        let entity = commands
-            .spawn()
-            .insert_bundle((
-                ZoneObject::Water,
-                meshes.add(mesh),
-                water_material.clone(),
-                Transform::default(),
-                GlobalTransform::default(),
-                Visibility::default(),
-                ComputedVisibility::default(),
-                NotShadowCaster {},
-                NotShadowReceiver {},
-                ColliderEntity::new(water_collider_entity),
-            ))
-            .add_child(water_collider_entity)
-            .id();
-
-        commands
-            .entity(water_collider_entity)
-            .insert(ColliderParent::new(entity));
+        commands.spawn().insert_bundle((
+            ZoneObject::Water,
+            meshes.add(mesh),
+            water_material.clone(),
+            Transform::default(),
+            GlobalTransform::default(),
+            Visibility::default(),
+            ComputedVisibility::default(),
+            NotShadowCaster {},
+            NotShadowReceiver {},
+            RigidBody::Fixed,
+            Collider::trimesh(collider_verts, collider_indices),
+            CollisionGroups::new(COLLISION_GROUP_ZONE_WATER, COLLISION_FILTER_INSPECTABLE),
+        ));
     }
 }
 
@@ -783,6 +762,7 @@ fn load_block_object(
         object_type(ZoneObjectId { id: object_id }),
         object_transform,
         GlobalTransform::default(),
+        RigidBody::Fixed,
     ));
 
     let object_entity = object_entity_commands.id();
@@ -869,14 +849,29 @@ fn load_block_object(
             let mut collision_filter = COLLISION_FILTER_INSPECTABLE;
 
             if object_part.collision_shape.is_some() {
-                collision_filter |= COLLISION_FILTER_COLLIDABLE;
-
-                if collision_group != COLLISION_GROUP_ZONE_WARP_OBJECT
+                if collision_group != COLLISION_GROUP_ZONE_EVENT_OBJECT
+                    && collision_group != COLLISION_GROUP_ZONE_WARP_OBJECT
                     && !object_part
                         .collision_flags
-                        .contains(ZscCollisionFlags::NOT_PICKABLE)
+                        .contains(ZscCollisionFlags::HEIGHT_ONLY)
                 {
-                    collision_filter |= COLLISION_FILTER_CLICKABLE;
+                    collision_filter |= COLLISION_FILTER_COLLIDABLE;
+                }
+
+                if collision_group != COLLISION_GROUP_ZONE_WARP_OBJECT {
+                    if !object_part
+                        .collision_flags
+                        .contains(ZscCollisionFlags::NOT_PICKABLE)
+                    {
+                        collision_filter |= COLLISION_FILTER_CLICKABLE;
+                    }
+
+                    if !object_part
+                        .collision_flags
+                        .contains(ZscCollisionFlags::NOT_MOVEABLE)
+                    {
+                        collision_filter |= COLLISION_FILTER_MOVEABLE;
+                    }
                 }
             }
 
@@ -910,18 +905,13 @@ fn load_block_object(
                 Visibility::default(),
                 ComputedVisibility::default(),
                 NotShadowCaster {},
+                ColliderParent::new(object_entity),
+                AsyncCollider {
+                    handle: mesh,
+                    shape: ComputedColliderShape::TriMesh,
+                },
+                CollisionGroups::new(collision_group, collision_filter),
             ));
-
-            part_commands.with_children(|builder| {
-                // Transform for collider must be absolute
-                let collider_transform = object_transform * part_transform;
-                builder.spawn_bundle((
-                    ColliderParent::new(object_entity),
-                    AsyncCollider::Mesh(mesh),
-                    CollisionGroups::new(collision_group, collision_filter),
-                    collider_transform,
-                ));
-            });
 
             let active_motion = object_part.animation_path.as_ref().map(|animation_path| {
                 ActiveMotion::new_repeating(asset_server.load(animation_path.path()))
@@ -1052,7 +1042,7 @@ fn load_animated_object(
     });
 
     // TODO: Animation object morph targets, blocked by lack of bevy morph targets
-    let mut entity_commands = commands.spawn_bundle((
+    commands.spawn_bundle((
         ZoneObject::AnimatedObject(ZoneObjectAnimatedObject {
             mesh_path: mesh_path.to_string(),
             motion_path: motion_path.to_string(),
@@ -1064,15 +1054,10 @@ fn load_animated_object(
         GlobalTransform::default(),
         Visibility::default(),
         ComputedVisibility::default(),
+        AsyncCollider {
+            handle: mesh,
+            shape: ComputedColliderShape::TriMesh,
+        },
+        CollisionGroups::new(COLLISION_GROUP_ZONE_OBJECT, COLLISION_FILTER_INSPECTABLE),
     ));
-    let object_entity = entity_commands.id();
-
-    entity_commands.with_children(|builder| {
-        builder.spawn_bundle((
-            ColliderParent::new(object_entity),
-            AsyncCollider::Mesh(mesh),
-            CollisionGroups::new(COLLISION_GROUP_ZONE_OBJECT, COLLISION_FILTER_INSPECTABLE),
-            object_transform,
-        ));
-    });
 }

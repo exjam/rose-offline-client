@@ -2,8 +2,8 @@ use bevy::{
     ecs::event::Events,
     math::{Quat, Vec3},
     prelude::{
-        BuildChildren, Commands, ComputedVisibility, DespawnRecursiveExt, EventWriter,
-        GlobalTransform, Mut, Res, ResMut, State, Transform, Visibility, World,
+        Commands, ComputedVisibility, DespawnRecursiveExt, EventWriter, GlobalTransform, Mut, Res,
+        ResMut, State, Transform, Visibility, World,
     },
 };
 
@@ -25,9 +25,9 @@ use rose_network_common::ConnectionError;
 use crate::{
     bundles::{ability_values_add_value_exclusive, ability_values_set_value_exclusive},
     components::{
-        ClientEntity, ClientEntityName, ClientEntityType, CollisionRayCastSource, Command,
-        CommandCastSkillTarget, Cooldowns, MovementCollisionEntities, NextCommand, PartyInfo,
-        PartyOwner, PassiveRecoveryTime, PendingDamage, PendingDamageList, PendingSkillEffect,
+        ClientEntity, ClientEntityName, ClientEntityType, CollisionHeightOnly, CollisionPlayer,
+        Command, CommandCastSkillTarget, Cooldowns, NextCommand, PartyInfo, PartyOwner,
+        PassiveRecoveryTime, PendingDamage, PendingDamageList, PendingSkillEffect,
         PendingSkillEffectList, PendingSkillTarget, PendingSkillTargetList, PersonalStore,
         PlayerCharacter, Position, VisibleStatusEffects,
     },
@@ -142,29 +142,16 @@ pub fn game_connection_system(
             }
             Ok(ServerMessage::JoinZone(message)) => {
                 if let Some(player_entity) = client_entity_list.player_entity {
-                    let down_ray_cast_source = commands
-                        .spawn_bundle((
-                            CollisionRayCastSource {},
-                            Transform::default()
-                                .with_translation(Vec3::new(0.0, 1.35, 0.0))
-                                .looking_at(-Vec3::Y, Vec3::X),
-                            GlobalTransform::default(),
-                        ))
-                        .id();
-
-                    commands
-                        .entity(player_entity)
-                        .insert_bundle((
-                            ClientEntity::new(message.entity_id, ClientEntityType::Character),
-                            MovementCollisionEntities::new(Some(down_ray_cast_source), None),
-                            Command::with_stop(),
-                            NextCommand::default(),
-                            message.experience_points,
-                            message.team,
-                            message.health_points,
-                            message.mana_points,
-                        ))
-                        .add_child(down_ray_cast_source);
+                    commands.entity(player_entity).insert_bundle((
+                        ClientEntity::new(message.entity_id, ClientEntityType::Character),
+                        CollisionPlayer,
+                        Command::with_stop(),
+                        NextCommand::default(),
+                        message.experience_points,
+                        message.team,
+                        message.health_points,
+                        message.mana_points,
+                    ));
 
                     commands.insert_resource(WorldRates {
                         craft_rate: message.craft_rate,
@@ -243,6 +230,7 @@ pub fn game_connection_system(
                     ))
                     .insert_bundle((
                         ClientEntity::new(message.entity_id, ClientEntityType::Character),
+                        CollisionHeightOnly,
                         PendingDamageList::default(),
                         PendingSkillEffectList::default(),
                         PendingSkillTargetList::default(),
@@ -256,15 +244,6 @@ pub fn game_connection_system(
                         ComputedVisibility::default(),
                         VisibleStatusEffects::default(),
                     ))
-                    .with_children(|child_builder| {
-                        child_builder.spawn_bundle((
-                            CollisionRayCastSource {},
-                            Transform::default()
-                                .with_translation(Vec3::new(0.0, 1.35, 0.0))
-                                .looking_at(-Vec3::Y, Vec3::X),
-                            GlobalTransform::default(),
-                        ));
-                    })
                     .id();
 
                 if let Some((skin, title)) = message.personal_store_info {
@@ -333,6 +312,7 @@ pub fn game_connection_system(
                     ))
                     .insert_bundle((
                         ClientEntity::new(message.entity_id, ClientEntityType::Npc),
+                        CollisionHeightOnly,
                         PendingDamageList::default(),
                         PendingSkillEffectList::default(),
                         PendingSkillTargetList::default(),
@@ -350,15 +330,6 @@ pub fn game_connection_system(
                         Visibility::default(),
                         ComputedVisibility::default(),
                     ))
-                    .with_children(|child_builder| {
-                        child_builder.spawn_bundle((
-                            CollisionRayCastSource {},
-                            Transform::default()
-                                .with_translation(Vec3::new(0.0, 1.35, 0.0))
-                                .looking_at(-Vec3::Y, Vec3::X),
-                            GlobalTransform::default(),
-                        ));
-                    })
                     .id();
 
                 client_entity_list.add(message.entity_id, entity);
@@ -453,6 +424,7 @@ pub fn game_connection_system(
                     ))
                     .insert_bundle((
                         ClientEntity::new(message.entity_id, ClientEntityType::Monster),
+                        CollisionHeightOnly,
                         PendingDamageList::default(),
                         PendingSkillEffectList::default(),
                         PendingSkillTargetList::default(),
@@ -466,15 +438,6 @@ pub fn game_connection_system(
                         Visibility::default(),
                         ComputedVisibility::default(),
                     ))
-                    .with_children(|child_builder| {
-                        child_builder.spawn_bundle((
-                            CollisionRayCastSource {},
-                            Transform::default()
-                                .with_translation(Vec3::new(0.0, 1.35, 0.0))
-                                .looking_at(-Vec3::Y, Vec3::X),
-                            GlobalTransform::default(),
-                        ));
-                    })
                     .id();
 
                 client_entity_list.add(message.entity_id, entity);
@@ -500,6 +463,7 @@ pub fn game_connection_system(
                         ItemDrop::with_dropped_item(message.dropped_item),
                         Position::new(message.position),
                         ClientEntity::new(message.entity_id, ClientEntityType::ItemDrop),
+                        CollisionHeightOnly,
                         Transform::from_xyz(
                             message.position.x / 100.0,
                             message.position.z / 100.0 + 10000.0,
@@ -509,15 +473,6 @@ pub fn game_connection_system(
                         Visibility::default(),
                         ComputedVisibility::default(),
                     ))
-                    .with_children(|child_builder| {
-                        child_builder.spawn_bundle((
-                            CollisionRayCastSource {},
-                            Transform::default()
-                                .with_translation(Vec3::new(0.0, 1.35, 0.0))
-                                .looking_at(-Vec3::Y, Vec3::X),
-                            GlobalTransform::default(),
-                        ));
-                    })
                     .id();
 
                 client_entity_list.add(message.entity_id, entity);
@@ -591,27 +546,6 @@ pub fn game_connection_system(
             }
             Ok(ServerMessage::Teleport(message)) => {
                 if let Some(player_entity) = client_entity_list.player_entity {
-                    // Remove colliders, we do not want to process collision until next zone has loaded
-                    commands.add(move |world: &mut World| {
-                        if let Some(movement_collision_entities) = world
-                            .entity(player_entity)
-                            .get::<MovementCollisionEntities>(
-                        ) {
-                            let down_ray_cast_source =
-                                movement_collision_entities.down_ray_cast_source;
-                            let forward_ray_cast_source =
-                                movement_collision_entities.forward_ray_cast_source;
-
-                            if let Some(down_ray_cast_source) = down_ray_cast_source {
-                                world.despawn(down_ray_cast_source);
-                            }
-
-                            if let Some(forward_ray_cast_source) = forward_ray_cast_source {
-                                world.despawn(forward_ray_cast_source);
-                            }
-                        }
-                    });
-
                     // Update player position
                     commands
                         .entity(player_entity)
@@ -620,7 +554,7 @@ pub fn game_connection_system(
                             Transform::from_xyz(message.x / 100.0, 100.0, -message.y / 100.0),
                         ))
                         .remove::<ClientEntity>()
-                        .remove::<MovementCollisionEntities>();
+                        .remove::<CollisionPlayer>();
 
                     // Despawn all non-player entities
                     for (client_entity_id, client_entity) in

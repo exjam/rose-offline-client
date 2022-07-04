@@ -41,8 +41,5 @@ pub fn update_position_system(
                 position.y += move_vector.y;
             }
         }
-
-        transform.translation.x = position.x / 100.0;
-        transform.translation.z = -position.y / 100.0;
     }
 }
