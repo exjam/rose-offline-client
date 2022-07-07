@@ -1,5 +1,6 @@
 #import bevy_pbr::mesh_types
 #import bevy_pbr::mesh_view_bindings
+#import rose_client::zone_lighting
 
 [[group(2), binding(0)]]
 var<uniform> mesh: Mesh;
@@ -95,7 +96,9 @@ fn fragment(in: FragmentInput) -> [[location(0)]] vec4<f32> {
 #ifdef HAS_OBJECT_LIGHTMAP
     output_color = output_color * textureSample(lightmap_texture, lightmap_sampler, (in.lightmap_uv + material.lightmap_uv_offset) * material.lightmap_uv_scale) * 2.0;
 #endif
-    output_color = pow(output_color, vec4<f32>(2.2)) * lights.ambient_color;
+
+    output_color = apply_zone_lighting(in.world_position, output_color);
+    output_color = pow(output_color, vec4<f32>(2.2));
 
     if ((material.flags & OBJECT_MATERIAL_FLAGS_HAS_ALPHA_VALUE) != 0u) {
         output_color.a = material.alpha_value;

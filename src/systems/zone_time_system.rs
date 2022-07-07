@@ -1,7 +1,7 @@
 use bevy::{
     ecs::prelude::{Res, ResMut},
     hierarchy::Children,
-    pbr::AmbientLight,
+    math::{const_vec3, Vec3, Vec4Swizzles},
     prelude::{Entity, Query, Visibility, With},
 };
 
@@ -9,8 +9,21 @@ use rose_data::{SkyboxState, WORLD_TICK_DURATION};
 
 use crate::{
     components::NightTimeEffect,
+    render::ZoneLighting,
     resources::{CurrentZone, GameData, WorldTime, ZoneTime, ZoneTimeState},
 };
+
+const MORNING_FOG_COLOR: Vec3 = const_vec3!([100.0 / 255.0, 100.0 / 255.0, 100.0 / 255.0]);
+const MORNING_FOG_DENSITY: f32 = 0.0022;
+
+const DAY_FOG_COLOR: Vec3 = const_vec3!([200.0 / 255.0, 200.0 / 255.0, 200.0 / 255.0]);
+const DAY_FOG_DENSITY: f32 = 0.0018;
+
+const EVENING_FOG_COLOR: Vec3 = const_vec3!([100.0 / 255.0, 100.0 / 255.0, 100.0 / 255.0]);
+const EVENING_FOG_DENSITY: f32 = 0.0022;
+
+const NIGHT_FOG_COLOR: Vec3 = const_vec3!([10.0 / 255.0, 10.0 / 255.0, 10.0 / 255.0]);
+const NIGHT_FOG_DENSITY: f32 = 0.0020;
 
 fn set_visible_recursive(
     is_visible: bool,
@@ -29,8 +42,18 @@ fn set_visible_recursive(
     }
 }
 
+pub trait SingleLerp {
+    fn lerp(self, end: Self, s: f32) -> Self;
+}
+
+impl SingleLerp for f32 {
+    fn lerp(self, end: Self, s: f32) -> Self {
+        self * (1.0 - s) + end * s
+    }
+}
+
 pub fn zone_time_system(
-    mut ambient_light: ResMut<AmbientLight>,
+    mut zone_lighting: ResMut<ZoneLighting>,
     current_zone: Option<Res<CurrentZone>>,
     game_data: Res<GameData>,
     world_time: Res<WorldTime>,
@@ -77,8 +100,14 @@ pub fn zone_time_system(
             (state_ticks as f32 + partial_tick) / state_length as f32;
 
         if let Some(skybox_data) = skybox_data {
-            ambient_light.brightness = 1.0;
-            ambient_light.color = skybox_data.map_ambient_color[SkyboxState::Night].into();
+            zone_lighting.map_ambient_color =
+                skybox_data.map_ambient_color[SkyboxState::Night].xyz();
+            zone_lighting.character_ambient_color =
+                skybox_data.character_ambient_color[SkyboxState::Night].xyz();
+            zone_lighting.character_diffuse_color =
+                skybox_data.character_diffuse_color[SkyboxState::Night].xyz();
+            zone_lighting.fog_color = NIGHT_FOG_COLOR;
+            zone_lighting.fog_density = NIGHT_FOG_DENSITY;
         }
     } else if day_time >= zone_data.evening_time {
         let state_length = zone_data.night_time - zone_data.evening_time;
@@ -95,21 +124,61 @@ pub fn zone_time_system(
             (state_ticks as f32 + partial_tick) / state_length as f32;
 
         if let Some(skybox_data) = skybox_data {
-            ambient_light.brightness = 1.0;
             if zone_time.state_percent_complete < 0.5 {
-                ambient_light.color = skybox_data.map_ambient_color[SkyboxState::Day]
+                zone_lighting.map_ambient_color = skybox_data.map_ambient_color[SkyboxState::Day]
                     .lerp(
                         skybox_data.map_ambient_color[SkyboxState::Evening],
                         zone_time.state_percent_complete * 2.0,
                     )
-                    .into();
+                    .xyz();
+                zone_lighting.character_ambient_color = skybox_data.character_ambient_color
+                    [SkyboxState::Day]
+                    .lerp(
+                        skybox_data.character_ambient_color[SkyboxState::Evening],
+                        zone_time.state_percent_complete * 2.0,
+                    )
+                    .xyz();
+                zone_lighting.character_diffuse_color = skybox_data.character_diffuse_color
+                    [SkyboxState::Day]
+                    .lerp(
+                        skybox_data.character_diffuse_color[SkyboxState::Evening],
+                        zone_time.state_percent_complete * 2.0,
+                    )
+                    .xyz();
+                zone_lighting.fog_color =
+                    DAY_FOG_COLOR.lerp(EVENING_FOG_COLOR, zone_time.state_percent_complete * 2.0);
+                zone_lighting.fog_density = DAY_FOG_DENSITY
+                    .lerp(EVENING_FOG_DENSITY, zone_time.state_percent_complete * 2.0);
             } else {
-                ambient_light.color = skybox_data.map_ambient_color[SkyboxState::Evening]
+                zone_lighting.map_ambient_color = skybox_data.map_ambient_color
+                    [SkyboxState::Evening]
                     .lerp(
                         skybox_data.map_ambient_color[SkyboxState::Night],
                         (zone_time.state_percent_complete - 0.5) * 2.0,
                     )
-                    .into();
+                    .xyz();
+                zone_lighting.character_ambient_color = skybox_data.character_ambient_color
+                    [SkyboxState::Evening]
+                    .lerp(
+                        skybox_data.character_ambient_color[SkyboxState::Night],
+                        (zone_time.state_percent_complete - 0.5) * 2.0,
+                    )
+                    .xyz();
+                zone_lighting.character_diffuse_color = skybox_data.character_diffuse_color
+                    [SkyboxState::Evening]
+                    .lerp(
+                        skybox_data.character_diffuse_color[SkyboxState::Night],
+                        (zone_time.state_percent_complete - 0.5) * 2.0,
+                    )
+                    .xyz();
+                zone_lighting.fog_color = EVENING_FOG_COLOR.lerp(
+                    NIGHT_FOG_COLOR,
+                    (zone_time.state_percent_complete - 0.5) * 2.0,
+                );
+                zone_lighting.fog_density = EVENING_FOG_DENSITY.lerp(
+                    NIGHT_FOG_DENSITY,
+                    (zone_time.state_percent_complete - 0.5) * 2.0,
+                );
             }
         }
     } else if day_time >= zone_data.day_time {
@@ -127,8 +196,13 @@ pub fn zone_time_system(
             (state_ticks as f32 + partial_tick) / state_length as f32;
 
         if let Some(skybox_data) = skybox_data {
-            ambient_light.brightness = 1.0;
-            ambient_light.color = skybox_data.map_ambient_color[SkyboxState::Day].into();
+            zone_lighting.map_ambient_color = skybox_data.map_ambient_color[SkyboxState::Day].xyz();
+            zone_lighting.character_ambient_color =
+                skybox_data.character_ambient_color[SkyboxState::Day].xyz();
+            zone_lighting.character_diffuse_color =
+                skybox_data.character_diffuse_color[SkyboxState::Day].xyz();
+            zone_lighting.fog_color = DAY_FOG_COLOR;
+            zone_lighting.fog_density = DAY_FOG_DENSITY;
         }
     } else if day_time >= zone_data.morning_time {
         let state_length = zone_data.day_time - zone_data.morning_time;
@@ -145,21 +219,61 @@ pub fn zone_time_system(
             (state_ticks as f32 + partial_tick) / state_length as f32;
 
         if let Some(skybox_data) = skybox_data {
-            ambient_light.brightness = 1.0;
             if zone_time.state_percent_complete < 0.5 {
-                ambient_light.color = skybox_data.map_ambient_color[SkyboxState::Night]
+                zone_lighting.map_ambient_color = skybox_data.map_ambient_color[SkyboxState::Night]
                     .lerp(
                         skybox_data.map_ambient_color[SkyboxState::Morning],
                         zone_time.state_percent_complete * 2.0,
                     )
-                    .into();
+                    .xyz();
+                zone_lighting.character_ambient_color = skybox_data.character_ambient_color
+                    [SkyboxState::Night]
+                    .lerp(
+                        skybox_data.character_ambient_color[SkyboxState::Morning],
+                        zone_time.state_percent_complete * 2.0,
+                    )
+                    .xyz();
+                zone_lighting.character_diffuse_color = skybox_data.character_diffuse_color
+                    [SkyboxState::Night]
+                    .lerp(
+                        skybox_data.character_diffuse_color[SkyboxState::Morning],
+                        zone_time.state_percent_complete * 2.0,
+                    )
+                    .xyz();
+                zone_lighting.fog_color =
+                    NIGHT_FOG_COLOR.lerp(MORNING_FOG_COLOR, zone_time.state_percent_complete * 2.0);
+                zone_lighting.fog_density = NIGHT_FOG_DENSITY
+                    .lerp(MORNING_FOG_DENSITY, zone_time.state_percent_complete * 2.0);
             } else {
-                ambient_light.color = skybox_data.map_ambient_color[SkyboxState::Morning]
+                zone_lighting.map_ambient_color = skybox_data.map_ambient_color
+                    [SkyboxState::Morning]
                     .lerp(
                         skybox_data.map_ambient_color[SkyboxState::Day],
                         (zone_time.state_percent_complete - 0.5) * 2.0,
                     )
-                    .into();
+                    .xyz();
+                zone_lighting.character_ambient_color = skybox_data.character_ambient_color
+                    [SkyboxState::Morning]
+                    .lerp(
+                        skybox_data.character_ambient_color[SkyboxState::Day],
+                        (zone_time.state_percent_complete - 0.5) * 2.0,
+                    )
+                    .xyz();
+                zone_lighting.character_diffuse_color = skybox_data.character_diffuse_color
+                    [SkyboxState::Morning]
+                    .lerp(
+                        skybox_data.character_diffuse_color[SkyboxState::Day],
+                        (zone_time.state_percent_complete - 0.5) * 2.0,
+                    )
+                    .xyz();
+                zone_lighting.fog_color = MORNING_FOG_COLOR.lerp(
+                    DAY_FOG_COLOR,
+                    (zone_time.state_percent_complete - 0.5) * 2.0,
+                );
+                zone_lighting.fog_density = MORNING_FOG_DENSITY.lerp(
+                    DAY_FOG_DENSITY,
+                    (zone_time.state_percent_complete - 0.5) * 2.0,
+                );
             }
         }
     }

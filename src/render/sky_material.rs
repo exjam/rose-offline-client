@@ -56,29 +56,17 @@ impl Plugin for SkyMaterialPlugin {
             Shader::from_wgsl(include_str!("shaders/sky_material.wgsl")),
         );
 
-        let render_device = app.world.resource::<RenderDevice>();
-        let buffer = render_device.create_buffer(&BufferDescriptor {
-            size: SkyUniformData::min_size().get(),
-            usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-            label: Some("sky_data_uniform_buffer"),
-        });
-
         app.add_asset::<SkyMaterial>()
             .add_plugin(ExtractComponentPlugin::<Handle<SkyMaterial>>::default())
             .add_plugin(RenderAssetPlugin::<SkyMaterial>::default());
         if let Ok(render_app) = app.get_sub_app_mut(RenderApp) {
             render_app
                 .add_render_command::<Opaque3d, DrawSkyMaterial>()
-                .insert_resource(SkyUniformMeta {
-                    buffer,
-                    bind_group: None,
-                })
+                .init_resource::<SkyUniformMeta>()
                 .init_resource::<SkyMaterialPipeline>()
                 .init_resource::<SpecializedMeshPipelines<SkyMaterialPipeline>>()
                 .add_system_to_stage(RenderStage::Extract, extract_sky_uniform_data)
                 .add_system_to_stage(RenderStage::Prepare, prepare_sky_uniform_data)
-                .add_system_to_stage(RenderStage::Queue, queue_sky_uniform_bind_group)
                 .add_system_to_stage(RenderStage::Queue, queue_sky_material_meshes);
         }
     }
@@ -102,7 +90,51 @@ fn extract_sky_uniform_data(mut commands: Commands, zone_time: Res<ZoneTime>) {
 
 struct SkyUniformMeta {
     buffer: Buffer,
-    bind_group: Option<BindGroup>,
+    bind_group: BindGroup,
+    bind_group_layout: BindGroupLayout,
+}
+
+impl FromWorld for SkyUniformMeta {
+    fn from_world(world: &mut World) -> Self {
+        let render_device = world.resource::<RenderDevice>();
+
+        let buffer = render_device.create_buffer(&BufferDescriptor {
+            size: SkyUniformData::min_size().get(),
+            usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+            label: Some("sky_data_uniform_buffer"),
+        });
+
+        let bind_group_layout =
+            render_device.create_bind_group_layout(&BindGroupLayoutDescriptor {
+                entries: &[BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: ShaderStages::FRAGMENT,
+                    ty: BindingType::Buffer {
+                        ty: BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: Some(SkyUniformData::min_size()),
+                    },
+                    count: None,
+                }],
+                label: Some("sky_uniform_layout"),
+            });
+
+        let bind_group = render_device.create_bind_group(&BindGroupDescriptor {
+            label: None,
+            layout: &bind_group_layout,
+            entries: &[BindGroupEntry {
+                binding: 0,
+                resource: buffer.as_entire_binding(),
+            }],
+        });
+
+        SkyUniformMeta {
+            buffer,
+            bind_group,
+            bind_group_layout,
+        }
+    }
 }
 
 fn prepare_sky_uniform_data(
@@ -115,22 +147,6 @@ fn prepare_sky_uniform_data(
     buffer.write(sky_uniform_data.as_ref()).unwrap();
 
     render_queue.write_buffer(&sky_uniform_meta.buffer, 0, buffer.as_ref());
-}
-
-fn queue_sky_uniform_bind_group(
-    render_device: Res<RenderDevice>,
-    mut sky_uniform_meta: ResMut<SkyUniformMeta>,
-    pipeline: Res<SkyMaterialPipeline>,
-) {
-    let bind_group = render_device.create_bind_group(&BindGroupDescriptor {
-        label: None,
-        layout: &pipeline.sky_uniform_layout,
-        entries: &[BindGroupEntry {
-            binding: 0,
-            resource: sky_uniform_meta.buffer.as_entire_binding(),
-        }],
-    });
-    sky_uniform_meta.bind_group = Some(bind_group);
 }
 
 pub struct SkyMaterialPipeline {
@@ -227,25 +243,10 @@ impl FromWorld for SkyMaterialPipeline {
             label: Some("sky_material_layout"),
         });
 
-        let sky_uniform_layout =
-            render_device.create_bind_group_layout(&BindGroupLayoutDescriptor {
-                entries: &[BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: ShaderStages::FRAGMENT,
-                    ty: BindingType::Buffer {
-                        ty: BufferBindingType::Uniform,
-                        has_dynamic_offset: false,
-                        min_binding_size: Some(SkyUniformData::min_size()),
-                    },
-                    count: None,
-                }],
-                label: Some("sky_uniform_layout"),
-            });
-
         SkyMaterialPipeline {
             mesh_pipeline: world.resource::<MeshPipeline>().clone(),
             material_layout,
-            sky_uniform_layout,
+            sky_uniform_layout: world.resource::<SkyUniformMeta>().bind_group_layout.clone(),
             vertex_shader: Some(SKY_MATERIAL_SHADER_HANDLE.typed()),
             fragment_shader: Some(SKY_MATERIAL_SHADER_HANDLE.typed()),
             sampler: render_device.create_sampler(&SamplerDescriptor {
@@ -368,11 +369,10 @@ impl<const I: usize> EntityRenderCommand for SetTimeBindGroup<I> {
     fn render<'w>(
         _view: Entity,
         _item: Entity,
-        time_meta: SystemParamItem<'w, '_, Self::Param>,
+        meta: SystemParamItem<'w, '_, Self::Param>,
         pass: &mut TrackedRenderPass<'w>,
     ) -> RenderCommandResult {
-        let time_bind_group = time_meta.into_inner().bind_group.as_ref().unwrap();
-        pass.set_bind_group(I, time_bind_group, &[]);
+        pass.set_bind_group(I, &meta.into_inner().bind_group, &[]);
 
         RenderCommandResult::Success
     }

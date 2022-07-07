@@ -14,12 +14,10 @@ use crate::{
     events::PlayerCommandEvent,
     resources::{GameData, Icons},
     ui::{
-        ui_add_item_tooltip, ui_add_skill_tooltip, DragAndDropId, DragAndDropSlot,
-        UiStateDragAndDrop,
+        ui_add_item_tooltip, ui_add_skill_tooltip, ui_inventory_system::GetItem, DragAndDropId,
+        DragAndDropSlot, UiStateDragAndDrop,
     },
 };
-
-use super::ui_inventory_system::GetItem;
 
 #[derive(Default)]
 pub struct UiStateHotBar {

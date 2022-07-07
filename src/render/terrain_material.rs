@@ -39,7 +39,10 @@ use bevy::{
     },
 };
 
-use crate::render::{TextureArray, MESH_ATTRIBUTE_UV_1};
+use crate::render::{
+    zone_lighting::{SetZoneLightingBindGroup, ZoneLightingUniformMeta},
+    TextureArray, MESH_ATTRIBUTE_UV_1,
+};
 
 pub const TERRAIN_MATERIAL_SHADER_HANDLE: HandleUntyped =
     HandleUntyped::weak_from_u64(Shader::TYPE_UUID, 0x3d7939250aff89cb);
@@ -74,6 +77,7 @@ impl Plugin for TerrainMaterialPlugin {
 pub struct TerrainMaterialPipeline {
     pub mesh_pipeline: MeshPipeline,
     pub material_layout: BindGroupLayout,
+    pub zone_lighting_layout: BindGroupLayout,
     pub vertex_shader: Option<Handle<Shader>>,
     pub fragment_shader: Option<Handle<Shader>>,
 }
@@ -125,6 +129,10 @@ impl FromWorld for TerrainMaterialPipeline {
         TerrainMaterialPipeline {
             mesh_pipeline: world.resource::<MeshPipeline>().clone(),
             material_layout,
+            zone_lighting_layout: world
+                .resource::<ZoneLightingUniformMeta>()
+                .bind_group_layout
+                .clone(),
             vertex_shader: Some(TERRAIN_MATERIAL_SHADER_HANDLE.typed()),
             fragment_shader: Some(TERRAIN_MATERIAL_SHADER_HANDLE.typed()),
         }
@@ -152,6 +160,7 @@ impl SpecializedMeshPipeline for TerrainMaterialPipeline {
             self.mesh_pipeline.view_layout.clone(),
             self.material_layout.clone(),
             self.mesh_pipeline.mesh_layout.clone(),
+            self.zone_lighting_layout.clone(),
         ]);
 
         let vertex_layout = layout.get_layout(&[
@@ -278,6 +287,7 @@ type DrawTerrainMaterial = (
     SetMeshViewBindGroup<0>,
     SetTerrainMaterialBindGroup<1>,
     SetMeshBindGroup<2>,
+    SetZoneLightingBindGroup<3>,
     DrawMesh,
 );
 

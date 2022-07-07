@@ -40,7 +40,10 @@ use bevy::{
     },
 };
 
-use crate::render::TextureArray;
+use crate::render::{
+    zone_lighting::{SetZoneLightingBindGroup, ZoneLightingUniformMeta},
+    TextureArray,
+};
 
 pub const WATER_MESH_MATERIAL_SHADER_HANDLE: HandleUntyped =
     HandleUntyped::weak_from_u64(Shader::TYPE_UUID, 0x333959e64b35d5d9);
@@ -119,6 +122,7 @@ fn prepare_water_texture_index(
 pub struct WaterMaterialPipeline {
     pub mesh_pipeline: MeshPipeline,
     pub material_layout: BindGroupLayout,
+    pub zone_lighting_layout: BindGroupLayout,
     pub vertex_shader: Option<Handle<Shader>>,
     pub fragment_shader: Option<Handle<Shader>>,
     pub sampler: Sampler,
@@ -164,6 +168,7 @@ impl SpecializedMeshPipeline for WaterMaterialPipeline {
             self.mesh_pipeline.view_layout.clone(),
             self.material_layout.clone(),
             self.mesh_pipeline.mesh_layout.clone(),
+            self.zone_lighting_layout.clone(),
         ]);
 
         let vertex_layout = layout.get_layout(&[
@@ -217,6 +222,10 @@ impl FromWorld for WaterMaterialPipeline {
         WaterMaterialPipeline {
             mesh_pipeline: world.resource::<MeshPipeline>().clone(),
             material_layout,
+            zone_lighting_layout: world
+                .resource::<ZoneLightingUniformMeta>()
+                .bind_group_layout
+                .clone(),
             vertex_shader: Some(WATER_MESH_MATERIAL_SHADER_HANDLE.typed()),
             fragment_shader: Some(WATER_MESH_MATERIAL_SHADER_HANDLE.typed()),
             sampler: render_device.create_sampler(&SamplerDescriptor {
@@ -325,6 +334,7 @@ type DrawWaterMaterial = (
     SetMeshViewBindGroup<0>,
     SetWaterMaterialBindGroup<1>,
     SetMeshBindGroup<2>,
+    SetZoneLightingBindGroup<3>,
     DrawMesh,
 );
 

@@ -16,6 +16,7 @@ mod sky_material;
 mod terrain_material;
 mod texture_array;
 mod water_material;
+mod zone_lighting;
 
 pub const MESH_ATTRIBUTE_UV_1: MeshVertexAttribute =
     MeshVertexAttribute::new("Vertex_Uv2", 280035324, VertexFormat::Float32x2);
@@ -37,6 +38,7 @@ pub use sky_material::SkyMaterial;
 pub use terrain_material::{TerrainMaterial, TERRAIN_MESH_ATTRIBUTE_TILE_INFO};
 pub use texture_array::{GpuTextureArray, TextureArray, TextureArrayBuilder};
 pub use water_material::WaterMaterial;
+pub use zone_lighting::ZoneLighting;
 
 use damage_digit_material::DamageDigitMaterialPlugin;
 use damage_digit_pipeline::DamageDigitRenderPlugin;
@@ -48,6 +50,7 @@ use sky_material::SkyMaterialPlugin;
 use terrain_material::TerrainMaterialPlugin;
 use texture_array::TextureArrayPlugin;
 use water_material::WaterMaterialPlugin;
+use zone_lighting::ZoneLightingPlugin;
 
 #[derive(Default)]
 pub struct RoseRenderPlugin;
@@ -55,7 +58,10 @@ pub struct RoseRenderPlugin;
 impl Plugin for RoseRenderPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugin(TextureArrayPlugin)
-            .add_plugin(TerrainMaterialPlugin)
+            .add_plugin(ZoneLightingPlugin)
+            .init_asset_loader::<RgbTextureLoader>();
+
+        app.add_plugin(TerrainMaterialPlugin)
             .add_plugin(EffectMeshMaterialPlugin)
             .add_plugin(ObjectMaterialPlugin)
             .add_plugin(WaterMaterialPlugin)
@@ -63,7 +69,6 @@ impl Plugin for RoseRenderPlugin {
             .add_plugin(ParticleRenderPlugin)
             .add_plugin(DamageDigitMaterialPlugin)
             .add_plugin(DamageDigitRenderPlugin)
-            .add_plugin(SkyMaterialPlugin)
-            .init_asset_loader::<RgbTextureLoader>();
+            .add_plugin(SkyMaterialPlugin);
     }
 }

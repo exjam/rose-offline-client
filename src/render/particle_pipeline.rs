@@ -29,9 +29,10 @@ use bytemuck::Pod;
 use num_traits::FromPrimitive;
 use std::{collections::HashMap, num::NonZeroU64, ops::Range};
 
-use crate::render::{particle_render_data::ParticleRenderData, ParticleMaterial};
-
-use super::particle_render_data::ParticleRenderBillboardType;
+use crate::render::{
+    particle_render_data::ParticleRenderBillboardType, particle_render_data::ParticleRenderData,
+    ParticleMaterial,
+};
 
 pub const PARTICLE_SHADER_HANDLE: HandleUntyped =
     HandleUntyped::weak_from_u64(Shader::TYPE_UUID, 3032357527543835453);

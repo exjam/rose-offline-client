@@ -1,23 +1,52 @@
+use std::marker::PhantomData;
+
 use bevy::{
     asset::Handle,
+    core_pipeline::core_3d::{AlphaMask3d, Opaque3d, Transparent3d},
+    ecs::system::{
+        lifetimeless::{Read, SQuery, SRes},
+        SystemParamItem,
+    },
     math::Vec2,
-    pbr::{AlphaMode, Material, MaterialPipeline, MaterialPipelineKey, MaterialPlugin},
-    prelude::{App, Assets, HandleUntyped, Mesh, Plugin},
+    pbr::{
+        AlphaMode, DrawMesh, MeshPipeline, MeshPipelineKey, MeshUniform, SetMeshBindGroup,
+        SetMeshViewBindGroup,
+    },
+    prelude::{
+        error, AddAsset, App, Assets, Entity, FromWorld, HandleUntyped, Mesh, Msaa, Plugin, Query,
+        Res, ResMut, World,
+    },
     reflect::TypeUuid,
     render::{
+        extract_component::ExtractComponentPlugin,
         mesh::MeshVertexBufferLayout,
         prelude::Shader,
-        render_asset::RenderAssets,
-        render_resource::{
-            encase::ShaderType, AsBindGroup, AsBindGroupShaderType, CompareFunction,
-            RenderPipelineDescriptor, ShaderRef, SpecializedMeshPipelineError,
+        render_asset::{PrepareAssetError, RenderAsset, RenderAssetPlugin, RenderAssets},
+        render_phase::{
+            AddRenderCommand, DrawFunctions, EntityRenderCommand, RenderCommandResult, RenderPhase,
+            SetItemPipeline, TrackedRenderPass,
         },
+        render_resource::{
+            encase::{self, ShaderType},
+            BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout,
+            BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingResource, BindingType, Buffer,
+            BufferBindingType, BufferInitDescriptor, BufferUsages, CompareFunction, PipelineCache,
+            RenderPipelineDescriptor, SamplerBindingType, ShaderSize, ShaderStages,
+            SpecializedMeshPipeline, SpecializedMeshPipelineError, SpecializedMeshPipelines,
+            TextureSampleType, TextureViewDimension,
+        },
+        renderer::RenderDevice,
         texture::Image,
+        view::{ExtractedView, VisibleEntities},
+        RenderApp, RenderStage,
     },
 };
 use bevy_inspector_egui::Inspectable;
 
-use crate::render::MESH_ATTRIBUTE_UV_1;
+use crate::render::{
+    zone_lighting::{SetZoneLightingBindGroup, ZoneLightingUniformMeta},
+    MESH_ATTRIBUTE_UV_1,
+};
 
 pub const OBJECT_MATERIAL_SHADER_HANDLE: HandleUntyped =
     HandleUntyped::weak_from_u64(Shader::TYPE_UUID, 0xb7ebbc00ea16d3c7);
@@ -33,9 +62,208 @@ impl Plugin for ObjectMaterialPlugin {
             Shader::from_wgsl(include_str!("shaders/object_material.wgsl")),
         );
 
-        app.add_plugin(MaterialPlugin::<ObjectMaterial>::default());
+        app.add_asset::<ObjectMaterial>()
+            .add_plugin(ExtractComponentPlugin::<Handle<ObjectMaterial>>::extract_visible())
+            .add_plugin(RenderAssetPlugin::<ObjectMaterial>::default());
+        if let Ok(render_app) = app.get_sub_app_mut(RenderApp) {
+            render_app
+                .add_render_command::<Transparent3d, DrawObjectMaterial>()
+                .add_render_command::<Opaque3d, DrawObjectMaterial>()
+                .add_render_command::<AlphaMask3d, DrawObjectMaterial>()
+                .init_resource::<ObjectMaterialPipeline>()
+                .init_resource::<SpecializedMeshPipelines<ObjectMaterialPipeline>>()
+                .add_system_to_stage(RenderStage::Queue, queue_object_material_meshes);
+        }
     }
 }
+
+pub struct ObjectMaterialPipeline {
+    pub mesh_pipeline: MeshPipeline,
+    pub material_layout: BindGroupLayout,
+    pub zone_lighting_layout: BindGroupLayout,
+    pub vertex_shader: Handle<Shader>,
+    pub fragment_shader: Handle<Shader>,
+}
+
+impl SpecializedMeshPipeline for ObjectMaterialPipeline {
+    type Key = (MeshPipelineKey, ObjectMaterialKey);
+
+    fn specialize(
+        &self,
+        key: Self::Key,
+        layout: &MeshVertexBufferLayout,
+    ) -> Result<RenderPipelineDescriptor, SpecializedMeshPipelineError> {
+        let mut descriptor = self.mesh_pipeline.specialize(key.0, layout)?;
+        descriptor.vertex.shader = self.vertex_shader.clone();
+        descriptor.fragment.as_mut().unwrap().shader = self.fragment_shader.clone();
+
+        // MeshPipeline::specialize's current implementation guarantees that the returned
+        // specialized descriptor has a populated layout
+        let descriptor_layout = descriptor.layout.as_mut().unwrap();
+        descriptor_layout.insert(1, self.material_layout.clone());
+        descriptor_layout.insert(3, self.zone_lighting_layout.clone());
+
+        let mut vertex_attributes = vec![
+            Mesh::ATTRIBUTE_POSITION.at_shader_location(0),
+            Mesh::ATTRIBUTE_UV_0.at_shader_location(1),
+        ];
+
+        if key.1.has_lightmap {
+            descriptor
+                .vertex
+                .shader_defs
+                .push(String::from("HAS_OBJECT_LIGHTMAP"));
+            descriptor
+                .fragment
+                .as_mut()
+                .unwrap()
+                .shader_defs
+                .push(String::from("HAS_OBJECT_LIGHTMAP"));
+
+            vertex_attributes.push(MESH_ATTRIBUTE_UV_1.at_shader_location(2));
+        } else {
+            descriptor
+                .fragment
+                .as_mut()
+                .unwrap()
+                .shader_defs
+                .push(String::from("ZONE_LIGHTING_CHARACTER"));
+        }
+
+        if layout.contains(Mesh::ATTRIBUTE_JOINT_INDEX)
+            && layout.contains(Mesh::ATTRIBUTE_JOINT_WEIGHT)
+        {
+            descriptor.vertex.shader_defs.push(String::from("SKINNED"));
+            descriptor
+                .fragment
+                .as_mut()
+                .unwrap()
+                .shader_defs
+                .push(String::from("SKINNED"));
+
+            vertex_attributes.push(Mesh::ATTRIBUTE_JOINT_INDEX.at_shader_location(3));
+            vertex_attributes.push(Mesh::ATTRIBUTE_JOINT_WEIGHT.at_shader_location(4));
+        } else if key.1.skinned {
+            panic!("strange");
+        }
+
+        descriptor.vertex.buffers = vec![layout.get_layout(&vertex_attributes)?];
+
+        if key.1.two_sided {
+            descriptor.primitive.cull_mode = None;
+        }
+
+        descriptor
+            .depth_stencil
+            .as_mut()
+            .unwrap()
+            .depth_write_enabled = key.1.z_write_enabled;
+
+        if !key.1.z_test_enabled {
+            descriptor.depth_stencil.as_mut().unwrap().depth_compare = CompareFunction::Always;
+        }
+
+        Ok(descriptor)
+    }
+}
+
+impl FromWorld for ObjectMaterialPipeline {
+    fn from_world(world: &mut World) -> Self {
+        let render_device = world.resource::<RenderDevice>();
+
+        let material_layout = render_device.create_bind_group_layout(&BindGroupLayoutDescriptor {
+            entries: &[
+                // Uniform data
+                BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: ShaderStages::FRAGMENT,
+                    ty: BindingType::Buffer {
+                        ty: BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: Some(ObjectMaterialUniformData::min_size()),
+                    },
+                    count: None,
+                },
+                // Base Texture
+                BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: ShaderStages::FRAGMENT,
+                    ty: BindingType::Texture {
+                        multisampled: false,
+                        sample_type: TextureSampleType::Float { filterable: true },
+                        view_dimension: TextureViewDimension::D2,
+                    },
+                    count: None,
+                },
+                // Base Texture Sampler
+                BindGroupLayoutEntry {
+                    binding: 2,
+                    visibility: ShaderStages::FRAGMENT,
+                    ty: BindingType::Sampler(SamplerBindingType::Filtering),
+                    count: None,
+                },
+                // Lightmap Texture
+                BindGroupLayoutEntry {
+                    binding: 3,
+                    visibility: ShaderStages::FRAGMENT,
+                    ty: BindingType::Texture {
+                        multisampled: false,
+                        sample_type: TextureSampleType::Float { filterable: true },
+                        view_dimension: TextureViewDimension::D2,
+                    },
+                    count: None,
+                },
+                // Lightmap Texture Sampler
+                BindGroupLayoutEntry {
+                    binding: 4,
+                    visibility: ShaderStages::FRAGMENT,
+                    ty: BindingType::Sampler(SamplerBindingType::Filtering),
+                    count: None,
+                },
+            ],
+            label: Some("object_material_layout"),
+        });
+
+        ObjectMaterialPipeline {
+            mesh_pipeline: world.resource::<MeshPipeline>().clone(),
+            material_layout,
+            zone_lighting_layout: world
+                .resource::<ZoneLightingUniformMeta>()
+                .bind_group_layout
+                .clone(),
+            vertex_shader: OBJECT_MATERIAL_SHADER_HANDLE.typed(),
+            fragment_shader: OBJECT_MATERIAL_SHADER_HANDLE.typed(),
+        }
+    }
+}
+
+pub struct SetObjectMaterialBindGroup<const I: usize>(PhantomData<ObjectMaterial>);
+impl<const I: usize> EntityRenderCommand for SetObjectMaterialBindGroup<I> {
+    type Param = (
+        SRes<RenderAssets<ObjectMaterial>>,
+        SQuery<Read<Handle<ObjectMaterial>>>,
+    );
+    fn render<'w>(
+        _view: Entity,
+        item: Entity,
+        (materials, query): SystemParamItem<'w, '_, Self::Param>,
+        pass: &mut TrackedRenderPass<'w>,
+    ) -> RenderCommandResult {
+        let material_handle = query.get(item).unwrap();
+        let material = materials.into_inner().get(material_handle).unwrap();
+        pass.set_bind_group(I, &material.bind_group, &[]);
+        RenderCommandResult::Success
+    }
+}
+
+type DrawObjectMaterial = (
+    SetItemPipeline,
+    SetMeshViewBindGroup<0>,
+    SetObjectMaterialBindGroup<1>,
+    SetMeshBindGroup<2>,
+    SetZoneLightingBindGroup<3>,
+    DrawMesh,
+);
 
 // NOTE: These must match the bit flags in shaders/object_material.wgsl!
 bitflags::bitflags! {
@@ -59,13 +287,9 @@ pub struct ObjectMaterialUniformData {
     pub lightmap_uv_scale: f32,
 }
 
-#[derive(AsBindGroup, Debug, Clone, TypeUuid, Inspectable)]
+#[derive(Debug, Clone, TypeUuid, Inspectable)]
 #[uuid = "62a496fa-33e8-41a8-9a44-237d70214227"]
-#[bind_group_data(ObjectMaterialKey)]
-#[uniform(0, ObjectMaterialUniformData)]
 pub struct ObjectMaterial {
-    #[texture(1)]
-    #[sampler(2)]
     pub base_texture: Option<Handle<Image>>,
 
     pub alpha_value: Option<f32>,
@@ -78,8 +302,6 @@ pub struct ObjectMaterial {
     pub skinned: bool,
 
     // lightmap texture, uv offset, uv scale
-    #[texture(3)]
-    #[sampler(4)]
     pub lightmap_texture: Option<Handle<Image>>,
     pub lightmap_uv_offset: Vec2,
     pub lightmap_uv_scale: f32,
@@ -104,47 +326,151 @@ impl Default for ObjectMaterial {
     }
 }
 
-impl AsBindGroupShaderType<ObjectMaterialUniformData> for ObjectMaterial {
-    fn as_bind_group_shader_type(
-        &self,
-        _images: &RenderAssets<Image>,
-    ) -> ObjectMaterialUniformData {
+#[derive(Debug, Clone)]
+pub struct GpuObjectMaterial {
+    pub bind_group: BindGroup,
+
+    pub uniform_buffer: Buffer,
+    pub base_texture: Option<Handle<Image>>,
+    pub lightmap_texture: Option<Handle<Image>>,
+
+    pub flags: ObjectMaterialFlags,
+    pub alpha_mode: AlphaMode,
+    pub two_sided: bool,
+    pub z_test_enabled: bool,
+    pub z_write_enabled: bool,
+
+    pub skinned: bool,
+}
+
+impl RenderAsset for ObjectMaterial {
+    type ExtractedAsset = ObjectMaterial;
+    type PreparedAsset = GpuObjectMaterial;
+    type Param = (
+        SRes<RenderDevice>,
+        SRes<ObjectMaterialPipeline>,
+        SRes<RenderAssets<Image>>,
+    );
+
+    fn extract_asset(&self) -> Self::ExtractedAsset {
+        self.clone()
+    }
+
+    fn prepare_asset(
+        material: Self::ExtractedAsset,
+        (render_device, material_pipeline, gpu_images): &mut SystemParamItem<Self::Param>,
+    ) -> Result<Self::PreparedAsset, PrepareAssetError<Self::ExtractedAsset>> {
+        let (base_texture_view, base_texture_sampler) = if let Some(result) = material_pipeline
+            .mesh_pipeline
+            .get_image_texture(gpu_images, &material.base_texture)
+        {
+            result
+        } else {
+            return Err(PrepareAssetError::RetryNextUpdate(material));
+        };
+
+        let (lightmap_texture_view, lightmap_texture_sampler) = if let Some(result) =
+            material_pipeline
+                .mesh_pipeline
+                .get_image_texture(gpu_images, &material.lightmap_texture)
+        {
+            result
+        } else {
+            return Err(PrepareAssetError::RetryNextUpdate(material));
+        };
+
         let mut flags = ObjectMaterialFlags::NONE;
         let mut alpha_cutoff = 0.5;
         let mut alpha_value = 1.0;
+        let mut alpha_mode = AlphaMode::Opaque;
 
-        if self.specular_enabled {
+        if material.specular_enabled {
             flags |= ObjectMaterialFlags::ALPHA_MODE_OPAQUE | ObjectMaterialFlags::SPECULAR;
+            alpha_mode = AlphaMode::Opaque;
             alpha_cutoff = 1.0;
         } else {
-            if self.alpha_enabled {
+            if material.alpha_enabled {
                 flags |= ObjectMaterialFlags::ALPHA_MODE_BLEND;
+                alpha_mode = AlphaMode::Blend;
 
-                if let Some(alpha_ref) = self.alpha_test {
+                if let Some(alpha_ref) = material.alpha_test {
                     flags |= ObjectMaterialFlags::ALPHA_MODE_MASK;
                     alpha_cutoff = alpha_ref;
+                    alpha_mode = AlphaMode::Mask(alpha_cutoff);
                 }
             } else {
                 flags |= ObjectMaterialFlags::ALPHA_MODE_OPAQUE;
             }
 
-            if let Some(material_alpha_value) = self.alpha_value {
+            if let Some(material_alpha_value) = material.alpha_value {
                 if material_alpha_value == 1.0 {
                     flags |= ObjectMaterialFlags::ALPHA_MODE_OPAQUE;
+                    alpha_mode = AlphaMode::Opaque;
                 } else {
                     flags |= ObjectMaterialFlags::HAS_ALPHA_VALUE;
+                    alpha_mode = AlphaMode::Blend;
                     alpha_value = material_alpha_value;
                 }
             }
         }
 
-        ObjectMaterialUniformData {
+        let value = ObjectMaterialUniformData {
             flags: flags.bits(),
             alpha_cutoff,
             alpha_value,
-            lightmap_uv_offset: self.lightmap_uv_offset,
-            lightmap_uv_scale: self.lightmap_uv_scale,
-        }
+            lightmap_uv_offset: material.lightmap_uv_offset,
+            lightmap_uv_scale: material.lightmap_uv_scale,
+        };
+
+        let byte_buffer = [0u8; ObjectMaterialUniformData::SIZE.get() as usize];
+        let mut buffer = encase::UniformBuffer::new(byte_buffer);
+        buffer.write(&value).unwrap();
+
+        let uniform_buffer = render_device.create_buffer_with_data(&BufferInitDescriptor {
+            label: Some("object_material_uniform_buffer"),
+            usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
+            contents: buffer.as_ref(),
+        });
+
+        let bind_group = render_device.create_bind_group(&BindGroupDescriptor {
+            entries: &[
+                BindGroupEntry {
+                    binding: 0,
+                    resource: uniform_buffer.as_entire_binding(),
+                },
+                BindGroupEntry {
+                    binding: 1,
+                    resource: BindingResource::TextureView(base_texture_view),
+                },
+                BindGroupEntry {
+                    binding: 2,
+                    resource: BindingResource::Sampler(base_texture_sampler),
+                },
+                BindGroupEntry {
+                    binding: 3,
+                    resource: BindingResource::TextureView(lightmap_texture_view),
+                },
+                BindGroupEntry {
+                    binding: 4,
+                    resource: BindingResource::Sampler(lightmap_texture_sampler),
+                },
+            ],
+            label: Some("object_material_bind_group"),
+            layout: &material_pipeline.material_layout,
+        });
+
+        Ok(GpuObjectMaterial {
+            bind_group,
+            uniform_buffer,
+            base_texture: material.base_texture,
+            lightmap_texture: material.lightmap_texture,
+            skinned: material.skinned,
+            flags,
+            alpha_mode,
+            two_sided: material.two_sided,
+            z_test_enabled: material.z_test_enabled,
+            z_write_enabled: material.z_write_enabled,
+        })
     }
 }
 
@@ -157,8 +483,8 @@ pub struct ObjectMaterialKey {
     skinned: bool,
 }
 
-impl From<&ObjectMaterial> for ObjectMaterialKey {
-    fn from(material: &ObjectMaterial) -> Self {
+impl From<&GpuObjectMaterial> for ObjectMaterialKey {
+    fn from(material: &GpuObjectMaterial) -> Self {
         ObjectMaterialKey {
             has_lightmap: material.lightmap_texture.is_some(),
             two_sided: material.two_sided,
@@ -169,106 +495,118 @@ impl From<&ObjectMaterial> for ObjectMaterialKey {
     }
 }
 
-impl Material for ObjectMaterial {
-    fn specialize(
-        _pipeline: &MaterialPipeline<Self>,
-        descriptor: &mut RenderPipelineDescriptor,
-        layout: &MeshVertexBufferLayout,
-        key: MaterialPipelineKey<Self>,
-    ) -> Result<(), SpecializedMeshPipelineError> {
-        let mut vertex_attributes = vec![
-            Mesh::ATTRIBUTE_POSITION.at_shader_location(0),
-            Mesh::ATTRIBUTE_UV_0.at_shader_location(1),
-        ];
+#[allow(clippy::too_many_arguments)]
+pub fn queue_object_material_meshes(
+    opaque_draw_functions: Res<DrawFunctions<Opaque3d>>,
+    alpha_mask_draw_functions: Res<DrawFunctions<AlphaMask3d>>,
+    transparent_draw_functions: Res<DrawFunctions<Transparent3d>>,
+    material_pipeline: Res<ObjectMaterialPipeline>,
+    mut pipelines: ResMut<SpecializedMeshPipelines<ObjectMaterialPipeline>>,
+    mut pipeline_cache: ResMut<PipelineCache>,
+    msaa: Res<Msaa>,
+    render_meshes: Res<RenderAssets<Mesh>>,
+    render_materials: Res<RenderAssets<ObjectMaterial>>,
+    material_meshes: Query<(&Handle<ObjectMaterial>, &Handle<Mesh>, &MeshUniform)>,
+    mut views: Query<(
+        &ExtractedView,
+        &VisibleEntities,
+        &mut RenderPhase<Opaque3d>,
+        &mut RenderPhase<AlphaMask3d>,
+        &mut RenderPhase<Transparent3d>,
+    )>,
+) {
+    for (view, visible_entities, mut opaque_phase, mut alpha_mask_phase, mut transparent_phase) in
+        views.iter_mut()
+    {
+        let draw_opaque_pbr = opaque_draw_functions
+            .read()
+            .get_id::<DrawObjectMaterial>()
+            .unwrap();
+        let draw_alpha_mask_pbr = alpha_mask_draw_functions
+            .read()
+            .get_id::<DrawObjectMaterial>()
+            .unwrap();
+        let draw_transparent_pbr = transparent_draw_functions
+            .read()
+            .get_id::<DrawObjectMaterial>()
+            .unwrap();
 
-        if key.bind_group_data.has_lightmap {
-            descriptor
-                .vertex
-                .shader_defs
-                .push(String::from("HAS_OBJECT_LIGHTMAP"));
-            descriptor
-                .fragment
-                .as_mut()
-                .unwrap()
-                .shader_defs
-                .push(String::from("HAS_OBJECT_LIGHTMAP"));
+        let inverse_view_matrix = view.transform.compute_matrix().inverse();
+        let inverse_view_row_2 = inverse_view_matrix.row(2);
+        let msaa_key = MeshPipelineKey::from_msaa_samples(msaa.samples);
 
-            vertex_attributes.push(MESH_ATTRIBUTE_UV_1.at_shader_location(2));
-        }
+        for visible_entity in &visible_entities.entities {
+            if let Ok((material_handle, mesh_handle, mesh_uniform)) =
+                material_meshes.get(*visible_entity)
+            {
+                if let Some(material) = render_materials.get(material_handle) {
+                    if let Some(mesh) = render_meshes.get(mesh_handle) {
+                        let mut mesh_key =
+                            MeshPipelineKey::from_primitive_topology(mesh.primitive_topology)
+                                | msaa_key;
+                        let alpha_mode = material.alpha_mode;
+                        if let AlphaMode::Blend = alpha_mode {
+                            mesh_key |= MeshPipelineKey::TRANSPARENT_MAIN_PASS;
+                        }
 
-        if layout.contains(Mesh::ATTRIBUTE_JOINT_INDEX)
-            && layout.contains(Mesh::ATTRIBUTE_JOINT_WEIGHT)
-        {
-            descriptor.vertex.shader_defs.push(String::from("SKINNED"));
-            descriptor
-                .fragment
-                .as_mut()
-                .unwrap()
-                .shader_defs
-                .push(String::from("SKINNED"));
+                        let pipeline_id = pipelines.specialize(
+                            &mut pipeline_cache,
+                            &material_pipeline,
+                            (mesh_key, material.into()),
+                            &mesh.layout,
+                        );
+                        let pipeline_id = match pipeline_id {
+                            Ok(id) => id,
+                            Err(err) => {
+                                error!("{}", err);
+                                continue;
+                            }
+                        };
 
-            vertex_attributes.push(Mesh::ATTRIBUTE_JOINT_INDEX.at_shader_location(3));
-            vertex_attributes.push(Mesh::ATTRIBUTE_JOINT_WEIGHT.at_shader_location(4));
-        } else if key.bind_group_data.skinned {
-            panic!("strange");
-        }
-
-        descriptor.vertex.buffers = vec![layout.get_layout(&vertex_attributes)?];
-
-        if key.bind_group_data.two_sided {
-            descriptor.primitive.cull_mode = None;
-        }
-
-        descriptor
-            .depth_stencil
-            .as_mut()
-            .unwrap()
-            .depth_write_enabled = key.bind_group_data.z_write_enabled;
-
-        if !key.bind_group_data.z_test_enabled {
-            descriptor.depth_stencil.as_mut().unwrap().depth_compare = CompareFunction::Always;
-        }
-
-        Ok(())
-    }
-
-    fn vertex_shader() -> ShaderRef {
-        ShaderRef::Handle(OBJECT_MATERIAL_SHADER_HANDLE.typed())
-    }
-
-    fn fragment_shader() -> ShaderRef {
-        ShaderRef::Handle(OBJECT_MATERIAL_SHADER_HANDLE.typed())
-    }
-
-    #[inline]
-    fn alpha_mode(&self) -> AlphaMode {
-        let mut alpha_mode = AlphaMode::Opaque;
-
-        if !self.z_write_enabled {
-            // When no depth write we need back to front rendering which only happens
-            // in the the transparent pass, by returning AlphaMode::Blend here we tell
-            // pbr::MeshPipeline to use the transparent pass
-            alpha_mode = AlphaMode::Blend;
-        } else if self.specular_enabled {
-            alpha_mode = AlphaMode::Opaque;
-        } else {
-            if self.alpha_enabled {
-                alpha_mode = AlphaMode::Blend;
-
-                if let Some(alpha_ref) = self.alpha_test {
-                    alpha_mode = AlphaMode::Mask(alpha_ref);
+                        // NOTE: row 2 of the inverse view matrix dotted with column 3 of the model matrix
+                        // gives the z component of translation of the mesh in view space
+                        let mesh_z = inverse_view_row_2.dot(mesh_uniform.transform.col(3));
+                        match alpha_mode {
+                            AlphaMode::Opaque => {
+                                opaque_phase.add(Opaque3d {
+                                    entity: *visible_entity,
+                                    draw_function: draw_opaque_pbr,
+                                    pipeline: pipeline_id,
+                                    // NOTE: Front-to-back ordering for opaque with ascending sort means near should have the
+                                    // lowest sort key and getting further away should increase. As we have
+                                    // -z in front of the camera, values in view space decrease away from the
+                                    // camera. Flipping the sign of mesh_z results in the correct front-to-back ordering
+                                    distance: -mesh_z,
+                                });
+                            }
+                            AlphaMode::Mask(_) => {
+                                alpha_mask_phase.add(AlphaMask3d {
+                                    entity: *visible_entity,
+                                    draw_function: draw_alpha_mask_pbr,
+                                    pipeline: pipeline_id,
+                                    // NOTE: Front-to-back ordering for alpha mask with ascending sort means near should have the
+                                    // lowest sort key and getting further away should increase. As we have
+                                    // -z in front of the camera, values in view space decrease away from the
+                                    // camera. Flipping the sign of mesh_z results in the correct front-to-back ordering
+                                    distance: -mesh_z,
+                                });
+                            }
+                            AlphaMode::Blend => {
+                                transparent_phase.add(Transparent3d {
+                                    entity: *visible_entity,
+                                    draw_function: draw_transparent_pbr,
+                                    pipeline: pipeline_id,
+                                    // NOTE: Back-to-front ordering for transparent with ascending sort means far should have the
+                                    // lowest sort key and getting closer should increase. As we have
+                                    // -z in front of the camera, the largest distance is -far with values increasing toward the
+                                    // camera. As such we can just use mesh_z as the distance
+                                    distance: mesh_z,
+                                });
+                            }
+                        }
+                    }
                 }
             }
-
-            if let Some(material_alpha_value) = self.alpha_value {
-                if material_alpha_value == 1.0 {
-                    alpha_mode = AlphaMode::Opaque;
-                } else {
-                    alpha_mode = AlphaMode::Blend;
-                }
-            }
         }
-
-        alpha_mode
     }
 }

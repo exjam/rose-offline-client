@@ -1,5 +1,6 @@
 #import bevy_pbr::mesh_types
 #import bevy_pbr::mesh_view_bindings
+#import rose_client::zone_lighting
 
 [[group(2), binding(0)]]
 var<uniform> mesh: Mesh;
@@ -72,11 +73,11 @@ fn fragment(in: FragmentInput) -> [[location(0)]] vec4<f32> {
         layer2_uv.y = x;
     }
 
-    var layer1: vec4<f32> = textureSample(tile_array_texture, tile_array_sampler, in.uv1, tile_layer1_id);
-    var layer2: vec4<f32> = textureSample(tile_array_texture, tile_array_sampler, layer2_uv, tile_layer2_id);
-    var lightmap: vec4<f32> = textureSample(lightmap_texture, lightmap_sampler, in.uv0);
-    var output_color: vec4<f32> = mix(layer1, layer2, layer2.a) * lightmap * 2.0;
-    output_color = pow(output_color, vec4<f32>(2.2)) * lights.ambient_color;
-    output_color.a = 1.0;
-    return output_color;
+    let layer1 = textureSample(tile_array_texture, tile_array_sampler, in.uv1, tile_layer1_id);
+    let layer2 = textureSample(tile_array_texture, tile_array_sampler, layer2_uv, tile_layer2_id);
+    let lightmap = textureSample(lightmap_texture, lightmap_sampler, in.uv0);
+    let terrain_color = mix(layer1, layer2, layer2.a) * lightmap * 2.0;
+    let lit_color = apply_zone_lighting(in.world_position, terrain_color);
+    let srgb_color = pow(lit_color, vec4<f32>(2.2));
+    return vec4<f32>(srgb_color.rgb, 1.0);
 }
