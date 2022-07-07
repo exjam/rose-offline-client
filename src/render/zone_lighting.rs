@@ -37,9 +37,16 @@ impl Plugin for ZoneLightingPlugin {
             character_ambient_color: Vec3::ONE,
             character_diffuse_color: Vec3::ONE,
             fog_color: Vec3::new(0.2, 0.2, 0.2),
+            color_fog_enabled: true,
             fog_density: 0.0018,
-            fog_alpha_weight_start: 0.6,
-            fog_alpha_weight_end: 0.8,
+            fog_min_density: 0.0,
+            fog_max_density: 0.75,
+            alpha_fog_enabled: true,
+            fog_alpha_weight_start: 0.85,
+            fog_alpha_weight_end: 0.98,
+            height_fog_enabled: false,
+            fog_height_offset: 15.0,
+            fog_height_falloff: 45.0,
         });
 
         if let Ok(render_app) = app.get_sub_app_mut(RenderApp) {
@@ -56,11 +63,19 @@ pub struct ZoneLighting {
     pub character_ambient_color: Vec3,
     pub character_diffuse_color: Vec3,
 
+    pub color_fog_enabled: bool,
     pub fog_color: Vec3,
     pub fog_density: f32,
+    pub fog_min_density: f32,
+    pub fog_max_density: f32,
 
+    pub alpha_fog_enabled: bool,
     pub fog_alpha_weight_start: f32,
     pub fog_alpha_weight_end: f32,
+
+    pub height_fog_enabled: bool,
+    pub fog_height_offset: f32,
+    pub fog_height_falloff: f32,
 }
 
 #[derive(Clone, ShaderType)]
@@ -68,8 +83,15 @@ pub struct ZoneLightingUniformData {
     pub map_ambient_color: Vec4,
     pub character_ambient_color: Vec4,
     pub character_diffuse_color: Vec4,
+
     pub fog_color: Vec4,
     pub fog_density: f32,
+    pub fog_min_density: f32,
+    pub fog_max_density: f32,
+
+    pub fog_height_offset: f32,
+    pub fog_height_falloff: f32,
+
     pub fog_alpha_weight_start: f32,
     pub fog_alpha_weight_end: f32,
 }
@@ -129,9 +151,41 @@ fn extract_uniform_data(mut commands: Commands, zone_lighting: Res<ZoneLighting>
         character_ambient_color: zone_lighting.character_ambient_color.extend(1.0),
         character_diffuse_color: zone_lighting.character_diffuse_color.extend(1.0),
         fog_color: zone_lighting.fog_color.extend(1.0),
-        fog_density: zone_lighting.fog_density,
-        fog_alpha_weight_start: zone_lighting.fog_alpha_weight_start,
-        fog_alpha_weight_end: zone_lighting.fog_alpha_weight_end,
+        fog_density: if zone_lighting.color_fog_enabled {
+            zone_lighting.fog_density
+        } else {
+            0.0
+        },
+        fog_min_density: if zone_lighting.color_fog_enabled {
+            zone_lighting.fog_min_density
+        } else {
+            0.0
+        },
+        fog_max_density: if zone_lighting.color_fog_enabled {
+            zone_lighting.fog_max_density
+        } else {
+            0.0
+        },
+        fog_height_offset: if zone_lighting.height_fog_enabled {
+            zone_lighting.fog_height_offset
+        } else {
+            99999999999.0
+        },
+        fog_height_falloff: if zone_lighting.height_fog_enabled {
+            zone_lighting.fog_height_falloff
+        } else {
+            99999999999.0
+        },
+        fog_alpha_weight_start: if zone_lighting.alpha_fog_enabled {
+            zone_lighting.fog_alpha_weight_start
+        } else {
+            99999999999.0
+        },
+        fog_alpha_weight_end: if zone_lighting.alpha_fog_enabled {
+            zone_lighting.fog_alpha_weight_end
+        } else {
+            99999999999.0
+        },
     });
 }
 

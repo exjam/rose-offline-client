@@ -28,9 +28,10 @@ use bevy::{
         render_resource::{
             BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout,
             BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingResource, BindingType,
-            PipelineCache, RenderPipelineDescriptor, SamplerBindingType, ShaderStages,
-            SpecializedMeshPipeline, SpecializedMeshPipelineError, SpecializedMeshPipelines,
-            TextureSampleType, TextureViewDimension, VertexFormat,
+            BlendComponent, BlendFactor, BlendOperation, BlendState, PipelineCache,
+            RenderPipelineDescriptor, SamplerBindingType, ShaderStages, SpecializedMeshPipeline,
+            SpecializedMeshPipelineError, SpecializedMeshPipelines, TextureSampleType,
+            TextureViewDimension, VertexFormat,
         },
         renderer::RenderDevice,
         texture::Image,
@@ -155,6 +156,19 @@ impl SpecializedMeshPipeline for TerrainMaterialPipeline {
         if let Some(fragment_shader) = &self.fragment_shader {
             descriptor.fragment.as_mut().unwrap().shader = fragment_shader.clone();
         }
+
+        descriptor.fragment.as_mut().unwrap().targets[0].blend = Some(BlendState {
+            color: BlendComponent {
+                src_factor: BlendFactor::SrcAlpha,
+                dst_factor: BlendFactor::OneMinusSrcAlpha,
+                operation: BlendOperation::Add,
+            },
+            alpha: BlendComponent {
+                src_factor: BlendFactor::SrcAlpha,
+                dst_factor: BlendFactor::OneMinusSrcAlpha,
+                operation: BlendOperation::Add,
+            },
+        });
 
         descriptor.layout = Some(vec![
             self.mesh_pipeline.view_layout.clone(),

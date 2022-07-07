@@ -77,7 +77,7 @@ fn fragment(in: FragmentInput) -> [[location(0)]] vec4<f32> {
     let layer2 = textureSample(tile_array_texture, tile_array_sampler, layer2_uv, tile_layer2_id);
     let lightmap = textureSample(lightmap_texture, lightmap_sampler, in.uv0);
     let terrain_color = mix(layer1, layer2, layer2.a) * lightmap * 2.0;
-    let lit_color = apply_zone_lighting(in.world_position, terrain_color);
+    let lit_color = apply_zone_lighting(in.world_position, vec4<f32>(terrain_color.rgb, 1.0));
     let srgb_color = pow(lit_color, vec4<f32>(2.2));
-    return vec4<f32>(srgb_color.rgb, 1.0);
+    return srgb_color;
 }

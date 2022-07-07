@@ -29,8 +29,9 @@ use bevy::{
         render_resource::{
             encase::{self, ShaderType},
             BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout,
-            BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingResource, BindingType, Buffer,
-            BufferBindingType, BufferInitDescriptor, BufferUsages, CompareFunction, PipelineCache,
+            BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingResource, BindingType,
+            BlendComponent, BlendFactor, BlendOperation, BlendState, Buffer, BufferBindingType,
+            BufferInitDescriptor, BufferUsages, CompareFunction, PipelineCache,
             RenderPipelineDescriptor, SamplerBindingType, ShaderSize, ShaderStages,
             SpecializedMeshPipeline, SpecializedMeshPipelineError, SpecializedMeshPipelines,
             TextureSampleType, TextureViewDimension,
@@ -162,6 +163,19 @@ impl SpecializedMeshPipeline for ObjectMaterialPipeline {
         if !key.1.z_test_enabled {
             descriptor.depth_stencil.as_mut().unwrap().depth_compare = CompareFunction::Always;
         }
+
+        descriptor.fragment.as_mut().unwrap().targets[0].blend = Some(BlendState {
+            color: BlendComponent {
+                src_factor: BlendFactor::SrcAlpha,
+                dst_factor: BlendFactor::OneMinusSrcAlpha,
+                operation: BlendOperation::Add,
+            },
+            alpha: BlendComponent {
+                src_factor: BlendFactor::SrcAlpha,
+                dst_factor: BlendFactor::OneMinusSrcAlpha,
+                operation: BlendOperation::Add,
+            },
+        });
 
         Ok(descriptor)
     }
