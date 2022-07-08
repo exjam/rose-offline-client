@@ -436,7 +436,7 @@ impl RenderAsset for ObjectMaterial {
             lightmap_uv_scale: material.lightmap_uv_scale,
         };
 
-        let byte_buffer = [0u8; ObjectMaterialUniformData::SIZE.get() as usize];
+        let byte_buffer = [0u8; ObjectMaterialUniformData::SHADER_SIZE.get() as usize];
         let mut buffer = encase::UniformBuffer::new(byte_buffer);
         buffer.write(&value).unwrap();
 
@@ -545,8 +545,7 @@ pub fn queue_object_material_meshes(
             .get_id::<DrawObjectMaterial>()
             .unwrap();
 
-        let inverse_view_matrix = view.transform.compute_matrix().inverse();
-        let inverse_view_row_2 = inverse_view_matrix.row(2);
+        let rangefinder = view.rangefinder3d();
         let msaa_key = MeshPipelineKey::from_msaa_samples(msaa.samples);
 
         for visible_entity in &visible_entities.entities {
@@ -577,20 +576,14 @@ pub fn queue_object_material_meshes(
                             }
                         };
 
-                        // NOTE: row 2 of the inverse view matrix dotted with column 3 of the model matrix
-                        // gives the z component of translation of the mesh in view space
-                        let mesh_z = inverse_view_row_2.dot(mesh_uniform.transform.col(3));
+                        let distance = rangefinder.distance(&mesh_uniform.transform);
                         match alpha_mode {
                             AlphaMode::Opaque => {
                                 opaque_phase.add(Opaque3d {
                                     entity: *visible_entity,
                                     draw_function: draw_opaque_pbr,
                                     pipeline: pipeline_id,
-                                    // NOTE: Front-to-back ordering for opaque with ascending sort means near should have the
-                                    // lowest sort key and getting further away should increase. As we have
-                                    // -z in front of the camera, values in view space decrease away from the
-                                    // camera. Flipping the sign of mesh_z results in the correct front-to-back ordering
-                                    distance: -mesh_z,
+                                    distance,
                                 });
                             }
                             AlphaMode::Mask(_) => {
@@ -598,11 +591,7 @@ pub fn queue_object_material_meshes(
                                     entity: *visible_entity,
                                     draw_function: draw_alpha_mask_pbr,
                                     pipeline: pipeline_id,
-                                    // NOTE: Front-to-back ordering for alpha mask with ascending sort means near should have the
-                                    // lowest sort key and getting further away should increase. As we have
-                                    // -z in front of the camera, values in view space decrease away from the
-                                    // camera. Flipping the sign of mesh_z results in the correct front-to-back ordering
-                                    distance: -mesh_z,
+                                    distance,
                                 });
                             }
                             AlphaMode::Blend => {
@@ -610,11 +599,7 @@ pub fn queue_object_material_meshes(
                                     entity: *visible_entity,
                                     draw_function: draw_transparent_pbr,
                                     pipeline: pipeline_id,
-                                    // NOTE: Back-to-front ordering for transparent with ascending sort means far should have the
-                                    // lowest sort key and getting closer should increase. As we have
-                                    // -z in front of the camera, the largest distance is -far with values increasing toward the
-                                    // camera. As such we can just use mesh_z as the distance
-                                    distance: mesh_z,
+                                    distance,
                                 });
                             }
                         }

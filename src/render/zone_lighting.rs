@@ -194,7 +194,7 @@ fn prepare_uniform_data(
     uniform_meta: ResMut<ZoneLightingUniformMeta>,
     render_queue: Res<RenderQueue>,
 ) {
-    let byte_buffer = [0u8; ZoneLightingUniformData::SIZE.get() as usize];
+    let byte_buffer = [0u8; ZoneLightingUniformData::SHADER_SIZE.get() as usize];
     let mut buffer = encase::UniformBuffer::new(byte_buffer);
     buffer.write(uniform_data.as_ref()).unwrap();
 

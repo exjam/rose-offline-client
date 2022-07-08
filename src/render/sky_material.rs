@@ -26,13 +26,14 @@ use bevy::{
             SetItemPipeline, TrackedRenderPass,
         },
         render_resource::{
-            encase::{self, ShaderType, Size},
+            encase::{self, ShaderType},
             AddressMode, BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout,
             BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingResource, BindingType, Buffer,
-            BufferBindingType, BufferDescriptor, BufferUsages, FilterMode, PipelineCache,
-            RenderPipelineDescriptor, Sampler, SamplerBindingType, SamplerDescriptor, ShaderStages,
-            SpecializedMeshPipeline, SpecializedMeshPipelineError, SpecializedMeshPipelines,
-            TextureSampleType, TextureViewDimension,
+            BufferBindingType, BufferDescriptor, BufferUsages, CompareFunction, FilterMode,
+            PipelineCache, RenderPipelineDescriptor, Sampler, SamplerBindingType,
+            SamplerDescriptor, ShaderSize, ShaderStages, SpecializedMeshPipeline,
+            SpecializedMeshPipelineError, SpecializedMeshPipelines, TextureSampleType,
+            TextureViewDimension,
         },
         renderer::{RenderDevice, RenderQueue},
         view::{ExtractedView, VisibleEntities},
@@ -142,7 +143,7 @@ fn prepare_sky_uniform_data(
     sky_uniform_meta: ResMut<SkyUniformMeta>,
     render_queue: Res<RenderQueue>,
 ) {
-    let byte_buffer = [0u8; SkyUniformData::SIZE.get() as usize];
+    let byte_buffer = [0u8; SkyUniformData::SHADER_SIZE.get() as usize];
     let mut buffer = encase::UniformBuffer::new(byte_buffer);
     buffer.write(sky_uniform_data.as_ref()).unwrap();
 
@@ -180,6 +181,7 @@ impl SpecializedMeshPipeline for SkyMaterialPipeline {
             .as_mut()
             .unwrap()
             .depth_write_enabled = false;
+        descriptor.depth_stencil.as_mut().unwrap().depth_compare = CompareFunction::Always;
 
         descriptor.layout = Some(vec![
             self.mesh_pipeline.view_layout.clone(),
@@ -436,7 +438,7 @@ fn queue_sky_material_meshes(
                             entity: *visible_entity,
                             draw_function: draw_opaque,
                             pipeline: pipeline_id,
-                            distance: -9999999999.0,
+                            distance: 9999999999.0,
                         });
                     }
                 }

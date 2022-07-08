@@ -1,7 +1,7 @@
 use bevy::{
     ecs::prelude::{Res, ResMut},
     hierarchy::Children,
-    math::{const_vec3, Vec3, Vec4Swizzles},
+    math::{Vec3, Vec4Swizzles},
     prelude::{Entity, Query, Visibility, With},
 };
 
@@ -13,16 +13,16 @@ use crate::{
     resources::{CurrentZone, GameData, WorldTime, ZoneTime, ZoneTimeState},
 };
 
-const MORNING_FOG_COLOR: Vec3 = const_vec3!([100.0 / 255.0, 100.0 / 255.0, 100.0 / 255.0]);
+const MORNING_FOG_COLOR: Vec3 = Vec3::new(100.0 / 255.0, 100.0 / 255.0, 100.0 / 255.0);
 const MORNING_FOG_DENSITY: f32 = 0.0022;
 
-const DAY_FOG_COLOR: Vec3 = const_vec3!([200.0 / 255.0, 200.0 / 255.0, 200.0 / 255.0]);
+const DAY_FOG_COLOR: Vec3 = Vec3::new(200.0 / 255.0, 200.0 / 255.0, 200.0 / 255.0);
 const DAY_FOG_DENSITY: f32 = 0.0018;
 
-const EVENING_FOG_COLOR: Vec3 = const_vec3!([100.0 / 255.0, 100.0 / 255.0, 100.0 / 255.0]);
+const EVENING_FOG_COLOR: Vec3 = Vec3::new(100.0 / 255.0, 100.0 / 255.0, 100.0 / 255.0);
 const EVENING_FOG_DENSITY: f32 = 0.0022;
 
-const NIGHT_FOG_COLOR: Vec3 = const_vec3!([10.0 / 255.0, 10.0 / 255.0, 10.0 / 255.0]);
+const NIGHT_FOG_COLOR: Vec3 = Vec3::new(10.0 / 255.0, 10.0 / 255.0, 10.0 / 255.0);
 const NIGHT_FOG_DENSITY: f32 = 0.0020;
 
 fn set_visible_recursive(

@@ -29,7 +29,7 @@ pub fn debug_render_polylines_setup_system(
             width: 2.0,
             color,
             perspective: false,
-            depth_test: true,
+            depth_bias: 0.0,
         });
 
         collider_line_data.push(DebugRenderPolyline {
@@ -54,7 +54,7 @@ pub fn debug_render_polylines_setup_system(
             width: 2.0,
             color: Color::WHITE,
             perspective: false,
-            depth_test: false,
+            depth_bias: -0.12,
         });
 
         DebugRenderPolyline {
@@ -79,7 +79,7 @@ pub fn debug_render_polylines_setup_system(
             width: 2.0,
             color: Color::PINK,
             perspective: false,
-            depth_test: false,
+            depth_bias: -0.12,
         });
 
         DebugRenderPolyline {
