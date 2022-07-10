@@ -59,7 +59,6 @@ pub fn item_drop_model_system(
 pub fn item_drop_model_add_collider_system(
     mut commands: Commands,
     query_models: Query<(Entity, &ItemDropModel), Without<ColliderEntity>>,
-    query_transform: Query<&Transform>,
     query_aabb: Query<Option<&Aabb>, With<Handle<Mesh>>>,
 ) {
     // Add colliders to NPC models without one
@@ -81,18 +80,14 @@ pub fn item_drop_model_add_collider_system(
             }
         }
 
-        let root_bone_entity = item_drop_model.root_bone;
-        let root_bone_transform = query_transform.get(root_bone_entity).ok();
-        if !all_parts_loaded || min.is_none() || max.is_none() || root_bone_transform.is_none() {
+        if !all_parts_loaded || min.is_none() || max.is_none() {
             continue;
         }
         let min = Vec3::from(min.unwrap());
         let max = Vec3::from(max.unwrap());
-        let root_bone_transform = root_bone_transform.unwrap();
 
         let local_bound_center = 0.5 * (min + max);
         let half_extents = 0.5 * (max - min);
-        let root_bone_offset = local_bound_center - root_bone_transform.translation;
 
         let collider_entity = commands
             .spawn_bundle((
@@ -102,7 +97,7 @@ pub fn item_drop_model_add_collider_system(
                     COLLISION_GROUP_ITEM_DROP,
                     COLLISION_FILTER_INSPECTABLE | COLLISION_FILTER_CLICKABLE,
                 ),
-                Transform::from_translation(root_bone_offset),
+                Transform::from_translation(local_bound_center),
                 GlobalTransform::default(),
             ))
             .id();
@@ -111,6 +106,8 @@ pub fn item_drop_model_add_collider_system(
             .entity(entity)
             .insert(ColliderEntity::new(collider_entity));
 
-        commands.entity(root_bone_entity).add_child(collider_entity);
+        commands
+            .entity(item_drop_model.root_bone)
+            .add_child(collider_entity);
     }
 }
