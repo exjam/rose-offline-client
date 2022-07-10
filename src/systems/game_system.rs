@@ -1,42 +1,33 @@
 use bevy::{
     math::Vec3,
-    prelude::{
-        Camera3d, Camera3dBundle, Commands, Entity, EventReader, EventWriter, Query, Res, State,
-        Transform, With,
-    },
+    prelude::{Camera3d, Commands, Entity, EventReader, EventWriter, Query, Res, State, With},
 };
 use rose_game_common::messages::client::ClientMessage;
 
 use crate::{
     components::{ActiveMotion, PlayerCharacter},
     events::{GameConnectionEvent, LoadZoneEvent, ZoneEvent},
-    fly_camera::FlyCameraController,
-    follow_camera::{FollowCameraBundle, FollowCameraController},
+    free_camera::FreeCamera,
+    orbit_camera::OrbitCamera,
     resources::{AppState, GameConnection},
 };
 
 pub fn game_state_enter_system(
     mut commands: Commands,
     query_cameras: Query<Entity, With<Camera3d>>,
-    query_player: Query<(Entity, &Transform), With<PlayerCharacter>>,
+    query_player: Query<Entity, With<PlayerCharacter>>,
 ) {
     // Reset camera
-    let (player_entity, player_transform) = query_player.single();
+    let player_entity = query_player.single();
     for entity in query_cameras.iter() {
         commands
             .entity(entity)
-            .remove::<FlyCameraController>()
+            .remove::<FreeCamera>()
             .remove::<ActiveMotion>()
-            .insert_bundle(FollowCameraBundle::new(
-                FollowCameraController {
-                    follow_entity: Some(player_entity),
-                    follow_offset: Vec3::new(0.0, 1.7, 0.0),
-                    follow_distance: 15.0,
-                    ..Default::default()
-                },
-                Camera3dBundle::default(),
-                player_transform.translation + Vec3::new(10.0, 10.0, 10.0),
-                player_transform.translation,
+            .insert(OrbitCamera::new(
+                player_entity,
+                Vec3::new(0.0, 1.7, 0.0),
+                15.0,
             ));
     }
 }

@@ -8,8 +8,8 @@ use rose_game_common::messages::client::ClientMessage;
 
 use crate::{
     components::PlayerCharacter,
-    fly_camera::FlyCameraController,
-    follow_camera::FollowCameraController,
+    free_camera::FreeCamera,
+    orbit_camera::OrbitCamera,
     resources::{DebugInspector, GameConnection},
 };
 
@@ -96,19 +96,19 @@ pub fn ui_debug_menu_system(
                                 if let Some(player_entity) = player_entity {
                                     commands
                                         .entity(camera_entity)
-                                        .remove::<FlyCameraController>()
-                                        .insert(FollowCameraController {
-                                            follow_entity: Some(player_entity),
-                                            follow_offset: Vec3::new(0.0, 1.7, 0.0),
-                                            ..Default::default()
-                                        });
+                                        .remove::<FreeCamera>()
+                                        .insert(OrbitCamera::new(
+                                            player_entity,
+                                            Vec3::new(0.0, 1.7, 0.0),
+                                            17.0,
+                                        ));
                                 }
                             }
                             DebugCameraType::Fly => {
                                 commands
                                     .entity(camera_entity)
-                                    .remove::<FollowCameraController>()
-                                    .insert(FlyCameraController::default());
+                                    .remove::<OrbitCamera>()
+                                    .insert(FreeCamera::new());
                             }
                         }
                     }

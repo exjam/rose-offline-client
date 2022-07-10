@@ -15,6 +15,7 @@ bitflags = "1.2"
 bytemuck = { version = "1.7.0", features = ["derive"] }
 clap = "3.1"
 crossbeam-channel = "0.5"
+dolly = "0.3.1"
 egui_extras = "0.18"
 enum-map = { version = "2.0", features = ["serde"] }
 image = { version = "0.24", default-features = false, features = ["dds"] }
@@ -24,7 +25,6 @@ md5 = "0.7.0"
 num-derive = "0.3"
 num-traits = "0.2"
 rand = "0.8"
-smooth-bevy-cameras = "0.2.0"
 thiserror = "1.0"
 tokio = { version = "1.17", features = ["rt", "net", "sync", "macros", "io-util"] }
 rose-data = { git = "https://github.com/exjam/rose-offline", rev = "f13eb85213bb3985c38684a9f0557fb79d6fc113" }
@@ -42,7 +42,6 @@ bevy_egui = { git = "https://github.com/exjam/bevy_egui", rev = "173f2df393f88b5
 bevy-inspector-egui = { git = "https://github.com/exjam/bevy-inspector-egui", rev = "dace3bec25a29da9fb2f18553967bb188c3428a5" }
 bevy_rapier3d = { git = "https://github.com/exjam/bevy_rapier", rev = "5a8a630b22da43da219c1847c8c9665fe67ad55a" }
 nalgebra = { git = "https://github.com/exjam/nalgebra", rev = "3623ab19e42eeea14a754a1fd9c29f4e9a2ce6d0" }
-smooth-bevy-cameras = { git = "https://github.com/exjam/smooth-bevy-cameras", rev = "20558e21b2c8f5e1807956887721a63be722440f" }
 
 [profile.dev.package."*"]
 opt-level = 3

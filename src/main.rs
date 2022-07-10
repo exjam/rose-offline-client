@@ -15,16 +15,15 @@ use bevy::{
     window::WindowDescriptor,
 };
 use bevy_egui::EguiContext;
-use scripting::RoseScriptingPlugin;
 use std::{path::Path, sync::Arc};
 
 mod bundles;
 mod components;
 mod effect_loader;
 mod events;
-mod fly_camera;
-mod follow_camera;
+mod free_camera;
 mod model_loader;
+mod orbit_camera;
 mod protocol;
 mod render;
 mod resources;
@@ -44,15 +43,16 @@ use events::{
     QuestTriggerEvent, SpawnEffectEvent, SpawnProjectileEvent, SystemFuncEvent,
     WorldConnectionEvent, ZoneEvent,
 };
-use fly_camera::FlyCameraPlugin;
-use follow_camera::FollowCameraPlugin;
+use free_camera::FreeCameraPlugin;
 use model_loader::ModelLoader;
+use orbit_camera::OrbitCameraPlugin;
 use render::{DamageDigitMaterial, RoseRenderPlugin};
 use resources::{
     run_network_thread, AppState, ClientEntityList, DamageDigitsSpawner, DebugRenderConfig,
     GameData, Icons, NetworkThread, NetworkThreadMessage, RenderConfiguration, ServerConfiguration,
     WorldTime, ZoneTime,
 };
+use scripting::RoseScriptingPlugin;
 use systems::{
     ability_values_system, animation_effect_system, animation_system,
     character_model_add_collider_system, character_model_system, character_select_enter_system,
@@ -303,7 +303,8 @@ fn main() {
     // Initialise 3rd party bevy plugins
     app.add_plugin(bevy_polyline::PolylinePlugin)
         .add_plugin(bevy_egui::EguiPlugin)
-        .add_plugin(smooth_bevy_cameras::LookTransformPlugin)
+        .add_plugin(FreeCameraPlugin)
+        .add_plugin(OrbitCameraPlugin)
         .add_plugin(bevy_rapier3d::prelude::RapierPhysicsPlugin::<
             bevy_rapier3d::prelude::NoUserData,
         >::default())
@@ -317,8 +318,6 @@ fn main() {
     app.init_asset_loader::<ZmsAssetLoader>()
         .add_asset::<ZmoAsset>()
         .init_asset_loader::<ZmoAssetLoader>()
-        .add_plugin(FlyCameraPlugin::default())
-        .add_plugin(FollowCameraPlugin::default())
         .insert_resource(RenderConfiguration {
             passthrough_terrain_textures,
         })

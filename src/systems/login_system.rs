@@ -14,8 +14,8 @@ use rose_game_common::messages::client::{ClientMessage, JoinServer};
 use crate::{
     components::ActiveMotion,
     events::LoadZoneEvent,
-    fly_camera::FlyCameraController,
-    follow_camera::FollowCameraController,
+    free_camera::FreeCamera,
+    orbit_camera::OrbitCamera,
     resources::{Account, LoginConnection, NetworkThread, ServerConfiguration, ServerList},
 };
 
@@ -83,8 +83,8 @@ pub fn login_state_enter_system(
                 Transform::from_xyz(5240.0, 10.0, -5400.0)
                     .looking_at(Vec3::new(5200.0, 35.0, -5300.0), Vec3::Y),
             )
-            .remove::<FlyCameraController>()
-            .remove::<FollowCameraController>()
+            .remove::<FreeCamera>()
+            .remove::<OrbitCamera>()
             .insert(ActiveMotion::new_repeating(
                 asset_server.load("3DDATA/TITLE/CAMERA01_INTRO01.ZMO"),
             ));

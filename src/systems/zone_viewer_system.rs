@@ -1,12 +1,7 @@
-use bevy::{
-    math::Vec3,
-    prelude::{Camera3d, Camera3dBundle, Commands, Entity, Query, ResMut, With},
-};
+use bevy::prelude::{Camera3d, Commands, Entity, Query, ResMut, With};
 
 use crate::{
-    components::ActiveMotion,
-    fly_camera::{FlyCameraBundle, FlyCameraController},
-    follow_camera::FollowCameraController,
+    components::ActiveMotion, free_camera::FreeCamera, orbit_camera::OrbitCamera,
     ui::UiStateDebugWindows,
 };
 
@@ -19,14 +14,9 @@ pub fn zone_viewer_enter_system(
     for entity in query_cameras.iter() {
         commands
             .entity(entity)
-            .remove::<FollowCameraController>()
+            .remove::<OrbitCamera>()
             .remove::<ActiveMotion>()
-            .insert_bundle(FlyCameraBundle::new(
-                FlyCameraController::default(),
-                Camera3dBundle::default(),
-                Vec3::new(5120.0, 50.0, -5120.0),
-                Vec3::new(5200.0, 0.0, -5200.0),
-            ));
+            .insert(FreeCamera::new());
     }
 
     // Open relevant debug windows

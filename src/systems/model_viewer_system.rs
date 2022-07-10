@@ -5,8 +5,8 @@ use bevy::{
     math::Vec3,
     pbr::AmbientLight,
     prelude::{
-        Camera3d, Camera3dBundle, Color, Commands, ComputedVisibility, Entity, EventWriter,
-        GlobalTransform, Query, Res, ResMut, Transform, Visibility, With,
+        Camera3d, Color, Commands, ComputedVisibility, Entity, EventWriter, GlobalTransform, Query,
+        Res, ResMut, Transform, Visibility, With,
     },
 };
 use bevy_egui::{egui, EguiContext};
@@ -21,8 +21,8 @@ use rose_game_common::components::{CharacterGender, CharacterInfo, Equipment, Np
 use crate::{
     components::{ActiveMotion, CharacterModel, Effect, NpcModel},
     events::{SpawnEffectData, SpawnEffectEvent},
-    fly_camera::{FlyCameraBundle, FlyCameraController},
-    follow_camera::FollowCameraController,
+    free_camera::FreeCamera,
+    orbit_camera::OrbitCamera,
     resources::GameData,
     ui::UiStateDebugWindows,
 };
@@ -52,14 +52,10 @@ pub fn model_viewer_enter_system(
     for entity in query_cameras.iter() {
         commands
             .entity(entity)
-            .remove::<FollowCameraController>()
+            .remove::<FreeCamera>()
+            .remove::<OrbitCamera>()
             .remove::<ActiveMotion>()
-            .insert_bundle(FlyCameraBundle::new(
-                FlyCameraController::default(),
-                Camera3dBundle::default(),
-                Vec3::new(10.0, 10.0, 10.0),
-                Vec3::new(0.0, 0.0, 0.0),
-            ));
+            .insert(FreeCamera::new());
     }
 
     // Initialise state

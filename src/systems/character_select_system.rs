@@ -26,8 +26,8 @@ use rose_game_common::{
 use crate::{
     components::{ActiveMotion, CharacterModel, ColliderParent, COLLISION_FILTER_CLICKABLE},
     events::{GameConnectionEvent, LoadZoneEvent, WorldConnectionEvent, ZoneEvent},
-    fly_camera::FlyCameraController,
-    follow_camera::FollowCameraController,
+    free_camera::FreeCamera,
+    orbit_camera::OrbitCamera,
     resources::{AppState, CharacterList, GameConnection, ServerConfiguration, WorldConnection},
     systems::collision_system::ray_from_screenspace,
 };
@@ -120,8 +120,8 @@ pub fn character_select_enter_system(
                 Transform::from_xyz(5200.0, 3.4, -5220.0)
                     .looking_at(Vec3::new(5200.0, 3.4, -5200.0), Vec3::Y),
             )
-            .remove::<FlyCameraController>()
-            .remove::<FollowCameraController>()
+            .remove::<FreeCamera>()
+            .remove::<OrbitCamera>()
             .insert(ActiveMotion::new_once(
                 asset_server.load("3DDATA/TITLE/CAMERA01_INSELECT01.ZMO"),
             ));

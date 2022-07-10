@@ -1,0 +1,182 @@
+use bevy::{
+    input::{
+        mouse::{MouseMotion, MouseWheel},
+        Input,
+    },
+    math::{Quat, Vec2, Vec3},
+    prelude::{
+        App, Component, EventReader, KeyCode, Local, MouseButton, Plugin, Query, Res, ResMut, Time,
+        Transform,
+    },
+    window::Windows,
+};
+use bevy_egui::EguiContext;
+use dolly::prelude::{CameraRig, LeftHanded, Position, Smooth, YawPitch};
+
+#[derive(Default)]
+pub struct FreeCameraPlugin;
+
+impl Plugin for FreeCameraPlugin {
+    fn build(&self, app: &mut App) {
+        app.add_system(free_camera_update);
+    }
+}
+
+#[derive(Component)]
+pub struct FreeCamera {
+    rig: CameraRig<LeftHanded>,
+    move_speed: f32,
+    drag_speed: f32,
+}
+
+impl FreeCamera {
+    pub fn new() -> Self {
+        Self {
+            rig: CameraRig::builder()
+                .with(Position::new(Vec3::new(5120.0, 50.0, -5120.0)))
+                .with(YawPitch::new())
+                .with(Smooth::new_position_rotation(1.0, 1.0))
+                .build(),
+            move_speed: 20.0,
+            drag_speed: 4.0,
+        }
+    }
+}
+
+#[derive(Default)]
+pub struct CameraControlState {
+    pub is_dragging: bool,
+    pub saved_cursor_position: Option<Vec2>,
+}
+
+fn free_camera_update(
+    mut control_state: Local<CameraControlState>,
+    mut query: Query<(&mut FreeCamera, &mut Transform)>,
+    time: Res<Time>,
+    mut mouse_motion_events: EventReader<MouseMotion>,
+    mut mouse_wheel_reader: EventReader<MouseWheel>,
+    keyboard: Res<Input<KeyCode>>,
+    mouse_buttons: Res<Input<MouseButton>>,
+    mut windows: ResMut<Windows>,
+    mut egui_ctx: ResMut<EguiContext>,
+) {
+    let window = windows.get_primary_mut().unwrap();
+    let (mut free_camera, mut camera_transform) = if let Ok((a, b)) = query.get_single_mut() {
+        (a, b)
+    } else {
+        if control_state.is_dragging {
+            // Restore cursor state
+            if let Some(saved_cursor_position) = control_state.saved_cursor_position.take() {
+                window.set_cursor_position(saved_cursor_position);
+            }
+
+            window.set_cursor_lock_mode(false);
+            window.set_cursor_visibility(true);
+            control_state.is_dragging = false;
+        }
+
+        return;
+    };
+
+    let allow_mouse_input = control_state.is_dragging || !egui_ctx.ctx_mut().wants_pointer_input();
+    let allow_keyboard_input = !egui_ctx.ctx_mut().wants_keyboard_input();
+
+    let left_pressed = mouse_buttons.pressed(MouseButton::Left);
+    let right_pressed = mouse_buttons.pressed(MouseButton::Right);
+    let middle_pressed = mouse_buttons.pressed(MouseButton::Middle);
+
+    let mut cursor_delta = Vec2::ZERO;
+    let mut wheel_delta = 0.0;
+    if allow_mouse_input {
+        for event in mouse_motion_events.iter() {
+            cursor_delta += event.delta;
+        }
+
+        for event in mouse_wheel_reader.iter() {
+            wheel_delta += event.x + event.y;
+        }
+    }
+
+    let mut drag_vec = Vec3::ZERO;
+    let mut translate_vec = Vec3::ZERO;
+    let mut move_vec = Vec3::ZERO;
+    let mut speed_multiplier = 1.0f32;
+    if allow_keyboard_input {
+        for key in keyboard.get_pressed() {
+            match key {
+                KeyCode::W => move_vec.z -= 1.0,      // Forward
+                KeyCode::S => move_vec.z += 1.0,      // Backward
+                KeyCode::A => move_vec.x -= 1.0,      // Left
+                KeyCode::D => move_vec.x += 1.0,      // Right
+                KeyCode::Q => translate_vec.y += 1.0, // Up
+                KeyCode::E => translate_vec.y -= 1.0, // Down
+                KeyCode::LShift => speed_multiplier = 4.0,
+                _ => {}
+            }
+        }
+    }
+
+    if middle_pressed || (left_pressed && right_pressed) {
+        drag_vec.x += cursor_delta.x;
+        drag_vec.z += cursor_delta.y;
+    }
+
+    free_camera.move_speed += wheel_delta * 2.0;
+
+    let drag_speed = free_camera.drag_speed;
+    let move_speed = free_camera.move_speed;
+
+    if drag_vec.length_squared() > 0.0 {
+        let yaw_radians = free_camera
+            .rig
+            .driver_mut::<YawPitch>()
+            .yaw_degrees
+            .to_radians();
+        let yaw_rot = Quat::from_axis_angle(Vec3::Y, yaw_radians);
+        let rot_x = yaw_rot * Vec3::X;
+        let rot_z = yaw_rot * Vec3::Z;
+
+        free_camera.rig.driver_mut::<Position>().translate(
+            -(drag_vec.x * rot_x + (drag_vec.z * rot_z) - Vec3::new(0.0, drag_vec.y, 0.0))
+                * time.delta_seconds()
+                * speed_multiplier
+                * drag_speed,
+        );
+    }
+
+    if move_vec.length_squared() > 0.0 || translate_vec.length_squared() > 0.0 {
+        free_camera.rig.driver_mut::<Position>().translate(
+            (camera_transform.rotation.mul_vec3(move_vec) + translate_vec)
+                * time.delta_seconds()
+                * speed_multiplier
+                * move_speed,
+        );
+    }
+
+    if right_pressed && !left_pressed && !middle_pressed {
+        let sensitivity = 0.1;
+        free_camera
+            .rig
+            .driver_mut::<YawPitch>()
+            .rotate_yaw_pitch(-sensitivity * cursor_delta.x, -sensitivity * cursor_delta.y);
+
+        if !control_state.is_dragging {
+            window.set_cursor_lock_mode(true);
+            window.set_cursor_visibility(false);
+            control_state.saved_cursor_position = window.cursor_position();
+            control_state.is_dragging = true;
+        }
+    } else if control_state.is_dragging {
+        if let Some(saved_cursor_position) = control_state.saved_cursor_position.take() {
+            window.set_cursor_position(saved_cursor_position);
+        }
+
+        window.set_cursor_lock_mode(false);
+        window.set_cursor_visibility(true);
+        control_state.is_dragging = false;
+    }
+
+    let calculated_transform = free_camera.rig.update(time.delta_seconds());
+    camera_transform.translation = calculated_transform.position;
+    camera_transform.rotation = calculated_transform.rotation;
+}
