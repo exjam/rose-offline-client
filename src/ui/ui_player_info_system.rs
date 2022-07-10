@@ -1,15 +1,20 @@
-use bevy::prelude::{Query, Res, ResMut, With};
+use bevy::prelude::{Commands, Entity, Query, Res, ResMut, With};
 use bevy_egui::{egui, EguiContext};
 use rose_game_common::components::{
     AbilityValues, CharacterInfo, ExperiencePoints, HealthPoints, Level, ManaPoints,
 };
 
-use crate::{components::PlayerCharacter, resources::GameData};
+use crate::{
+    components::{PlayerCharacter, SelectedTarget},
+    resources::GameData,
+};
 
 pub fn ui_player_info_system(
+    mut commands: Commands,
     mut egui_context: ResMut<EguiContext>,
     query_player: Query<
         (
+            Entity,
             &AbilityValues,
             &CharacterInfo,
             &Level,
@@ -22,6 +27,7 @@ pub fn ui_player_info_system(
     game_data: Res<GameData>,
 ) {
     let (
+        player_entity,
         player_ability_values,
         player_info,
         player_level,
@@ -30,7 +36,7 @@ pub fn ui_player_info_system(
         player_experience_points,
     ) = query_player.single();
 
-    egui::Window::new("Player Info")
+    let response = egui::Window::new("Player Info")
         .anchor(egui::Align2::LEFT_TOP, [10.0, 10.0])
         .collapsible(false)
         .title_bar(false)
@@ -94,4 +100,12 @@ pub fn ui_player_info_system(
 
             ui.label(format!("Level {}", player_level.level));
         });
+
+    if let Some(response) = response {
+        if response.response.clicked() {
+            commands
+                .entity(player_entity)
+                .insert(SelectedTarget::new(player_entity));
+        }
+    }
 }

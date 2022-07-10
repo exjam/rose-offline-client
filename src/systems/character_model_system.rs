@@ -17,8 +17,9 @@ use rose_game_common::components::{CharacterInfo, Equipment};
 use crate::{
     components::{
         CharacterModel, CharacterModelPart, ColliderEntity, ColliderParent, DummyBoneOffset,
-        ModelHeight, PersonalStore, PersonalStoreModel, COLLISION_FILTER_CLICKABLE,
-        COLLISION_FILTER_INSPECTABLE, COLLISION_GROUP_CHARACTER,
+        ModelHeight, PersonalStore, PersonalStoreModel, PlayerCharacter,
+        COLLISION_FILTER_CLICKABLE, COLLISION_FILTER_INSPECTABLE, COLLISION_GROUP_CHARACTER,
+        COLLISION_GROUP_PLAYER,
     },
     model_loader::ModelLoader,
     render::ObjectMaterial,
@@ -31,12 +32,20 @@ pub struct CharacterColliderRootBoneOffset {
 
 pub fn character_model_add_collider_system(
     mut commands: Commands,
-    query_models: Query<(Entity, &CharacterModel, &SkinnedMesh), Without<ColliderEntity>>,
+    query_models: Query<
+        (
+            Entity,
+            &CharacterModel,
+            &SkinnedMesh,
+            Option<&PlayerCharacter>,
+        ),
+        Without<ColliderEntity>,
+    >,
     query_aabb: Query<Option<&Aabb>, With<Handle<Mesh>>>,
     inverse_bindposes: Res<Assets<SkinnedMeshInverseBindposes>>,
 ) {
     // Add colliders to character models without one
-    for (entity, character_model, skinned_mesh) in query_models.iter() {
+    for (entity, character_model, skinned_mesh, player_character) in query_models.iter() {
         let mut min: Option<Vec3A> = None;
         let mut max: Option<Vec3A> = None;
         let mut all_parts_loaded = true;
@@ -85,7 +94,11 @@ pub fn character_model_add_collider_system(
                 ColliderParent::new(entity),
                 Collider::cuboid(half_extents.x, half_extents.y, half_extents.z),
                 CollisionGroups::new(
-                    COLLISION_GROUP_CHARACTER,
+                    if player_character.is_some() {
+                        COLLISION_GROUP_PLAYER
+                    } else {
+                        COLLISION_GROUP_CHARACTER
+                    },
                     COLLISION_FILTER_INSPECTABLE | COLLISION_FILTER_CLICKABLE,
                 ),
                 Transform::from_translation(root_bone_offset)

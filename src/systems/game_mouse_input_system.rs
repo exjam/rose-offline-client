@@ -17,7 +17,7 @@ use rose_game_common::components::{ItemDrop, Team};
 use crate::{
     components::{
         ClientEntityName, ColliderParent, PlayerCharacter, Position, SelectedTarget,
-        COLLISION_FILTER_CLICKABLE,
+        COLLISION_FILTER_CLICKABLE, COLLISION_GROUP_PLAYER,
     },
     events::PlayerCommandEvent,
     systems::{collision_system::ray_from_screenspace, ZoneObject},
@@ -69,7 +69,10 @@ pub fn game_mouse_input_system(
                 ray_direction,
                 10000000.0,
                 false,
-                InteractionGroups::all().with_memberships(COLLISION_FILTER_CLICKABLE),
+                InteractionGroups::new(
+                    COLLISION_FILTER_CLICKABLE,
+                    u32::MAX & !COLLISION_GROUP_PLAYER,
+                ),
                 None,
             ) {
                 let hit_position = ray_origin + ray_direction * distance;
