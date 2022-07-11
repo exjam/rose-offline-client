@@ -1,4 +1,7 @@
-use bevy::prelude::{Camera3d, Commands, Entity, Query, ResMut, With};
+use bevy::{
+    math::Vec3,
+    prelude::{Camera3d, Commands, Entity, Query, ResMut, With},
+};
 
 use crate::{
     components::ActiveMotion, free_camera::FreeCamera, orbit_camera::OrbitCamera,
@@ -16,7 +19,11 @@ pub fn zone_viewer_enter_system(
             .entity(entity)
             .remove::<OrbitCamera>()
             .remove::<ActiveMotion>()
-            .insert(FreeCamera::new());
+            .insert(FreeCamera::new(
+                Vec3::new(5120.0, 50.0, -5120.0),
+                -45.0,
+                -20.0,
+            ));
     }
 
     // Open relevant debug windows

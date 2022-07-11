@@ -55,7 +55,7 @@ pub fn model_viewer_enter_system(
             .remove::<FreeCamera>()
             .remove::<OrbitCamera>()
             .remove::<ActiveMotion>()
-            .insert(FreeCamera::new());
+            .insert(FreeCamera::new(Vec3::new(0.0, 10.0, 15.0), 0.0, -20.0));
     }
 
     // Initialise state

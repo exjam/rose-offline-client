@@ -1,7 +1,7 @@
 use bevy::{
     input::Input,
-    math::Vec3,
-    prelude::{Camera3d, Commands, Entity, KeyCode, Local, Query, Res, ResMut, With},
+    math::{EulerRot, Vec3},
+    prelude::{Camera3d, Commands, Entity, KeyCode, Local, Query, Res, ResMut, Transform, With},
 };
 use bevy_egui::{egui, EguiContext};
 use rose_game_common::messages::client::ClientMessage;
@@ -15,13 +15,13 @@ use crate::{
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum DebugCameraType {
-    Follow,
-    Fly,
+    Orbit,
+    Free,
 }
 
 impl Default for DebugCameraType {
     fn default() -> Self {
-        Self::Follow
+        Self::Orbit
     }
 }
 
@@ -53,7 +53,7 @@ pub fn ui_debug_menu_system(
     mut egui_context: ResMut<EguiContext>,
     mut ui_state_debug_windows: ResMut<UiStateDebugWindows>,
     mut ui_state_debug_menu: Local<UiStateDebugMenu>,
-    query_cameras: Query<Entity, With<Camera3d>>,
+    query_cameras: Query<(Entity, &Transform), With<Camera3d>>,
     query_player: Query<Entity, With<PlayerCharacter>>,
     game_connection: Option<Res<GameConnection>>,
     keyboard: Res<Input<KeyCode>>,
@@ -78,21 +78,21 @@ pub fn ui_debug_menu_system(
                 if player_entity.is_some() {
                     ui.selectable_value(
                         &mut ui_state_debug_menu.selected_camera_type,
-                        DebugCameraType::Follow,
-                        "Follow",
+                        DebugCameraType::Orbit,
+                        "Orbit",
                     );
                 }
 
                 ui.selectable_value(
                     &mut ui_state_debug_menu.selected_camera_type,
-                    DebugCameraType::Fly,
-                    "Fly",
+                    DebugCameraType::Free,
+                    "Free",
                 );
 
                 if ui_state_debug_menu.selected_camera_type != previous_camera_type {
-                    for camera_entity in query_cameras.iter() {
+                    for (camera_entity, camera_transform) in query_cameras.iter() {
                         match ui_state_debug_menu.selected_camera_type {
-                            DebugCameraType::Follow => {
+                            DebugCameraType::Orbit => {
                                 if let Some(player_entity) = player_entity {
                                     commands
                                         .entity(camera_entity)
@@ -104,11 +104,18 @@ pub fn ui_debug_menu_system(
                                         ));
                                 }
                             }
-                            DebugCameraType::Fly => {
+                            DebugCameraType::Free => {
+                                let (yaw, pitch, _roll) =
+                                    camera_transform.rotation.to_euler(EulerRot::YXZ);
+
                                 commands
                                     .entity(camera_entity)
                                     .remove::<OrbitCamera>()
-                                    .insert(FreeCamera::new());
+                                    .insert(FreeCamera::new(
+                                        camera_transform.translation,
+                                        yaw.to_degrees(),
+                                        pitch.to_degrees(),
+                                    ));
                             }
                         }
                     }

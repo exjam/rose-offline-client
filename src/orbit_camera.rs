@@ -30,14 +30,14 @@ impl Plugin for OrbitCameraPlugin {
 
 #[derive(Component)]
 pub struct OrbitCamera {
-    rig: CameraRig<LeftHanded>,
-    has_initial_position: bool,
-    follow_entity: Entity,
-    follow_offset: Vec3,
-    follow_distance: f32,
-    min_distance: f32,
-    max_distance: f32,
-    current_distance: ExpSmoothed<f32>,
+    pub rig: CameraRig<LeftHanded>,
+    pub has_initial_position: bool,
+    pub follow_entity: Entity,
+    pub follow_offset: Vec3,
+    pub follow_distance: f32,
+    pub min_distance: f32,
+    pub max_distance: f32,
+    pub current_distance: ExpSmoothed<f32>,
 }
 
 impl OrbitCamera {
@@ -158,11 +158,12 @@ fn orbit_camera_update(
 
         // Camera collision
         let ray_direction = (camera_transform.translation - follow_position).normalize();
+        let ball_radius = 0.5;
         if let Some((_, distance)) = rapier_context.cast_shape(
-            follow_position,
+            follow_position + ray_direction * ball_radius,
             Quat::default(),
             ray_direction,
-            &Collider::ball(0.5),
+            &Collider::ball(ball_radius),
             orbit_camera.max_distance,
             InteractionGroups::all()
                 .with_memberships(COLLISION_FILTER_MOVEABLE | COLLISION_FILTER_COLLIDABLE),
@@ -209,7 +210,7 @@ fn orbit_camera_update(
     camera_transform.rotation = calculated_transform.rotation;
 }
 
-pub(crate) trait Interpolate {
+pub trait Interpolate {
     fn interpolate(self, other: Self, t: f32) -> Self;
 }
 
@@ -234,17 +235,17 @@ impl Interpolate for Quat {
     }
 }
 
-pub(crate) struct ExpSmoothingParams {
+pub struct ExpSmoothingParams {
     pub smoothness: f32,
     pub output_offset_scale: f32,
     pub delta_time_seconds: f32,
 }
 
 #[derive(Default, Debug)]
-pub(crate) struct ExpSmoothed<T: Interpolate + Copy + std::fmt::Debug>(Option<T>);
+pub struct ExpSmoothed<T: Interpolate + Copy + std::fmt::Debug>(Option<T>);
 
 impl<T: Interpolate + Copy + std::fmt::Debug> ExpSmoothed<T> {
-    pub(crate) fn exp_smooth_towards(&mut self, other: &T, params: ExpSmoothingParams) -> T {
+    pub fn exp_smooth_towards(&mut self, other: &T, params: ExpSmoothingParams) -> T {
         // An ad-hoc multiplier to make default smoothness parameters
         // produce good-looking results.
         const SMOOTHNESS_MULT: f32 = 8.0;

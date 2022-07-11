@@ -24,17 +24,19 @@ impl Plugin for FreeCameraPlugin {
 
 #[derive(Component)]
 pub struct FreeCamera {
-    rig: CameraRig<LeftHanded>,
-    move_speed: f32,
-    drag_speed: f32,
+    pub rig: CameraRig<LeftHanded>,
+    pub move_speed: f32,
+    pub drag_speed: f32,
 }
 
 impl FreeCamera {
-    pub fn new() -> Self {
+    pub fn new(position: Vec3, yaw_degrees: f32, pitch_degrees: f32) -> Self {
+        let mut yaw_pitch = YawPitch::new();
+        yaw_pitch.rotate_yaw_pitch(yaw_degrees, pitch_degrees);
         Self {
             rig: CameraRig::builder()
-                .with(Position::new(Vec3::new(5120.0, 50.0, -5120.0)))
-                .with(YawPitch::new())
+                .with(Position::new(position))
+                .with(yaw_pitch)
                 .with(Smooth::new_position_rotation(1.0, 1.0))
                 .build(),
             move_speed: 20.0,
@@ -86,21 +88,22 @@ fn free_camera_update(
     let middle_pressed = mouse_buttons.pressed(MouseButton::Middle);
 
     let mut cursor_delta = Vec2::ZERO;
-    let mut wheel_delta = 0.0;
+    let mut move_speed_multiplier = 1.0;
     if allow_mouse_input {
         for event in mouse_motion_events.iter() {
             cursor_delta += event.delta;
         }
 
         for event in mouse_wheel_reader.iter() {
-            wheel_delta += event.x + event.y;
+            move_speed_multiplier *= 1.0 + event.y * 0.10;
         }
+        free_camera.move_speed = (free_camera.move_speed * move_speed_multiplier).max(1.0);
     }
 
     let mut drag_vec = Vec3::ZERO;
     let mut translate_vec = Vec3::ZERO;
     let mut move_vec = Vec3::ZERO;
-    let mut speed_multiplier = 1.0f32;
+    let mut speed_boost_multiplier = 1.0f32;
     if allow_keyboard_input {
         for key in keyboard.get_pressed() {
             match key {
@@ -108,9 +111,9 @@ fn free_camera_update(
                 KeyCode::S => move_vec.z += 1.0,      // Backward
                 KeyCode::A => move_vec.x -= 1.0,      // Left
                 KeyCode::D => move_vec.x += 1.0,      // Right
-                KeyCode::Q => translate_vec.y += 1.0, // Up
-                KeyCode::E => translate_vec.y -= 1.0, // Down
-                KeyCode::LShift => speed_multiplier = 4.0,
+                KeyCode::Q => translate_vec.y -= 1.0, // Down
+                KeyCode::E => translate_vec.y += 1.0, // Up
+                KeyCode::LShift => speed_boost_multiplier = 4.0,
                 _ => {}
             }
         }
@@ -120,8 +123,6 @@ fn free_camera_update(
         drag_vec.x += cursor_delta.x;
         drag_vec.z += cursor_delta.y;
     }
-
-    free_camera.move_speed += wheel_delta * 2.0;
 
     let drag_speed = free_camera.drag_speed;
     let move_speed = free_camera.move_speed;
@@ -139,7 +140,7 @@ fn free_camera_update(
         free_camera.rig.driver_mut::<Position>().translate(
             -(drag_vec.x * rot_x + (drag_vec.z * rot_z) - Vec3::new(0.0, drag_vec.y, 0.0))
                 * time.delta_seconds()
-                * speed_multiplier
+                * speed_boost_multiplier
                 * drag_speed,
         );
     }
@@ -148,7 +149,7 @@ fn free_camera_update(
         free_camera.rig.driver_mut::<Position>().translate(
             (camera_transform.rotation.mul_vec3(move_vec) + translate_vec)
                 * time.delta_seconds()
-                * speed_multiplier
+                * speed_boost_multiplier
                 * move_speed,
         );
     }
