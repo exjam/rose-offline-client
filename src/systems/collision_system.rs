@@ -18,7 +18,8 @@ use crate::{
     components::{
         ColliderParent, CollisionHeightOnly, CollisionPlayer, EventObject, NextCommand, Position,
         WarpObject, COLLISION_FILTER_COLLIDABLE, COLLISION_FILTER_MOVEABLE,
-        COLLISION_GROUP_ZONE_EVENT_OBJECT, COLLISION_GROUP_ZONE_WARP_OBJECT,
+        COLLISION_GROUP_ZONE_EVENT_OBJECT, COLLISION_GROUP_ZONE_TERRAIN,
+        COLLISION_GROUP_ZONE_WARP_OBJECT,
     },
     events::QuestTriggerEvent,
     resources::{CurrentZone, GameConnection},
@@ -182,27 +183,32 @@ pub fn collision_player_system(
     time: Res<Time>,
 ) {
     for (entity, mut position, mut transform) in query_collision_entity.iter_mut() {
-        // TODO: This should probably be some sort of shape cast to avoid moving through gaps in fences etc
         // Cast ray forward to collide with walls
         let new_translation = Vec3::new(
             position.x / 100.0,
             transform.translation.y,
             -position.y / 100.0,
         );
-        let forward_ray_radius = 0.3;
-        let forward_ray_direction = new_translation - transform.translation;
-        let forward_ray_origin = transform.translation + Vec3::new(0.0, 1.35, 0.0);
-        if forward_ray_direction.length() > 0.00001 {
-            if let Some((_, distance)) = rapier_context.cast_ray(
-                forward_ray_origin,
-                forward_ray_direction.normalize(),
-                forward_ray_direction.length() + forward_ray_radius,
-                false,
-                InteractionGroups::all().with_memberships(COLLISION_FILTER_COLLIDABLE),
+        let collider_radius = 0.4;
+        let translation_delta = new_translation - transform.translation;
+        if translation_delta.length() > 0.00001 {
+            let cast_origin = transform.translation + Vec3::new(0.0, 1.2, 0.0);
+            let cast_direction = translation_delta.normalize();
+
+            if let Some((_, distance)) = rapier_context.cast_shape(
+                cast_origin + cast_direction * collider_radius,
+                Quat::default(),
+                cast_direction,
+                &Collider::ball(collider_radius),
+                translation_delta.length(),
+                InteractionGroups::new(
+                    COLLISION_FILTER_COLLIDABLE,
+                    u32::MAX & !COLLISION_GROUP_ZONE_TERRAIN,
+                ),
                 None,
             ) {
-                let collision_translation = forward_ray_origin
-                    + forward_ray_direction * (distance - forward_ray_radius - 0.05).max(0.0);
+                let collision_translation =
+                    cast_origin + translation_delta * (distance.toi - 0.1).max(0.0);
                 position.x = collision_translation.x * 100.0;
                 position.y = -(collision_translation.z * 100.0);
                 position.z = collision_translation.y * 100.0;
