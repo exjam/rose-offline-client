@@ -28,15 +28,16 @@ use rose_network_irose::{
         PacketClientCastSkillTargetPosition, PacketClientChangeAmmo, PacketClientChangeEquipment,
         PacketClientChangeVehiclePart, PacketClientChat, PacketClientConnectRequest,
         PacketClientDropItemFromInventory, PacketClientEmote, PacketClientIncreaseBasicStat,
-        PacketClientJoinZone, PacketClientLevelUpSkill, PacketClientMove, PacketClientMoveToggle,
-        PacketClientMoveToggleType, PacketClientNpcStoreTransaction, PacketClientPartyReply,
-        PacketClientPartyRequest, PacketClientPartyUpdateRules, PacketClientPersonalStoreListItems,
+        PacketClientJoinZone, PacketClientLevelUpSkill, PacketClientMove,
+        PacketClientMoveCollision, PacketClientMoveToggle, PacketClientMoveToggleType,
+        PacketClientNpcStoreTransaction, PacketClientPartyReply, PacketClientPartyRequest,
+        PacketClientPartyUpdateRules, PacketClientPersonalStoreListItems,
         PacketClientPickupItemDrop, PacketClientQuestRequest, PacketClientQuestRequestType,
         PacketClientReviveRequest, PacketClientSetHotbarSlot, PacketClientUseItem,
         PacketClientWarpGateRequest,
     },
     game_server_packets::{
-        ConnectResult, PacketConnectionReply, PacketServerAnnounceChat,
+        ConnectResult, PacketConnectionReply, PacketServerAdjustPosition, PacketServerAnnounceChat,
         PacketServerApplySkillDamage, PacketServerApplySkillEffect, PacketServerAttackEntity,
         PacketServerCancelCastingSkill, PacketServerCastSkillSelf,
         PacketServerCastSkillTargetEntity, PacketServerCastSkillTargetPosition,
@@ -783,6 +784,15 @@ impl GameClient {
                     ))
                     .ok();
             }
+            Some(ServerPackets::AdjustPosition) => {
+                let message = PacketServerAdjustPosition::try_from(&packet)?;
+                self.server_message_tx
+                    .send(ServerMessage::AdjustPosition(
+                        message.client_entity_id,
+                        message.position,
+                    ))
+                    .ok();
+            }
             _ => log::info!("Unhandled game packet {:x}", packet.command),
         }
 
@@ -1070,6 +1080,11 @@ impl GameClient {
                         item_sharing,
                         xp_sharing,
                     }))
+                    .await?
+            }
+            ClientMessage::MoveCollision(position) => {
+                connection
+                    .write_packet(Packet::from(&PacketClientMoveCollision { position }))
                     .await?
             }
             unimplemented => {

@@ -490,9 +490,15 @@ pub fn game_connection_system(
                     ));
                 }
             }
+            Ok(ServerMessage::AdjustPosition(client_entity_id, position)) => {
+                if let Some(entity) = client_entity_list.get(client_entity_id) {
+                    commands
+                        .entity(entity)
+                        .insert(NextCommand::with_move(position, None, None));
+                }
+            }
             Ok(ServerMessage::StopMoveEntity(message)) => {
                 if let Some(entity) = client_entity_list.get(message.entity_id) {
-                    // TODO: Apply the stop entity message.xyz ?
                     commands.entity(entity).insert(NextCommand::with_stop());
                 }
             }

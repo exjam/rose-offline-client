@@ -9,10 +9,7 @@ use bevy::{
 };
 use bevy_rapier3d::prelude::{Collider, InteractionGroups, RapierContext};
 
-use rose_game_common::{
-    components::Destination,
-    messages::client::{ClientMessage, MoveCollision},
-};
+use rose_game_common::{components::Destination, messages::client::ClientMessage};
 
 use crate::{
     components::{
@@ -221,11 +218,7 @@ pub fn collision_player_system(
                 if let Some(game_connection) = game_connection.as_ref() {
                     game_connection
                         .client_message_tx
-                        .send(ClientMessage::MoveCollision(MoveCollision {
-                            x: position.x,
-                            y: position.y,
-                            z: position.z.max(0.0) as u16,
-                        }))
+                        .send(ClientMessage::MoveCollision(position.position))
                         .ok();
                 }
             }
