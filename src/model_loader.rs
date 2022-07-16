@@ -532,7 +532,12 @@ impl ModelLoader {
                 }
 
                 // Spawn new model
-                if model_id != 0 {
+                if model_id != 0
+                    || matches!(
+                        model_part,
+                        CharacterModelPart::CharacterHair | CharacterModelPart::CharacterFace
+                    )
+                {
                     character_model.model_parts[model_part] = spawn_model(
                         commands,
                         asset_server,
