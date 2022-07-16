@@ -451,7 +451,9 @@ impl ModelLoader {
             CharacterModelPart::Weapon,
             CharacterModelPart::SubWeapon,
         ] {
-            if let Some(model_id) = get_model_part_index(character_info, equipment, model_part) {
+            if let Some(model_id) =
+                get_model_part_index(&self.item_database, character_info, equipment, model_part)
+            {
                 model_parts[model_part] = spawn_model(
                     commands,
                     asset_server,
@@ -495,9 +497,13 @@ impl ModelLoader {
         dummy_bone_offset: &DummyBoneOffset,
         skinned_mesh: &SkinnedMesh,
     ) {
-        let weapon_model_id =
-            get_model_part_index(character_info, equipment, CharacterModelPart::Weapon)
-                .unwrap_or(0);
+        let weapon_model_id = get_model_part_index(
+            &self.item_database,
+            character_info,
+            equipment,
+            CharacterModelPart::Weapon,
+        )
+        .unwrap_or(0);
         if weapon_model_id != character_model.model_parts[CharacterModelPart::Weapon].0 {
             character_model.action_motions =
                 self.load_character_action_motions(asset_server, character_info, equipment);
@@ -515,7 +521,9 @@ impl ModelLoader {
             CharacterModelPart::Weapon,
             CharacterModelPart::SubWeapon,
         ] {
-            let model_id = get_model_part_index(character_info, equipment, model_part).unwrap_or(0);
+            let model_id =
+                get_model_part_index(&self.item_database, character_info, equipment, model_part)
+                    .unwrap_or(0);
 
             if model_id != character_model.model_parts[model_part].0 {
                 // Despawn previous model
@@ -758,13 +766,22 @@ fn spawn_model(
 }
 
 fn get_model_part_index(
+    item_database: &ItemDatabase,
     character_info: &CharacterInfo,
     equipment: &Equipment,
     model_part: CharacterModelPart,
 ) -> Option<usize> {
     match model_part {
         CharacterModelPart::CharacterFace => Some(character_info.face as usize),
-        CharacterModelPart::CharacterHair => Some(character_info.hair as usize),
+        CharacterModelPart::CharacterHair => {
+            let head_hair_type = equipment.equipped_items[EquipmentIndex::Head]
+                .as_ref()
+                .map(|equipment_item| equipment_item.item.item_number)
+                .and_then(|item_number| item_database.get_head_item(item_number))
+                .map_or(0, |head_item_data| head_item_data.hair_type as usize);
+
+            Some(character_info.hair as usize + head_hair_type)
+        }
         CharacterModelPart::Head => equipment.equipped_items[EquipmentIndex::Head]
             .as_ref()
             .map(|equipment_item| equipment_item.item.item_number),
