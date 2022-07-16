@@ -55,11 +55,11 @@ use resources::{
 use scripting::RoseScriptingPlugin;
 use systems::{
     ability_values_system, animation_effect_system, animation_system,
-    character_model_add_collider_system, character_model_system, character_select_enter_system,
-    character_select_exit_system, character_select_input_system, character_select_models_system,
-    character_select_system, client_entity_event_system, collision_height_only_system,
-    collision_player_system, collision_player_system_join_zoin, command_system,
-    conversation_dialog_system, cooldown_system, damage_digit_render_system,
+    character_model_add_collider_system, character_model_blink_system, character_model_system,
+    character_select_enter_system, character_select_exit_system, character_select_input_system,
+    character_select_models_system, character_select_system, client_entity_event_system,
+    collision_height_only_system, collision_player_system, collision_player_system_join_zoin,
+    command_system, conversation_dialog_system, cooldown_system, damage_digit_render_system,
     debug_render_collider_system, debug_render_polylines_setup_system,
     debug_render_polylines_update_system, debug_render_skeleton_system, effect_system,
     game_connection_system, game_mouse_input_system, game_state_enter_system,
@@ -86,7 +86,7 @@ use ui::{
 };
 use vfs_asset_io::VfsAssetIo;
 use zmo_asset_loader::{ZmoAsset, ZmoAssetLoader};
-use zms_asset_loader::ZmsAssetLoader;
+use zms_asset_loader::{ZmsAssetLoader, ZmsMaterialNumFaces};
 
 pub struct VfsResource {
     vfs: Arc<VfsIndex>,
@@ -360,8 +360,11 @@ fn main() {
         .insert_resource(Events::<WorldConnectionEvent>::default())
         .insert_resource(Events::<ZoneEvent>::default());
 
+    app.add_asset::<ZmsMaterialNumFaces>();
+
     app.add_system(character_model_system)
         .add_system(character_model_add_collider_system.after(character_model_system))
+        .add_system(character_model_blink_system.after(character_model_system))
         .add_system(npc_model_system)
         .add_system(npc_model_add_collider_system.after(npc_model_system))
         .add_system(item_drop_model_system)

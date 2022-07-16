@@ -1,11 +1,18 @@
 use bevy::{
     asset::{AssetLoader, BoxedFuture, LoadContext, LoadedAsset},
     prelude::Mesh,
+    reflect::TypeUuid,
     render::{mesh::Indices, render_resource::PrimitiveTopology},
 };
 use rose_file_readers::{RoseFile, ZmsFile};
 
 use crate::render::{MESH_ATTRIBUTE_UV_1, MESH_ATTRIBUTE_UV_2, MESH_ATTRIBUTE_UV_3};
+
+#[derive(Debug, TypeUuid, Clone)]
+#[uuid = "8688d5ed-b98b-4641-bab3-5fe83dfd4ecd"]
+pub struct ZmsMaterialNumFaces {
+    pub material_num_faces: Vec<u16>,
+}
 
 #[derive(Default)]
 pub struct ZmsAssetLoader;
@@ -80,6 +87,15 @@ impl AssetLoader for ZmsAssetLoader {
 
                     if !zms.uv4.is_empty() {
                         mesh.insert_attribute(MESH_ATTRIBUTE_UV_3, zms.uv4);
+                    }
+
+                    if !zms.material_num_faces.is_empty() {
+                        load_context.set_labeled_asset(
+                            "material_num_faces",
+                            LoadedAsset::new(ZmsMaterialNumFaces {
+                                material_num_faces: zms.material_num_faces,
+                            }),
+                        );
                     }
 
                     load_context.set_default_asset(LoadedAsset::new(mesh));

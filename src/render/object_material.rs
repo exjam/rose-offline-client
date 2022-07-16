@@ -3,23 +3,26 @@ use std::marker::PhantomData;
 use bevy::{
     asset::Handle,
     core_pipeline::core_3d::{AlphaMask3d, Opaque3d, Transparent3d},
-    ecs::system::{
-        lifetimeless::{Read, SQuery, SRes},
-        SystemParamItem,
+    ecs::{
+        query::QueryItem,
+        system::{
+            lifetimeless::{Read, SQuery, SRes},
+            SystemParamItem,
+        },
     },
     math::Vec2,
     pbr::{
-        AlphaMode, DrawMesh, MeshPipeline, MeshPipelineKey, MeshUniform, SetMeshBindGroup,
+        AlphaMode, MeshPipeline, MeshPipelineKey, MeshUniform, SetMeshBindGroup,
         SetMeshViewBindGroup,
     },
     prelude::{
-        error, AddAsset, App, Assets, Entity, FromWorld, HandleUntyped, Mesh, Msaa, Plugin, Query,
-        Res, ResMut, World,
+        error, AddAsset, App, Assets, Component, Entity, FromWorld, HandleUntyped, Mesh, Msaa,
+        Plugin, Query, Res, ResMut, With, World,
     },
     reflect::TypeUuid,
     render::{
-        extract_component::ExtractComponentPlugin,
-        mesh::MeshVertexBufferLayout,
+        extract_component::{ExtractComponent, ExtractComponentPlugin},
+        mesh::{GpuBufferInfo, MeshVertexBufferLayout},
         prelude::Shader,
         render_asset::{PrepareAssetError, RenderAsset, RenderAssetPlugin, RenderAssets},
         render_phase::{
@@ -65,6 +68,7 @@ impl Plugin for ObjectMaterialPlugin {
 
         app.add_asset::<ObjectMaterial>()
             .add_plugin(ExtractComponentPlugin::<Handle<ObjectMaterial>>::extract_visible())
+            .add_plugin(ExtractComponentPlugin::<ObjectMaterialClipFace>::extract_visible())
             .add_plugin(RenderAssetPlugin::<ObjectMaterial>::default());
         if let Ok(render_app) = app.get_sub_app_mut(RenderApp) {
             render_app
@@ -75,6 +79,21 @@ impl Plugin for ObjectMaterialPlugin {
                 .init_resource::<SpecializedMeshPipelines<ObjectMaterialPipeline>>()
                 .add_system_to_stage(RenderStage::Queue, queue_object_material_meshes);
         }
+    }
+}
+
+#[derive(Copy, Clone, Component)]
+pub enum ObjectMaterialClipFace {
+    First(u32),
+    Last(u32),
+}
+
+impl ExtractComponent for ObjectMaterialClipFace {
+    type Query = &'static Self;
+    type Filter = With<Handle<ObjectMaterial>>;
+
+    fn extract_component(item: QueryItem<Self::Query>) -> Self {
+        item.clone()
     }
 }
 
@@ -270,13 +289,63 @@ impl<const I: usize> EntityRenderCommand for SetObjectMaterialBindGroup<I> {
     }
 }
 
+pub struct DrawObjectMesh;
+impl EntityRenderCommand for DrawObjectMesh {
+    type Param = (
+        SRes<RenderAssets<Mesh>>,
+        SQuery<(Read<Handle<Mesh>>, Option<&'static ObjectMaterialClipFace>)>,
+    );
+    #[inline]
+    fn render<'w>(
+        _view: Entity,
+        item: Entity,
+        (meshes, mesh_query): SystemParamItem<'w, '_, Self::Param>,
+        pass: &mut TrackedRenderPass<'w>,
+    ) -> RenderCommandResult {
+        let (mesh_handle, clip_face) = mesh_query.get(item).unwrap();
+
+        let (start_index_offset, end_index_offset) = if let Some(clip_face) = clip_face {
+            match clip_face {
+                ObjectMaterialClipFace::First(num_faces) => (num_faces * 3, 0),
+                ObjectMaterialClipFace::Last(num_faces) => (0, num_faces * 3),
+            }
+        } else {
+            (0, 0)
+        };
+
+        if let Some(gpu_mesh) = meshes.into_inner().get(mesh_handle) {
+            pass.set_vertex_buffer(0, gpu_mesh.vertex_buffer.slice(..));
+            match &gpu_mesh.buffer_info {
+                GpuBufferInfo::Indexed {
+                    buffer,
+                    index_format,
+                    count,
+                } => {
+                    let start_index = start_index_offset;
+                    let end_index = *count - end_index_offset;
+                    pass.set_index_buffer(buffer.slice(..), 0, *index_format);
+                    pass.draw_indexed(start_index..end_index, 0, 0..1);
+                }
+                GpuBufferInfo::NonIndexed { vertex_count } => {
+                    let start_vertex = start_index_offset;
+                    let end_vertex = *vertex_count - end_index_offset;
+                    pass.draw(start_vertex..end_vertex, 0..1);
+                }
+            }
+            RenderCommandResult::Success
+        } else {
+            RenderCommandResult::Failure
+        }
+    }
+}
+
 type DrawObjectMaterial = (
     SetItemPipeline,
     SetMeshViewBindGroup<0>,
     SetObjectMaterialBindGroup<1>,
     SetMeshBindGroup<2>,
     SetZoneLightingBindGroup<3>,
-    DrawMesh,
+    DrawObjectMesh,
 );
 
 // NOTE: These must match the bit flags in shaders/object_material.wgsl!

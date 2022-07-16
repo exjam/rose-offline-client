@@ -25,6 +25,7 @@ use crate::{
     effect_loader::spawn_effect,
     render::{EffectMeshMaterial, ObjectMaterial, ParticleMaterial, RgbTextureLoader},
     zmo_asset_loader::ZmoAsset,
+    zms_asset_loader::ZmsMaterialNumFaces,
 };
 
 pub struct ModelLoader {
@@ -201,6 +202,7 @@ impl ModelLoader {
                 Some(&skinned_mesh),
                 None,
                 dummy_bone_offset,
+                false,
             );
             model_parts.append(&mut parts);
         }
@@ -240,6 +242,7 @@ impl ModelLoader {
                     Some(&skinned_mesh),
                     None,
                     dummy_bone_offset,
+                    false,
                 );
                 model_parts.append(&mut parts);
             }
@@ -255,6 +258,7 @@ impl ModelLoader {
                     Some(&skinned_mesh),
                     None,
                     dummy_bone_offset,
+                    false,
                 );
                 model_parts.append(&mut parts);
             }
@@ -304,6 +308,7 @@ impl ModelLoader {
             None,
             None,
             0,
+            false,
         );
 
         PersonalStoreModel {
@@ -349,6 +354,7 @@ impl ModelLoader {
                     None,
                     None,
                     0,
+                    false,
                 )
                 .1,
             },
@@ -456,6 +462,7 @@ impl ModelLoader {
                     Some(&skinned_mesh),
                     model_part.default_bone_id(dummy_bone_offset),
                     dummy_bone_offset,
+                    matches!(model_part, CharacterModelPart::CharacterFace),
                 );
             }
         }
@@ -528,6 +535,7 @@ impl ModelLoader {
                         Some(skinned_mesh),
                         model_part.default_bone_id(dummy_bone_offset.index),
                         dummy_bone_offset.index,
+                        matches!(model_part, CharacterModelPart::CharacterFace),
                     );
                 } else {
                     character_model.model_parts[model_part].0 = model_id;
@@ -660,6 +668,7 @@ fn spawn_model(
     skinned_mesh: Option<&SkinnedMesh>,
     default_bone_index: Option<usize>,
     dummy_bone_offset: usize,
+    load_clip_faces: bool,
 ) -> (usize, Vec<Entity>) {
     let mut parts = Vec::new();
     let object = if let Some(object) = model_list.objects.get(model_id) {
@@ -701,6 +710,14 @@ fn spawn_model(
             Visibility::default(),
             ComputedVisibility::default(),
         ));
+
+        if load_clip_faces {
+            let zms_material_num_faces = asset_server.load::<ZmsMaterialNumFaces, _>(&format!(
+                "{}#material_num_faces",
+                model_list.meshes[mesh_id].path().to_string_lossy()
+            ));
+            entity_commands.insert(zms_material_num_faces);
+        }
 
         if zsc_material.is_skin {
             if let Some(skinned_mesh) = skinned_mesh {

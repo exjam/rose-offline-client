@@ -30,7 +30,7 @@ pub const MESH_ATTRIBUTE_UV_3: MeshVertexAttribute =
 pub use damage_digit_material::DamageDigitMaterial;
 pub use damage_digit_render_data::DamageDigitRenderData;
 pub use effect_mesh_material::EffectMeshMaterial;
-pub use object_material::ObjectMaterial;
+pub use object_material::{ObjectMaterial, ObjectMaterialClipFace};
 pub use particle_material::ParticleMaterial;
 pub use particle_render_data::{ParticleRenderBillboardType, ParticleRenderData};
 pub use rgb_texture_loader::RgbTextureLoader;

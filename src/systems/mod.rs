@@ -44,7 +44,9 @@ mod zone_viewer_system;
 pub use ability_values_system::ability_values_system;
 pub use animation_effect_system::animation_effect_system;
 pub use animation_system::animation_system;
-pub use character_model_system::{character_model_add_collider_system, character_model_system};
+pub use character_model_system::{
+    character_model_add_collider_system, character_model_blink_system, character_model_system,
+};
 pub use character_select_system::{
     character_select_enter_system, character_select_exit_system, character_select_input_system,
     character_select_models_system, character_select_system,
