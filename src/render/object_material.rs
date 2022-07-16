@@ -16,8 +16,8 @@ use bevy::{
         SetMeshViewBindGroup,
     },
     prelude::{
-        error, AddAsset, App, Assets, Component, Entity, FromWorld, HandleUntyped, Mesh, Msaa,
-        Plugin, Query, Res, ResMut, With, World,
+        error, AddAsset, App, AssetServer, Assets, Component, Entity, FromWorld, HandleUntyped,
+        Mesh, Msaa, Plugin, Query, Res, ResMut, With, World,
     },
     reflect::TypeUuid,
     render::{
@@ -93,7 +93,7 @@ impl ExtractComponent for ObjectMaterialClipFace {
     type Filter = With<Handle<ObjectMaterial>>;
 
     fn extract_component(item: QueryItem<Self::Query>) -> Self {
-        item.clone()
+        *item
     }
 }
 
@@ -103,6 +103,7 @@ pub struct ObjectMaterialPipeline {
     pub zone_lighting_layout: BindGroupLayout,
     pub vertex_shader: Handle<Shader>,
     pub fragment_shader: Handle<Shader>,
+    pub specular_texture: Option<Handle<Image>>,
 }
 
 impl SpecializedMeshPipeline for ObjectMaterialPipeline {
@@ -125,7 +126,8 @@ impl SpecializedMeshPipeline for ObjectMaterialPipeline {
 
         let mut vertex_attributes = vec![
             Mesh::ATTRIBUTE_POSITION.at_shader_location(0),
-            Mesh::ATTRIBUTE_UV_0.at_shader_location(1),
+            Mesh::ATTRIBUTE_NORMAL.at_shader_location(1),
+            Mesh::ATTRIBUTE_UV_0.at_shader_location(2),
         ];
 
         if key.1.has_lightmap {
@@ -140,7 +142,7 @@ impl SpecializedMeshPipeline for ObjectMaterialPipeline {
                 .shader_defs
                 .push(String::from("HAS_OBJECT_LIGHTMAP"));
 
-            vertex_attributes.push(MESH_ATTRIBUTE_UV_1.at_shader_location(2));
+            vertex_attributes.push(MESH_ATTRIBUTE_UV_1.at_shader_location(3));
         } else {
             descriptor
                 .fragment
@@ -161,8 +163,8 @@ impl SpecializedMeshPipeline for ObjectMaterialPipeline {
                 .shader_defs
                 .push(String::from("SKINNED"));
 
-            vertex_attributes.push(Mesh::ATTRIBUTE_JOINT_INDEX.at_shader_location(3));
-            vertex_attributes.push(Mesh::ATTRIBUTE_JOINT_WEIGHT.at_shader_location(4));
+            vertex_attributes.push(Mesh::ATTRIBUTE_JOINT_INDEX.at_shader_location(4));
+            vertex_attributes.push(Mesh::ATTRIBUTE_JOINT_WEIGHT.at_shader_location(5));
         } else if key.1.skinned {
             panic!("strange");
         }
@@ -202,6 +204,9 @@ impl SpecializedMeshPipeline for ObjectMaterialPipeline {
 
 impl FromWorld for ObjectMaterialPipeline {
     fn from_world(world: &mut World) -> Self {
+        let asset_server = world.resource::<AssetServer>();
+        let specular_texture = asset_server.load("ETC/SPECULAR_SPHEREMAP.DDS");
+
         let render_device = world.resource::<RenderDevice>();
 
         let material_layout = render_device.create_bind_group_layout(&BindGroupLayoutDescriptor {
@@ -253,6 +258,24 @@ impl FromWorld for ObjectMaterialPipeline {
                     ty: BindingType::Sampler(SamplerBindingType::Filtering),
                     count: None,
                 },
+                // Specular Texture
+                BindGroupLayoutEntry {
+                    binding: 5,
+                    visibility: ShaderStages::FRAGMENT,
+                    ty: BindingType::Texture {
+                        multisampled: false,
+                        sample_type: TextureSampleType::Float { filterable: true },
+                        view_dimension: TextureViewDimension::D2,
+                    },
+                    count: None,
+                },
+                // Specular Texture Sampler
+                BindGroupLayoutEntry {
+                    binding: 6,
+                    visibility: ShaderStages::FRAGMENT,
+                    ty: BindingType::Sampler(SamplerBindingType::Filtering),
+                    count: None,
+                },
             ],
             label: Some("object_material_layout"),
         });
@@ -266,6 +289,7 @@ impl FromWorld for ObjectMaterialPipeline {
                 .clone(),
             vertex_shader: OBJECT_MATERIAL_SHADER_HANDLE.typed(),
             fragment_shader: OBJECT_MATERIAL_SHADER_HANDLE.typed(),
+            specular_texture: Some(specular_texture),
         }
     }
 }
@@ -462,6 +486,16 @@ impl RenderAsset for ObjectMaterial {
             return Err(PrepareAssetError::RetryNextUpdate(material));
         };
 
+        let (specular_texture_view, specular_texture_sampler) = if let Some(result) =
+            material_pipeline
+                .mesh_pipeline
+                .get_image_texture(gpu_images, &material_pipeline.specular_texture)
+        {
+            result
+        } else {
+            return Err(PrepareAssetError::RetryNextUpdate(material));
+        };
+
         let mut flags = ObjectMaterialFlags::NONE;
         let mut alpha_cutoff = 0.5;
         let mut alpha_value = 1.0;
@@ -536,6 +570,14 @@ impl RenderAsset for ObjectMaterial {
                 BindGroupEntry {
                     binding: 4,
                     resource: BindingResource::Sampler(lightmap_texture_sampler),
+                },
+                BindGroupEntry {
+                    binding: 5,
+                    resource: BindingResource::TextureView(specular_texture_view),
+                },
+                BindGroupEntry {
+                    binding: 6,
+                    resource: BindingResource::Sampler(specular_texture_sampler),
                 },
             ],
             label: Some("object_material_bind_group"),
