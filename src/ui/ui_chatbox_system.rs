@@ -5,10 +5,13 @@ use rose_game_common::messages::client::ClientMessage;
 
 use crate::{events::ChatboxEvent, resources::GameConnection};
 
+const MAX_CHATBOX_ENTRIES: usize = 100;
+
 #[derive(Default)]
 pub struct UiStateChatbox {
     textbox_text: String,
-    textbox_history: Vec<(egui::Color32, String)>,
+    textbox_layout_job: egui::text::LayoutJob,
+    cleanup_layout_text_counter: usize,
 }
 
 pub fn ui_chatbox_system(
@@ -25,46 +28,109 @@ pub fn ui_chatbox_system(
         128,
     );
 
+    let local_time = chrono::Local::now();
+    let timestamp = local_time.format("%H:%M:%S");
+
     for event in chatbox_events.iter() {
+        if ui_state_chatbox.textbox_layout_job.sections.len() == MAX_CHATBOX_ENTRIES {
+            ui_state_chatbox.textbox_layout_job.sections.remove(0);
+            ui_state_chatbox.cleanup_layout_text_counter += 1;
+
+            if ui_state_chatbox.cleanup_layout_text_counter == MAX_CHATBOX_ENTRIES {
+                let offset = ui_state_chatbox.textbox_layout_job.sections[0]
+                    .byte_range
+                    .start;
+                ui_state_chatbox.textbox_layout_job.text =
+                    ui_state_chatbox.textbox_layout_job.text.split_off(offset);
+
+                for section in ui_state_chatbox.textbox_layout_job.sections.iter_mut() {
+                    section.byte_range.start -= offset;
+                    section.byte_range.end -= offset;
+                }
+
+                ui_state_chatbox.cleanup_layout_text_counter = 0;
+            }
+        }
+
+        ui_state_chatbox.textbox_layout_job.append(
+            &format!("[{}] ", timestamp),
+            0.0,
+            egui::TextFormat {
+                color: egui::Color32::from_rgb(150, 150, 150),
+                ..Default::default()
+            },
+        );
+
         match event {
             ChatboxEvent::Say(name, text) => {
-                ui_state_chatbox.textbox_history.push((
-                    egui::Color32::from_rgb(255, 255, 255),
-                    format!("{}> {}", name, text),
-                ));
+                ui_state_chatbox.textbox_layout_job.append(
+                    &format!("{}> {}\n", name, text),
+                    0.0,
+                    egui::TextFormat {
+                        color: egui::Color32::from_rgb(255, 255, 255),
+                        ..Default::default()
+                    },
+                );
             }
             ChatboxEvent::Shout(name, text) => {
-                ui_state_chatbox.textbox_history.push((
-                    egui::Color32::from_rgb(189, 250, 255),
-                    format!("{}> {}", name, text),
-                ));
+                ui_state_chatbox.textbox_layout_job.append(
+                    &format!("{}> {}\n", name, text),
+                    0.0,
+                    egui::TextFormat {
+                        color: egui::Color32::from_rgb(189, 250, 255),
+                        ..Default::default()
+                    },
+                );
             }
             ChatboxEvent::Whisper(name, text) => {
-                ui_state_chatbox.textbox_history.push((
-                    egui::Color32::from_rgb(201, 255, 144),
-                    format!("{}> {}", name, text),
-                ));
+                ui_state_chatbox.textbox_layout_job.append(
+                    &format!("{}> {}\n", name, text),
+                    0.0,
+                    egui::TextFormat {
+                        color: egui::Color32::from_rgb(201, 255, 144),
+                        ..Default::default()
+                    },
+                );
             }
             ChatboxEvent::Announce(Some(name), text) => {
-                ui_state_chatbox.textbox_history.push((
-                    egui::Color32::from_rgb(255, 188, 172),
-                    format!("{}> {}", name, text),
-                ));
+                ui_state_chatbox.textbox_layout_job.append(
+                    &format!("{}> {}\n", name, text),
+                    0.0,
+                    egui::TextFormat {
+                        color: egui::Color32::from_rgb(255, 188, 172),
+                        ..Default::default()
+                    },
+                );
             }
             ChatboxEvent::Announce(None, text) => {
-                ui_state_chatbox
-                    .textbox_history
-                    .push((egui::Color32::from_rgb(255, 188, 172), text.clone()));
+                ui_state_chatbox.textbox_layout_job.append(
+                    &format!("{}\n", text),
+                    0.0,
+                    egui::TextFormat {
+                        color: egui::Color32::from_rgb(255, 188, 172),
+                        ..Default::default()
+                    },
+                );
             }
             ChatboxEvent::System(text) => {
-                ui_state_chatbox
-                    .textbox_history
-                    .push((egui::Color32::from_rgb(255, 224, 229), text.clone()));
+                ui_state_chatbox.textbox_layout_job.append(
+                    &format!("{}\n", text),
+                    0.0,
+                    egui::TextFormat {
+                        color: egui::Color32::from_rgb(255, 224, 229),
+                        ..Default::default()
+                    },
+                );
             }
             ChatboxEvent::Quest(text) => {
-                ui_state_chatbox
-                    .textbox_history
-                    .push((egui::Color32::from_rgb(151, 221, 241), text.clone()));
+                ui_state_chatbox.textbox_layout_job.append(
+                    &format!("{}\n", text),
+                    0.0,
+                    egui::TextFormat {
+                        color: egui::Color32::from_rgb(151, 221, 241),
+                        ..Default::default()
+                    },
+                );
             }
         }
     }
@@ -77,31 +143,19 @@ pub fn ui_chatbox_system(
         .frame(egui::Frame::window(&chatbox_style))
         .show(egui_context.ctx_mut(), |ui| {
             ui.with_layout(egui::Layout::top_down_justified(egui::Align::LEFT), |ui| {
-                let text_style = egui::TextStyle::Body;
-                let row_height = ui.text_style_height(&text_style);
-
                 egui_extras::StripBuilder::new(ui)
                     .size(egui_extras::Size::remainder().at_least(50.0))
                     .size(egui_extras::Size::exact(20.0))
                     .vertical(|mut strip| {
                         strip.cell(|ui| {
-                            egui::ScrollArea::vertical()
-                                .auto_shrink([false; 2])
-                                .stick_to_bottom()
-                                .show_rows(
-                                    ui,
-                                    row_height,
-                                    ui_state_chatbox.textbox_history.len(),
-                                    |ui, row_range| {
-                                        for row in row_range {
-                                            if let Some((colour, text)) =
-                                                ui_state_chatbox.textbox_history.get(row)
-                                            {
-                                                ui.colored_label(*colour, text);
-                                            }
-                                        }
-                                    },
-                                );
+                            ui.with_layout(egui::Layout::top_down(egui::Align::LEFT), |ui| {
+                                egui::ScrollArea::vertical()
+                                    .auto_shrink([false; 2])
+                                    .stick_to_bottom()
+                                    .show(ui, |ui| {
+                                        ui.label(ui_state_chatbox.textbox_layout_job.clone());
+                                    });
+                            });
                         });
 
                         strip.cell(|ui| {
@@ -127,45 +181,6 @@ pub fn ui_chatbox_system(
                             }
                         });
                     });
-                /*
-                egui::ScrollArea::vertical()
-                    .max_height(250.0)
-                    .auto_shrink([false; 2])
-                    .stick_to_bottom()
-                    .show_rows(
-                        ui,
-                        row_height,
-                        ui_state_chatbox.textbox_history.len(),
-                        |ui, row_range| {
-                            for row in row_range {
-                                if let Some((colour, text)) =
-                                    ui_state_chatbox.textbox_history.get(row)
-                                {
-                                    ui.colored_label(*colour, text);
-                                }
-                            }
-                        },
-                    );
-
-                let response = ui.text_edit_singleline(&mut ui_state_chatbox.textbox_text);
-
-                if ui.input().key_pressed(egui::Key::Enter) {
-                    if response.lost_focus() {
-                        if !ui_state_chatbox.textbox_text.is_empty() {
-                            if let Some(game_connection) = game_connection.as_ref() {
-                                game_connection
-                                    .client_message_tx
-                                    .send(ClientMessage::Chat(
-                                        ui_state_chatbox.textbox_text.clone(),
-                                    ))
-                                    .ok();
-                                ui_state_chatbox.textbox_text.clear();
-                            }
-                        }
-                    } else {
-                        response.request_focus();
-                    }
-                } */
             });
         });
 }
