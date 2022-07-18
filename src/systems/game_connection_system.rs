@@ -97,7 +97,7 @@ pub fn game_connection_system(
                         ))
                         .insert_bundle((
                             Command::with_stop(),
-                            NextCommand::default(),
+                            NextCommand::with_stop(),
                             ability_values,
                             status_effects,
                             move_mode,
@@ -146,7 +146,7 @@ pub fn game_connection_system(
                         ClientEntity::new(message.entity_id, ClientEntityType::Character),
                         CollisionPlayer,
                         Command::with_stop(),
-                        NextCommand::default(),
+                        NextCommand::with_stop(),
                         message.experience_points,
                         message.team,
                         message.health_points,
