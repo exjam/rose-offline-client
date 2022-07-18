@@ -13,17 +13,13 @@ use bevy_inspector_egui::{InspectableRegistry, WorldInspectorParams};
 use bevy_rapier3d::prelude::{InteractionGroups, RapierContext};
 
 use crate::{
-    components::COLLISION_FILTER_INSPECTABLE,
+    components::{
+        ZoneObject, ZoneObjectAnimatedObject, ZoneObjectPart, ZoneObjectPartCollisionShape,
+        ZoneObjectTerrain, COLLISION_FILTER_INSPECTABLE,
+    },
     render::ObjectMaterial,
     resources::DebugInspector,
-    systems::{
-        collision_system::ray_from_screenspace,
-        load_zone_system::{
-            ZoneObjectAnimatedObject, ZoneObjectPart, ZoneObjectPartCollisionShape,
-            ZoneObjectTerrain,
-        },
-        ZoneObject,
-    },
+    systems::collision_system::ray_from_screenspace,
 };
 
 pub struct DebugInspectorPlugin;

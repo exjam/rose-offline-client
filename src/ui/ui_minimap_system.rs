@@ -11,6 +11,7 @@ use rose_data::ZoneId;
 use crate::{
     components::{PlayerCharacter, Position},
     resources::{CurrentZone, GameData, Icons},
+    zone_loader::ZoneLoaderAsset,
 };
 
 const PLAYER_ICON_SIZE: egui::Vec2 = egui::Vec2::new(16.0, 16.0);
@@ -37,6 +38,7 @@ pub fn ui_minimap_system(
     query_camera: Query<&Transform, With<Camera3d>>,
     images: Res<Assets<Image>>,
     current_zone: Option<Res<CurrentZone>>,
+    zone_loader_assets: Res<Assets<ZoneLoaderAsset>>,
     game_data: Res<GameData>,
     icons: Res<Icons>,
 ) {
@@ -44,6 +46,7 @@ pub fn ui_minimap_system(
         return;
     }
     let current_zone = current_zone.unwrap();
+    let current_zone_data = zone_loader_assets.get(&current_zone.handle).unwrap();
 
     let camera_forward_2d = query_camera.single().forward().xz().normalize_or_zero();
     let camera_angle = -camera_forward_2d.angle_between(Vec2::Y);
@@ -71,7 +74,8 @@ pub fn ui_minimap_system(
             ui_state.minimap_image_size = Some(minimap_image_size);
 
             if let Some(zone_data) = game_data.zone_list.get_zone(current_zone.id) {
-                let world_block_size = 16.0 * current_zone.grid_per_patch * current_zone.grid_size;
+                let world_block_size =
+                    16.0 * current_zone_data.zon.grid_per_patch * current_zone_data.zon.grid_size;
                 let minimap_blocks_x =
                     (minimap_image_size.x - 2.0 * MAP_OUTLINE_PIXELS) / MAP_BLOCK_PIXELS;
                 let minimap_blocks_y =

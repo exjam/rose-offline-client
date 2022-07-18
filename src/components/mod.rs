@@ -25,6 +25,8 @@ mod projectile;
 mod selected_target;
 mod visible_status_effects;
 mod warp_object;
+mod zone;
+mod zone_object;
 
 pub use active_motion::ActiveMotion;
 pub use character_model::{CharacterModel, CharacterModelPart};
@@ -65,3 +67,8 @@ pub use projectile::{Projectile, ProjectileParabola};
 pub use selected_target::SelectedTarget;
 pub use visible_status_effects::{VisibleStatusEffect, VisibleStatusEffects};
 pub use warp_object::WarpObject;
+pub use zone::Zone;
+pub use zone_object::{
+    ZoneObject, ZoneObjectAnimatedObject, ZoneObjectId, ZoneObjectPart,
+    ZoneObjectPartCollisionShape, ZoneObjectTerrain,
+};

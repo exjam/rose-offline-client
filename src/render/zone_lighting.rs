@@ -92,6 +92,8 @@ pub struct ZoneLightingUniformData {
     pub fog_height_offset: f32,
     pub fog_height_falloff: f32,
 
+    // TODO: Calculate camera far plane based on alpha fog:
+    // far = sqrt(log2(1.0 - fog_alpha_weight_end) / (-fog_density * fog_density * 1.442695))
     pub fog_alpha_weight_start: f32,
     pub fog_alpha_weight_end: f32,
 }

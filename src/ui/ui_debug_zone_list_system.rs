@@ -1,4 +1,4 @@
-use bevy::prelude::{EventWriter, Res, ResMut, State};
+use bevy::prelude::{EventWriter, Local, Res, ResMut, State};
 use bevy_egui::{egui, EguiContext};
 use rose_game_common::messages::client::ClientMessage;
 
@@ -8,10 +8,23 @@ use crate::{
     ui::UiStateDebugWindows,
 };
 
+pub struct UiDebugZoneListState {
+    pub despawn_other_zones: bool,
+}
+
+impl Default for UiDebugZoneListState {
+    fn default() -> Self {
+        Self {
+            despawn_other_zones: true,
+        }
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 pub fn ui_debug_zone_list_system(
     mut egui_context: ResMut<EguiContext>,
     mut ui_state_debug_windows: ResMut<UiStateDebugWindows>,
+    mut ui_state_zone_list: Local<UiDebugZoneListState>,
     mut load_zone_events: EventWriter<LoadZoneEvent>,
     app_state: Res<State<AppState>>,
     game_connection: Option<Res<GameConnection>>,
@@ -27,6 +40,13 @@ pub fn ui_debug_zone_list_system(
         .default_height(300.0)
         .open(&mut ui_state_debug_windows.zone_list_open)
         .show(egui_context.ctx_mut(), |ui| {
+            if matches!(app_state.current(), AppState::ZoneViewer) {
+                ui.checkbox(
+                    &mut ui_state_zone_list.despawn_other_zones,
+                    "Despawn other zones",
+                );
+            }
+
             egui_extras::TableBuilder::new(ui)
                 .striped(true)
                 .cell_layout(egui::Layout::left_to_right().with_cross_align(egui::Align::Center))
@@ -71,7 +91,11 @@ pub fn ui_debug_zone_list_system(
                                 }
                                 AppState::ZoneViewer => {
                                     if ui.button("Load").clicked() {
-                                        load_zone_events.send(LoadZoneEvent::new(zone.id));
+                                        load_zone_events.send(LoadZoneEvent {
+                                            id: zone.id,
+                                            despawn_other_zones: ui_state_zone_list
+                                                .despawn_other_zones,
+                                        });
                                     }
                                 }
                                 _ => {}

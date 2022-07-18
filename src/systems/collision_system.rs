@@ -1,8 +1,8 @@
 use bevy::{
     math::{Mat4, Quat, Vec2, Vec3},
     prelude::{
-        Camera, Changed, Commands, Entity, EventWriter, GlobalTransform, Or, Query, Res, Time,
-        Transform, With,
+        Assets, Camera, Changed, Commands, Entity, EventWriter, GlobalTransform, Or, Query, Res,
+        Time, Transform, With,
     },
     render::camera::{Projection, RenderTarget},
     window::{Window, Windows},
@@ -20,6 +20,7 @@ use crate::{
     },
     events::QuestTriggerEvent,
     resources::{CurrentZone, GameConnection},
+    zone_loader::ZoneLoaderAsset,
 };
 
 fn get_window_for_camera<'a>(windows: &'a Windows, camera: &Camera) -> Option<&'a Window> {
@@ -78,7 +79,20 @@ pub fn collision_height_only_system(
     >,
     rapier_context: Res<RapierContext>,
     current_zone: Option<Res<CurrentZone>>,
+    zone_loader_assets: Res<Assets<ZoneLoaderAsset>>,
 ) {
+    let current_zone = if let Some(current_zone) = current_zone {
+        current_zone
+    } else {
+        return;
+    };
+    let current_zone_data =
+        if let Some(current_zone_data) = zone_loader_assets.get(&current_zone.handle) {
+            current_zone_data
+        } else {
+            return;
+        };
+
     for (mut position, mut transform) in query_collision_entity.iter_mut() {
         let ray_origin = Vec3::new(position.x / 100.0, 100000.0, -position.y / 100.0);
         let ray_direction = Vec3::new(0.0, -1.0, 0.0);
@@ -98,21 +112,15 @@ pub fn collision_height_only_system(
         };
 
         // We can never be below the heightmap
-        let terrain_height = current_zone
-            .as_ref()
-            .map(|current_zone| current_zone.get_terrain_height(position.x, position.y) / 100.0);
+        let terrain_height = current_zone_data.get_terrain_height(position.x, position.y) / 100.0;
 
         // Update entity translation and position
         transform.translation.x = position.x / 100.0;
         transform.translation.z = -position.y / 100.0;
-        transform.translation.y = if let Some(terrain_height) = terrain_height {
-            if let Some(collision_height) = collision_height {
-                collision_height.max(terrain_height)
-            } else {
-                terrain_height
-            }
+        transform.translation.y = if let Some(collision_height) = collision_height {
+            collision_height.max(terrain_height)
         } else {
-            collision_height.unwrap_or(0.0)
+            terrain_height
         };
         position.z = transform.translation.y * 100.0;
     }
@@ -123,7 +131,20 @@ pub fn collision_player_system_join_zoin(
     mut query_collision_entity: Query<(&mut Position, &mut Transform), Changed<CollisionPlayer>>,
     rapier_context: Res<RapierContext>,
     current_zone: Option<Res<CurrentZone>>,
+    zone_loader_assets: Res<Assets<ZoneLoaderAsset>>,
 ) {
+    let current_zone = if let Some(current_zone) = current_zone {
+        current_zone
+    } else {
+        return;
+    };
+    let current_zone_data =
+        if let Some(current_zone_data) = zone_loader_assets.get(&current_zone.handle) {
+            current_zone_data
+        } else {
+            return;
+        };
+
     for (mut position, mut transform) in query_collision_entity.iter_mut() {
         let ray_origin = Vec3::new(position.x / 100.0, 100000.0, -position.y / 100.0);
         let ray_direction = Vec3::new(0.0, -1.0, 0.0);
@@ -143,21 +164,15 @@ pub fn collision_player_system_join_zoin(
         };
 
         // We can never be below the heightmap
-        let terrain_height = current_zone
-            .as_ref()
-            .map(|current_zone| current_zone.get_terrain_height(position.x, position.y) / 100.0);
+        let terrain_height = current_zone_data.get_terrain_height(position.x, position.y) / 100.0;
 
         // Update entity translation and position
         transform.translation.x = position.x / 100.0;
         transform.translation.z = -position.y / 100.0;
-        transform.translation.y = if let Some(terrain_height) = terrain_height {
-            if let Some(collision_height) = collision_height {
-                collision_height.max(terrain_height)
-            } else {
-                terrain_height
-            }
+        transform.translation.y = if let Some(collision_height) = collision_height {
+            collision_height.max(terrain_height)
         } else {
-            collision_height.unwrap_or(0.0)
+            terrain_height
         };
         position.z = transform.translation.y * 100.0;
     }
@@ -178,7 +193,20 @@ pub fn collision_player_system(
     game_connection: Option<Res<GameConnection>>,
     rapier_context: Res<RapierContext>,
     time: Res<Time>,
+    zone_loader_assets: Res<Assets<ZoneLoaderAsset>>,
 ) {
+    let current_zone = if let Some(current_zone) = current_zone {
+        current_zone
+    } else {
+        return;
+    };
+    let current_zone_data =
+        if let Some(current_zone_data) = zone_loader_assets.get(&current_zone.handle) {
+            current_zone_data
+        } else {
+            return;
+        };
+
     for (entity, mut position, mut transform) in query_collision_entity.iter_mut() {
         // Cast ray forward to collide with walls
         let new_translation = Vec3::new(
@@ -246,18 +274,12 @@ pub fn collision_player_system(
         };
 
         // We can never be below the heightmap
-        let terrain_height = current_zone
-            .as_ref()
-            .map(|current_zone| current_zone.get_terrain_height(position.x, position.y) / 100.0);
+        let terrain_height = current_zone_data.get_terrain_height(position.x, position.y) / 100.0;
 
-        let target_y = if let Some(terrain_height) = terrain_height {
-            if let Some(collision_height) = collision_height {
-                collision_height.max(terrain_height)
-            } else {
-                terrain_height
-            }
+        let target_y = if let Some(collision_height) = collision_height {
+            collision_height.max(terrain_height)
         } else {
-            collision_height.unwrap_or(0.0)
+            terrain_height
         };
 
         // Update entity translation and position

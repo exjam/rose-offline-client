@@ -1,31 +1,42 @@
+use std::{
+    path::{Path, PathBuf},
+    sync::Arc,
+};
+
+use anyhow::Result;
 use arrayvec::ArrayVec;
 use bevy::{
-    asset::LoadState,
-    hierarchy::BuildChildren,
+    asset::{AssetLoader, BoxedFuture, LoadContext, LoadState, LoadedAsset},
+    ecs::system::SystemParam,
+    hierarchy::{BuildChildren, DespawnRecursiveExt},
     math::{Quat, Vec2, Vec3},
     pbr::{NotShadowCaster, NotShadowReceiver},
     prelude::{
-        AssetServer, Assets, Commands, Component, ComputedVisibility, DespawnRecursiveExt, Entity,
-        EventReader, EventWriter, GlobalTransform, Handle, Local, Mesh, Query, Res, ResMut,
-        Transform, Visibility, With,
+        AssetServer, Assets, Commands, ComputedVisibility, Entity, EventReader, EventWriter,
+        GlobalTransform, Handle, Local, Mesh, Res, ResMut, Transform, Visibility,
     },
-    render::{mesh::Indices, render_resource::PrimitiveTopology, view::NoFrustumCulling},
+    reflect::TypeUuid,
+    render::{
+        mesh::{Indices, PrimitiveTopology},
+        view::NoFrustumCulling,
+    },
+    tasks::IoTaskPool,
 };
-use bevy_inspector_egui::Inspectable;
 use bevy_rapier3d::prelude::{
     AsyncCollider, Collider, CollisionGroups, ComputedColliderShape, RigidBody,
 };
-use std::path::Path;
+use thiserror::Error;
 
-use rose_data::{WarpGateId, ZoneId, ZoneListEntry};
+use rose_data::{SkyboxData, WarpGateId, ZoneId, ZoneList};
 use rose_file_readers::{
-    HimFile, IfoFile, IfoObject, LitFile, LitObject, StbFile, TilFile, ZonFile, ZonTile,
-    ZonTileRotation, ZscCollisionFlags, ZscCollisionShape, ZscEffectType, ZscFile,
+    HimFile, IfoFile, IfoObject, LitFile, LitObject, RoseFile, RoseFileReader, StbFile, TilFile,
+    ZonFile, ZonTileRotation, ZscCollisionFlags, ZscEffectType, ZscFile,
 };
 
 use crate::{
     components::{
-        ActiveMotion, ColliderParent, EventObject, NightTimeEffect, WarpObject,
+        ActiveMotion, ColliderParent, EventObject, NightTimeEffect, WarpObject, Zone, ZoneObject,
+        ZoneObjectAnimatedObject, ZoneObjectId, ZoneObjectPart, ZoneObjectTerrain,
         COLLISION_FILTER_CLICKABLE, COLLISION_FILTER_COLLIDABLE, COLLISION_FILTER_INSPECTABLE,
         COLLISION_FILTER_MOVEABLE, COLLISION_GROUP_ZONE_EVENT_OBJECT, COLLISION_GROUP_ZONE_OBJECT,
         COLLISION_GROUP_ZONE_TERRAIN, COLLISION_GROUP_ZONE_WARP_OBJECT, COLLISION_GROUP_ZONE_WATER,
@@ -37,240 +48,582 @@ use crate::{
         TerrainMaterial, TextureArray, TextureArrayBuilder, WaterMaterial, MESH_ATTRIBUTE_UV_1,
         TERRAIN_MESH_ATTRIBUTE_TILE_INFO,
     },
-    resources::{CurrentZone, GameData},
+    resources::{CurrentZone, DebugInspector, GameData},
     VfsResource,
 };
 
-const SKYBOX_MODEL_SCALE: f32 = 10.0;
-
-#[derive(Inspectable)]
-pub enum ZoneObjectPartCollisionShape {
-    None,
-    Sphere,
-    AxisAlignedBoundingBox,
-    ObjectOrientedBoundingBox,
-    Polygon,
+#[derive(Error, Debug)]
+pub enum ZoneLoadError {
+    #[error("Invalid Zone Id")]
+    InvalidZoneId,
 }
 
-impl Default for ZoneObjectPartCollisionShape {
-    fn default() -> Self {
-        Self::AxisAlignedBoundingBox
-    }
+pub struct ZoneLoaderBlock {
+    pub block_x: usize,
+    pub block_y: usize,
+    pub him: HimFile,
+    pub til: Option<TilFile>,
+    pub ifo: Option<IfoFile>,
+    pub lit_cnst: Option<LitFile>,
+    pub lit_deco: Option<LitFile>,
 }
 
-impl From<&Option<ZscCollisionShape>> for ZoneObjectPartCollisionShape {
-    fn from(value: &Option<ZscCollisionShape>) -> Self {
-        match value {
-            Some(ZscCollisionShape::Sphere) => Self::Sphere,
-            Some(ZscCollisionShape::AxisAlignedBoundingBox) => Self::AxisAlignedBoundingBox,
-            Some(ZscCollisionShape::ObjectOrientedBoundingBox) => Self::ObjectOrientedBoundingBox,
-            Some(ZscCollisionShape::Polygon) => Self::Polygon,
-            None => Self::None,
+#[derive(TypeUuid)]
+#[uuid = "596e2c17-f2dd-4276-8df4-1e94dc0d056b"]
+pub struct ZoneLoaderAsset {
+    pub zone_id: ZoneId,
+    pub zone_path: PathBuf,
+    pub zon: ZonFile,
+    pub zsc_cnst: ZscFile,
+    pub zsc_deco: ZscFile,
+    pub blocks: Vec<Option<Box<ZoneLoaderBlock>>>,
+}
+
+impl ZoneLoaderAsset {
+    pub fn get_terrain_height(&self, x: f32, y: f32) -> f32 {
+        let block_x = x / (16.0 * self.zon.grid_per_patch * self.zon.grid_size);
+        let block_y = 65.0 - (y / (16.0 * self.zon.grid_per_patch * self.zon.grid_size));
+
+        if let Some(heightmap) = self
+            .blocks
+            .get(block_x.max(0.0).min(64.0) as usize + block_y.max(0.0).min(64.0) as usize * 64)
+            .and_then(|block| block.as_ref())
+            .map(|block| &block.him)
+        {
+            let tile_x = (heightmap.width - 1) as f32 * block_x.fract();
+            let tile_y = (heightmap.height - 1) as f32 * block_y.fract();
+
+            let tile_index_x = tile_x as i32;
+            let tile_index_y = tile_y as i32;
+
+            let height_00 = heightmap.get_clamped(tile_index_x, tile_index_y);
+            let height_01 = heightmap.get_clamped(tile_index_x, tile_index_y + 1);
+            let height_10 = heightmap.get_clamped(tile_index_x + 1, tile_index_y);
+            let height_11 = heightmap.get_clamped(tile_index_x + 1, tile_index_y + 1);
+
+            let weight_x = tile_x.fract();
+            let weight_y = tile_y.fract();
+
+            let height_y0 = height_00 * (1.0 - weight_x) + height_10 * weight_x;
+            let height_y1 = height_01 * (1.0 - weight_x) + height_11 * weight_x;
+
+            height_y0 * (1.0 - weight_y) + height_y1 * weight_y
+        } else {
+            0.0
         }
     }
 }
 
-#[derive(Inspectable, Default)]
-pub struct ZoneObjectId {
-    pub id: usize,
+pub struct ZoneLoader {
+    pub zone_list: Arc<ZoneList>,
 }
 
-#[derive(Inspectable, Default)]
-pub struct ZoneObjectPart {
-    pub mesh_path: String,
-    pub collision_shape: ZoneObjectPartCollisionShape,
-    pub collision_not_moveable: bool,
-    pub collision_not_pickable: bool,
-    pub collision_height_only: bool,
-    pub collision_no_camera: bool,
-}
+impl AssetLoader for ZoneLoader {
+    fn load<'a>(
+        &'a self,
+        bytes: &'a [u8],
+        load_context: &'a mut LoadContext,
+    ) -> BoxedFuture<'a, Result<()>> {
+        Box::pin(async move {
+            load_zone(self, ZoneId::new(bytes[0] as u16).unwrap(), load_context).await
+        })
+    }
 
-#[derive(Inspectable, Default)]
-pub struct ZoneObjectAnimatedObject {
-    pub mesh_path: String,
-    pub motion_path: String,
-    pub texture_path: String,
-}
-
-#[derive(Inspectable, Default)]
-pub struct ZoneObjectTerrain {
-    pub block_x: u32,
-    pub block_y: u32,
-}
-
-#[derive(Component, Inspectable)]
-pub enum ZoneObject {
-    AnimatedObject(ZoneObjectAnimatedObject),
-    WarpObject(ZoneObjectId),
-    WarpObjectPart(ZoneObjectPart),
-    EventObject(ZoneObjectId),
-    EventObjectPart(ZoneObjectPart),
-    CnstObject(ZoneObjectId),
-    CnstObjectPart(ZoneObjectPart),
-    DecoObject(ZoneObjectId),
-    DecoObjectPart(ZoneObjectPart),
-    Terrain(ZoneObjectTerrain),
-    Water,
-}
-
-pub enum LoadZoneState {
-    None,
-    Loading(ZoneId),
-    Loaded(ZoneId),
-}
-
-impl Default for LoadZoneState {
-    fn default() -> Self {
-        Self::None
+    fn extensions(&self) -> &[&str] {
+        &["zone_loader"]
     }
 }
 
-#[allow(clippy::too_many_arguments)]
-pub fn load_zone_system(
-    mut commands: Commands,
-    (asset_server, game_data, vfs_resource): (Res<AssetServer>, Res<GameData>, Res<VfsResource>),
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut terrain_materials: ResMut<Assets<TerrainMaterial>>,
-    mut effect_mesh_materials: ResMut<Assets<EffectMeshMaterial>>,
-    mut particle_materials: ResMut<Assets<ParticleMaterial>>,
-    mut sky_materials: ResMut<Assets<SkyMaterial>>,
-    mut object_materials: ResMut<Assets<ObjectMaterial>>,
-    mut water_materials: ResMut<Assets<WaterMaterial>>,
-    mut texture_arrays: ResMut<Assets<TextureArray>>,
-    mut load_zone_state: Local<LoadZoneState>,
-    mut loading_current_zone: Local<Option<CurrentZone>>,
-    mut load_zone_event: EventReader<LoadZoneEvent>,
+async fn load_zone<'a, 'b>(
+    zone_loader: &'a ZoneLoader,
+    zone_id: ZoneId,
+    load_context: &'a mut LoadContext<'b>,
+) -> Result<(), anyhow::Error> {
+    let zone_list_entry = zone_loader
+        .zone_list
+        .get_zone(zone_id)
+        .ok_or(ZoneLoadError::InvalidZoneId)?;
+
+    let zon: ZonFile = RoseFile::read(
+        RoseFileReader::from(
+            &load_context
+                .read_asset_bytes(zone_list_entry.zon_file_path.path())
+                .await?,
+        ),
+        &Default::default(),
+    )?;
+    let zsc_cnst: ZscFile = RoseFile::read(
+        RoseFileReader::from(
+            &load_context
+                .read_asset_bytes(zone_list_entry.zsc_cnst_path.path())
+                .await?,
+        ),
+        &Default::default(),
+    )?;
+    let zsc_deco: ZscFile = RoseFile::read(
+        RoseFileReader::from(
+            &load_context
+                .read_asset_bytes(zone_list_entry.zsc_deco_path.path())
+                .await?,
+        ),
+        &Default::default(),
+    )?;
+    let zone_path = zone_list_entry
+        .zon_file_path
+        .path()
+        .parent()
+        .unwrap_or_else(|| Path::new(""));
+
+    let zone_blocks_iterator = IoTaskPool::get()
+        .scope(|scope| {
+            for block_y in 0..64 {
+                for block_x in 0..64 {
+                    let load_context: &LoadContext = load_context;
+
+                    scope.spawn(async move {
+                        load_block_files(load_context, zone_path, block_x, block_y).await
+                    });
+                }
+            }
+        })
+        .into_iter()
+        .filter_map(|result| result.ok());
+
+    let mut blocks = Vec::new();
+    blocks.resize_with(64 * 64, || None);
+    for block in zone_blocks_iterator {
+        let index = block.block_x as usize + block.block_y as usize * 64;
+        blocks[index] = Some(block);
+    }
+
+    load_context.set_default_asset(LoadedAsset::new(ZoneLoaderAsset {
+        zone_path: zone_path.into(),
+        zone_id,
+        zon,
+        zsc_cnst,
+        zsc_deco,
+        blocks,
+    }));
+    Ok(())
+}
+
+async fn load_block_files<'a>(
+    load_context: &LoadContext<'a>,
+    zone_path: &Path,
+    block_x: usize,
+    block_y: usize,
+) -> Result<Box<ZoneLoaderBlock>, anyhow::Error> {
+    let him = RoseFile::read(
+        RoseFileReader::from(
+            &load_context
+                .read_asset_bytes(zone_path.join(format!("{}_{}.HIM", block_x, block_y)))
+                .await?,
+        ),
+        &Default::default(),
+    )?;
+
+    let til = if let Ok(data) = load_context
+        .read_asset_bytes(zone_path.join(format!("{}_{}.TIL", block_x, block_y)))
+        .await
+    {
+        RoseFile::read(RoseFileReader::from(&data), &Default::default()).ok()
+    } else {
+        None
+    };
+
+    let ifo = if let Ok(data) = load_context
+        .read_asset_bytes(zone_path.join(format!("{}_{}.IFO", block_x, block_y)))
+        .await
+    {
+        RoseFile::read(RoseFileReader::from(&data), &Default::default()).ok()
+    } else {
+        None
+    };
+
+    let lit_cnst = if let Ok(data) = load_context
+        .read_asset_bytes(zone_path.join(format!(
+            "{}_{}/LIGHTMAP/BUILDINGLIGHTMAPDATA.LIT",
+            block_x, block_y
+        )))
+        .await
+    {
+        RoseFile::read(RoseFileReader::from(&data), &Default::default()).ok()
+    } else {
+        None
+    };
+
+    let lit_deco = if let Ok(data) = load_context
+        .read_asset_bytes(zone_path.join(format!(
+            "{}_{}/LIGHTMAP/OBJECTLIGHTMAPDATA.LIT",
+            block_x, block_y
+        )))
+        .await
+    {
+        RoseFile::read(RoseFileReader::from(&data), &Default::default()).ok()
+    } else {
+        None
+    };
+
+    Ok(Box::new(ZoneLoaderBlock {
+        block_x,
+        block_y,
+        til,
+        him,
+        ifo,
+        lit_cnst,
+        lit_deco,
+    }))
+}
+
+#[derive(SystemParam)]
+pub struct SpawnZoneParams<'w, 's> {
+    pub commands: Commands<'w, 's>,
+    pub asset_server: Res<'w, AssetServer>,
+    pub game_data: Res<'w, GameData>,
+    pub vfs_resource: Res<'w, VfsResource>,
+    pub meshes: ResMut<'w, Assets<Mesh>>,
+    pub sky_materials: ResMut<'w, Assets<SkyMaterial>>,
+    pub terrain_materials: ResMut<'w, Assets<TerrainMaterial>>,
+    pub effect_mesh_materials: ResMut<'w, Assets<EffectMeshMaterial>>,
+    pub particle_materials: ResMut<'w, Assets<ParticleMaterial>>,
+    pub object_materials: ResMut<'w, Assets<ObjectMaterial>>,
+    pub water_materials: ResMut<'w, Assets<WaterMaterial>>,
+    pub texture_arrays: ResMut<'w, Assets<TextureArray>>,
+}
+
+pub struct CachedZone {
+    pub data_handle: Handle<ZoneLoaderAsset>,
+    pub spawned_entity: Option<Entity>,
+}
+
+#[derive(Default)]
+pub struct ZoneLoaderCache {
+    pub cache: Vec<Option<CachedZone>>,
+}
+
+pub fn zone_loader_system(
+    mut zone_loader_cache: Local<ZoneLoaderCache>,
+    mut pending_loading_zones: Local<Vec<(Handle<ZoneLoaderAsset>, bool)>>,
+    mut load_zone_events: EventReader<LoadZoneEvent>,
     mut zone_events: EventWriter<ZoneEvent>,
-    query_sky: Query<Entity, With<Handle<SkyMaterial>>>,
-    query_zone_objects: Query<(Entity, Option<&Handle<Mesh>>), With<ZoneObject>>,
+    mut spawn_zone_params: SpawnZoneParams,
+    zone_loader_assets: Res<Assets<ZoneLoaderAsset>>,
+    mut debug_inspector_state: ResMut<DebugInspector>,
 ) {
-    let current_zone_id = match *load_zone_state {
-        LoadZoneState::None => None,
-        LoadZoneState::Loading(zone_id) => Some(zone_id),
-        LoadZoneState::Loaded(zone_id) => Some(zone_id),
-    };
-
-    // Check if we need to load a new zone
-    if let Some(load_zone_event) = load_zone_event.iter().last() {
-        *load_zone_state = LoadZoneState::Loading(load_zone_event.id);
+    if zone_loader_cache.cache.is_empty() {
+        zone_loader_cache
+            .cache
+            .resize_with(spawn_zone_params.game_data.zone_list.len(), || None);
     }
 
-    let load_zone_id = match *load_zone_state {
-        LoadZoneState::None => None,
-        LoadZoneState::Loading(zone_id) => Some(zone_id),
-        LoadZoneState::Loaded(zone_id) => Some(zone_id),
-    };
+    for event in load_zone_events.iter() {
+        let zone_index = event.id.get() as usize;
 
-    if current_zone_id == load_zone_id {
-        if let LoadZoneState::Loading(zone_id) = *load_zone_state {
-            let mut loaded = true;
+        if zone_loader_cache.cache[zone_index].is_none() {
+            zone_loader_cache.cache[zone_index] = Some(CachedZone {
+                data_handle: spawn_zone_params
+                    .asset_server
+                    .load(&format!("{}.zone_loader", zone_index)),
+                spawned_entity: None,
+            });
+        } else if let Some(zone_entity) = zone_loader_cache.cache[zone_index]
+            .as_ref()
+            .and_then(|cached_zone| cached_zone.spawned_entity)
+        {
+            // Zone is already spawned
+            zone_events.send(ZoneEvent::Loaded(event.id));
+            debug_inspector_state.entity = Some(zone_entity);
+            continue;
+        }
 
-            // Check if zone has finished loading
-            for (_, mesh) in query_zone_objects.iter() {
-                if let Some(handle) = mesh {
-                    if matches!(asset_server.get_load_state(handle), LoadState::Loading) {
-                        loaded = false;
-                        break;
+        let cached_zone = zone_loader_cache.cache[zone_index].as_ref().unwrap();
+        pending_loading_zones.push((cached_zone.data_handle.clone(), event.despawn_other_zones));
+    }
+
+    let mut index = 0;
+    while index < pending_loading_zones.len() {
+        let (handle, despawn_other_zones) = &pending_loading_zones[index];
+
+        match spawn_zone_params.asset_server.get_load_state(handle) {
+            LoadState::NotLoaded | LoadState::Loading => {
+                index += 1;
+            }
+            LoadState::Loaded => {
+                if let Some(zone_data) = zone_loader_assets.get(handle) {
+                    // Despawn other zones
+                    if *despawn_other_zones {
+                        for cached_zone in zone_loader_cache
+                            .cache
+                            .iter_mut()
+                            .filter_map(|x| x.as_mut())
+                        {
+                            if let Some(spawned_entity) = cached_zone.spawned_entity.take() {
+                                spawn_zone_params
+                                    .commands
+                                    .entity(spawned_entity)
+                                    .despawn_recursive();
+                            }
+                        }
+
+                        spawn_zone_params.commands.remove_resource::<CurrentZone>();
+                    }
+
+                    // Spawn next zone
+                    if let Ok(zone_entity) = spawn_zone(&mut spawn_zone_params, zone_data) {
+                        zone_events.send(ZoneEvent::Loaded(zone_data.zone_id));
+
+                        zone_loader_cache.cache[zone_data.zone_id.get() as usize] =
+                            Some(CachedZone {
+                                data_handle: handle.clone(),
+                                spawned_entity: Some(zone_entity),
+                            });
+
+                        spawn_zone_params.commands.insert_resource(CurrentZone {
+                            id: zone_data.zone_id,
+                            handle: handle.clone(),
+                        });
+
+                        debug_inspector_state.entity = Some(zone_entity);
                     }
                 }
+
+                pending_loading_zones.remove(index);
             }
-
-            if loaded {
-                if let Some(current_zone) = loading_current_zone.take() {
-                    commands.insert_resource(current_zone);
-                }
-
-                *load_zone_state = LoadZoneState::Loaded(zone_id);
-                zone_events.send(ZoneEvent::Loaded(zone_id));
+            LoadState::Unloaded | LoadState::Failed => {
+                pending_loading_zones.remove(index);
             }
         }
-
-        // Nothing to do
-        return;
-    }
-    let next_zone_id = load_zone_id.unwrap();
-    *load_zone_state = LoadZoneState::Loading(next_zone_id);
-
-    // Despawn old zone
-    for (entity, _) in query_zone_objects.iter() {
-        commands.entity(entity).despawn_recursive();
-    }
-
-    for entity in query_sky.iter() {
-        commands.entity(entity).despawn_recursive();
-    }
-
-    commands.remove_resource::<CurrentZone>();
-
-    // Spawn new zone
-    if let Some(zone_list_entry) = game_data.zone_list.get_zone(next_zone_id) {
-        *loading_current_zone = load_zone(
-            &mut commands,
-            &asset_server,
-            &game_data,
-            &vfs_resource,
-            &mut meshes,
-            &mut terrain_materials,
-            &mut effect_mesh_materials,
-            &mut particle_materials,
-            &mut sky_materials,
-            &mut object_materials,
-            &mut water_materials,
-            &mut texture_arrays,
-            zone_list_entry,
-        )
-        .ok();
     }
 }
 
-#[allow(clippy::too_many_arguments)]
-fn load_zone(
-    commands: &mut Commands,
-    asset_server: &AssetServer,
-    game_data: &GameData,
-    vfs_resource: &VfsResource,
-    meshes: &mut ResMut<Assets<Mesh>>,
-    terrain_materials: &mut ResMut<Assets<TerrainMaterial>>,
-    effect_mesh_materials: &mut ResMut<Assets<EffectMeshMaterial>>,
-    particle_materials: &mut ResMut<Assets<ParticleMaterial>>,
-    sky_materials: &mut ResMut<Assets<SkyMaterial>>,
-    object_materials: &mut ResMut<Assets<ObjectMaterial>>,
-    water_materials: &mut ResMut<Assets<WaterMaterial>>,
-    texture_arrays: &mut ResMut<Assets<TextureArray>>,
-    zone_list_entry: &ZoneListEntry,
-) -> Result<CurrentZone, anyhow::Error> {
-    let zone_file = vfs_resource
-        .vfs
-        .read_file::<ZonFile, _>(&zone_list_entry.zon_file_path)?;
-    let zsc_cnst = vfs_resource
-        .vfs
-        .read_file::<ZscFile, _>(&zone_list_entry.zsc_cnst_path)
-        .ok();
-    let zsc_deco = vfs_resource
-        .vfs
-        .read_file::<ZscFile, _>(&zone_list_entry.zsc_deco_path)
-        .ok();
+pub fn spawn_zone(
+    params: &mut SpawnZoneParams,
+    zone_data: &ZoneLoaderAsset,
+) -> Result<Entity, anyhow::Error> {
+    let SpawnZoneParams {
+        commands,
+        asset_server,
+        game_data,
+        vfs_resource,
+        meshes,
+        sky_materials,
+        terrain_materials,
+        effect_mesh_materials,
+        particle_materials,
+        object_materials,
+        water_materials,
+        texture_arrays,
+    } = params;
 
-    // TODO: Cache these
-    let zsc_event_object = vfs_resource
-        .vfs
-        .read_file::<ZscFile, _>("3DDATA/SPECIAL/EVENT_OBJECT.ZSC")
-        .ok();
-    let zsc_special_object = vfs_resource
-        .vfs
-        .read_file::<ZscFile, _>("3DDATA/SPECIAL/LIST_DECO_SPECIAL.ZSC")
-        .ok();
-    let stb_morph_object = vfs_resource
-        .vfs
-        .read_file::<StbFile, _>("3DDATA/STB/LIST_MORPH_OBJECT.STB")
-        .ok();
+    let zone_list_entry = game_data
+        .zone_list
+        .get_zone(zone_data.zone_id)
+        .ok_or(ZoneLoadError::InvalidZoneId)?;
 
-    // Update skybox
+    let tilemap_texture_array = {
+        let mut tilemap_texture_array_builder = TextureArrayBuilder::new();
+        for path in zone_data.zon.tile_textures.iter() {
+            if path == "end" {
+                break;
+            }
+
+            tilemap_texture_array_builder.add(path.clone());
+        }
+        texture_arrays.add(tilemap_texture_array_builder.build(asset_server))
+    };
+
+    let water_material = {
+        let mut water_texture_array_builder = TextureArrayBuilder::new();
+        for i in 1..=25 {
+            water_texture_array_builder.add(format!("3DDATA/JUNON/WATER/OCEAN01_{:02}.DDS", i));
+        }
+
+        water_materials.add(WaterMaterial {
+            water_texture_array: texture_arrays
+                .add(water_texture_array_builder.build(asset_server)),
+        })
+    };
+
+    let zone_entity = commands
+        .spawn_bundle((
+            Zone {
+                id: zone_data.zone_id,
+            },
+            Visibility::default(),
+            ComputedVisibility::default(),
+            Transform::default(),
+            GlobalTransform::default(),
+        ))
+        .id();
+
     if let Some(skybox_data) = zone_list_entry
         .skybox_id
         .and_then(|skybox_id| game_data.skybox.get_skybox_data(skybox_id))
     {
-        commands.spawn_bundle((
+        let skybox_entity = spawn_skybox(commands, asset_server, sky_materials, skybox_data);
+        commands.entity(zone_entity).add_child(skybox_entity);
+    }
+
+    for block_y in 0..64 {
+        for block_x in 0..64 {
+            if let Some(block_data) = zone_data.blocks[block_x + block_y * 64].as_ref() {
+                let terrain_entity = spawn_terrain(
+                    commands,
+                    asset_server,
+                    meshes,
+                    terrain_materials,
+                    tilemap_texture_array.clone(),
+                    zone_data,
+                    block_data,
+                );
+                commands.entity(zone_entity).add_child(terrain_entity);
+
+                if let Some(ifo) = block_data.ifo.as_ref() {
+                    let lightmap_path = zone_data
+                        .zone_path
+                        .join(format!("{}_{}/LIGHTMAP/", block_x, block_y));
+
+                    for (plane_start, plane_end) in ifo.water_planes.iter() {
+                        let water_entity = spawn_water(
+                            commands,
+                            meshes,
+                            &water_material,
+                            ifo.water_size,
+                            Vec3::new(plane_start.x, plane_start.y, plane_start.z),
+                            Vec3::new(plane_end.x, plane_end.y, plane_end.z),
+                        );
+                        commands.entity(zone_entity).add_child(water_entity);
+                    }
+
+                    for event_object in ifo.event_objects.iter() {
+                        let event_entity = spawn_object(
+                            commands,
+                            asset_server,
+                            vfs_resource,
+                            effect_mesh_materials.as_mut(),
+                            particle_materials.as_mut(),
+                            object_materials.as_mut(),
+                            &game_data.zsc_event_object,
+                            &lightmap_path,
+                            None,
+                            &event_object.object,
+                            event_object.object.object_id as usize,
+                            ZoneObject::EventObject,
+                            ZoneObject::EventObjectPart,
+                            COLLISION_GROUP_ZONE_EVENT_OBJECT,
+                        );
+
+                        commands.entity(event_entity).insert(EventObject::new(
+                            event_object.quest_trigger_name.clone(),
+                            event_object.script_function_name.clone(),
+                        ));
+                        commands.entity(zone_entity).add_child(event_entity);
+                    }
+
+                    for warp_object in ifo.warps.iter() {
+                        let warp_entity = spawn_object(
+                            commands,
+                            asset_server,
+                            vfs_resource,
+                            effect_mesh_materials.as_mut(),
+                            particle_materials.as_mut(),
+                            object_materials.as_mut(),
+                            &game_data.zsc_special_object,
+                            &lightmap_path,
+                            None,
+                            warp_object,
+                            1,
+                            ZoneObject::WarpObject,
+                            ZoneObject::WarpObjectPart,
+                            COLLISION_GROUP_ZONE_WARP_OBJECT,
+                        );
+
+                        commands
+                            .entity(warp_entity)
+                            .insert(WarpObject::new(WarpGateId::new(warp_object.warp_id)));
+                        commands.entity(zone_entity).add_child(warp_entity);
+                    }
+
+                    for (object_id, object_instance) in ifo.cnst_objects.iter().enumerate() {
+                        let lit_object = block_data.lit_cnst.as_ref().and_then(|lit| {
+                            lit.objects
+                                .iter()
+                                .find(|lit_object| lit_object.id as usize == object_id + 1)
+                        });
+
+                        let object_entity = spawn_object(
+                            commands,
+                            asset_server,
+                            vfs_resource,
+                            effect_mesh_materials.as_mut(),
+                            particle_materials.as_mut(),
+                            object_materials.as_mut(),
+                            &zone_data.zsc_cnst,
+                            &lightmap_path,
+                            lit_object,
+                            object_instance,
+                            object_instance.object_id as usize,
+                            ZoneObject::CnstObject,
+                            ZoneObject::CnstObjectPart,
+                            COLLISION_GROUP_ZONE_OBJECT,
+                        );
+                        commands.entity(zone_entity).add_child(object_entity);
+                    }
+
+                    for (object_id, object_instance) in ifo.deco_objects.iter().enumerate() {
+                        let lit_object = block_data.lit_deco.as_ref().and_then(|lit| {
+                            lit.objects
+                                .iter()
+                                .find(|lit_object| lit_object.id as usize == object_id + 1)
+                        });
+
+                        let object_entity = spawn_object(
+                            commands,
+                            asset_server,
+                            vfs_resource,
+                            effect_mesh_materials.as_mut(),
+                            particle_materials.as_mut(),
+                            object_materials.as_mut(),
+                            &zone_data.zsc_deco,
+                            &lightmap_path,
+                            lit_object,
+                            object_instance,
+                            object_instance.object_id as usize,
+                            ZoneObject::DecoObject,
+                            ZoneObject::DecoObjectPart,
+                            COLLISION_GROUP_ZONE_OBJECT,
+                        );
+                        commands.entity(zone_entity).add_child(object_entity);
+                    }
+
+                    for object_instance in ifo.animated_objects.iter() {
+                        let object_entity = spawn_animated_object(
+                            commands,
+                            asset_server,
+                            object_materials.as_mut(),
+                            &game_data.stb_morph_object,
+                            object_instance,
+                        );
+                        commands.entity(zone_entity).add_child(object_entity);
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(zone_entity)
+}
+
+const SKYBOX_MODEL_SCALE: f32 = 10.0;
+
+fn spawn_skybox(
+    commands: &mut Commands,
+    asset_server: &AssetServer,
+    sky_materials: &mut Assets<SkyMaterial>,
+    skybox_data: &SkyboxData,
+) -> Entity {
+    commands
+        .spawn_bundle((
             asset_server.load::<Mesh, _>(skybox_data.mesh.path()),
             sky_materials.add(SkyMaterial {
                 texture_day: Some(asset_server.load(RgbTextureLoader::convert_path(
@@ -285,242 +638,22 @@ fn load_zone(
             Visibility::default(),
             ComputedVisibility::default(),
             NoFrustumCulling,
-        ));
-    }
-
-    // Load zone tile array
-    let mut tile_texture_array_builder = TextureArrayBuilder::new();
-    for path in zone_file.tile_textures.iter() {
-        if path == "end" {
-            break;
-        }
-
-        tile_texture_array_builder.add(path.clone());
-    }
-    let tile_texture_array = texture_arrays.add(tile_texture_array_builder.build(asset_server));
-
-    // Load zone water array
-    let mut water_texture_array_builder = TextureArrayBuilder::new();
-    for i in 1..=25 {
-        water_texture_array_builder.add(format!("3DDATA/JUNON/WATER/OCEAN01_{:02}.DDS", i));
-    }
-    let water_material = water_materials.add(WaterMaterial {
-        water_texture_array: texture_arrays.add(water_texture_array_builder.build(asset_server)),
-    });
-
-    // Load the zone
-    let zone_path = zone_list_entry
-        .zon_file_path
-        .path()
-        .parent()
-        .unwrap_or_else(|| Path::new(""));
-
-    let mut heightmaps = vec![None; 64 * 64];
-
-    for block_y in 0..64u32 {
-        for block_x in 0..64u32 {
-            let tilemap = vfs_resource
-                .vfs
-                .read_file::<TilFile, _>(zone_path.join(format!("{}_{}.TIL", block_x, block_y)));
-            let heightmap = vfs_resource
-                .vfs
-                .read_file::<HimFile, _>(zone_path.join(format!("{}_{}.HIM", block_x, block_y)));
-
-            if let (Ok(heightmap), Ok(tilemap)) = (heightmap, tilemap) {
-                let block_terrain_material = terrain_materials.add(TerrainMaterial {
-                    lightmap_texture: asset_server.load(&format!(
-                        "{}/{1:}_{2:}/{1:}_{2:}_PLANELIGHTINGMAP.DDS.rgb_texture",
-                        zone_path.to_str().unwrap(),
-                        block_x,
-                        block_y,
-                    )),
-                    tile_array_texture: tile_texture_array.clone(),
-                });
-
-                load_block_heightmap(
-                    commands,
-                    meshes.as_mut(),
-                    &heightmap,
-                    &tilemap,
-                    &zone_file.tiles,
-                    block_terrain_material,
-                    block_x,
-                    block_y,
-                );
-
-                heightmaps[block_x as usize + block_y as usize * 64] = Some(heightmap);
-            }
-
-            let ifo = vfs_resource
-                .vfs
-                .read_file::<IfoFile, _>(zone_path.join(format!("{}_{}.IFO", block_x, block_y)));
-            if let Ok(ifo) = ifo {
-                let lightmap_path = zone_path.join(format!("{}_{}/LIGHTMAP/", block_x, block_y));
-                load_block_waterplanes(
-                    commands,
-                    meshes.as_mut(),
-                    ifo.water_size,
-                    &ifo.water_planes,
-                    &water_material,
-                );
-
-                if let Some(zsc_event_object) = zsc_event_object.as_ref() {
-                    for event_object in ifo.event_objects.iter() {
-                        let event_entity = load_block_object(
-                            commands,
-                            asset_server,
-                            vfs_resource,
-                            effect_mesh_materials.as_mut(),
-                            particle_materials.as_mut(),
-                            object_materials.as_mut(),
-                            zsc_event_object,
-                            &lightmap_path,
-                            None,
-                            &event_object.object,
-                            event_object.object.object_id as usize,
-                            ZoneObject::EventObject,
-                            ZoneObject::EventObjectPart,
-                            COLLISION_GROUP_ZONE_EVENT_OBJECT,
-                        );
-
-                        commands.entity(event_entity).insert(EventObject::new(
-                            event_object.quest_trigger_name.clone(),
-                            event_object.script_function_name.clone(),
-                        ));
-                    }
-                }
-
-                if let Some(zsc_special_object) = zsc_special_object.as_ref() {
-                    for warp_object in ifo.warps.iter() {
-                        let warp_entity = load_block_object(
-                            commands,
-                            asset_server,
-                            vfs_resource,
-                            effect_mesh_materials.as_mut(),
-                            particle_materials.as_mut(),
-                            object_materials.as_mut(),
-                            zsc_special_object,
-                            &lightmap_path,
-                            None,
-                            warp_object,
-                            1,
-                            ZoneObject::WarpObject,
-                            ZoneObject::WarpObjectPart,
-                            COLLISION_GROUP_ZONE_WARP_OBJECT,
-                        );
-
-                        commands
-                            .entity(warp_entity)
-                            .insert(WarpObject::new(WarpGateId::new(warp_object.warp_id)));
-                    }
-                }
-
-                if let Some(zsc_cnst) = zsc_cnst.as_ref() {
-                    let cnst_lit = vfs_resource
-                        .vfs
-                        .read_file::<LitFile, _>(zone_path.join(format!(
-                            "{}_{}/LIGHTMAP/BUILDINGLIGHTMAPDATA.LIT",
-                            block_x, block_y
-                        )))
-                        .ok();
-
-                    for (object_id, object_instance) in ifo.cnst_objects.iter().enumerate() {
-                        let lit_object = cnst_lit.as_ref().and_then(|lit| {
-                            lit.objects
-                                .iter()
-                                .find(|lit_object| lit_object.id as usize == object_id + 1)
-                        });
-
-                        load_block_object(
-                            commands,
-                            asset_server,
-                            vfs_resource,
-                            effect_mesh_materials.as_mut(),
-                            particle_materials.as_mut(),
-                            object_materials.as_mut(),
-                            zsc_cnst,
-                            &lightmap_path,
-                            lit_object,
-                            object_instance,
-                            object_instance.object_id as usize,
-                            ZoneObject::CnstObject,
-                            ZoneObject::CnstObjectPart,
-                            COLLISION_GROUP_ZONE_OBJECT,
-                        );
-                    }
-                }
-
-                if let Some(zsc_deco) = zsc_deco.as_ref() {
-                    let deco_lit = vfs_resource
-                        .vfs
-                        .read_file::<LitFile, _>(zone_path.join(format!(
-                            "{}_{}/LIGHTMAP/OBJECTLIGHTMAPDATA.LIT",
-                            block_x, block_y
-                        )))
-                        .ok();
-
-                    for (object_id, object_instance) in ifo.deco_objects.iter().enumerate() {
-                        let lit_object = deco_lit.as_ref().and_then(|lit| {
-                            lit.objects
-                                .iter()
-                                .find(|lit_object| lit_object.id as usize == object_id + 1)
-                        });
-
-                        load_block_object(
-                            commands,
-                            asset_server,
-                            vfs_resource,
-                            effect_mesh_materials.as_mut(),
-                            particle_materials.as_mut(),
-                            object_materials.as_mut(),
-                            zsc_deco,
-                            &lightmap_path,
-                            lit_object,
-                            object_instance,
-                            object_instance.object_id as usize,
-                            ZoneObject::DecoObject,
-                            ZoneObject::DecoObjectPart,
-                            COLLISION_GROUP_ZONE_OBJECT,
-                        );
-                    }
-                }
-
-                if let Some(stb_morph_object) = stb_morph_object.as_ref() {
-                    for object_instance in ifo.animated_objects.iter() {
-                        load_animated_object(
-                            commands,
-                            asset_server,
-                            object_materials.as_mut(),
-                            stb_morph_object,
-                            object_instance,
-                        );
-                    }
-                }
-            }
-        }
-    }
-
-    Ok(CurrentZone {
-        id: zone_list_entry.id,
-        grid_per_patch: zone_file.grid_per_patch,
-        grid_size: zone_file.grid_size,
-        heightmaps,
-    })
+        ))
+        .id()
 }
 
 #[allow(clippy::too_many_arguments)]
-fn load_block_heightmap(
+fn spawn_terrain(
     commands: &mut Commands,
+    asset_server: &AssetServer,
     meshes: &mut Assets<Mesh>,
-    heightmap: &HimFile,
-    tilemap: &TilFile,
-    tile_info: &[ZonTile],
-    material: Handle<TerrainMaterial>,
-    block_x: u32,
-    block_y: u32,
-) {
-    let offset_x = 160.0 * block_x as f32;
-    let offset_y = 160.0 * (65.0 - block_y as f32);
+    terrain_materials: &mut Assets<TerrainMaterial>,
+    tilemap_texture_array: Handle<TextureArray>,
+    zone_data: &ZoneLoaderAsset,
+    block_data: &ZoneLoaderBlock,
+) -> Entity {
+    let offset_x = 160.0 * block_data.block_x as f32;
+    let offset_y = 160.0 * (65.0 - block_data.block_y as f32);
 
     let mut positions = Vec::new();
     let mut normals = Vec::new();
@@ -529,9 +662,14 @@ fn load_block_heightmap(
     let mut indices = Vec::new();
     let mut tile_ids = Vec::new();
 
+    let tilemap = block_data.til.as_ref();
+    let heightmap = &block_data.him;
+
     for tile_x in 0..16 {
         for tile_y in 0..16 {
-            let tile = &tile_info[tilemap.get_clamped(tile_x, tile_y) as usize];
+            let tile = &zone_data.zon.tiles[tilemap
+                .map(|tilemap| tilemap.get_clamped(tile_x, tile_y) as usize)
+                .unwrap_or(0)];
             let tile_array_index1 = tile.layer1 + tile.offset1;
             let tile_array_index2 = tile.layer2 + tile.offset2;
             let tile_rotation = match tile.rotation {
@@ -628,78 +766,92 @@ fn load_block_heightmap(
         }
     }
 
-    commands.spawn_bundle((
-        ZoneObject::Terrain(ZoneObjectTerrain { block_x, block_y }),
-        meshes.add(mesh),
-        material,
-        Transform::from_xyz(offset_x, 0.0, -offset_y),
-        GlobalTransform::default(),
-        Visibility::default(),
-        ComputedVisibility::default(),
-        NotShadowCaster {},
-        RigidBody::Fixed,
-        Collider::trimesh(collider_verts, collider_indices),
-        CollisionGroups::new(
-            COLLISION_GROUP_ZONE_TERRAIN,
-            COLLISION_FILTER_INSPECTABLE
-                | COLLISION_FILTER_COLLIDABLE
-                | COLLISION_FILTER_MOVEABLE
-                | COLLISION_FILTER_CLICKABLE,
-        ),
-    ));
+    let material = terrain_materials.add(TerrainMaterial {
+        lightmap_texture: asset_server.load(&format!(
+            "{}/{1:}_{2:}/{1:}_{2:}_PLANELIGHTINGMAP.DDS.rgb_texture",
+            zone_data.zone_path.to_str().unwrap(),
+            block_data.block_x,
+            block_data.block_y,
+        )),
+        tilemap_texture_array,
+    });
+
+    commands
+        .spawn_bundle((
+            ZoneObject::Terrain(ZoneObjectTerrain {
+                block_x: block_data.block_x as u32,
+                block_y: block_data.block_y as u32,
+            }),
+            meshes.add(mesh),
+            material,
+            Transform::from_xyz(offset_x, 0.0, -offset_y),
+            GlobalTransform::default(),
+            Visibility::default(),
+            ComputedVisibility::default(),
+            NotShadowCaster {},
+            RigidBody::Fixed,
+            Collider::trimesh(collider_verts, collider_indices),
+            CollisionGroups::new(
+                COLLISION_GROUP_ZONE_TERRAIN,
+                COLLISION_FILTER_INSPECTABLE
+                    | COLLISION_FILTER_COLLIDABLE
+                    | COLLISION_FILTER_MOVEABLE
+                    | COLLISION_FILTER_CLICKABLE,
+            ),
+        ))
+        .id()
 }
 
-fn load_block_waterplanes(
+fn spawn_water(
     commands: &mut Commands,
     meshes: &mut Assets<Mesh>,
-    water_size: f32,
-    water_planes: &[(
-        rose_file_readers::types::Vec3<f32>,
-        rose_file_readers::types::Vec3<f32>,
-    )],
     water_material: &Handle<WaterMaterial>,
-) {
-    for (plane_start, plane_end) in water_planes {
-        let start = Vec3::new(
-            5200.0 + plane_start.x / 100.0,
-            plane_start.y / 100.0,
-            -(5200.0 + plane_start.z / 100.0),
-        );
-        let end = Vec3::new(
-            5200.0 + plane_end.x / 100.0,
-            plane_end.y / 100.0,
-            -(5200.0 + plane_end.z / 100.0),
-        );
-        let uv_x = (end.x - start.x) / (water_size / 100.0);
-        let uv_y = (end.z - start.z) / (water_size / 100.0);
+    water_size: f32,
+    plane_start: Vec3,
+    plane_end: Vec3,
+) -> Entity {
+    let start = Vec3::new(
+        5200.0 + plane_start.x / 100.0,
+        plane_start.y / 100.0,
+        -(5200.0 + plane_start.z / 100.0),
+    );
+    let end = Vec3::new(
+        5200.0 + plane_end.x / 100.0,
+        plane_end.y / 100.0,
+        -(5200.0 + plane_end.z / 100.0),
+    );
+    let uv_x = (end.x - start.x) / (water_size / 100.0);
+    let uv_y = (end.z - start.z) / (water_size / 100.0);
 
-        let vertices = [
-            ([start.x, start.y, end.z], [0.0, 1.0, 0.0], [uv_x, uv_y]),
-            ([start.x, start.y, start.z], [0.0, 1.0, 0.0], [uv_x, 0.0]),
-            ([end.x, start.y, start.z], [0.0, 1.0, 0.0], [0.0, 0.0]),
-            ([end.x, start.y, end.z], [0.0, 1.0, 0.0], [0.0, uv_y]),
-        ];
-        let indices = Indices::U32(vec![0, 2, 1, 0, 3, 2]);
-        let collider_indices = vec![[0, 2, 1], [0, 3, 2]];
+    let vertices = [
+        ([start.x, start.y, end.z], [0.0, 1.0, 0.0], [uv_x, uv_y]),
+        ([start.x, start.y, start.z], [0.0, 1.0, 0.0], [uv_x, 0.0]),
+        ([end.x, start.y, start.z], [0.0, 1.0, 0.0], [0.0, 0.0]),
+        ([end.x, start.y, end.z], [0.0, 1.0, 0.0], [0.0, uv_y]),
+    ];
+    let indices = Indices::U32(vec![0, 2, 1, 0, 3, 2]);
+    let collider_indices = vec![[0, 2, 1], [0, 3, 2]];
 
-        let mut collider_verts = Vec::new();
-        let mut positions = Vec::new();
-        let mut normals = Vec::new();
-        let mut uvs = Vec::new();
-        for (position, normal, uv) in &vertices {
-            collider_verts.push((*position).into());
-            positions.push(*position);
-            normals.push(*normal);
-            uvs.push(*uv);
-        }
+    let mut collider_verts = Vec::new();
+    let mut positions = Vec::new();
+    let mut normals = Vec::new();
+    let mut uvs = Vec::new();
+    for (position, normal, uv) in &vertices {
+        collider_verts.push((*position).into());
+        positions.push(*position);
+        normals.push(*normal);
+        uvs.push(*uv);
+    }
 
-        let mut mesh = Mesh::new(PrimitiveTopology::TriangleList);
-        mesh.set_indices(Some(indices));
-        mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
-        mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
-        mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, uvs);
+    let mut mesh = Mesh::new(PrimitiveTopology::TriangleList);
+    mesh.set_indices(Some(indices));
+    mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
+    mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
+    mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, uvs);
 
-        commands.spawn().insert_bundle((
+    commands
+        .spawn()
+        .insert_bundle((
             ZoneObject::Water,
             meshes.add(mesh),
             water_material.clone(),
@@ -712,11 +864,11 @@ fn load_block_waterplanes(
             RigidBody::Fixed,
             Collider::trimesh(collider_verts, collider_indices),
             CollisionGroups::new(COLLISION_GROUP_ZONE_WATER, COLLISION_FILTER_INSPECTABLE),
-        ));
-    }
+        ))
+        .id()
 }
 
-fn load_block_object(
+fn spawn_object(
     commands: &mut Commands,
     asset_server: &AssetServer,
     vfs_resource: &VfsResource,
@@ -979,13 +1131,13 @@ fn load_block_object(
     object_entity
 }
 
-fn load_animated_object(
+fn spawn_animated_object(
     commands: &mut Commands,
     asset_server: &AssetServer,
     object_materials: &mut Assets<ObjectMaterial>,
     stb_morph_object: &StbFile,
     object_instance: &IfoObject,
-) {
+) -> Entity {
     let object_id = object_instance.object_id as usize;
     let mesh_path = stb_morph_object.get(object_id, 1);
     let motion_path = stb_morph_object.get(object_id, 2);
@@ -1042,22 +1194,24 @@ fn load_animated_object(
     });
 
     // TODO: Animation object morph targets, blocked by lack of bevy morph targets
-    commands.spawn_bundle((
-        ZoneObject::AnimatedObject(ZoneObjectAnimatedObject {
-            mesh_path: mesh_path.to_string(),
-            motion_path: motion_path.to_string(),
-            texture_path: texture_path.to_string(),
-        }),
-        mesh.clone(),
-        material,
-        object_transform,
-        GlobalTransform::default(),
-        Visibility::default(),
-        ComputedVisibility::default(),
-        AsyncCollider {
-            handle: mesh,
-            shape: ComputedColliderShape::TriMesh,
-        },
-        CollisionGroups::new(COLLISION_GROUP_ZONE_OBJECT, COLLISION_FILTER_INSPECTABLE),
-    ));
+    commands
+        .spawn_bundle((
+            ZoneObject::AnimatedObject(ZoneObjectAnimatedObject {
+                mesh_path: mesh_path.to_string(),
+                motion_path: motion_path.to_string(),
+                texture_path: texture_path.to_string(),
+            }),
+            mesh.clone(),
+            material,
+            object_transform,
+            GlobalTransform::default(),
+            Visibility::default(),
+            ComputedVisibility::default(),
+            AsyncCollider {
+                handle: mesh,
+                shape: ComputedColliderShape::TriMesh,
+            },
+            CollisionGroups::new(COLLISION_GROUP_ZONE_OBJECT, COLLISION_FILTER_INSPECTABLE),
+        ))
+        .id()
 }

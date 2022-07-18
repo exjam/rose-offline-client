@@ -193,14 +193,14 @@ impl SpecializedMeshPipeline for TerrainMaterialPipeline {
 #[uuid = "403e3628-46d2-4d2a-b74c-ce84be2b1ba2"]
 pub struct TerrainMaterial {
     pub lightmap_texture: Handle<Image>,
-    pub tile_array_texture: Handle<TextureArray>,
+    pub tilemap_texture_array: Handle<TextureArray>,
 }
 
 #[derive(Debug, Clone)]
 pub struct GpuTerrainMaterial {
     pub bind_group: BindGroup,
     pub lightmap_texture: Handle<Image>,
-    pub tile_array_texture: Handle<TextureArray>,
+    pub tilemap_texture_array: Handle<TextureArray>,
 }
 
 impl RenderAsset for TerrainMaterial {
@@ -233,18 +233,17 @@ impl RenderAsset for TerrainMaterial {
                 return Err(PrepareAssetError::RetryNextUpdate(material));
             };
 
-        let (tile_array_texture_view, tile_array_texture_sampler) = if let Some(
-            tile_array_gpu_image,
-        ) =
-            gpu_texture_arrays.get(&material.tile_array_texture)
-        {
-            (
-                &tile_array_gpu_image.texture_view,
-                &tile_array_gpu_image.sampler,
-            )
-        } else {
-            return Err(PrepareAssetError::RetryNextUpdate(material));
-        };
+        let (tile_array_texture_view, tile_array_texture_sampler) =
+            if let Some(tile_array_gpu_image) =
+                gpu_texture_arrays.get(&material.tilemap_texture_array)
+            {
+                (
+                    &tile_array_gpu_image.texture_view,
+                    &tile_array_gpu_image.sampler,
+                )
+            } else {
+                return Err(PrepareAssetError::RetryNextUpdate(material));
+            };
 
         let bind_group = render_device.create_bind_group(&BindGroupDescriptor {
             entries: &[
@@ -272,7 +271,7 @@ impl RenderAsset for TerrainMaterial {
         Ok(GpuTerrainMaterial {
             bind_group,
             lightmap_texture: material.lightmap_texture.clone(),
-            tile_array_texture: material.tile_array_texture.clone(),
+            tilemap_texture_array: material.tilemap_texture_array.clone(),
         })
     }
 }

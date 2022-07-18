@@ -16,11 +16,11 @@ use rose_game_common::components::{ItemDrop, Team};
 
 use crate::{
     components::{
-        ClientEntityName, ColliderParent, PlayerCharacter, Position, SelectedTarget,
+        ClientEntityName, ColliderParent, PlayerCharacter, Position, SelectedTarget, ZoneObject,
         COLLISION_FILTER_CLICKABLE, COLLISION_GROUP_PLAYER,
     },
     events::PlayerCommandEvent,
-    systems::{collision_system::ray_from_screenspace, ZoneObject},
+    systems::collision_system::ray_from_screenspace,
 };
 
 #[allow(clippy::too_many_arguments)]

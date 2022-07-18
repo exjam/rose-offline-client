@@ -16,6 +16,7 @@ use bevy::{
 };
 use bevy_egui::EguiContext;
 use std::{path::Path, sync::Arc};
+use zone_loader::{zone_loader_system, ZoneLoaderAsset};
 
 mod bundles;
 mod components;
@@ -33,9 +34,10 @@ mod ui;
 mod vfs_asset_io;
 mod zmo_asset_loader;
 mod zms_asset_loader;
+mod zone_loader;
 
 use rose_data::{CharacterMotionDatabaseOptions, NpcDatabaseOptions, ZoneId};
-use rose_file_readers::{LtbFile, StlFile, StlReadOptions, VfsIndex};
+use rose_file_readers::{LtbFile, StbFile, StlFile, StlReadOptions, VfsIndex, ZscFile};
 
 use events::{
     AnimationFrameEvent, ChatboxEvent, ClientEntityEvent, ConversationDialogEvent,
@@ -64,7 +66,7 @@ use systems::{
     debug_render_polylines_update_system, debug_render_skeleton_system, effect_system,
     game_connection_system, game_mouse_input_system, game_state_enter_system,
     game_zone_change_system, hit_event_system, item_drop_model_add_collider_system,
-    item_drop_model_system, load_zone_system, login_connection_system, login_state_enter_system,
+    item_drop_model_system, login_connection_system, login_state_enter_system,
     login_state_exit_system, login_system, model_viewer_enter_system, model_viewer_system,
     npc_model_add_collider_system, npc_model_system, particle_sequence_system,
     passive_recovery_system, pending_damage_system, pending_skill_effect_system,
@@ -87,6 +89,7 @@ use ui::{
 use vfs_asset_io::VfsAssetIo;
 use zmo_asset_loader::{ZmoAsset, ZmoAssetLoader};
 use zms_asset_loader::{ZmsAssetLoader, ZmsMaterialNumFaces};
+use zone_loader::ZoneLoader;
 
 pub struct VfsResource {
     vfs: Arc<VfsIndex>,
@@ -318,6 +321,7 @@ fn main() {
     app.init_asset_loader::<ZmsAssetLoader>()
         .add_asset::<ZmoAsset>()
         .init_asset_loader::<ZmoAssetLoader>()
+        .add_asset::<ZoneLoaderAsset>()
         .insert_resource(RenderConfiguration {
             passthrough_terrain_textures,
         })
@@ -434,8 +438,8 @@ fn main() {
         CoreStage::Update,
         GameStages::ZoneChange,
         SystemStage::parallel()
-            .with_system(load_zone_system)
-            .with_system(game_zone_change_system),
+            .with_system(zone_loader_system)
+            .with_system(game_zone_change_system), // TODO: Split this to run before & after zone_loader_system to reduce 1 frame delay
     );
 
     // Run debug render stage last so it has accurate data
@@ -599,6 +603,13 @@ fn load_game_data(
         )
         .expect("Failed to load character motion list"),
     );
+    let zone_list = Arc::new(
+        rose_data_irose::get_zone_list(&vfs_resource.vfs).expect("Failed to load zone list"),
+    );
+
+    asset_server.add_loader(ZoneLoader {
+        zone_list: zone_list.clone(),
+    });
 
     commands.insert_resource(GameData {
         ability_value_calculator: rose_game_irose::data::get_ability_value_calculator(
@@ -624,9 +635,7 @@ fn load_game_data(
             rose_data_irose::get_status_effect_database(&vfs_resource.vfs)
                 .expect("Failed to load status effect database"),
         ),
-        zone_list: Arc::new(
-            rose_data_irose::get_zone_list(&vfs_resource.vfs).expect("Failed to load zone list"),
-        ),
+        zone_list,
         ltb_event: vfs_resource
             .vfs
             .read_file::<LtbFile, _>("3DDATA/EVENT/ULNGTB_CON.LTB")
@@ -640,6 +649,19 @@ fn load_game_data(
                 },
             )
             .expect("Failed to load quest string file"),
+
+        zsc_event_object: vfs_resource
+            .vfs
+            .read_file::<ZscFile, _>("3DDATA/SPECIAL/EVENT_OBJECT.ZSC")
+            .expect("Failed to load 3DDATA/SPECIAL/EVENT_OBJECT.ZSC"),
+        zsc_special_object: vfs_resource
+            .vfs
+            .read_file::<ZscFile, _>("3DDATA/SPECIAL/LIST_DECO_SPECIAL.ZSC")
+            .expect("Failed to load 3DDATA/SPECIAL/LIST_DECO_SPECIAL.ZSC"),
+        stb_morph_object: vfs_resource
+            .vfs
+            .read_file::<StbFile, _>("3DDATA/STB/LIST_MORPH_OBJECT.STB")
+            .expect("Failed to load 3DDATA/STB/LIST_MORPH_OBJECT.STB"),
     });
 
     commands.insert_resource(

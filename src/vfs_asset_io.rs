@@ -26,7 +26,10 @@ impl AssetIo for VfsAssetIo {
                 .unwrap()
                 .trim_end_matches(".image_copy_src")
                 .trim_end_matches(".rgb_texture");
-            if let Some(file) = self.vfs.open_file(path) {
+            if path.ends_with(".zone_loader") {
+                let zone_id = path.trim_end_matches(".zone_loader").parse::<u8>().unwrap();
+                Ok(vec![zone_id])
+            } else if let Some(file) = self.vfs.open_file(path) {
                 match file {
                     VfsFile::Buffer(buffer) => Ok(buffer),
                     VfsFile::View(view) => Ok(view.into()),
