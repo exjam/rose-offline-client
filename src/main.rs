@@ -364,7 +364,6 @@ fn main() {
 
     app.add_system(character_model_system)
         .add_system(character_model_add_collider_system.after(character_model_system))
-        .add_system(character_model_blink_system.after(character_model_system))
         .add_system(npc_model_system)
         .add_system(npc_model_add_collider_system.after(npc_model_system))
         .add_system(item_drop_model_system)
@@ -426,6 +425,9 @@ fn main() {
                 .exclusive_system()
                 .label("ui_system"),
         );
+
+    // character_model_blink_system must be in a stage after character_model_system
+    app.add_system_to_stage(CoreStage::PostUpdate, character_model_blink_system);
 
     // Run zone change system after Update, so we do can add/remove entities
     app.add_stage_after(
