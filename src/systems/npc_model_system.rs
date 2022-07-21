@@ -17,7 +17,7 @@ use rose_game_common::components::Npc;
 use crate::{
     components::{
         ColliderEntity, ColliderParent, NpcModel, COLLISION_FILTER_CLICKABLE,
-        COLLISION_FILTER_INSPECTABLE, COLLISION_GROUP_NPC,
+        COLLISION_FILTER_INSPECTABLE, COLLISION_GROUP_NPC, COLLISION_GROUP_PHYSICS_TOY,
     },
     model_loader::ModelLoader,
     render::{EffectMeshMaterial, ObjectMaterial, ParticleMaterial},
@@ -151,7 +151,9 @@ pub fn npc_model_add_collider_system(
                 Collider::cuboid(half_extents.x, half_extents.y, half_extents.z),
                 CollisionGroups::new(
                     COLLISION_GROUP_NPC,
-                    COLLISION_FILTER_INSPECTABLE | COLLISION_FILTER_CLICKABLE,
+                    COLLISION_FILTER_INSPECTABLE
+                        | COLLISION_FILTER_CLICKABLE
+                        | COLLISION_GROUP_PHYSICS_TOY,
                 ),
                 Transform::from_translation(root_bone_offset)
                     .with_rotation(Quat::from_axis_angle(Vec3::Z, std::f32::consts::PI / 2.0)),

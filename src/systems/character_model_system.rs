@@ -22,7 +22,7 @@ use crate::{
         CharacterModel, CharacterModelPart, ColliderEntity, ColliderParent, DummyBoneOffset,
         ModelHeight, PersonalStore, PersonalStoreModel, PlayerCharacter,
         COLLISION_FILTER_CLICKABLE, COLLISION_FILTER_INSPECTABLE, COLLISION_GROUP_CHARACTER,
-        COLLISION_GROUP_PLAYER,
+        COLLISION_GROUP_PHYSICS_TOY, COLLISION_GROUP_PLAYER,
     },
     model_loader::ModelLoader,
     render::{ObjectMaterial, ObjectMaterialClipFace},
@@ -125,7 +125,9 @@ pub fn character_model_add_collider_system(
                     } else {
                         COLLISION_GROUP_CHARACTER
                     },
-                    COLLISION_FILTER_INSPECTABLE | COLLISION_FILTER_CLICKABLE,
+                    COLLISION_FILTER_INSPECTABLE
+                        | COLLISION_FILTER_CLICKABLE
+                        | COLLISION_GROUP_PHYSICS_TOY,
                 ),
                 Transform::from_translation(root_bone_offset)
                     .with_rotation(Quat::from_axis_angle(Vec3::Z, std::f32::consts::PI / 2.0)),

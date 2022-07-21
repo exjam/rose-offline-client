@@ -36,6 +36,7 @@ pub struct UiStateDebugWindows {
     pub item_list_open: bool,
     pub npc_list_open: bool,
     pub object_inspector_open: bool,
+    pub physics_open: bool,
     pub skill_list_open: bool,
     pub zone_list_open: bool,
     pub zone_lighting_open: bool,
@@ -175,6 +176,7 @@ pub fn ui_debug_menu_system(
                 }
 
                 ui.checkbox(&mut ui_state_debug_windows.camera_info_open, "Camera Info");
+                ui.checkbox(&mut ui_state_debug_windows.physics_open, "Physics");
             });
         });
     });

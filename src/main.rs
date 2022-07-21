@@ -6,6 +6,7 @@ use bevy::{
     core_pipeline::clear_color::ClearColor,
     ecs::{event::Events, schedule::ShouldRun},
     log::{Level, LogSettings},
+    pbr::AmbientLight,
     prelude::{
         AddAsset, App, AssetServer, Assets, Camera3dBundle, Color, Commands, CoreStage,
         ExclusiveSystemDescriptorCoercion, IntoExclusiveSystem, Msaa,
@@ -26,6 +27,7 @@ mod free_camera;
 mod model_loader;
 mod orbit_camera;
 mod protocol;
+mod ray_from_screenspace;
 mod render;
 mod resources;
 mod scripting;
@@ -79,12 +81,12 @@ use ui::{
     ui_character_info_system, ui_chatbox_system, ui_debug_camera_info_system,
     ui_debug_client_entity_list_system, ui_debug_command_viewer_system,
     ui_debug_entity_inspector_system, ui_debug_item_list_system, ui_debug_menu_system,
-    ui_debug_npc_list_system, ui_debug_render_system, ui_debug_skill_list_system,
-    ui_debug_zone_lighting_system, ui_debug_zone_list_system, ui_debug_zone_time_system,
-    ui_diagnostics_system, ui_drag_and_drop_system, ui_hotbar_system, ui_inventory_system,
-    ui_minimap_system, ui_npc_store_system, ui_party_system, ui_player_info_system,
-    ui_quest_list_system, ui_selected_target_system, ui_skill_list_system, ui_window_system,
-    UiStateDebugWindows, UiStateDragAndDrop, UiStateWindows,
+    ui_debug_npc_list_system, ui_debug_physics_system, ui_debug_render_system,
+    ui_debug_skill_list_system, ui_debug_zone_lighting_system, ui_debug_zone_list_system,
+    ui_debug_zone_time_system, ui_diagnostics_system, ui_drag_and_drop_system, ui_hotbar_system,
+    ui_inventory_system, ui_minimap_system, ui_npc_store_system, ui_party_system,
+    ui_player_info_system, ui_quest_list_system, ui_selected_target_system, ui_skill_list_system,
+    ui_window_system, UiStateDebugWindows, UiStateDragAndDrop, UiStateWindows,
 };
 use vfs_asset_io::VfsAssetIo;
 use zmo_asset_loader::{ZmoAsset, ZmoAssetLoader};
@@ -412,17 +414,18 @@ fn main() {
         .add_system(system_func_event_system)
         .add_system(zone_time_system.after(world_time_system))
         .add_system(ui_npc_store_system.label("ui_system"))
-        .add_system(ui_debug_menu_system.before("ui_system"))
-        .add_system(ui_debug_zone_list_system.label("ui_system"))
-        .add_system(ui_debug_item_list_system.label("ui_system"))
-        .add_system(ui_debug_npc_list_system.label("ui_system"))
-        .add_system(ui_debug_skill_list_system.label("ui_system"))
         .add_system(ui_debug_camera_info_system.label("ui_system"))
         .add_system(ui_debug_client_entity_list_system.label("ui_system"))
         .add_system(ui_debug_command_viewer_system.label("ui_system"))
+        .add_system(ui_debug_item_list_system.label("ui_system"))
+        .add_system(ui_debug_menu_system.before("ui_system"))
+        .add_system(ui_debug_npc_list_system.label("ui_system"))
+        .add_system(ui_debug_physics_system.label("ui_system"))
         .add_system(ui_debug_render_system.label("ui_system"))
-        .add_system(ui_debug_zone_time_system.label("ui_system"))
+        .add_system(ui_debug_skill_list_system.label("ui_system"))
         .add_system(ui_debug_zone_lighting_system.label("ui_system"))
+        .add_system(ui_debug_zone_list_system.label("ui_system"))
+        .add_system(ui_debug_zone_time_system.label("ui_system"))
         .add_system(ui_diagnostics_system.label("ui_system"))
         .add_system(
             ui_debug_entity_inspector_system
@@ -675,6 +678,10 @@ fn load_game_data(
     );
 
     commands.spawn_bundle(Camera3dBundle::default());
+    commands.insert_resource(AmbientLight {
+        color: Color::rgb(1.0, 1.0, 1.0),
+        brightness: 0.9,
+    });
 
     // Load icons
     let mut item_pages = Vec::new();

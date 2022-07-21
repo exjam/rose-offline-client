@@ -28,8 +28,8 @@ use crate::{
     events::{GameConnectionEvent, LoadZoneEvent, WorldConnectionEvent, ZoneEvent},
     free_camera::FreeCamera,
     orbit_camera::OrbitCamera,
+    ray_from_screenspace::ray_from_screenspace,
     resources::{AppState, CharacterList, GameConnection, ServerConfiguration, WorldConnection},
-    systems::collision_system::ray_from_screenspace,
 };
 
 enum CharacterSelectState {

@@ -1,11 +1,8 @@
 use bevy::{
-    math::{Mat4, Quat, Vec2, Vec3},
+    math::{Quat, Vec3},
     prelude::{
-        Assets, Camera, Changed, Commands, Entity, EventWriter, GlobalTransform, Or, Query, Res,
-        Time, Transform, With,
+        Assets, Changed, Commands, Entity, EventWriter, Or, Query, Res, Time, Transform, With,
     },
-    render::camera::{Projection, RenderTarget},
-    window::{Window, Windows},
 };
 use bevy_rapier3d::prelude::{Collider, InteractionGroups, RapierContext};
 
@@ -15,58 +12,13 @@ use crate::{
     components::{
         ColliderParent, CollisionHeightOnly, CollisionPlayer, EventObject, NextCommand, Position,
         WarpObject, COLLISION_FILTER_COLLIDABLE, COLLISION_FILTER_MOVEABLE,
-        COLLISION_GROUP_ZONE_EVENT_OBJECT, COLLISION_GROUP_ZONE_TERRAIN,
-        COLLISION_GROUP_ZONE_WARP_OBJECT,
+        COLLISION_GROUP_PHYSICS_TOY, COLLISION_GROUP_ZONE_EVENT_OBJECT,
+        COLLISION_GROUP_ZONE_TERRAIN, COLLISION_GROUP_ZONE_WARP_OBJECT,
     },
     events::QuestTriggerEvent,
     resources::{CurrentZone, GameConnection},
     zone_loader::ZoneLoaderAsset,
 };
-
-fn get_window_for_camera<'a>(windows: &'a Windows, camera: &Camera) -> Option<&'a Window> {
-    match camera.target {
-        RenderTarget::Window(window_id) => match windows.get(window_id) {
-            None => None,
-            window => window,
-        },
-        _ => None,
-    }
-}
-
-pub fn ray_from_screenspace(
-    cursor_pos_screen: Vec2,
-    windows: &Res<Windows>,
-    camera: &Camera,
-    camera_projection: &Projection,
-    camera_transform: &GlobalTransform,
-) -> Option<(Vec3, Vec3)> {
-    let view = camera_transform.compute_matrix();
-    let window = get_window_for_camera(windows, camera)?;
-    let screen_size = Vec2::from([window.width() as f32, window.height() as f32]);
-    let projection = camera.projection_matrix();
-
-    // 2D Normalized device coordinate cursor position from (-1, -1) to (1, 1)
-    let cursor_ndc = (cursor_pos_screen / screen_size) * 2.0 - Vec2::from([1.0, 1.0]);
-    let ndc_to_world: Mat4 = view * projection.inverse();
-    let world_to_ndc = projection * view;
-    let is_orthographic = projection.w_axis[3] == 1.0;
-
-    // Compute the cursor position at the near plane. The bevy camera looks at -Z.
-    let camera_near = match camera_projection {
-        Projection::Perspective(perspective_projection) => perspective_projection.near,
-        Projection::Orthographic(orthographic_projection) => orthographic_projection.near,
-    };
-    let ndc_near = world_to_ndc.transform_point3(-Vec3::Z * camera_near).z;
-    let cursor_pos_near = ndc_to_world.transform_point3(cursor_ndc.extend(ndc_near));
-
-    // Compute the ray's direction depending on the projection used.
-    let ray_direction = match is_orthographic {
-        true => view.transform_vector3(-Vec3::Z), // All screenspace rays are parallel in ortho
-        false => cursor_pos_near - camera_transform.translation, // Direction from camera to cursor
-    };
-
-    Some((cursor_pos_near, ray_direction))
-}
 
 #[allow(clippy::too_many_arguments)]
 pub fn collision_height_only_system(
@@ -103,7 +55,10 @@ pub fn collision_height_only_system(
             ray_direction,
             100000000.0,
             false,
-            InteractionGroups::all().with_memberships(COLLISION_FILTER_MOVEABLE),
+            InteractionGroups::new(
+                COLLISION_FILTER_MOVEABLE,
+                u32::MAX & !COLLISION_GROUP_PHYSICS_TOY,
+            ),
             None,
         ) {
             Some((ray_origin + ray_direction * distance).y)
@@ -155,7 +110,10 @@ pub fn collision_player_system_join_zoin(
             ray_direction,
             100000000.0,
             false,
-            InteractionGroups::all().with_memberships(COLLISION_FILTER_MOVEABLE),
+            InteractionGroups::new(
+                COLLISION_FILTER_MOVEABLE,
+                u32::MAX & !COLLISION_GROUP_PHYSICS_TOY,
+            ),
             None,
         ) {
             Some((ray_origin + ray_direction * distance).y)
@@ -228,7 +186,7 @@ pub fn collision_player_system(
                 translation_delta.length(),
                 InteractionGroups::new(
                     COLLISION_FILTER_COLLIDABLE,
-                    u32::MAX & !COLLISION_GROUP_ZONE_TERRAIN,
+                    u32::MAX & !COLLISION_GROUP_ZONE_TERRAIN & !COLLISION_GROUP_PHYSICS_TOY,
                 ),
                 None,
             ) {
@@ -265,7 +223,10 @@ pub fn collision_player_system(
             ray_direction,
             1.35 + fall_distance,
             false,
-            InteractionGroups::all().with_memberships(COLLISION_FILTER_MOVEABLE),
+            InteractionGroups::new(
+                COLLISION_FILTER_MOVEABLE,
+                u32::MAX & !COLLISION_GROUP_PHYSICS_TOY,
+            ),
             None,
         ) {
             Some((ray_origin + ray_direction * distance).y)

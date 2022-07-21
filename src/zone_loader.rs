@@ -38,8 +38,9 @@ use crate::{
         ActiveMotion, ColliderParent, EventObject, NightTimeEffect, WarpObject, Zone, ZoneObject,
         ZoneObjectAnimatedObject, ZoneObjectId, ZoneObjectPart, ZoneObjectTerrain,
         COLLISION_FILTER_CLICKABLE, COLLISION_FILTER_COLLIDABLE, COLLISION_FILTER_INSPECTABLE,
-        COLLISION_FILTER_MOVEABLE, COLLISION_GROUP_ZONE_EVENT_OBJECT, COLLISION_GROUP_ZONE_OBJECT,
-        COLLISION_GROUP_ZONE_TERRAIN, COLLISION_GROUP_ZONE_WARP_OBJECT, COLLISION_GROUP_ZONE_WATER,
+        COLLISION_FILTER_MOVEABLE, COLLISION_GROUP_PHYSICS_TOY, COLLISION_GROUP_ZONE_EVENT_OBJECT,
+        COLLISION_GROUP_ZONE_OBJECT, COLLISION_GROUP_ZONE_TERRAIN,
+        COLLISION_GROUP_ZONE_WARP_OBJECT, COLLISION_GROUP_ZONE_WATER,
     },
     effect_loader::spawn_effect,
     events::{LoadZoneEvent, ZoneEvent},
@@ -795,6 +796,7 @@ fn spawn_terrain(
                 COLLISION_GROUP_ZONE_TERRAIN,
                 COLLISION_FILTER_INSPECTABLE
                     | COLLISION_FILTER_COLLIDABLE
+                    | COLLISION_GROUP_PHYSICS_TOY
                     | COLLISION_FILTER_MOVEABLE
                     | COLLISION_FILTER_CLICKABLE,
             ),
@@ -1007,7 +1009,7 @@ fn spawn_object(
                         .collision_flags
                         .contains(ZscCollisionFlags::HEIGHT_ONLY)
                 {
-                    collision_filter |= COLLISION_FILTER_COLLIDABLE;
+                    collision_filter |= COLLISION_FILTER_COLLIDABLE | COLLISION_GROUP_PHYSICS_TOY;
                 }
 
                 if collision_group != COLLISION_GROUP_ZONE_WARP_OBJECT {

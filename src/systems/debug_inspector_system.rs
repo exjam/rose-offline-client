@@ -17,9 +17,9 @@ use crate::{
         ZoneObject, ZoneObjectAnimatedObject, ZoneObjectPart, ZoneObjectPartCollisionShape,
         ZoneObjectTerrain, COLLISION_FILTER_INSPECTABLE,
     },
+    ray_from_screenspace::ray_from_screenspace,
     render::ObjectMaterial,
     resources::DebugInspector,
-    systems::collision_system::ray_from_screenspace,
 };
 
 pub struct DebugInspectorPlugin;

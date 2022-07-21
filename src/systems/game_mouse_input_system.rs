@@ -17,10 +17,10 @@ use rose_game_common::components::{ItemDrop, Team};
 use crate::{
     components::{
         ClientEntityName, ColliderParent, PlayerCharacter, Position, SelectedTarget, ZoneObject,
-        COLLISION_FILTER_CLICKABLE, COLLISION_GROUP_PLAYER,
+        COLLISION_FILTER_CLICKABLE, COLLISION_GROUP_PHYSICS_TOY, COLLISION_GROUP_PLAYER,
     },
     events::PlayerCommandEvent,
-    systems::collision_system::ray_from_screenspace,
+    ray_from_screenspace::ray_from_screenspace,
 };
 
 #[allow(clippy::too_many_arguments)]
@@ -71,7 +71,7 @@ pub fn game_mouse_input_system(
                 false,
                 InteractionGroups::new(
                     COLLISION_FILTER_CLICKABLE,
-                    u32::MAX & !COLLISION_GROUP_PLAYER,
+                    u32::MAX & !COLLISION_GROUP_PLAYER & !COLLISION_GROUP_PHYSICS_TOY,
                 ),
                 None,
             ) {

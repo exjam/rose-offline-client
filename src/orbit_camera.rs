@@ -17,7 +17,9 @@ use bevy_rapier3d::{
 };
 use dolly::prelude::{Arm, CameraRig, LeftHanded, Position, Smooth, YawPitch};
 
-use crate::components::{COLLISION_FILTER_COLLIDABLE, COLLISION_FILTER_MOVEABLE};
+use crate::components::{
+    COLLISION_FILTER_COLLIDABLE, COLLISION_FILTER_MOVEABLE, COLLISION_GROUP_PHYSICS_TOY,
+};
 
 #[derive(Default)]
 pub struct OrbitCameraPlugin;
@@ -165,8 +167,10 @@ fn orbit_camera_update(
             ray_direction,
             &Collider::ball(ball_radius),
             orbit_camera.max_distance,
-            InteractionGroups::all()
-                .with_memberships(COLLISION_FILTER_MOVEABLE | COLLISION_FILTER_COLLIDABLE),
+            InteractionGroups::new(
+                COLLISION_FILTER_MOVEABLE | COLLISION_FILTER_COLLIDABLE,
+                u32::MAX & !COLLISION_GROUP_PHYSICS_TOY,
+            ),
             None,
         ) {
             camera_collide_distance = distance.toi;
