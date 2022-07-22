@@ -9,6 +9,7 @@ pub struct ActiveMotion {
     pub animation_speed: f32,
     pub start_time: Option<f64>,
     pub previous_frame: Option<usize>,
+    pub blend_weight: f32,
 }
 
 impl ActiveMotion {
@@ -19,6 +20,7 @@ impl ActiveMotion {
             animation_speed: 1.0,
             start_time: None,
             previous_frame: None,
+            blend_weight: 0.0,
         }
     }
 
@@ -29,6 +31,7 @@ impl ActiveMotion {
             animation_speed: 1.0,
             start_time: None,
             previous_frame: None,
+            blend_weight: 0.0,
         }
     }
 

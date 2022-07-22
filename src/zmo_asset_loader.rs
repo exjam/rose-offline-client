@@ -25,6 +25,7 @@ pub struct ZmoAsset {
     fps: usize,
     bones: Vec<ZmoAssetBone>,
     frame_events: Vec<u16>,
+    interpolation_interval: f32,
 }
 
 impl ZmoAsset {
@@ -34,6 +35,10 @@ impl ZmoAsset {
 
     pub fn num_frames(&self) -> usize {
         self.num_frames
+    }
+
+    pub fn interpolation_interval(&self) -> f32 {
+        self.interpolation_interval
     }
 
     pub fn get_translation(&self, bone_id: usize, frame_id: usize) -> Option<Vec3> {
@@ -123,6 +128,8 @@ impl AssetLoader for ZmoAssetLoader {
                         fps: zmo.fps,
                         bones,
                         frame_events: zmo.frame_events,
+                        interpolation_interval: zmo.interpolation_interval_ms.unwrap_or(500) as f32
+                            / 1000.0,
                     }));
                     Ok(())
                 }

@@ -1,5 +1,7 @@
+use std::f32::consts::FRAC_PI_2;
+
 use bevy::{
-    math::Vec3,
+    math::{Quat, Vec3},
     prelude::{Assets, Camera3d, Commands, Entity, EventWriter, Query, Res, Time, Transform},
     render::{camera::Projection, mesh::skinning::SkinnedMesh},
 };
@@ -8,6 +10,116 @@ use crate::{
     components::ActiveMotion, events::AnimationFrameEvent, resources::GameData,
     zmo_asset_loader::ZmoAsset,
 };
+
+fn sample_translation(
+    zmo_asset: &ZmoAsset,
+    channel: usize,
+    current_frame_fract: f32,
+    current_frame_index: usize,
+    next_frame_index: usize,
+) -> Option<Vec3> {
+    let current = zmo_asset.get_translation(channel, current_frame_index);
+    let next = zmo_asset.get_translation(channel, next_frame_index);
+
+    if let (Some(current), Some(next)) = (current, next) {
+        Some(current.lerp(next, current_frame_fract))
+    } else {
+        None
+    }
+}
+
+fn sample_rotation(
+    zmo_asset: &ZmoAsset,
+    channel: usize,
+    current_frame_fract: f32,
+    current_frame_index: usize,
+    next_frame_index: usize,
+) -> Option<Quat> {
+    let current = zmo_asset.get_rotation(channel, current_frame_index);
+    let next = zmo_asset.get_rotation(channel, next_frame_index);
+
+    if let (Some(current), Some(next)) = (current, next) {
+        Some(current.slerp(next, current_frame_fract))
+    } else {
+        None
+    }
+}
+
+fn sample_scale(
+    zmo_asset: &ZmoAsset,
+    channel: usize,
+    current_frame_fract: f32,
+    current_frame_index: usize,
+    next_frame_index: usize,
+) -> Option<f32> {
+    let current = zmo_asset.get_scale(channel, current_frame_index);
+    let next = zmo_asset.get_scale(channel, next_frame_index);
+
+    if let (Some(current), Some(next)) = (current, next) {
+        Some(current + (next - current) * current_frame_fract)
+    } else {
+        None
+    }
+}
+
+fn advance_active_motion(
+    active_motion: &mut ActiveMotion,
+    zmo_asset: &ZmoAsset,
+    time: &Time,
+) -> Option<(f32, usize, usize)> {
+    let current_time = time.seconds_since_startup();
+    let start_time = if let Some(start_time) = active_motion.start_time {
+        start_time
+    } else {
+        active_motion.start_time = Some(current_time);
+        current_time
+    };
+
+    let current_frame_index_exact = (current_time - start_time)
+        * (zmo_asset.fps() as f64)
+        * active_motion.animation_speed as f64;
+    let current_frame_fract = current_frame_index_exact.fract() as f32;
+    let current_loop_count = current_frame_index_exact as usize / zmo_asset.num_frames();
+    if current_loop_count >= active_motion.repeat_limit.unwrap_or(usize::MAX) {
+        return None; // Animation complete
+    }
+
+    let current_frame_index = current_frame_index_exact as usize % zmo_asset.num_frames();
+    let next_frame_index = if current_frame_index + 1 == zmo_asset.num_frames()
+        && current_loop_count + 1 >= active_motion.repeat_limit.unwrap_or(usize::MAX)
+    {
+        // The last frame of last loop should not blend to the first frame
+        current_frame_index
+    } else {
+        (current_frame_index + 1) % zmo_asset.num_frames()
+    };
+
+    Some((current_frame_fract, current_frame_index, next_frame_index))
+}
+
+fn emit_animation_events(
+    zmo_asset: &ZmoAsset,
+    game_data: &GameData,
+    animation_frame_events: &mut EventWriter<AnimationFrameEvent>,
+    entity: Entity,
+    start_frame_index: usize,
+    end_frame_index: usize,
+) {
+    let mut frame_index = start_frame_index;
+
+    // Emit every frame event between previous frame and current frame
+    while frame_index != end_frame_index {
+        if let Some(event_id) = zmo_asset.get_frame_event(frame_index) {
+            if let Some(flags) = game_data.animation_event_flags.get(event_id.get() as usize) {
+                if !flags.is_empty() {
+                    animation_frame_events.send(AnimationFrameEvent::new(entity, *flags));
+                }
+            }
+        }
+
+        frame_index = (frame_index + 1) % zmo_asset.num_frames();
+    }
+}
 
 pub fn animation_system(
     mut commands: Commands,
@@ -24,130 +136,115 @@ pub fn animation_system(
     motion_assets: Res<Assets<ZmoAsset>>,
     time: Res<Time>,
 ) {
-    let current_time = time.seconds_since_startup();
-
     for (entity, mut active_motion, skinned_mesh, camera_3d) in query_active_motions.iter_mut() {
-        let current_motion = motion_assets.get(&active_motion.motion);
-        if current_motion.is_none() {
-            continue;
-        }
-        let current_motion = current_motion.unwrap();
-
-        let start_time = if let Some(start_time) = active_motion.start_time {
-            start_time
+        let zmo_asset = if let Some(zmo_asset) = motion_assets.get(&active_motion.motion) {
+            zmo_asset
         } else {
-            active_motion.start_time = Some(current_time);
-            current_time
+            continue;
         };
 
-        let current_frame_index_exact = (current_time - start_time)
-            * (current_motion.fps() as f64)
-            * active_motion.animation_speed as f64;
-        let current_frame_fract = current_frame_index_exact.fract() as f32;
-        let current_loop_count = current_frame_index_exact as usize / current_motion.num_frames();
-        if current_loop_count >= active_motion.repeat_limit.unwrap_or(usize::MAX) {
-            commands.entity(entity).remove::<ActiveMotion>();
-            continue;
+        let (current_frame_fract, current_frame_index, next_frame_index) =
+            if let Some(result) = advance_active_motion(&mut active_motion, zmo_asset, &time) {
+                result
+            } else {
+                // Animation complete, emit remaining events and remove ActiveMotion
+                emit_animation_events(
+                    zmo_asset,
+                    &game_data,
+                    &mut animation_frame_events,
+                    entity,
+                    active_motion.previous_frame.unwrap_or(0),
+                    zmo_asset.num_frames() - 1,
+                );
+                commands.entity(entity).remove::<ActiveMotion>();
+                continue;
+            };
+
+        if active_motion.blend_weight < 1.0 {
+            active_motion.blend_weight += time.delta_seconds() / zmo_asset.interpolation_interval();
         }
 
-        let current_frame_index = current_frame_index_exact as usize % current_motion.num_frames();
-        let next_frame_index = if current_frame_index + 1 == current_motion.num_frames()
-            && current_loop_count + 1 >= active_motion.repeat_limit.unwrap_or(usize::MAX)
-        {
-            // The last frame of last loop should not blend to the first frame
-            current_frame_index
+        let blend_weight = if active_motion.blend_weight < 1.0 {
+            Some((active_motion.blend_weight * FRAC_PI_2).sin())
         } else {
-            (current_frame_index + 1) % current_motion.num_frames()
+            None
         };
 
-        if let Some(mut previous_frame_index) = active_motion.previous_frame {
-            // Emit every frame event between previous frame and current frame
-            while previous_frame_index != current_frame_index {
-                if let Some(event_id) = current_motion.get_frame_event(previous_frame_index) {
-                    if let Some(flags) =
-                        game_data.animation_event_flags.get(event_id.get() as usize)
-                    {
-                        if !flags.is_empty() {
-                            animation_frame_events.send(AnimationFrameEvent::new(entity, *flags));
-                        }
-                    }
-                }
-
-                previous_frame_index = (previous_frame_index + 1) % current_motion.num_frames();
-            }
-        }
+        emit_animation_events(
+            zmo_asset,
+            &game_data,
+            &mut animation_frame_events,
+            entity,
+            active_motion.previous_frame.unwrap_or(0),
+            current_frame_index,
+        );
         active_motion.previous_frame = Some(current_frame_index);
 
         if let Some(skinned_mesh) = skinned_mesh {
             for (bone_id, bone_entity) in skinned_mesh.joints.iter().enumerate() {
                 if let Ok(mut bone_transform) = query_transform.get_mut(*bone_entity) {
-                    let current_frame_translation =
-                        current_motion.get_translation(bone_id, current_frame_index);
-                    let next_frame_translation =
-                        current_motion.get_translation(bone_id, next_frame_index);
-
-                    if let (Some(current_frame_translation), Some(next_frame_translation)) =
-                        (current_frame_translation, next_frame_translation)
-                    {
-                        bone_transform.translation = current_frame_translation
-                            .lerp(next_frame_translation, current_frame_fract);
+                    if let Some(translation) = sample_translation(
+                        zmo_asset,
+                        bone_id,
+                        current_frame_fract,
+                        current_frame_index,
+                        next_frame_index,
+                    ) {
+                        if let Some(blend_weight) = blend_weight {
+                            bone_transform.translation =
+                                bone_transform.translation.lerp(translation, blend_weight);
+                        } else {
+                            bone_transform.translation = translation;
+                        }
                     }
 
-                    let current_frame_rotation =
-                        current_motion.get_rotation(bone_id, current_frame_index);
-                    let next_frame_rotation =
-                        current_motion.get_rotation(bone_id, next_frame_index);
-                    if let (Some(current_frame_rotation), Some(next_frame_rotation)) =
-                        (current_frame_rotation, next_frame_rotation)
-                    {
-                        bone_transform.rotation =
-                            current_frame_rotation.lerp(next_frame_rotation, current_frame_fract);
+                    if let Some(rotation) = sample_rotation(
+                        zmo_asset,
+                        bone_id,
+                        current_frame_fract,
+                        current_frame_index,
+                        next_frame_index,
+                    ) {
+                        if let Some(blend_weight) = blend_weight {
+                            bone_transform.rotation =
+                                bone_transform.rotation.slerp(rotation, blend_weight);
+                        } else {
+                            bone_transform.rotation = rotation;
+                        }
                     }
-
-                    // TODO: Skinned mesh also support animation of Alpha and UV
                 }
             }
         } else if camera_3d.is_some() {
-            let current_eye = current_motion.get_translation(0, current_frame_index);
-            let next_eye = current_motion.get_translation(0, next_frame_index);
-            let eye = if let (Some(current_eye), Some(next_eye)) = (current_eye, next_eye) {
-                Some(
-                    current_eye.lerp(next_eye, current_frame_fract)
-                        + Vec3::new(5200.0, 0.0, -5200.0),
-                )
-            } else {
-                None
-            };
-
-            let current_center = current_motion.get_translation(1, current_frame_index);
-            let next_center = current_motion.get_translation(1, next_frame_index);
-            let center =
-                if let (Some(current_center), Some(next_center)) = (current_center, next_center) {
-                    Some(
-                        current_center.lerp(next_center, current_frame_fract)
-                            + Vec3::new(5200.0, 0.0, -5200.0),
-                    )
-                } else {
-                    None
-                };
-
-            let current_up = current_motion.get_translation(2, current_frame_index);
-            let next_up = current_motion.get_translation(2, next_frame_index);
-            let up = if let (Some(current_up), Some(next_up)) = (current_up, next_up) {
-                Some(current_up.lerp(next_up, current_frame_fract))
-            } else {
-                None
-            };
-
-            let current_fov_near_far = current_motion.get_translation(3, current_frame_index);
-            let next_fov_near_far = current_motion.get_translation(3, next_frame_index);
-            let fov_near_far = if let (Some(current_fov_near_far), Some(next_fov_near_far)) =
-                (current_fov_near_far, next_fov_near_far)
-            {
-                Some(current_fov_near_far.lerp(next_fov_near_far, current_frame_fract))
-            } else {
-                None
-            };
+            let eye = sample_translation(
+                zmo_asset,
+                0,
+                current_frame_fract,
+                current_frame_index,
+                next_frame_index,
+            )
+            .map(|eye| eye + Vec3::new(5200.0, 0.0, -5200.0));
+            let center = sample_translation(
+                zmo_asset,
+                1,
+                current_frame_fract,
+                current_frame_index,
+                next_frame_index,
+            )
+            .map(|eye| eye + Vec3::new(5200.0, 0.0, -5200.0));
+            let up = sample_translation(
+                zmo_asset,
+                2,
+                current_frame_fract,
+                current_frame_index,
+                next_frame_index,
+            );
+            let fov_near_far = sample_translation(
+                zmo_asset,
+                3,
+                current_frame_fract,
+                current_frame_index,
+                next_frame_index,
+            );
 
             if let (Some(eye), Some(center), Some(up)) = (eye, center, up) {
                 if let Ok(mut transform) = query_transform.get_mut(entity) {
@@ -167,35 +264,39 @@ pub fn animation_system(
                 }
             }
         } else if let Ok(mut entity_transform) = query_transform.get_mut(entity) {
-            let current_frame_translation = current_motion.get_translation(0, current_frame_index);
-            let next_frame_translation = current_motion.get_translation(0, next_frame_index);
-
-            if let (Some(current_frame_translation), Some(next_frame_translation)) =
-                (current_frame_translation, next_frame_translation)
-            {
-                entity_transform.translation =
-                    current_frame_translation.lerp(next_frame_translation, current_frame_fract);
+            if let Some(translation) = sample_translation(
+                zmo_asset,
+                0,
+                current_frame_fract,
+                current_frame_index,
+                next_frame_index,
+            ) {
+                entity_transform.translation = translation;
             }
 
-            let current_frame_rotation = current_motion.get_rotation(0, current_frame_index);
-            let next_frame_rotation = current_motion.get_rotation(0, next_frame_index);
-            if let (Some(current_frame_rotation), Some(next_frame_rotation)) =
-                (current_frame_rotation, next_frame_rotation)
-            {
-                entity_transform.rotation =
-                    current_frame_rotation.lerp(next_frame_rotation, current_frame_fract);
+            if let Some(rotation) = sample_rotation(
+                zmo_asset,
+                0,
+                current_frame_fract,
+                current_frame_index,
+                next_frame_index,
+            ) {
+                entity_transform.rotation = rotation;
             }
 
-            let current_frame_scale = current_motion.get_scale(0, current_frame_index);
-            let next_frame_scale = current_motion.get_scale(0, next_frame_index);
-            if let (Some(current_frame_scale), Some(next_frame_scale)) =
-                (current_frame_scale, next_frame_scale)
-            {
-                entity_transform.scale = Vec3::splat(
-                    current_frame_scale
-                        + (next_frame_scale - current_frame_scale) * current_frame_fract,
-                );
+            if let Some(scale) = sample_scale(
+                zmo_asset,
+                0,
+                current_frame_fract,
+                current_frame_index,
+                next_frame_index,
+            ) {
+                entity_transform.scale = Vec3::splat(scale);
             }
+
+            // TODO: Support animation of alpha
         }
+
+        // TODO: We also need morph targets which supports Vertex Position, Vertex Normal, Vertex UV0-3, Material Alpha
     }
 }
