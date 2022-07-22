@@ -16,6 +16,7 @@ use bevy::{
     window::WindowDescriptor,
 };
 use bevy_egui::EguiContext;
+use bevy_rapier3d::plugin::PhysicsStages;
 use std::{path::Path, sync::Arc};
 use zone_loader::{zone_loader_system, ZoneLoaderAsset};
 
@@ -436,19 +437,19 @@ fn main() {
     // character_model_blink_system must be in a stage after character_model_system
     app.add_system_to_stage(CoreStage::PostUpdate, character_model_blink_system);
 
-    // Run zone change system after Update, so we do can add/remove entities
-    app.add_stage_after(
-        CoreStage::Update,
+    // Run zone change system just before physics sync which is after Update
+    app.add_stage_before(
+        PhysicsStages::SyncBackend,
         GameStages::ZoneChange,
         SystemStage::parallel()
             .with_system(zone_loader_system)
-            .with_system(game_zone_change_system), // TODO: Split this to run before & after zone_loader_system to reduce 1 frame delay
+            .with_system(game_zone_change_system.after(zone_loader_system)),
     );
 
-    // Run debug render stage last so it has accurate data
+    // Run debug render stage last after physics update so it has accurate data
     app.add_startup_system(debug_render_polylines_setup_system);
     app.add_stage_after(
-        GameStages::ZoneChange,
+        PhysicsStages::Writeback,
         GameStages::DebugRender,
         SystemStage::parallel()
             .with_system(debug_render_collider_system.before(debug_render_polylines_update_system))

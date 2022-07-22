@@ -1,15 +1,15 @@
 use bevy::{
     math::Vec3,
-    prelude::{Camera3d, Commands, Entity, EventReader, EventWriter, Query, Res, State, With},
+    prelude::{Camera3d, Commands, Entity, EventReader, Query, Res, With},
 };
 use rose_game_common::messages::client::ClientMessage;
 
 use crate::{
     components::{ActiveMotion, PlayerCharacter},
-    events::{GameConnectionEvent, LoadZoneEvent, ZoneEvent},
+    events::ZoneEvent,
     free_camera::FreeCamera,
     orbit_camera::OrbitCamera,
-    resources::{AppState, GameConnection},
+    resources::GameConnection,
 };
 
 pub fn game_state_enter_system(
@@ -34,24 +34,9 @@ pub fn game_state_enter_system(
 
 #[allow(clippy::too_many_arguments)]
 pub fn game_zone_change_system(
-    mut load_zone_events: EventWriter<LoadZoneEvent>,
-    mut game_connection_events: EventReader<GameConnectionEvent>,
     mut zone_events: EventReader<ZoneEvent>,
     game_connection: Option<Res<GameConnection>>,
-    app_state: Res<State<AppState>>,
 ) {
-    if !matches!(app_state.current(), AppState::Game) {
-        // Only run during game app state, its confusing how to
-        // combine state + stages so I just do it here
-        return;
-    }
-
-    for event in game_connection_events.iter() {
-        if let &GameConnectionEvent::JoiningZone(zone_id) = event {
-            load_zone_events.send(LoadZoneEvent::new(zone_id));
-        }
-    }
-
     for zone_event in zone_events.iter() {
         match zone_event {
             &ZoneEvent::Loaded(_) => {

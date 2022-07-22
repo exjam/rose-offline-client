@@ -31,7 +31,10 @@ use crate::{
         PendingSkillEffectList, PendingSkillTarget, PendingSkillTargetList, PersonalStore,
         PlayerCharacter, Position, VisibleStatusEffects,
     },
-    events::{ChatboxEvent, ClientEntityEvent, GameConnectionEvent, PartyEvent, QuestTriggerEvent},
+    events::{
+        ChatboxEvent, ClientEntityEvent, GameConnectionEvent, LoadZoneEvent, PartyEvent,
+        QuestTriggerEvent,
+    },
     resources::{AppState, ClientEntityList, GameConnection, GameData, WorldRates, WorldTime},
 };
 
@@ -43,6 +46,7 @@ pub fn game_connection_system(
     mut client_entity_list: ResMut<ClientEntityList>,
     mut chatbox_events: EventWriter<ChatboxEvent>,
     mut game_connection_events: EventWriter<GameConnectionEvent>,
+    mut load_zone_events: EventWriter<LoadZoneEvent>,
     mut client_entity_events: EventWriter<ClientEntityEvent>,
     mut party_events: EventWriter<PartyEvent>,
     mut quest_trigger_events: EventWriter<QuestTriggerEvent>,
@@ -123,9 +127,9 @@ pub fn game_connection_system(
                         .id(),
                 );
 
-                // Load next zone
-                game_connection_events
-                    .send(GameConnectionEvent::JoiningZone(character_data.zone_id));
+                // Emit connected event, character select system will be responsible for
+                // starting the load of the next zone once its animations have completed
+                game_connection_events.send(GameConnectionEvent::Connected(character_data.zone_id));
                 client_entity_list.zone_id = Some(character_data.zone_id);
             }
             Ok(ServerMessage::CharacterDataItems(message)) => {
@@ -169,10 +173,6 @@ pub fn game_connection_system(
                     if !matches!(app_state.current(), AppState::Game) {
                         app_state.set(AppState::Game).ok();
                     }
-
-                    game_connection_events.send(GameConnectionEvent::JoinedZone(
-                        client_entity_list.zone_id.unwrap(),
-                    ));
                 }
             }
             Ok(ServerMessage::SpawnEntityCharacter(message)) => {
@@ -578,7 +578,7 @@ pub fn game_connection_system(
                     client_entity_list.clear();
 
                     // Load next zone
-                    game_connection_events.send(GameConnectionEvent::JoiningZone(message.zone_id));
+                    load_zone_events.send(LoadZoneEvent::new(message.zone_id));
                     client_entity_list.zone_id = Some(message.zone_id);
                 }
             }

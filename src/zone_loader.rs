@@ -13,7 +13,7 @@ use bevy::{
     pbr::{NotShadowCaster, NotShadowReceiver},
     prelude::{
         AssetServer, Assets, Commands, ComputedVisibility, Entity, EventReader, EventWriter,
-        GlobalTransform, Handle, Local, Mesh, Res, ResMut, Transform, Visibility,
+        GlobalTransform, Handle, HandleUntyped, Local, Mesh, Res, ResMut, Transform, Visibility,
     },
     reflect::TypeUuid,
     render::{
@@ -297,6 +297,19 @@ pub struct CachedZone {
     pub spawned_entity: Option<Entity>,
 }
 
+pub enum LoadingZoneState {
+    Loading,
+    Spawned,
+}
+
+pub struct LoadingZone {
+    pub state: LoadingZoneState,
+    pub handle: Handle<ZoneLoaderAsset>,
+    pub despawn_other_zones: bool,
+    pub zone_assets: Vec<HandleUntyped>,
+    pub ready_frames: usize,
+}
+
 #[derive(Default)]
 pub struct ZoneLoaderCache {
     pub cache: Vec<Option<CachedZone>>,
@@ -304,7 +317,7 @@ pub struct ZoneLoaderCache {
 
 pub fn zone_loader_system(
     mut zone_loader_cache: Local<ZoneLoaderCache>,
-    mut pending_loading_zones: Local<Vec<(Handle<ZoneLoaderAsset>, bool)>>,
+    mut loading_zones: Local<Vec<LoadingZone>>,
     mut load_zone_events: EventReader<LoadZoneEvent>,
     mut zone_events: EventWriter<ZoneEvent>,
     mut spawn_zone_params: SpawnZoneParams,
@@ -338,60 +351,106 @@ pub fn zone_loader_system(
         }
 
         let cached_zone = zone_loader_cache.cache[zone_index].as_ref().unwrap();
-        pending_loading_zones.push((cached_zone.data_handle.clone(), event.despawn_other_zones));
+        loading_zones.push(LoadingZone {
+            state: LoadingZoneState::Loading,
+            handle: cached_zone.data_handle.clone(),
+            despawn_other_zones: event.despawn_other_zones,
+            zone_assets: Vec::default(),
+            ready_frames: 0,
+        });
     }
 
     let mut index = 0;
-    while index < pending_loading_zones.len() {
-        let (handle, despawn_other_zones) = &pending_loading_zones[index];
+    while index < loading_zones.len() {
+        let loading_zone = &mut loading_zones[index];
 
-        match spawn_zone_params.asset_server.get_load_state(handle) {
-            LoadState::NotLoaded | LoadState::Loading => {
-                index += 1;
-            }
-            LoadState::Loaded => {
-                if let Some(zone_data) = zone_loader_assets.get(handle) {
-                    // Despawn other zones
-                    if *despawn_other_zones {
-                        for cached_zone in zone_loader_cache
-                            .cache
-                            .iter_mut()
-                            .filter_map(|x| x.as_mut())
-                        {
-                            if let Some(spawned_entity) = cached_zone.spawned_entity.take() {
-                                spawn_zone_params
-                                    .commands
-                                    .entity(spawned_entity)
-                                    .despawn_recursive();
-                            }
-                        }
-
-                        spawn_zone_params.commands.remove_resource::<CurrentZone>();
+        match loading_zone.state {
+            LoadingZoneState::Loading => {
+                match spawn_zone_params
+                    .asset_server
+                    .get_load_state(&loading_zone.handle)
+                {
+                    LoadState::NotLoaded | LoadState::Loading => {
+                        index += 1;
                     }
+                    LoadState::Loaded => {
+                        if let Some(zone_data) = zone_loader_assets.get(&loading_zone.handle) {
+                            // Despawn other zones
+                            if loading_zone.despawn_other_zones {
+                                for cached_zone in zone_loader_cache
+                                    .cache
+                                    .iter_mut()
+                                    .filter_map(|x| x.as_mut())
+                                {
+                                    if let Some(spawned_entity) = cached_zone.spawned_entity.take()
+                                    {
+                                        spawn_zone_params
+                                            .commands
+                                            .entity(spawned_entity)
+                                            .despawn_recursive();
+                                    }
+                                }
 
-                    // Spawn next zone
-                    if let Ok(zone_entity) = spawn_zone(&mut spawn_zone_params, zone_data) {
-                        zone_events.send(ZoneEvent::Loaded(zone_data.zone_id));
+                                spawn_zone_params.commands.remove_resource::<CurrentZone>();
+                            }
 
-                        zone_loader_cache.cache[zone_data.zone_id.get() as usize] =
-                            Some(CachedZone {
-                                data_handle: handle.clone(),
-                                spawned_entity: Some(zone_entity),
-                            });
+                            // Spawn next zone
+                            if let Ok((zone_entity, loading_assets)) =
+                                spawn_zone(&mut spawn_zone_params, zone_data)
+                            {
+                                zone_loader_cache.cache[zone_data.zone_id.get() as usize] =
+                                    Some(CachedZone {
+                                        data_handle: loading_zone.handle.clone(),
+                                        spawned_entity: Some(zone_entity),
+                                    });
 
-                        spawn_zone_params.commands.insert_resource(CurrentZone {
-                            id: zone_data.zone_id,
-                            handle: handle.clone(),
-                        });
+                                spawn_zone_params.commands.insert_resource(CurrentZone {
+                                    id: zone_data.zone_id,
+                                    handle: loading_zone.handle.clone(),
+                                });
 
-                        debug_inspector_state.entity = Some(zone_entity);
+                                debug_inspector_state.entity = Some(zone_entity);
+                                loading_zone.zone_assets = loading_assets;
+                            }
+
+                            if loading_zone.zone_assets.is_empty() {
+                                zone_events.send(ZoneEvent::Loaded(zone_data.zone_id));
+                                loading_zones.remove(index);
+                            } else {
+                                loading_zone.state = LoadingZoneState::Spawned;
+                            }
+                        } else {
+                            index += 1;
+                        }
+                    }
+                    LoadState::Unloaded | LoadState::Failed => {
+                        loading_zones.remove(index);
                     }
                 }
-
-                pending_loading_zones.remove(index);
             }
-            LoadState::Unloaded | LoadState::Failed => {
-                pending_loading_zones.remove(index);
+            LoadingZoneState::Spawned => {
+                let is_loading = loading_zone.zone_assets.iter().any(|handle| {
+                    matches!(
+                        spawn_zone_params.asset_server.get_load_state(handle),
+                        LoadState::NotLoaded | LoadState::Loading
+                    )
+                });
+
+                if is_loading {
+                    index += 1;
+                } else if let Some(zone_data) = zone_loader_assets.get(&loading_zone.handle) {
+                    // The physics system will take 2 frames to initialise colliders properly
+                    loading_zone.ready_frames += 1;
+
+                    if loading_zone.ready_frames == 2 {
+                        zone_events.send(ZoneEvent::Loaded(zone_data.zone_id));
+                        loading_zones.remove(index);
+                    } else {
+                        index += 1;
+                    }
+                } else {
+                    index += 1;
+                }
             }
         }
     }
@@ -400,7 +459,7 @@ pub fn zone_loader_system(
 pub fn spawn_zone(
     params: &mut SpawnZoneParams,
     zone_data: &ZoneLoaderAsset,
-) -> Result<Entity, anyhow::Error> {
+) -> Result<(Entity, Vec<HandleUntyped>), anyhow::Error> {
     let SpawnZoneParams {
         commands,
         asset_server,
@@ -445,6 +504,7 @@ pub fn spawn_zone(
         })
     };
 
+    let mut zone_loading_assets: Vec<HandleUntyped> = Vec::default();
     let zone_entity = commands
         .spawn_bundle((
             Zone {
@@ -500,6 +560,7 @@ pub fn spawn_zone(
                         let event_entity = spawn_object(
                             commands,
                             asset_server,
+                            &mut zone_loading_assets,
                             vfs_resource,
                             effect_mesh_materials.as_mut(),
                             particle_materials.as_mut(),
@@ -525,6 +586,7 @@ pub fn spawn_zone(
                         let warp_entity = spawn_object(
                             commands,
                             asset_server,
+                            &mut zone_loading_assets,
                             vfs_resource,
                             effect_mesh_materials.as_mut(),
                             particle_materials.as_mut(),
@@ -555,6 +617,7 @@ pub fn spawn_zone(
                         let object_entity = spawn_object(
                             commands,
                             asset_server,
+                            &mut zone_loading_assets,
                             vfs_resource,
                             effect_mesh_materials.as_mut(),
                             particle_materials.as_mut(),
@@ -581,6 +644,7 @@ pub fn spawn_zone(
                         let object_entity = spawn_object(
                             commands,
                             asset_server,
+                            &mut zone_loading_assets,
                             vfs_resource,
                             effect_mesh_materials.as_mut(),
                             particle_materials.as_mut(),
@@ -612,7 +676,7 @@ pub fn spawn_zone(
         }
     }
 
-    Ok(zone_entity)
+    Ok((zone_entity, zone_loading_assets))
 }
 
 const SKYBOX_MODEL_SCALE: f32 = 10.0;
@@ -873,6 +937,7 @@ fn spawn_water(
 fn spawn_object(
     commands: &mut Commands,
     asset_server: &AssetServer,
+    zone_loading_assets: &mut Vec<HandleUntyped>,
     vfs_resource: &VfsResource,
     effect_mesh_materials: &mut Assets<EffectMeshMaterial>,
     particle_materials: &mut Assets<ParticleMaterial>,
@@ -949,6 +1014,7 @@ fn spawn_object(
                 mesh_cache.insert(mesh_id, Some(handle.clone()));
                 handle
             });
+            zone_loading_assets.push(mesh.clone_untyped());
             let lit_part = lit_object.and_then(|lit_object| lit_object.parts.get(part_index));
             let lightmap_texture = lit_part.map(|lit_part| {
                 asset_server.load(RgbTextureLoader::convert_path(

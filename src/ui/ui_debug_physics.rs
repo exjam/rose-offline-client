@@ -1,7 +1,8 @@
 use bevy::{
+    hierarchy::BuildChildren,
     input::Input,
     math::Vec3,
-    pbr::StandardMaterial,
+    pbr::{AlphaMode, StandardMaterial},
     prelude::{
         shape, Assets, Camera, Camera3d, Color, Commands, ComputedVisibility, GlobalTransform,
         Handle, KeyCode, Local, Mesh, Query, Res, ResMut, Time, Transform, Visibility, With,
@@ -15,9 +16,11 @@ use bevy_rapier3d::{
     prelude::{Collider, CollisionGroups, InteractionGroups, Restitution, RigidBody},
 };
 use rand::prelude::SliceRandom;
+use rose_data::NpcId;
+use rose_game_common::components::Npc;
 
 use crate::{
-    components::{COLLISION_FILTER_CLICKABLE, COLLISION_GROUP_PHYSICS_TOY},
+    components::{ColliderEntity, COLLISION_FILTER_CLICKABLE, COLLISION_GROUP_PHYSICS_TOY},
     ray_from_screenspace::ray_from_screenspace,
     ui::UiStateDebugWindows,
 };
@@ -168,7 +171,8 @@ pub fn ui_debug_physics_system(
                 ui_state_debug_physics
                     .materials
                     .push(materials.add(StandardMaterial {
-                        base_color: *color,
+                        base_color: *color.clone().set_a(0.3),
+                        alpha_mode: AlphaMode::Blend,
                         ..Default::default()
                     }));
             }
@@ -228,22 +232,42 @@ pub fn ui_debug_physics_system(
 
                         let hit_position = ray_origin + ray_direction * distance;
 
-                        commands.spawn_bundle((
-                            mesh,
-                            material,
-                            RigidBody::Dynamic,
-                            Restitution::coefficient(ui_state_debug_physics.restitution),
-                            Collider::ball(ui_state_debug_physics.ball_radius),
-                            Transform::from_translation(Vec3::new(
-                                hit_position.x,
-                                hit_position.y + ui_state_debug_physics.spawn_height,
-                                hit_position.z,
-                            )),
-                            GlobalTransform::default(),
-                            Visibility::default(),
-                            ComputedVisibility::default(),
-                            CollisionGroups::new(COLLISION_GROUP_PHYSICS_TOY, u32::MAX),
-                        ));
+                        let entity_id = commands
+                            .spawn_bundle((
+                                mesh,
+                                material,
+                                RigidBody::Dynamic,
+                                Restitution::coefficient(ui_state_debug_physics.restitution),
+                                Collider::ball(ui_state_debug_physics.ball_radius),
+                                Transform::from_translation(Vec3::new(
+                                    hit_position.x,
+                                    hit_position.y + ui_state_debug_physics.spawn_height,
+                                    hit_position.z,
+                                )),
+                                GlobalTransform::default(),
+                                Visibility::default(),
+                                ComputedVisibility::default(),
+                                CollisionGroups::new(COLLISION_GROUP_PHYSICS_TOY, u32::MAX),
+                            ))
+                            .id();
+
+                        let npc_entity = commands
+                            .spawn_bundle((
+                                Npc::new(NpcId::new(1).unwrap(), 0),
+                                ColliderEntity::new(entity_id),
+                                Transform::from_translation(Vec3::new(
+                                    0.0,
+                                    -ui_state_debug_physics.ball_radius / 2.0,
+                                    0.0,
+                                )),
+                                GlobalTransform::default(),
+                                Visibility::default(),
+                                ComputedVisibility::default(),
+                            ))
+                            .id();
+
+                        commands.entity(entity_id).add_child(npc_entity);
+
                         ui_state_debug_physics.spawn_timer -= ui_state_debug_physics.spawn_interval;
                     }
                 }

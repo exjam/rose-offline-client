@@ -25,11 +25,11 @@ use rose_game_common::{
 
 use crate::{
     components::{ActiveMotion, CharacterModel, ColliderParent, COLLISION_FILTER_CLICKABLE},
-    events::{GameConnectionEvent, LoadZoneEvent, WorldConnectionEvent, ZoneEvent},
+    events::{GameConnectionEvent, LoadZoneEvent, WorldConnectionEvent},
     free_camera::FreeCamera,
     orbit_camera::OrbitCamera,
     ray_from_screenspace::ray_from_screenspace,
-    resources::{AppState, CharacterList, GameConnection, ServerConfiguration, WorldConnection},
+    resources::{AppState, CharacterList, ServerConfiguration, WorldConnection},
 };
 
 enum CharacterSelectState {
@@ -200,13 +200,11 @@ pub fn character_select_system(
     mut app_state: ResMut<State<AppState>>,
     mut character_select_state: ResMut<CharacterSelect>,
     mut egui_context: ResMut<EguiContext>,
-    mut zone_events: EventReader<ZoneEvent>,
     mut game_connection_events: EventReader<GameConnectionEvent>,
     mut world_connection_events: EventReader<WorldConnectionEvent>,
     mut load_zone_events: EventWriter<LoadZoneEvent>,
     query_camera: Query<(Entity, &Camera, &GlobalTransform, Option<&ActiveMotion>), With<Camera3d>>,
     mut query_create_character_info: Query<&mut CharacterInfo>,
-    game_connection: Option<Res<GameConnection>>,
     world_connection: Option<Res<WorldConnection>>,
     character_list: Option<Res<CharacterList>>,
     (server_configuration, asset_server): (Res<ServerConfiguration>, Res<AssetServer>),
@@ -583,18 +581,18 @@ pub fn character_select_system(
                 });
 
             for event in game_connection_events.iter() {
-                if let &GameConnectionEvent::JoiningZone(zone_id) = event {
-                    // Start camera animation
-                    let (camera_entity, _, _, _) = query_camera.single();
-                    commands
-                        .entity(camera_entity)
-                        .insert(ActiveMotion::new_once(
-                            asset_server.load("3DDATA/TITLE/CAMERA01_INGAME01.ZMO"),
-                        ));
+                let &GameConnectionEvent::Connected(zone_id) = event;
 
-                    character_select_state.state = CharacterSelectState::Leaving;
-                    character_select_state.join_zone_id = Some(zone_id);
-                }
+                // Start camera animation
+                let (camera_entity, _, _, _) = query_camera.single();
+                commands
+                    .entity(camera_entity)
+                    .insert(ActiveMotion::new_once(
+                        asset_server.load("3DDATA/TITLE/CAMERA01_INGAME01.ZMO"),
+                    ));
+
+                character_select_state.state = CharacterSelectState::Leaving;
+                character_select_state.join_zone_id = Some(zone_id);
             }
         }
         CharacterSelectState::Leaving => {
@@ -607,22 +605,7 @@ pub fn character_select_system(
                 ));
             }
         }
-        CharacterSelectState::Loading => {
-            for event in zone_events.iter() {
-                match event {
-                    &ZoneEvent::Loaded(_) => {
-                        // Tell server we are ready to join the zone, once the server replies
-                        // then game_connection_system will transition app state to in game
-                        if let Some(game_connection) = game_connection.as_ref() {
-                            game_connection
-                                .client_message_tx
-                                .send(ClientMessage::JoinZoneRequest)
-                                .ok();
-                        }
-                    }
-                }
-            }
-        }
+        CharacterSelectState::Loading => {}
     }
 
     if !matches!(
