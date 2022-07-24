@@ -113,6 +113,34 @@ impl ZoneLoaderAsset {
             0.0
         }
     }
+
+    pub fn get_tile_index(&self, x: f32, y: f32) -> usize {
+        let block_x = x / (16.0 * self.zon.grid_per_patch * self.zon.grid_size);
+        let block_y = 65.0 - (y / (16.0 * self.zon.grid_per_patch * self.zon.grid_size));
+
+        if let Some(tilemap) = self
+            .blocks
+            .get(block_x.max(0.0).min(64.0) as usize + block_y.max(0.0).min(64.0) as usize * 64)
+            .and_then(|block| block.as_ref())
+            .and_then(|block| block.til.as_ref())
+        {
+            let tile_x = tilemap.width as f32 * block_x.fract();
+            let tile_y = tilemap.height as f32 * block_y.fract();
+
+            let tile_index_x = tile_x as usize;
+            let tile_index_y = tile_y as usize;
+
+            let tile_index = tilemap.get_clamped(tile_index_x, tile_index_y) as usize;
+
+            if let Some(tile_info) = self.zon.tiles.get(tile_index) {
+                (tile_info.layer2 + tile_info.offset2) as usize
+            } else {
+                0
+            }
+        } else {
+            0
+        }
+    }
 }
 
 pub struct ZoneLoader {

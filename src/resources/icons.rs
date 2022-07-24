@@ -55,6 +55,16 @@ impl Icons {
         )
     }
 
+    pub fn get_window_icon_settings(&self) -> (egui::TextureId, egui::Rect) {
+        (
+            self.window_icons_image.1,
+            egui::Rect::from_min_max(
+                egui::Pos2::new(151.5 / 512.0, 229.5 / 512.0),
+                egui::Pos2::new(190.5 / 512.0, 268.5 / 512.0),
+            ),
+        )
+    }
+
     pub fn get_item_icon(&self, index: usize) -> Option<(egui::TextureId, egui::Rect)> {
         let page_index = index / ICONS_PER_PAGE;
         let (_, item_texture_id) = self.item_pages.get(page_index)?;

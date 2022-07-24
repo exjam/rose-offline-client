@@ -14,6 +14,7 @@ mod network_thread;
 mod render_configuration;
 mod server_configuration;
 mod server_list;
+mod sound_settings;
 mod world_connection;
 mod world_rates;
 mod world_time;
@@ -37,6 +38,7 @@ pub use network_thread::{run_network_thread, NetworkThread, NetworkThreadMessage
 pub use render_configuration::RenderConfiguration;
 pub use server_configuration::ServerConfiguration;
 pub use server_list::{ServerList, ServerListGameServer, ServerListWorldServer};
+pub use sound_settings::SoundSettings;
 pub use world_connection::WorldConnection;
 pub use world_rates::WorldRates;
 pub use world_time::WorldTime;

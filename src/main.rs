@@ -17,9 +17,13 @@ use bevy::{
 };
 use bevy_egui::EguiContext;
 use bevy_rapier3d::plugin::PhysicsStages;
+use enum_map::enum_map;
 use std::{path::Path, sync::Arc};
-use zone_loader::{zone_loader_system, ZoneLoaderAsset};
 
+use rose_data::{CharacterMotionDatabaseOptions, NpcDatabaseOptions, ZoneId};
+use rose_file_readers::{LtbFile, StbFile, StlFile, StlReadOptions, VfsIndex, ZscFile};
+
+mod audio;
 mod bundles;
 mod components;
 mod effect_loader;
@@ -39,9 +43,7 @@ mod zmo_asset_loader;
 mod zms_asset_loader;
 mod zone_loader;
 
-use rose_data::{CharacterMotionDatabaseOptions, NpcDatabaseOptions, ZoneId};
-use rose_file_readers::{LtbFile, StbFile, StlFile, StlReadOptions, VfsIndex, ZscFile};
-
+use audio::OddioPlugin;
 use events::{
     AnimationFrameEvent, ChatboxEvent, ClientEntityEvent, ConversationDialogEvent,
     GameConnectionEvent, HitEvent, LoadZoneEvent, NpcStoreEvent, PartyEvent, PlayerCommandEvent,
@@ -55,26 +57,26 @@ use render::{DamageDigitMaterial, RoseRenderPlugin};
 use resources::{
     run_network_thread, AppState, ClientEntityList, DamageDigitsSpawner, DebugRenderConfig,
     GameData, Icons, NetworkThread, NetworkThreadMessage, RenderConfiguration, ServerConfiguration,
-    WorldTime, ZoneTime,
+    SoundSettings, WorldTime, ZoneTime,
 };
 use scripting::RoseScriptingPlugin;
 use systems::{
-    ability_values_system, animation_effect_system, animation_system,
-    character_model_add_collider_system, character_model_blink_system, character_model_system,
-    character_select_enter_system, character_select_exit_system, character_select_input_system,
-    character_select_models_system, character_select_system, client_entity_event_system,
-    collision_height_only_system, collision_player_system, collision_player_system_join_zoin,
-    command_system, conversation_dialog_system, cooldown_system, damage_digit_render_system,
-    debug_render_collider_system, debug_render_polylines_setup_system,
+    ability_values_system, animation_effect_system, animation_sound_system, animation_system,
+    background_music_system, character_model_add_collider_system, character_model_blink_system,
+    character_model_system, character_select_enter_system, character_select_exit_system,
+    character_select_input_system, character_select_models_system, character_select_system,
+    client_entity_event_system, collision_height_only_system, collision_player_system,
+    collision_player_system_join_zoin, command_system, conversation_dialog_system, cooldown_system,
+    damage_digit_render_system, debug_render_collider_system, debug_render_polylines_setup_system,
     debug_render_polylines_update_system, debug_render_skeleton_system, effect_system,
     game_connection_system, game_mouse_input_system, game_state_enter_system,
     game_zone_change_system, hit_event_system, item_drop_model_add_collider_system,
     item_drop_model_system, login_connection_system, login_state_enter_system,
     login_state_exit_system, login_system, model_viewer_enter_system, model_viewer_system,
-    npc_model_add_collider_system, npc_model_system, particle_sequence_system,
-    passive_recovery_system, pending_damage_system, pending_skill_effect_system,
-    player_command_system, projectile_system, quest_trigger_system, spawn_effect_system,
-    spawn_projectile_system, system_func_event_system, update_position_system,
+    npc_idle_sound_system, npc_model_add_collider_system, npc_model_system,
+    particle_sequence_system, passive_recovery_system, pending_damage_system,
+    pending_skill_effect_system, player_command_system, projectile_system, quest_trigger_system,
+    spawn_effect_system, spawn_projectile_system, system_func_event_system, update_position_system,
     visible_status_effects_system, world_connection_system, world_time_system, zone_time_system,
     zone_viewer_enter_system, DebugInspectorPlugin,
 };
@@ -86,13 +88,16 @@ use ui::{
     ui_debug_skill_list_system, ui_debug_zone_lighting_system, ui_debug_zone_list_system,
     ui_debug_zone_time_system, ui_diagnostics_system, ui_drag_and_drop_system, ui_hotbar_system,
     ui_inventory_system, ui_minimap_system, ui_npc_store_system, ui_party_system,
-    ui_player_info_system, ui_quest_list_system, ui_selected_target_system, ui_skill_list_system,
-    ui_window_system, UiStateDebugWindows, UiStateDragAndDrop, UiStateWindows,
+    ui_player_info_system, ui_quest_list_system, ui_selected_target_system, ui_settings_system,
+    ui_skill_list_system, ui_window_system, UiStateDebugWindows, UiStateDragAndDrop,
+    UiStateWindows,
 };
 use vfs_asset_io::VfsAssetIo;
 use zmo_asset_loader::{ZmoAsset, ZmoAssetLoader};
 use zms_asset_loader::{ZmsAssetLoader, ZmsMaterialNumFaces};
-use zone_loader::ZoneLoader;
+use zone_loader::{zone_loader_system, ZoneLoader, ZoneLoaderAsset};
+
+use crate::components::SoundCategory;
 
 pub struct VfsResource {
     vfs: Arc<VfsIndex>,
@@ -198,6 +203,11 @@ fn main() {
             clap::Arg::new("passthrough-terrain-textures")
                 .long("passthrough-terrain-textures")
                 .help("Assume all terrain textures are the same format such that we can pass through compressed textures to the GPU without decompression on the CPU. Note: This is not true for default irose 129_129en assets."),
+        )
+        .arg(
+            clap::Arg::new("enable-sound")
+                .long("enable-sound")
+                .help("Enable sound."),
         );
     let data_path_error = command.error(
         clap::ErrorKind::ArgumentNotFound,
@@ -224,6 +234,7 @@ fn main() {
     let preset_character_name = matches.value_of("character-name").map(|x| x.to_string());
     let auto_login = matches.is_present("auto-login");
     let passthrough_terrain_textures = matches.is_present("passthrough-terrain-textures");
+    let enable_sound = matches.is_present("enable-sound");
 
     let disable_vsync = matches.is_present("disable-vsync");
     let mut app_state = AppState::ZoneViewer;
@@ -283,7 +294,7 @@ fn main() {
         })
         .insert_resource(LogSettings {
             level: Level::INFO,
-            filter: "wgpu=error,packets=debug,quest=trace,lua=trace".to_string(),
+            filter: "wgpu=error,packets=debug,quest=trace,lua=trace,animation=info".to_string(),
         })
         .add_plugin(bevy::log::LogPlugin::default())
         .add_plugin(bevy::core::CorePlugin::default())
@@ -318,7 +329,8 @@ fn main() {
             physics_pipeline_active: false,
             query_pipeline_active: true,
             ..Default::default()
-        });
+        })
+        .add_plugin(OddioPlugin);
 
     // Initialise rose stuff
     app.init_asset_loader::<ZmsAssetLoader>()
@@ -339,6 +351,16 @@ fn main() {
             preset_channel_id,
             preset_character_name,
             auto_login,
+        })
+        .insert_resource(SoundSettings {
+            enabled: enable_sound,
+            global_gain: 0.5,
+            gains: enum_map! {
+                SoundCategory::PlayerFootstep => 0.8,
+                SoundCategory::NpcSounds => 0.7,
+                SoundCategory::OtherFootstep => 0.5,
+                SoundCategory::BackgroundMusic => 0.4,
+            },
         });
 
     // Setup state
@@ -369,7 +391,8 @@ fn main() {
 
     app.add_asset::<ZmsMaterialNumFaces>();
 
-    app.add_system(character_model_system)
+    app.add_system(background_music_system)
+        .add_system(character_model_system)
         .add_system(character_model_add_collider_system.after(character_model_system))
         .add_system(npc_model_system)
         .add_system(npc_model_add_collider_system.after(npc_model_system))
@@ -383,6 +406,7 @@ fn main() {
                 .after(animation_system)
                 .before(spawn_effect_system),
         )
+        .add_system(animation_sound_system.after(animation_system))
         .add_system(pending_skill_effect_system.after(animation_effect_system))
         .add_system(
             projectile_system
@@ -411,6 +435,7 @@ fn main() {
                 .after(hit_event_system),
         )
         .add_system(spawn_effect_system)
+        .add_system(npc_idle_sound_system)
         .add_system(world_time_system)
         .add_system(system_func_event_system)
         .add_system(zone_time_system.after(world_time_system))
@@ -547,6 +572,7 @@ fn main() {
                 .with_system(ui_selected_target_system.label("ui_system"))
                 .with_system(ui_skill_list_system.label("ui_system"))
                 .with_system(ui_window_system.label("ui_system"))
+                .with_system(ui_settings_system.label("ui_system"))
                 .with_system(conversation_dialog_system.label("ui_system")),
         );
     app.add_system_to_stage(CoreStage::PostUpdate, ui_drag_and_drop_system);
@@ -635,6 +661,8 @@ fn load_game_data(
         skills: skill_database,
         skybox: rose_data_irose::get_skybox_database(&vfs_resource.vfs)
             .expect("Failed to load skybox database"),
+        sounds: rose_data_irose::get_sound_database(&vfs_resource.vfs)
+            .expect("Failed to load sound database"),
         status_effects: Arc::new(
             rose_data_irose::get_status_effect_database(&vfs_resource.vfs)
                 .expect("Failed to load status effect database"),

@@ -15,6 +15,9 @@ pub struct UiStateWindows {
 
     pub quest_list_window_id: egui::Id,
     pub quest_list_open: bool,
+
+    pub settings_window_id: egui::Id,
+    pub settings_open: bool,
 }
 
 impl Default for UiStateWindows {
@@ -28,6 +31,8 @@ impl Default for UiStateWindows {
             skill_list_open: false,
             quest_list_window_id: egui::Id::new("window_id_quest_list"),
             quest_list_open: false,
+            settings_window_id: egui::Id::new("window_id_settings"),
+            settings_open: false,
         }
     }
 }
@@ -54,6 +59,10 @@ pub fn ui_window_system(
 
         if input.consume_key(egui::Modifiers::ALT, egui::Key::Q) {
             ui_state_windows.quest_list_open = !ui_state_windows.quest_list_open;
+        }
+
+        if input.consume_key(egui::Modifiers::ALT, egui::Key::O) {
+            ui_state_windows.settings_open = !ui_state_windows.settings_open;
         }
     }
 
@@ -123,6 +132,22 @@ pub fn ui_window_system(
                     ui.ctx().move_to_top(egui::LayerId::new(
                         egui::Order::Middle,
                         ui_state_windows.quest_list_window_id,
+                    ));
+                }
+            }
+
+            let (texture_id, uv) = icons.get_window_icon_settings();
+            if ui
+                .add(egui::ImageButton::new(texture_id, icon_size).uv(uv))
+                .on_hover_text("Settings (Alt + O)")
+                .clicked()
+            {
+                ui_state_windows.settings_open = !ui_state_windows.settings_open;
+
+                if ui_state_windows.settings_open {
+                    ui.ctx().move_to_top(egui::LayerId::new(
+                        egui::Order::Middle,
+                        ui_state_windows.settings_window_id,
                     ));
                 }
             }

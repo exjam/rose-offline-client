@@ -28,7 +28,7 @@ pub fn animation_effect_system(
 ) {
     for event in animation_frame_events.iter() {
         if client_entity_list.player_entity == Some(event.entity) {
-            log::info!(target: "animation", "Player animation event flags: {:?}", event.flags);
+            log::debug!(target: "animation", "Player animation event flags: {:?}", event.flags);
         }
 
         if event

@@ -15,26 +15,30 @@ bitflags = "1.2"
 bytemuck = { version = "1.7.0", features = ["derive"] }
 chrono = "0.4"
 clap = "3.1"
+cpal = "0.13"
 crossbeam-channel = "0.5"
 dolly = "0.3.1"
 egui_extras = "0.18"
 enum-map = { version = "2.0", features = ["serde"] }
+hound = "3.4"
 image = { version = "0.24", default-features = false, features = ["dds"] }
 lazy_static = "1.4.0"
+lewton = "0.10"
 log = "0.4.14"
 md5 = "0.7.0"
 num-derive = "0.3"
 num-traits = "0.2"
+oddio = "0.5"
 rand = "0.8"
 thiserror = "1.0"
 tokio = { version = "1.17", features = ["rt", "net", "sync", "macros", "io-util"] }
-rose-data = { git = "https://github.com/exjam/rose-offline", rev = "6471aae1eaddcdd9f022a5aabadf56f5652272b2" }
-rose-data-irose = { git = "https://github.com/exjam/rose-offline", rev = "6471aae1eaddcdd9f022a5aabadf56f5652272b2" }
-rose-file-readers = { git = "https://github.com/exjam/rose-offline", rev = "6471aae1eaddcdd9f022a5aabadf56f5652272b2" }
-rose-game-common = { git = "https://github.com/exjam/rose-offline", rev = "6471aae1eaddcdd9f022a5aabadf56f5652272b2" }
-rose-game-irose = { git = "https://github.com/exjam/rose-offline", rev = "6471aae1eaddcdd9f022a5aabadf56f5652272b2" }
-rose-network-common = { git = "https://github.com/exjam/rose-offline", rev = "6471aae1eaddcdd9f022a5aabadf56f5652272b2" }
-rose-network-irose = { git = "https://github.com/exjam/rose-offline", rev = "6471aae1eaddcdd9f022a5aabadf56f5652272b2" }
+rose-data = { git = "https://github.com/exjam/rose-offline", rev = "dc94a0d7198f99e050d3df8db5525a11ed2fc908" }
+rose-data-irose = { git = "https://github.com/exjam/rose-offline", rev = "dc94a0d7198f99e050d3df8db5525a11ed2fc908" }
+rose-file-readers = { git = "https://github.com/exjam/rose-offline", rev = "dc94a0d7198f99e050d3df8db5525a11ed2fc908" }
+rose-game-common = { git = "https://github.com/exjam/rose-offline", rev = "dc94a0d7198f99e050d3df8db5525a11ed2fc908" }
+rose-game-irose = { git = "https://github.com/exjam/rose-offline", rev = "dc94a0d7198f99e050d3df8db5525a11ed2fc908" }
+rose-network-common = { git = "https://github.com/exjam/rose-offline", rev = "dc94a0d7198f99e050d3df8db5525a11ed2fc908" }
+rose-network-irose = { git = "https://github.com/exjam/rose-offline", rev = "dc94a0d7198f99e050d3df8db5525a11ed2fc908" }
 
 [patch.crates-io]
 bevy = { git = "https://github.com/exjam/bevy", rev = "0e877a9a69623a1bd7c6fc79c88a145e29c20aa3" }
@@ -43,6 +47,8 @@ bevy_egui = { git = "https://github.com/exjam/bevy_egui", rev = "173f2df393f88b5
 bevy-inspector-egui = { git = "https://github.com/exjam/bevy-inspector-egui", rev = "dace3bec25a29da9fb2f18553967bb188c3428a5" }
 bevy_rapier3d = { git = "https://github.com/exjam/bevy_rapier", rev = "5a8a630b22da43da219c1847c8c9665fe67ad55a" }
 nalgebra = { git = "https://github.com/exjam/nalgebra", rev = "3623ab19e42eeea14a754a1fd9c29f4e9a2ce6d0" }
+oddio = { git = "https://github.com/exjam/oddio", rev = "4f4eb4076c3a4068225a7c442a25e40422261c93" }
+
 
 [profile.dev.package."*"]
 opt-level = 3

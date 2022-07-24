@@ -25,6 +25,7 @@ mod ui_party_system;
 mod ui_player_info_system;
 mod ui_quest_list_system;
 mod ui_selected_target_system;
+mod ui_settings_system;
 mod ui_skill_list_system;
 mod ui_window_system;
 
@@ -55,5 +56,6 @@ pub use ui_party_system::ui_party_system;
 pub use ui_player_info_system::ui_player_info_system;
 pub use ui_quest_list_system::ui_quest_list_system;
 pub use ui_selected_target_system::ui_selected_target_system;
+pub use ui_settings_system::ui_settings_system;
 pub use ui_skill_list_system::ui_skill_list_system;
 pub use ui_window_system::{ui_window_system, UiStateWindows};

@@ -80,6 +80,7 @@ fn advance_active_motion(
         * active_motion.animation_speed as f64;
     let current_frame_fract = current_frame_index_exact.fract() as f32;
     let current_loop_count = current_frame_index_exact as usize / zmo_asset.num_frames();
+    active_motion.loop_count = current_loop_count;
     if current_loop_count >= active_motion.repeat_limit.unwrap_or(usize::MAX) {
         return None; // Animation complete
     }
