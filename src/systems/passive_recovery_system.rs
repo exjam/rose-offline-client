@@ -34,6 +34,11 @@ pub fn passive_recovery_system(
         if passive_recovery_time.time > RECOVERY_INTERVAL {
             passive_recovery_time.time -= RECOVERY_INTERVAL;
 
+            if command.is_die() {
+                // No recovery whilst dead!
+                continue;
+            }
+
             let recovery_state = if command.is_sit() {
                 PassiveRecoveryState::Sitting
             } else {
