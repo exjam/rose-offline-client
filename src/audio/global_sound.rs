@@ -1,4 +1,9 @@
-use bevy::prelude::{Assets, Changed, Commands, Component, Entity, Handle, Query, Res, ResMut};
+use bevy::{
+    asset::LoadState,
+    prelude::{
+        AssetServer, Assets, Changed, Commands, Component, Entity, Handle, Query, Res, ResMut,
+    },
+};
 
 use super::{audio_source::AudioSource, streaming_sound::StreamingSound, OddioContext, SoundGain};
 
@@ -70,6 +75,7 @@ pub fn global_sound_system(
     mut commands: Commands,
     mut player: ResMut<OddioContext>,
     audio: Res<Assets<AudioSource>>,
+    asset_server: Res<AssetServer>,
     mut query_global_sounds: Query<(Entity, &mut GlobalSound, Option<&SoundGain>)>,
 ) {
     let player = &mut player.mixer;
@@ -143,6 +149,16 @@ pub fn global_sound_system(
                 ControlHandle::Mono(handle)
             });
             global_sound.streaming_sound = Some(streaming_sound);
+        } else if matches!(
+            asset_server.get_load_state(&global_sound.asset_handle),
+            LoadState::Failed | LoadState::Unloaded
+        ) {
+            global_sound.asset_handle = Handle::default();
+
+            if !global_sound.repeating {
+                // Despawn non-repeating sounds which fail to load
+                commands.entity(entity).despawn();
+            }
         }
     }
 }

@@ -1,8 +1,9 @@
 use bevy::{
+    asset::LoadState,
     math::Vec3,
     prelude::{
-        Assets, Camera3d, Changed, Commands, Component, Entity, GlobalTransform, Handle, Local,
-        Query, Res, ResMut, With,
+        AssetServer, Assets, Camera3d, Changed, Commands, Component, Entity, GlobalTransform,
+        Handle, Local, Query, Res, ResMut, With,
     },
 };
 
@@ -82,6 +83,7 @@ pub fn spatial_sound_system(
     mut commands: Commands,
     mut context: ResMut<OddioContext>,
     audio: Res<Assets<AudioSource>>,
+    asset_server: Res<AssetServer>,
     camera: Query<&GlobalTransform, With<Camera3d>>,
     mut query_spatial_sounds: Query<(
         Entity,
@@ -177,6 +179,16 @@ pub fn spatial_sound_system(
 
             spatial_sound.control_handle = Some(handle);
             spatial_sound.streaming_sound = Some(streaming_sound);
+        } else if matches!(
+            asset_server.get_load_state(&spatial_sound.asset_handle),
+            LoadState::Failed | LoadState::Unloaded
+        ) {
+            spatial_sound.asset_handle = Handle::default();
+
+            if !spatial_sound.repeating {
+                // Despawn non-repeating sounds which fail to load
+                commands.entity(entity).despawn();
+            }
         }
     }
 }
