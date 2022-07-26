@@ -4,7 +4,6 @@ use bevy::{
 };
 use rand::Rng;
 
-use rose_data::SoundId;
 use rose_game_common::components::Npc;
 
 use crate::{
@@ -60,21 +59,22 @@ pub fn npc_idle_sound_system(
         }
 
         if rng.gen_range(0..100) < 20 {
-            if let Some(npc_data) = game_data.npcs.get_npc(npc.id) {
-                if let Some(sound_data) = SoundId::new(npc_data.normal_effect_sound_index as u16)
-                    .and_then(|id| game_data.sounds.get_sound(id))
-                {
-                    commands.entity(entity).with_children(|builder| {
-                        builder.spawn_bundle((
-                            SpatialSound::new(asset_server.load(sound_data.path.path())),
-                            SoundRadius::new(4.0),
-                            SoundCategory::NpcSounds,
-                            gain,
-                            Transform::default(),
-                            *global_transform,
-                        ));
-                    });
-                }
+            if let Some(sound_data) = game_data
+                .npcs
+                .get_npc(npc.id)
+                .and_then(|npc_data| npc_data.normal_effect_sound_id)
+                .and_then(|sound_id| game_data.sounds.get_sound(sound_id))
+            {
+                commands.entity(entity).with_children(|builder| {
+                    builder.spawn_bundle((
+                        SpatialSound::new(asset_server.load(sound_data.path.path())),
+                        SoundRadius::new(4.0),
+                        SoundCategory::NpcSounds,
+                        gain,
+                        Transform::default(),
+                        *global_transform,
+                    ));
+                });
             }
         }
     }

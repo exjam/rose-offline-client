@@ -63,11 +63,8 @@ pub fn ui_settings_system(
                         ui.label(text);
                         gain_changed |= ui
                             .add(
-                                egui::Slider::new(
-                                    &mut sound_settings.gains[category],
-                                    0.0..=1.0,
-                                )
-                                .show_value(true),
+                                egui::Slider::new(&mut sound_settings.gains[category], 0.0..=1.0)
+                                    .show_value(true),
                             )
                             .changed();
                         ui.end_row();
@@ -76,6 +73,8 @@ pub fn ui_settings_system(
                     add_category_slider("Background Music:", SoundCategory::BackgroundMusic);
                     add_category_slider("Player Footsteps:", SoundCategory::PlayerFootstep);
                     add_category_slider("Other Footsteps:", SoundCategory::OtherFootstep);
+                    add_category_slider("Player Combat:", SoundCategory::PlayerCombat);
+                    add_category_slider("Other Combat:", SoundCategory::OtherCombat);
                     add_category_slider("NPC Sounds:", SoundCategory::NpcSounds);
 
                     if gain_changed {

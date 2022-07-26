@@ -356,10 +356,12 @@ fn main() {
             enabled: enable_sound,
             global_gain: 0.5,
             gains: enum_map! {
-                SoundCategory::PlayerFootstep => 0.8,
-                SoundCategory::NpcSounds => 0.7,
+                SoundCategory::BackgroundMusic => 0.3,
+                SoundCategory::PlayerFootstep => 1.0,
+                SoundCategory::PlayerCombat => 1.0,
                 SoundCategory::OtherFootstep => 0.5,
-                SoundCategory::BackgroundMusic => 0.4,
+                SoundCategory::OtherCombat => 0.5,
+                SoundCategory::NpcSounds => 0.6,
             },
         });
 

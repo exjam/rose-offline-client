@@ -6,5 +6,7 @@ pub enum SoundCategory {
     BackgroundMusic,
     PlayerFootstep,
     OtherFootstep,
+    PlayerCombat,
+    OtherCombat,
     NpcSounds,
 }
