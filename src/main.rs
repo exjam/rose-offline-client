@@ -354,10 +354,10 @@ fn main() {
         })
         .insert_resource(SoundSettings {
             enabled: enable_sound,
-            global_gain: 0.5,
+            global_gain: 0.6,
             gains: enum_map! {
-                SoundCategory::BackgroundMusic => 0.3,
-                SoundCategory::PlayerFootstep => 1.0,
+                SoundCategory::BackgroundMusic => 0.15,
+                SoundCategory::PlayerFootstep => 0.9,
                 SoundCategory::PlayerCombat => 1.0,
                 SoundCategory::OtherFootstep => 0.5,
                 SoundCategory::OtherCombat => 0.5,

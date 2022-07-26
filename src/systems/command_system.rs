@@ -22,7 +22,7 @@ use crate::{
         CommandCastSkill, CommandCastSkillState, CommandCastSkillTarget, CommandEmote, CommandMove,
         CommandSit, NextCommand, NpcModel, PlayerCharacter, Position,
     },
-    events::ConversationDialogEvent,
+    events::{ClientEntityEvent, ConversationDialogEvent},
     resources::{GameConnection, GameData},
     zmo_asset_loader::ZmoAsset,
 };
@@ -256,6 +256,7 @@ pub fn command_system(
     game_connection: Option<Res<GameConnection>>,
     game_data: Res<GameData>,
     mut conversation_dialog_events: EventWriter<ConversationDialogEvent>,
+    mut client_entity_events: EventWriter<ClientEntityEvent>,
 ) {
     let mut rng = rand::thread_rng();
 
@@ -715,6 +716,8 @@ pub fn command_system(
                         false,
                     );
                 }
+
+                client_entity_events.send(ClientEntityEvent::Die(entity));
 
                 *command = Command::with_die();
                 *next_command = NextCommand::default();

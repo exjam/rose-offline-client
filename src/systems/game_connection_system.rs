@@ -835,10 +835,8 @@ pub fn game_connection_system(
             }
             Ok(ServerMessage::UpdateLevel(message)) => {
                 if let Some(entity) = client_entity_list.get(message.entity_id) {
-                    client_entity_events.send(ClientEntityEvent::LevelUp(
-                        message.entity_id,
-                        message.level.level,
-                    ));
+                    client_entity_events
+                        .send(ClientEntityEvent::LevelUp(entity, message.level.level));
 
                     commands.entity(entity).insert_bundle((
                         message.level,
@@ -1195,8 +1193,9 @@ pub fn game_connection_system(
                 }
             }
             Ok(ServerMessage::UseItem(message)) => {
-                client_entity_events
-                    .send(ClientEntityEvent::UseItem(message.entity_id, message.item));
+                if let Some(entity) = client_entity_list.get(message.entity_id) {
+                    client_entity_events.send(ClientEntityEvent::UseItem(entity, message.item));
+                }
             }
             Ok(ServerMessage::CastSkillSelf(message)) => {
                 if let Some(entity) = client_entity_list.get(message.entity_id) {
