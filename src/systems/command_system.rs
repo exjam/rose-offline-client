@@ -443,7 +443,7 @@ pub fn command_system(
             }
         }
 
-        if command.is_sit() {
+        if command.is_sit() && !next_command.is_die() {
             // If current command is sit, we must stand before performing NextCommand
             if let Some(motion) = get_standing_animation(character_model, npc_model) {
                 update_active_motion(
