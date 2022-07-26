@@ -1,3 +1,4 @@
+mod dialog;
 mod drag_and_drop_slot;
 mod tooltips;
 mod ui_character_info_system;
@@ -5,6 +6,7 @@ mod ui_chatbox_system;
 mod ui_debug_camera_info_system;
 mod ui_debug_client_entity_list_system;
 mod ui_debug_command_viewer_system;
+mod ui_debug_dialog_list;
 mod ui_debug_entity_inspector_system;
 mod ui_debug_item_list_system;
 mod ui_debug_npc_list_system;
@@ -29,6 +31,10 @@ mod ui_settings_system;
 mod ui_skill_list_system;
 mod ui_window_system;
 
+pub use dialog::{
+    draw_dialog, load_dialog_sprites_system, Button, Checkbox, Dialog, DialogDataBindings,
+    DialogLoader, Sprite, Textbox, Widget,
+};
 pub use drag_and_drop_slot::{DragAndDropId, DragAndDropSlot};
 pub use tooltips::{ui_add_item_tooltip, ui_add_skill_tooltip};
 pub use ui_character_info_system::ui_character_info_system;
@@ -36,6 +42,7 @@ pub use ui_chatbox_system::ui_chatbox_system;
 pub use ui_debug_camera_info_system::ui_debug_camera_info_system;
 pub use ui_debug_client_entity_list_system::ui_debug_client_entity_list_system;
 pub use ui_debug_command_viewer_system::ui_debug_command_viewer_system;
+pub use ui_debug_dialog_list::ui_debug_dialog_list_system;
 pub use ui_debug_entity_inspector_system::ui_debug_entity_inspector_system;
 pub use ui_debug_item_list_system::ui_debug_item_list_system;
 pub use ui_debug_npc_list_system::ui_debug_npc_list_system;

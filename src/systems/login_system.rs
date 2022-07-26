@@ -1,8 +1,9 @@
 use bevy::{
+    app::AppExit,
     math::Vec3,
     prelude::{
-        AssetServer, Camera3d, Commands, Entity, EventWriter, FromWorld, Query, Res, ResMut,
-        Transform, With, World,
+        AssetServer, Assets, Camera3d, Commands, Entity, EventWriter, FromWorld, Query, Res,
+        ResMut, Transform, With, World,
     },
     window::Windows,
 };
@@ -16,7 +17,10 @@ use crate::{
     events::LoadZoneEvent,
     free_camera::FreeCamera,
     orbit_camera::OrbitCamera,
-    resources::{Account, LoginConnection, NetworkThread, ServerConfiguration, ServerList},
+    resources::{
+        Account, LoginConnection, NetworkThread, ServerConfiguration, ServerList, UiResources,
+    },
+    ui::{draw_dialog, Dialog, DialogDataBindings},
 };
 
 enum LoginState {
@@ -39,6 +43,7 @@ pub struct Login {
     port: String,
     username: String,
     password: String,
+    remember_details: bool,
     selected_world_server_id: usize,
     selected_game_server_id: usize,
     auto_login: bool,
@@ -55,6 +60,7 @@ impl FromWorld for Login {
             port: config.port.clone(),
             username: config.preset_username.as_ref().cloned().unwrap_or_default(),
             password: config.preset_password.as_ref().cloned().unwrap_or_default(),
+            remember_details: false,
             selected_world_server_id: config.preset_server_id.unwrap_or(0),
             selected_game_server_id: config.preset_channel_id.unwrap_or(0),
             auto_login: config.auto_login,
@@ -101,6 +107,12 @@ pub fn login_state_exit_system(mut commands: Commands) {
     commands.remove_resource::<Login>();
 }
 
+const IID_EDIT_ID: i32 = 2;
+const IID_EDIT_PWD: i32 = 3;
+const IID_BTN_OK: i32 = 4;
+const IID_BTN_CANCEL: i32 = 5;
+const IID_CHECKBOX_SAVE_LASTCONECTID: i32 = 10;
+
 #[allow(clippy::too_many_arguments)]
 pub fn login_system(
     mut commands: Commands,
@@ -109,7 +121,11 @@ pub fn login_system(
     login_connection: Option<Res<LoginConnection>>,
     server_list: Option<Res<ServerList>>,
     network_thread: Res<NetworkThread>,
+    ui_resources: Res<UiResources>,
+    dialog_assets: Res<Assets<Dialog>>,
+    mut exit_events: EventWriter<AppExit>,
 ) {
+    let mut ui_state = &mut *ui_state;
     if login_connection.is_none() {
         // If we have no connection, return to input state
         ui_state.state = LoginState::Input;
@@ -131,64 +147,85 @@ pub fn login_system(
 
     match ui_state.state {
         LoginState::Input => {
+            let dialog = if let Some(dialog) = dialog_assets.get(&ui_resources.dialog_login) {
+                dialog
+            } else {
+                return;
+            };
+
+            let mut response_username = None;
+            let mut response_password = None;
+            let mut response_ok = None;
+            let mut response_cancel = None;
+            let mut enter_pressed = false;
+
             egui::Window::new("Login")
                 .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
-                .collapsible(false)
+                .frame(egui::Frame::none())
+                .title_bar(false)
+                .resizable(false)
+                .default_width(dialog.width)
+                .default_height(dialog.height)
                 .show(egui_context.ctx_mut(), |ui| {
-                    let (text_username, text_password) = egui::Grid::new("login_dialog_grid")
-                        .num_columns(2)
-                        .show(ui, |ui| {
-                            ui.label("Username");
-                            let text_username = ui.text_edit_singleline(&mut ui_state.username);
-                            ui.end_row();
-
-                            ui.label("Password");
-                            let text_password = ui.add(
-                                egui::TextEdit::singleline(&mut ui_state.password).password(true),
-                            );
-                            ui.end_row();
-
-                            if !ui_state.initial_focus_set {
-                                text_username.request_focus();
-                                ui_state.initial_focus_set = true;
-                            }
-
-                            (text_username, text_password)
-                        })
-                        .inner;
-
-                    ui.separator();
-
-                    let mut try_start_login =
-                        ui.input().key_pressed(egui::Key::Enter) || ui_state.auto_login;
-                    ui.horizontal(|ui| {
-                        if ui.button("Login").clicked() {
-                            try_start_login = true;
-                        }
-
-                        if ui.button("Exit").clicked() {
-                            // take some action here
-                        }
-                    });
-
-                    if try_start_login {
-                        if ui_state.username.is_empty() {
-                            text_username.request_focus();
-                        } else if ui_state.password.is_empty() {
-                            text_password.request_focus();
-                        } else {
-                            ui_state.state = LoginState::WaitServerList;
-                            commands.insert_resource(Account {
-                                username: ui_state.username.clone(),
-                                password_md5: format!("{:x}", md5::compute(&ui_state.password)),
-                            });
-                            commands.insert_resource(network_thread.connect_login(
-                                &ui_state.ip,
-                                ui_state.port.parse::<u16>().unwrap_or(29000),
-                            ));
-                        }
-                    }
+                    draw_dialog(
+                        ui,
+                        dialog,
+                        DialogDataBindings {
+                            checked: [(
+                                IID_CHECKBOX_SAVE_LASTCONECTID,
+                                &mut ui_state.remember_details,
+                            )],
+                            text: [
+                                (IID_EDIT_ID, &mut ui_state.username),
+                                (IID_EDIT_PWD, &mut ui_state.password),
+                            ],
+                            response: [
+                                (IID_EDIT_ID, &mut response_username),
+                                (IID_EDIT_PWD, &mut response_password),
+                                (IID_BTN_OK, &mut response_ok),
+                                (IID_BTN_CANCEL, &mut response_cancel),
+                            ],
+                            gauge: [],
+                        },
+                        |ui| {
+                            enter_pressed = ui.input().key_pressed(egui::Key::Enter);
+                        },
+                    )
                 });
+
+            if !ui_state.initial_focus_set {
+                if let Some(r) = response_username.as_ref() {
+                    r.request_focus();
+                }
+                ui_state.initial_focus_set = true;
+            }
+
+            if ui_state.auto_login || enter_pressed || response_ok.map_or(false, |r| r.clicked()) {
+                if ui_state.username.is_empty() {
+                    if let Some(r) = response_username.as_ref() {
+                        r.request_focus();
+                    }
+                } else if ui_state.password.is_empty() {
+                    if let Some(r) = response_password.as_ref() {
+                        r.request_focus();
+                    }
+                } else {
+                    ui_state.state = LoginState::WaitServerList;
+
+                    commands.insert_resource(Account {
+                        username: ui_state.username.clone(),
+                        password_md5: format!("{:x}", md5::compute(&ui_state.password)),
+                    });
+                    commands.insert_resource(network_thread.connect_login(
+                        &ui_state.ip,
+                        ui_state.port.parse::<u16>().unwrap_or(29000),
+                    ));
+                }
+            }
+
+            if response_cancel.map_or(false, |r| r.clicked()) {
+                exit_events.send(AppExit);
+            }
         }
         LoginState::WaitServerList => {
             egui::Window::new("Connecting...")

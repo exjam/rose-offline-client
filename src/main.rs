@@ -55,9 +55,9 @@ use model_loader::ModelLoader;
 use orbit_camera::OrbitCameraPlugin;
 use render::{DamageDigitMaterial, RoseRenderPlugin};
 use resources::{
-    run_network_thread, AppState, ClientEntityList, DamageDigitsSpawner, DebugRenderConfig,
-    GameData, Icons, NetworkThread, NetworkThreadMessage, RenderConfiguration, ServerConfiguration,
-    SoundSettings, WorldTime, ZoneTime,
+    load_ui_resources, run_network_thread, AppState, ClientEntityList, DamageDigitsSpawner,
+    DebugRenderConfig, GameData, Icons, NetworkThread, NetworkThreadMessage, RenderConfiguration,
+    ServerConfiguration, SoundSettings, WorldTime, ZoneTime,
 };
 use scripting::RoseScriptingPlugin;
 use systems::{
@@ -81,15 +81,16 @@ use systems::{
     zone_viewer_enter_system, DebugInspectorPlugin,
 };
 use ui::{
-    ui_character_info_system, ui_chatbox_system, ui_debug_camera_info_system,
-    ui_debug_client_entity_list_system, ui_debug_command_viewer_system,
-    ui_debug_entity_inspector_system, ui_debug_item_list_system, ui_debug_menu_system,
-    ui_debug_npc_list_system, ui_debug_physics_system, ui_debug_render_system,
-    ui_debug_skill_list_system, ui_debug_zone_lighting_system, ui_debug_zone_list_system,
-    ui_debug_zone_time_system, ui_diagnostics_system, ui_drag_and_drop_system, ui_hotbar_system,
-    ui_inventory_system, ui_minimap_system, ui_npc_store_system, ui_party_system,
-    ui_player_info_system, ui_quest_list_system, ui_selected_target_system, ui_settings_system,
-    ui_skill_list_system, ui_window_system, UiStateDebugWindows, UiStateDragAndDrop,
+    load_dialog_sprites_system, ui_character_info_system, ui_chatbox_system,
+    ui_debug_camera_info_system, ui_debug_client_entity_list_system,
+    ui_debug_command_viewer_system, ui_debug_dialog_list_system, ui_debug_entity_inspector_system,
+    ui_debug_item_list_system, ui_debug_menu_system, ui_debug_npc_list_system,
+    ui_debug_physics_system, ui_debug_render_system, ui_debug_skill_list_system,
+    ui_debug_zone_lighting_system, ui_debug_zone_list_system, ui_debug_zone_time_system,
+    ui_diagnostics_system, ui_drag_and_drop_system, ui_hotbar_system, ui_inventory_system,
+    ui_minimap_system, ui_npc_store_system, ui_party_system, ui_player_info_system,
+    ui_quest_list_system, ui_selected_target_system, ui_settings_system, ui_skill_list_system,
+    ui_window_system, Dialog, DialogLoader, UiStateDebugWindows, UiStateDragAndDrop,
     UiStateWindows,
 };
 use vfs_asset_io::VfsAssetIo;
@@ -337,6 +338,8 @@ fn main() {
         .add_asset::<ZmoAsset>()
         .init_asset_loader::<ZmoAssetLoader>()
         .add_asset::<ZoneLoaderAsset>()
+        .init_asset_loader::<DialogLoader>()
+        .add_asset::<Dialog>()
         .insert_resource(RenderConfiguration {
             passthrough_terrain_textures,
         })
@@ -440,11 +443,13 @@ fn main() {
         .add_system(npc_idle_sound_system)
         .add_system(world_time_system)
         .add_system(system_func_event_system)
+        .add_system(load_dialog_sprites_system)
         .add_system(zone_time_system.after(world_time_system))
         .add_system(ui_npc_store_system.label("ui_system"))
         .add_system(ui_debug_camera_info_system.label("ui_system"))
         .add_system(ui_debug_client_entity_list_system.label("ui_system"))
         .add_system(ui_debug_command_viewer_system.label("ui_system"))
+        .add_system(ui_debug_dialog_list_system.label("ui_system"))
         .add_system(ui_debug_item_list_system.label("ui_system"))
         .add_system(ui_debug_menu_system.before("ui_system"))
         .add_system(ui_debug_npc_list_system.label("ui_system"))
@@ -595,7 +600,8 @@ fn main() {
             .with_system(game_connection_system),
     );
 
-    app.add_startup_system(load_game_data);
+    app.add_startup_system(load_game_data)
+        .add_startup_system(load_ui_resources);
     app.run();
 
     network_thread_tx.send(NetworkThreadMessage::Exit).ok();

@@ -33,6 +33,7 @@ pub struct UiStateDebugWindows {
     pub client_entity_list_open: bool,
     pub command_viewer_open: bool,
     pub debug_render_open: bool,
+    pub dialog_list_open: bool,
     pub item_list_open: bool,
     pub npc_list_open: bool,
     pub object_inspector_open: bool,
@@ -143,6 +144,7 @@ pub fn ui_debug_menu_system(
                     &mut ui_state_debug_windows.debug_render_open,
                     "Debug Render",
                 );
+                ui.checkbox(&mut ui_state_debug_windows.dialog_list_open, "Dialog List");
                 ui.checkbox(&mut ui_state_debug_windows.item_list_open, "Item List");
                 ui.checkbox(&mut ui_state_debug_windows.npc_list_open, "NPC List");
                 ui.checkbox(&mut ui_state_debug_windows.skill_list_open, "Skill List");
