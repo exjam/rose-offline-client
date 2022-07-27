@@ -186,8 +186,9 @@ pub fn login_system(
                                 (IID_BTN_CANCEL, &mut response_cancel),
                             ],
                             gauge: [],
+                            tabs: [],
                         },
-                        |ui| {
+                        |ui, _| {
                             enter_pressed = ui.input().key_pressed(egui::Key::Enter);
                         },
                     )

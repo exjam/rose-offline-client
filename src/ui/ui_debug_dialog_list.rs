@@ -84,8 +84,9 @@ pub fn ui_debug_dialog_list_system(
                         text: [],
                         response: [],
                         gauge: [],
+                        tabs: [],
                     },
-                    |_| {},
+                    |_, _| {},
                 )
             });
     }

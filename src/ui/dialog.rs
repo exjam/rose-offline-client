@@ -97,6 +97,10 @@ pub enum Widget {
     Textbox(Textbox),
     #[serde(rename = "PANE")]
     Pane(Pane),
+    #[serde(rename = "TABBUTTON")]
+    TabButton(TabButton),
+    #[serde(rename = "TABBEDPANE")]
+    TabbedPane(TabbedPane),
     #[serde(rename = "IMAGE")]
     Sprite(Sprite),
 }
@@ -352,6 +356,96 @@ pub struct Pane {
 widget_to_rect! { Pane }
 
 #[derive(Default, Deserialize)]
+#[serde(rename = "TAB")]
+#[serde(default)]
+pub struct Tab {
+    #[serde(rename = "ID")]
+    pub id: i32,
+
+    #[serde(rename = "$value")]
+    pub widgets: Vec<Widget>,
+
+    #[serde(skip)]
+    pub tab_button_widget_index: Option<usize>, // Index into self.widgets
+}
+
+impl Tab {
+    pub fn tab_button(&self) -> Option<&TabButton> {
+        if let Some(Widget::TabButton(tab_button)) = self
+            .tab_button_widget_index
+            .and_then(|i| self.widgets.get(i))
+        {
+            Some(tab_button)
+        } else {
+            None
+        }
+    }
+}
+
+#[derive(Default, Deserialize)]
+#[serde(rename = "TABBUTTON")]
+#[serde(default)]
+pub struct TabButton {
+    #[serde(rename = "ID")]
+    pub id: i32,
+    #[serde(rename = "NAME")]
+    pub name: String,
+    #[serde(rename = "X")]
+    pub x: f32,
+    #[serde(rename = "Y")]
+    pub y: f32,
+    #[serde(rename = "OFFSETX")]
+    pub offset_x: f32,
+    #[serde(rename = "OFFSETY")]
+    pub offset_y: f32,
+    #[serde(rename = "WIDTH")]
+    pub width: f32,
+    #[serde(rename = "HEIGHT")]
+    pub height: f32,
+
+    #[serde(rename = "MODULEID")]
+    pub module_id: i32,
+    #[serde(rename = "NORMALGID")]
+    pub normal_sprite_name: String,
+    #[serde(rename = "OVERGID")]
+    pub over_sprite_name: String,
+    #[serde(rename = "DOWNGID")]
+    pub down_sprite_name: String,
+    #[serde(rename = "DISABLESID")]
+    pub disable_sound_id: i32,
+
+    #[serde(skip)]
+    pub normal_sprite: Option<LoadedSprite>,
+    #[serde(skip)]
+    pub over_sprite: Option<LoadedSprite>,
+    #[serde(skip)]
+    pub down_sprite: Option<LoadedSprite>,
+}
+
+widget_to_rect! { TabButton }
+
+#[derive(Default, Deserialize)]
+#[serde(rename = "TABBEDPANE")]
+#[serde(default)]
+pub struct TabbedPane {
+    #[serde(rename = "ID")]
+    pub id: i32,
+    #[serde(rename = "NAME")]
+    pub name: String,
+    #[serde(rename = "X")]
+    pub x: f32,
+    #[serde(rename = "Y")]
+    pub y: f32,
+    #[serde(rename = "OFFSETX")]
+    pub offset_x: f32,
+    #[serde(rename = "OFFSETY")]
+    pub offset_y: f32,
+
+    #[serde(rename = "TAB")]
+    pub tabs: Vec<Tab>,
+}
+
+#[derive(Default, Deserialize)]
 #[serde(rename = "IMAGE")]
 #[serde(default)]
 pub struct Sprite {
@@ -512,6 +606,37 @@ fn load_widgets_sprites(
             }
             Widget::Pane(pane) => {
                 load_widgets_sprites(&mut pane.widgets, ui_resources, images);
+            }
+            Widget::TabButton(tab_button) => {
+                tab_button.normal_sprite = get_loaded_sprite(
+                    ui_resources,
+                    images,
+                    tab_button.module_id,
+                    &tab_button.normal_sprite_name,
+                );
+                tab_button.over_sprite = get_loaded_sprite(
+                    ui_resources,
+                    images,
+                    tab_button.module_id,
+                    &tab_button.over_sprite_name,
+                );
+                tab_button.down_sprite = get_loaded_sprite(
+                    ui_resources,
+                    images,
+                    tab_button.module_id,
+                    &tab_button.down_sprite_name,
+                );
+            }
+            Widget::TabbedPane(pane) => {
+                for tab in pane.tabs.iter_mut() {
+                    load_widgets_sprites(&mut tab.widgets, ui_resources, images);
+
+                    for (index, widget) in tab.widgets.iter().enumerate() {
+                        if matches!(widget, Widget::TabButton(_)) {
+                            tab.tab_button_widget_index = Some(index);
+                        }
+                    }
+                }
             }
             Widget::Textbox(_) | Widget::Listbox(_) | Widget::Caption(_) => {}
         }
@@ -703,6 +828,35 @@ impl<'a> egui::Widget for DrawSprite<'a> {
     }
 }
 
+struct DrawTabButton<'a> {
+    tab_button: &'a TabButton,
+    selected: bool,
+}
+
+impl<'a> egui::Widget for DrawTabButton<'a> {
+    fn ui(self, ui: &mut egui::Ui) -> egui::Response {
+        let rect = self.tab_button.widget_rect(ui.min_rect().min);
+        let response = ui.allocate_rect(rect, egui::Sense::click());
+
+        if ui.is_rect_visible(rect) {
+            let sprite = if self.selected || response.is_pointer_button_down_on() {
+                self.tab_button.down_sprite.as_ref()
+            } else if response.hovered() || response.has_focus() {
+                self.tab_button.over_sprite.as_ref()
+            } else {
+                None
+            }
+            .or(self.tab_button.normal_sprite.as_ref());
+
+            if let Some(sprite) = sprite {
+                draw_loaded_sprite(ui, rect.min, sprite);
+            }
+        }
+
+        response
+    }
+}
+
 struct DrawTextbox<'a, 'b> {
     textbox: &'a Textbox,
     buffer: &'b mut String,
@@ -727,27 +881,43 @@ pub struct DialogDataBindings<
     const N1: usize,
     const N2: usize,
     const N3: usize,
+    const N4: usize,
 > {
     pub checked: [(i32, &'a mut bool); N0],
     pub text: [(i32, &'a mut String); N1],
     pub gauge: [(i32, &'a f32, &'a str); N2],
-    pub response: [(i32, &'a mut Option<egui::Response>); N3],
+    pub tabs: [(i32, &'a mut i32); N3],
+    pub response: [(i32, &'a mut Option<egui::Response>); N4],
 }
 
-impl<'a, const N0: usize, const N1: usize, const N2: usize, const N3: usize>
-    DialogDataBindings<'a, N0, N1, N2, N3>
+impl<'a, const N0: usize, const N1: usize, const N2: usize, const N3: usize, const N4: usize>
+    DialogDataBindings<'a, N0, N1, N2, N3, N4>
 {
     pub fn set_response(&mut self, id: i32, response: egui::Response) {
         if let Some((_, out)) = self.response.iter_mut().find(|(x, _)| *x == id) {
             **out = Some(response);
         }
     }
+
+    pub fn tab_binding(&mut self, id: i32) -> Option<&mut i32> {
+        self.tabs
+            .iter_mut()
+            .find(|(x, _)| *x == id)
+            .map(|(_, buffer)| &mut **buffer)
+    }
 }
 
-fn draw_widgets<'a, const N0: usize, const N1: usize, const N2: usize, const N3: usize>(
+fn draw_widgets<
+    'a,
+    const N0: usize,
+    const N1: usize,
+    const N2: usize,
+    const N3: usize,
+    const N4: usize,
+>(
     ui: &mut egui::Ui,
     widgets: &[Widget],
-    bindings: &mut DialogDataBindings<'a, N0, N1, N2, N3>,
+    bindings: &mut DialogDataBindings<'a, N0, N1, N2, N3, N4>,
 ) {
     for element in widgets.iter() {
         match element {
@@ -805,20 +975,73 @@ fn draw_widgets<'a, const N0: usize, const N1: usize, const N2: usize, const N3:
             }
             Widget::Pane(pane) => {
                 ui.allocate_ui_at_rect(pane.widget_rect(ui.min_rect().min), |ui| {
-                    ui.centered_and_justified(|ui| draw_widgets(ui, &pane.widgets, bindings))
-                        .inner
+                    draw_widgets(ui, &pane.widgets, bindings)
                 });
             }
+            Widget::TabbedPane(tabbed_pane) => {
+                if !tabbed_pane.tabs.is_empty() {
+                    let mut rect = ui.min_rect();
+                    rect.min.x += tabbed_pane.x;
+                    rect.min.y += tabbed_pane.y;
+
+                    ui.allocate_ui_at_rect(rect, |ui| {
+                        let mut current_tab = bindings
+                            .tab_binding(tabbed_pane.id)
+                            .map(|x| *x)
+                            .unwrap_or(tabbed_pane.tabs[0].id);
+
+                        // First draw the buttons
+                        for tab in tabbed_pane.tabs.iter() {
+                            if let Some(tab_button) = tab.tab_button() {
+                                let response = egui::Widget::ui(
+                                    DrawTabButton {
+                                        tab_button,
+                                        selected: current_tab == tab.id,
+                                    },
+                                    ui,
+                                );
+                                if response.clicked() {
+                                    current_tab = tab.id;
+                                }
+                                bindings.set_response(tab_button.id, response);
+                            }
+                        }
+
+                        // Update current tab
+                        if let Some(tab_id) = bindings.tab_binding(tabbed_pane.id) {
+                            *tab_id = current_tab;
+                        }
+
+                        // Next draw active tab
+                        for tab in tabbed_pane.tabs.iter() {
+                            if tab.id != current_tab {
+                                continue;
+                            }
+
+                            draw_widgets(ui, &tab.widgets, bindings)
+                        }
+                    });
+                }
+            }
+            Widget::TabButton(_) => {} // These are drawn by Widget::TabbedPane
             Widget::Caption(_) => {}
         }
     }
 }
 
-pub fn draw_dialog<'a, const N0: usize, const N1: usize, const N2: usize, const N3: usize, R>(
+pub fn draw_dialog<
+    'a,
+    const N0: usize,
+    const N1: usize,
+    const N2: usize,
+    const N3: usize,
+    const N4: usize,
+    R,
+>(
     ui: &mut egui::Ui,
     dialog: &Dialog,
-    mut bindings: DialogDataBindings<'a, N0, N1, N2, N3>,
-    add_contents: impl FnOnce(&mut egui::Ui) -> R,
+    mut bindings: DialogDataBindings<'a, N0, N1, N2, N3, N4>,
+    add_contents: impl FnOnce(&mut egui::Ui, &mut DialogDataBindings<'a, N0, N1, N2, N3, N4>) -> R,
 ) {
     ui.style_mut()
         .visuals
@@ -829,5 +1052,5 @@ pub fn draw_dialog<'a, const N0: usize, const N1: usize, const N2: usize, const 
 
     draw_widgets(ui, &dialog.widgets, &mut bindings);
 
-    add_contents(ui);
+    add_contents(ui, &mut bindings);
 }

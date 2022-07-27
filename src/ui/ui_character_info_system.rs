@@ -1,211 +1,279 @@
-use bevy::prelude::{Local, Query, Res, ResMut, With};
+use bevy::{
+    ecs::query::WorldQuery,
+    prelude::{Assets, Local, Query, Res, ResMut, With},
+};
 use bevy_egui::{egui, EguiContext};
 
 use rose_game_common::{
     components::{
         AbilityValues, BasicStatType, BasicStats, CharacterInfo, ExperiencePoints, Level,
-        MoveSpeed, Stamina, StatPoints,
+        MoveSpeed, Stamina, StatPoints, MAX_STAMINA,
     },
     messages::client::ClientMessage,
 };
 
 use crate::{
     components::PlayerCharacter,
-    resources::{GameConnection, GameData},
-    ui::UiStateWindows,
+    resources::{GameConnection, GameData, UiResources},
+    ui::{draw_dialog, Dialog, DialogDataBindings, UiStateWindows},
 };
 
-#[derive(PartialEq)]
-enum CharacterInfoPage {
-    Info,
-    Stats,
-}
+const IID_BTN_CLOSE: i32 = 10;
+// const IID_BTN_DIALOG2ICON: i32 = 11;
+const IID_TABBEDPANE: i32 = 20;
+const IID_TAB_BASICINFO: i32 = 21;
+// const IID_TAB_BASICINFO_BG: i32 = 22;
+// const IID_TAB_BASICINFO_BTN: i32 = 23;
+const IID_GUAGE_STAMINA: i32 = 24;
+const IID_TAB_ABILITY: i32 = 31;
+// const IID_TAB_ABILITY_BG: i32 = 32;
+// const IID_TAB_ABILITY_BTN: i32 = 33;
+const IID_BTN_UP_STR: i32 = 34;
+const IID_BTN_UP_DEX: i32 = 35;
+const IID_BTN_UP_INT: i32 = 36;
+const IID_BTN_UP_CON: i32 = 37;
+const IID_BTN_UP_CHARM: i32 = 38;
+const IID_BTN_UP_SENSE: i32 = 39;
+const IID_TAB_UNION: i32 = 41;
+// const IID_TAB_UNION_BG: i32 = 42;
+// const IID_TAB_UNION_BTN: i32 = 43;
 
 pub struct UiStateCharacterInfo {
-    current_page: CharacterInfoPage,
+    current_tab: i32,
 }
 
 impl Default for UiStateCharacterInfo {
     fn default() -> Self {
         Self {
-            current_page: CharacterInfoPage::Info,
+            current_tab: IID_TAB_BASICINFO,
         }
     }
 }
 
+#[derive(WorldQuery)]
+pub struct PlayerQuery<'w> {
+    ability_values: &'w AbilityValues,
+    basic_stats: &'w BasicStats,
+    character_info: &'w CharacterInfo,
+    experience_points: &'w ExperiencePoints,
+    level: &'w Level,
+    move_speed: &'w MoveSpeed,
+    stamina: &'w Stamina,
+    stat_points: &'w StatPoints,
+}
+
 pub fn ui_character_info_system(
     mut egui_context: ResMut<EguiContext>,
-    mut ui_state_character_info: Local<UiStateCharacterInfo>,
+    query_player: Query<PlayerQuery, With<PlayerCharacter>>,
+    mut ui_state: Local<UiStateCharacterInfo>,
     mut ui_state_windows: ResMut<UiStateWindows>,
-    query_player: Query<
-        (
-            &CharacterInfo,
-            &AbilityValues,
-            &BasicStats,
-            &ExperiencePoints,
-            &Level,
-            &MoveSpeed,
-            &Stamina,
-            &StatPoints,
-        ),
-        With<PlayerCharacter>,
-    >,
+    ui_resources: Res<UiResources>,
+    dialog_assets: Res<Assets<Dialog>>,
     game_connection: Option<Res<GameConnection>>,
     game_data: Res<GameData>,
 ) {
-    let (
-        player_character_info,
-        player_ability_values,
-        player_basic_stats,
-        player_experience_points,
-        player_level,
-        player_move_speed,
-        player_stamina,
-        player_stat_points,
-    ) = query_player.single();
+    let dialog = if let Some(dialog) = dialog_assets.get(&ui_resources.dialog_character_info) {
+        dialog
+    } else {
+        return;
+    };
+
+    let player = if let Ok(player) = query_player.get_single() {
+        player
+    } else {
+        return;
+    };
+
+    let ui_state = &mut *ui_state;
+    let mut response_close_button = None;
+    let mut response_raise_str_button = None;
+    let mut response_raise_dex_button = None;
+    let mut response_raise_int_button = None;
+    let mut response_raise_con_button = None;
+    let mut response_raise_cha_button = None;
+    let mut response_raise_sen_button = None;
 
     egui::Window::new("Character Info")
-        .id(ui_state_windows.character_info_window_id)
+        .frame(egui::Frame::none())
         .open(&mut ui_state_windows.character_info_open)
-        .resizable(true)
+        .title_bar(false)
+        .resizable(false)
+        .default_width(dialog.width)
+        .default_height(dialog.height)
         .show(egui_context.ctx_mut(), |ui| {
-            ui.horizontal(|ui| {
-                ui.selectable_value(
-                    &mut ui_state_character_info.current_page,
-                    CharacterInfoPage::Info,
-                    "Info",
-                );
-                ui.selectable_value(
-                    &mut ui_state_character_info.current_page,
-                    CharacterInfoPage::Stats,
-                    "Stats",
-                );
-            });
+            let need_xp = game_data
+                .ability_value_calculator
+                .calculate_levelup_require_xp(player.level.level);
+            let stamina = player.stamina.stamina as f32 / MAX_STAMINA as f32;
 
-            match ui_state_character_info.current_page {
-                CharacterInfoPage::Info => {
-                    egui::Grid::new("info_grid").num_columns(2).show(ui, |ui| {
-                        ui.label("Name");
-                        ui.label(&player_character_info.name);
-                        ui.end_row();
+            draw_dialog(
+                ui,
+                dialog,
+                DialogDataBindings {
+                    checked: [],
+                    text: [],
+                    response: [
+                        (IID_BTN_CLOSE, &mut response_close_button),
+                        (IID_BTN_UP_STR, &mut response_raise_str_button),
+                        (IID_BTN_UP_DEX, &mut response_raise_dex_button),
+                        (IID_BTN_UP_INT, &mut response_raise_int_button),
+                        (IID_BTN_UP_CON, &mut response_raise_con_button),
+                        (IID_BTN_UP_CHARM, &mut response_raise_cha_button),
+                        (IID_BTN_UP_SENSE, &mut response_raise_sen_button),
+                    ],
+                    gauge: [(
+                        IID_GUAGE_STAMINA,
+                        &stamina,
+                        &format!("{} / {}", player.stamina.stamina, MAX_STAMINA),
+                    )],
+                    tabs: [(IID_TABBEDPANE, &mut ui_state.current_tab)],
+                },
+                |ui, bindings| {
+                    let draw_text_at = |ui: &mut egui::Ui, x, y, text: &str| {
+                        ui.allocate_ui_at_rect(ui.min_rect().translate(egui::vec2(x, y)), |ui| {
+                            ui.horizontal_top(|ui| ui.add(egui::Label::new(text))).inner
+                        });
+                    };
 
-                        ui.label("Job");
-                        ui.label(format!("{}", player_character_info.job));
-                        ui.end_row();
-
-                        ui.label("Clan");
-                        ui.label("");
-                        ui.end_row();
-
-                        ui.label("Level");
-                        ui.label(format!("{}", player_level.level));
-                        ui.end_row();
-
-                        ui.label("Experience");
-                        ui.scope(|ui| {
-                            let need_xp = game_data
-                                .ability_value_calculator
-                                .calculate_levelup_require_xp(player_level.level);
-                            ui.style_mut().visuals.selection.bg_fill =
-                                egui::Color32::from_rgb(145, 133, 0);
-                            ui.add(
-                                egui::ProgressBar::new(
-                                    player_experience_points.xp as f32 / need_xp as f32,
-                                )
-                                .text(format!("{} / {}", player_experience_points.xp, need_xp)),
+                    match bindings.tab_binding(IID_TABBEDPANE) {
+                        Some(&mut IID_TAB_BASICINFO) => {
+                            draw_text_at(ui, 59.0, 67.0, &player.character_info.name);
+                            draw_text_at(ui, 59.0, 88.0, "TODO: job name");
+                            draw_text_at(ui, 59.0, 109.0, "TODO: clan name");
+                            draw_text_at(ui, 59.0, 172.0, &format!("{}", player.level.level));
+                            draw_text_at(
+                                ui,
+                                59.0,
+                                193.0,
+                                &format!("{} / {}", player.experience_points.xp, need_xp),
                             );
-                        });
-                        ui.end_row();
-
-                        ui.label("Stamina");
-                        ui.scope(|ui| {
-                            ui.style_mut().visuals.selection.bg_fill =
-                                egui::Color32::from_rgb(145, 133, 0);
-                            ui.add(
-                                egui::ProgressBar::new(player_stamina.stamina as f32 / 5000.0)
-                                    .text(format!("{} / {}", player_stamina.stamina, 5000.0)),
+                        }
+                        Some(&mut IID_TAB_ABILITY) => {
+                            draw_text_at(
+                                ui,
+                                58.0,
+                                67.0,
+                                &format!("{}", player.ability_values.get_strength()),
                             );
-                        });
-                        ui.end_row();
-                    });
-                }
-                CharacterInfoPage::Stats => {
-                    ui.horizontal_top(|ui| {
-                        ui.vertical(|ui| {
-                        egui::Grid::new("basic_stats_grid")
-                            .num_columns(3)
-                            .show(ui, |ui| {
-                                let show_stat = |ui: &mut egui::Ui, name: &str, value: i32, basic_stat_type: BasicStatType| {
-                                    ui.label(name);
-                                    ui.label(format!("{}", value));
-                                    if let Some(cost) = game_data
-                                        .ability_value_calculator
-                                        .calculate_basic_stat_increase_cost(
-                                            player_basic_stats,
-                                            basic_stat_type,
-                                        )
-                                    {
-                                        if ui.add_enabled(cost <= player_stat_points.points, egui::Button::new("+"))
-                                            .on_hover_text(format!("Required Points: {}", cost))
-                                            .clicked()
-                                        {
-                                            if let Some(game_connection) = game_connection.as_ref() {
-                                                game_connection.client_message_tx.send(ClientMessage::IncreaseBasicStat(basic_stat_type)).ok();
-                                            }
-                                        }
-                                    }
-                                    ui.end_row();
-                                };
+                            draw_text_at(
+                                ui,
+                                58.0,
+                                88.0,
+                                &format!("{}", player.ability_values.get_dexterity()),
+                            );
+                            draw_text_at(
+                                ui,
+                                58.0,
+                                109.0,
+                                &format!("{}", player.ability_values.get_intelligence()),
+                            );
+                            draw_text_at(
+                                ui,
+                                58.0,
+                                130.0,
+                                &format!("{}", player.ability_values.get_concentration()),
+                            );
+                            draw_text_at(
+                                ui,
+                                58.0,
+                                151.0,
+                                &format!("{}", player.ability_values.get_charm()),
+                            );
+                            draw_text_at(
+                                ui,
+                                58.0,
+                                172.0,
+                                &format!("{}", player.ability_values.get_sense()),
+                            );
+                            draw_text_at(
+                                ui,
+                                69.0,
+                                211.0,
+                                &format!("{}", player.stat_points.points),
+                            );
 
-                                show_stat(ui, "Strength", player_basic_stats.strength, BasicStatType::Strength);
-                                show_stat(ui, "Dexterity", player_basic_stats.dexterity, BasicStatType::Dexterity);
-                                show_stat(ui, "Intelligence", player_basic_stats.intelligence, BasicStatType::Intelligence);
-                                show_stat(ui, "Concentration", player_basic_stats.concentration, BasicStatType::Concentration);
-                                show_stat(ui, "Charm", player_basic_stats.charm, BasicStatType::Charm);
-                                show_stat(ui, "Sense", player_basic_stats.sense, BasicStatType::Sense);
-                            });
+                            draw_text_at(
+                                ui,
+                                171.0,
+                                67.0,
+                                &format!("{}", player.ability_values.get_attack_power()),
+                            );
+                            draw_text_at(
+                                ui,
+                                171.0,
+                                88.0,
+                                &format!("{}", player.ability_values.get_defence()),
+                            );
+                            draw_text_at(
+                                ui,
+                                171.0,
+                                109.0,
+                                &format!("{}", player.ability_values.get_resistance()),
+                            );
+                            draw_text_at(
+                                ui,
+                                171.0,
+                                130.0,
+                                &format!("{}", player.ability_values.get_hit()),
+                            );
+                            draw_text_at(
+                                ui,
+                                171.0,
+                                151.0,
+                                &format!("{}", player.ability_values.get_critical()),
+                            );
+                            draw_text_at(
+                                ui,
+                                171.0,
+                                172.0,
+                                &format!("{}", player.ability_values.get_avoid()),
+                            );
+                            draw_text_at(
+                                ui,
+                                171.0,
+                                193.0,
+                                &format!("{}", player.ability_values.get_attack_speed()),
+                            );
+                            draw_text_at(ui, 171.0, 214.0, &format!("{}", player.move_speed.speed));
+                        }
+                        Some(&mut IID_TAB_UNION) => {}
+                        _ => {}
+                    }
+                },
+            );
+        });
 
-                            ui.label(format!("Available Points: {}", player_stat_points.points));
-                        });
+    if response_close_button.map_or(false, |r| r.clicked()) {
+        ui_state_windows.character_info_open = false;
+    }
 
-                        ui.separator();
-                        egui::Grid::new("ability_values_grid")
-                            .num_columns(2)
-                            .show(ui, |ui| {
-                                ui.label("Attack");
-                                ui.label(format!("{}", player_ability_values.get_attack_power()));
-                                ui.end_row();
-
-                                ui.label("Defence");
-                                ui.label(format!("{}", player_ability_values.get_defence()));
-                                ui.end_row();
-
-                                ui.label("Magic Defence");
-                                ui.label(format!("{}", player_ability_values.get_resistance()));
-                                ui.end_row();
-
-                                ui.label("Hit");
-                                ui.label(format!("{}", player_ability_values.get_hit()));
-                                ui.end_row();
-
-                                ui.label("Critical");
-                                ui.label(format!("{}", player_ability_values.get_critical()));
-                                ui.end_row();
-
-                                ui.label("Avoid");
-                                ui.label(format!("{}", player_ability_values.get_avoid()));
-                                ui.end_row();
-
-                                ui.label("Attack Speed");
-                                ui.label(format!("{}", player_ability_values.get_attack_speed()));
-                                ui.end_row();
-
-                                ui.label("Move Speed");
-                                ui.label(format!("{}", player_move_speed.speed));
-                                ui.end_row();
-                            });
-                    });
+    let stat_button_response = |basic_stat_type: BasicStatType,
+                                response: Option<egui::Response>| {
+        if let Some(response) = response {
+            if let Some(cost) = game_data
+                .ability_value_calculator
+                .calculate_basic_stat_increase_cost(player.basic_stats, basic_stat_type)
+            {
+                if response
+                    .on_hover_text(format!("Required Points: {}", cost))
+                    .clicked()
+                    && cost <= player.stat_points.points
+                {
+                    if let Some(game_connection) = game_connection.as_ref() {
+                        game_connection
+                            .client_message_tx
+                            .send(ClientMessage::IncreaseBasicStat(basic_stat_type))
+                            .ok();
+                    }
                 }
             }
-        });
+        }
+    };
+
+    stat_button_response(BasicStatType::Strength, response_raise_str_button);
+    stat_button_response(BasicStatType::Dexterity, response_raise_dex_button);
+    stat_button_response(BasicStatType::Intelligence, response_raise_int_button);
+    stat_button_response(BasicStatType::Concentration, response_raise_con_button);
+    stat_button_response(BasicStatType::Charm, response_raise_cha_button);
+    stat_button_response(BasicStatType::Sense, response_raise_sen_button);
 }

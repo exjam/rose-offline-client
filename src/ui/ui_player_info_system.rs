@@ -91,8 +91,9 @@ pub fn ui_player_info_system(
                         ),
                         (IID_GAUGE_EXP, &xp, &format!("{:.2}%", xp * 100.0)),
                     ],
+                    tabs: [],
                 },
-                |ui| {
+                |ui, _| {
                     ui.put(
                         egui::Rect::from_min_max(
                             ui.min_rect().min + egui::vec2(15.0, 8.0),

@@ -29,6 +29,7 @@ pub struct UiResources {
     pub sprite_sheets_load_group: Vec<HandleId>,
     pub dialog_files: HashMap<String, Handle<Dialog>>,
     pub dialog_login: Handle<Dialog>,
+    pub dialog_character_info: Handle<Dialog>,
     pub dialog_player_info: Handle<Dialog>,
 }
 
@@ -140,6 +141,7 @@ pub fn load_ui_resources(
             UiSpriteSheetType::ExUi => load_ui_spritesheet(vfs, &asset_server, &mut egui_context, &mut load_group,  "3DDATA/CONTROL/RES/EXUI.TSI", "3DDATA/CONTROL/XML/EXUI_STRID.ID").expect("Failed to load EXUI sprite sheet"),
         },
         sprite_sheets_load_group: load_group,
+        dialog_character_info: dialog_files["DLGAVATA.XML"].clone(),
         dialog_login: dialog_files["DLGLOGIN.XML"].clone(),
         dialog_player_info: dialog_files["DLGINFO.XML"].clone(),
         dialog_files,
