@@ -145,7 +145,7 @@ fn generate_cooldown_mesh(cooldown: f32, content_rect: egui::Rect) -> egui::epai
 impl<'w> DragAndDropSlot<'w> {
     pub fn draw(&self, ui: &mut egui::Ui, accepts_dragged_item: bool) -> (bool, egui::Response) {
         let (rect, response) = ui.allocate_exact_size(
-            self.size + egui::Vec2::splat(self.border_width * 2.0),
+            self.size,
             if self.contents.is_some() && !matches!(self.dnd_id, DragAndDropId::NotDraggable) {
                 egui::Sense::click_and_drag()
             } else {
@@ -158,7 +158,7 @@ impl<'w> DragAndDropSlot<'w> {
             use egui::epaint::*;
 
             // For some reason, we must do manual implementation of response.hovered
-            let style = {
+            let is_active = {
                 let input = ui.ctx().input();
                 let hovered = input
                     .pointer
@@ -171,24 +171,14 @@ impl<'w> DragAndDropSlot<'w> {
                     {
                         dropped = true;
                     }
-                    ui.visuals().widgets.active
+                    true
                 } else {
-                    ui.visuals().widgets.inactive
+                    false
                 }
             };
 
-            ui.painter().add(egui::Shape::Rect(egui::epaint::RectShape {
-                rect,
-                rounding: egui::Rounding::none(),
-                fill: style.bg_fill,
-                stroke: style.bg_stroke,
-            }));
-
             if let Some((texture_id, uv)) = self.contents {
-                let content_rect = egui::Rect::from_min_max(
-                    rect.min + egui::Vec2::splat(self.border_width),
-                    rect.max - egui::Vec2::splat(self.border_width),
-                );
+                let content_rect = rect;
                 let mut mesh = Mesh::with_texture(texture_id);
                 mesh.add_rect_with_uv(content_rect, uv, egui::Color32::WHITE);
                 ui.painter().add(Shape::mesh(mesh));
@@ -255,6 +245,18 @@ impl<'w> DragAndDropSlot<'w> {
                         }
                     }
                 }
+            }
+
+            if is_active {
+                ui.painter().add(egui::Shape::Rect(egui::epaint::RectShape {
+                    rect: rect.shrink(self.border_width),
+                    rounding: egui::Rounding::none(),
+                    fill: Default::default(),
+                    stroke: egui::Stroke {
+                        width: self.border_width,
+                        color: egui::Color32::YELLOW,
+                    },
+                }));
             }
         }
         (dropped, response)

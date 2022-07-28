@@ -110,9 +110,7 @@ pub fn ui_character_info_system(
                 ui,
                 dialog,
                 DialogDataBindings {
-                    checked: [],
-                    text: [],
-                    response: [
+                    response: &mut [
                         (IID_BTN_CLOSE, &mut response_close_button),
                         (IID_BTN_UP_STR, &mut response_raise_str_button),
                         (IID_BTN_UP_DEX, &mut response_raise_dex_button),
@@ -121,12 +119,13 @@ pub fn ui_character_info_system(
                         (IID_BTN_UP_CHARM, &mut response_raise_cha_button),
                         (IID_BTN_UP_SENSE, &mut response_raise_sen_button),
                     ],
-                    gauge: [(
+                    gauge: &mut [(
                         IID_GUAGE_STAMINA,
                         &stamina,
                         &format!("{} / {}", player.stamina.stamina, MAX_STAMINA),
                     )],
-                    tabs: [(IID_TABBEDPANE, &mut ui_state.current_tab)],
+                    tabs: &mut [(IID_TABBEDPANE, &mut ui_state.current_tab)],
+                    ..Default::default()
                 },
                 |ui, bindings| {
                     let draw_text_at = |ui: &mut egui::Ui, x, y, text: &str| {
@@ -135,7 +134,7 @@ pub fn ui_character_info_system(
                         });
                     };
 
-                    match bindings.tab_binding(IID_TABBEDPANE) {
+                    match bindings.tab(IID_TABBEDPANE) {
                         Some(&mut IID_TAB_BASICINFO) => {
                             draw_text_at(ui, 59.0, 67.0, &player.character_info.name);
                             draw_text_at(ui, 59.0, 88.0, "TODO: job name");

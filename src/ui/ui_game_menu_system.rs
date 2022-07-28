@@ -59,9 +59,7 @@ pub fn ui_game_menu_system(
                 ui,
                 dialog,
                 DialogDataBindings {
-                    checked: [],
-                    text: [],
-                    response: [
+                    response: &mut [
                         (IID_BTN_CHAR, &mut response_button_character_info),
                         (IID_BTN_ITEM, &mut response_button_inventory),
                         (IID_BTN_SKILL, &mut response_button_skill_list),
@@ -73,8 +71,7 @@ pub fn ui_game_menu_system(
                         (IID_BTN_OPTION, &mut response_button_options),
                         (IID_BTN_EXIT, &mut response_button_exit),
                     ],
-                    gauge: [],
-                    tabs: [],
+                    ..Default::default()
                 },
                 |_, _| {},
             );

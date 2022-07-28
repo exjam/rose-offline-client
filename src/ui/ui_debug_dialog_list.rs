@@ -76,18 +76,7 @@ pub fn ui_debug_dialog_list_system(
             .default_width(dialog.width)
             .default_height(dialog.height)
             .show(egui_context.ctx_mut(), |ui| {
-                draw_dialog(
-                    ui,
-                    dialog,
-                    DialogDataBindings {
-                        checked: [],
-                        text: [],
-                        response: [],
-                        gauge: [],
-                        tabs: [],
-                    },
-                    |_, _| {},
-                )
+                draw_dialog(ui, dialog, DialogDataBindings::default(), |_, _| {})
             });
     }
 }

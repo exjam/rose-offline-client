@@ -171,22 +171,21 @@ pub fn login_system(
                         ui,
                         dialog,
                         DialogDataBindings {
-                            checked: [(
+                            checked: &mut [(
                                 IID_CHECKBOX_SAVE_LASTCONECTID,
                                 &mut ui_state.remember_details,
                             )],
-                            text: [
+                            text: &mut [
                                 (IID_EDIT_ID, &mut ui_state.username),
                                 (IID_EDIT_PWD, &mut ui_state.password),
                             ],
-                            response: [
+                            response: &mut [
                                 (IID_EDIT_ID, &mut response_username),
                                 (IID_EDIT_PWD, &mut response_password),
                                 (IID_BTN_OK, &mut response_ok),
                                 (IID_BTN_CANCEL, &mut response_cancel),
                             ],
-                            gauge: [],
-                            tabs: [],
+                            ..Default::default()
                         },
                         |ui, _| {
                             enter_pressed = ui.input().key_pressed(egui::Key::Enter);

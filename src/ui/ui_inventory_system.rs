@@ -1,4 +1,4 @@
-use bevy::prelude::{EventWriter, Local, Query, Res, ResMut, With};
+use bevy::prelude::{Assets, EventWriter, Local, Query, Res, ResMut, With};
 use bevy_egui::{egui, EguiContext};
 use enum_map::{enum_map, EnumMap};
 
@@ -13,88 +13,128 @@ use rose_game_common::{
 use crate::{
     components::{ConsumableCooldownGroup, Cooldowns, PlayerCharacter},
     events::{ChatboxEvent, PlayerCommandEvent},
-    resources::{GameConnection, GameData, Icons},
-    ui::{ui_add_item_tooltip, DragAndDropId, DragAndDropSlot, UiStateDragAndDrop, UiStateWindows},
+    resources::{GameConnection, GameData, Icons, UiResources},
+    ui::{
+        dialog::GetWidget, draw_dialog, ui_add_item_tooltip, Dialog, DialogDataBindings,
+        DragAndDropId, DragAndDropSlot, UiStateDragAndDrop, UiStateWindows, Widget,
+    },
 };
 
-#[derive(Copy, Clone, PartialEq, Debug)]
-enum EquipmentPageType {
-    Equipment,
-    Vehicle,
-}
+const IID_BTN_CLOSE: i32 = 10;
+// const IID_BTN_ICONIZE: i32 = 11;
+// const IID_BTN_MONEY: i32 = 12;
+const IID_TABBEDPANE_EQUIP: i32 = 20;
+const IID_TAB_EQUIP_PAT: i32 = 21;
+// const IID_BTN_EQUIP_PAT: i32 = 23;
+const IID_TAB_EQUIP_AVATAR: i32 = 31;
+// const IID_BTN_EQUIP_AVATAR: i32 = 33;
+const IID_TABBEDPANE_INVEN_ITEM: i32 = 50;
+const IID_TAB_INVEN_EQUIP: i32 = 51;
+// const IID_BTN_INVEN_EQUIP: i32 = 53;
+const IID_TAB_INVEN_USE: i32 = 61;
+// const IID_BTN_INVEN_USE: i32 = 63;
+const IID_TAB_INVEN_ETC: i32 = 71;
+// const IID_BTN_INVEN_ETC: i32 = 73;
+const IID_TABBEDPANE_INVEN_PAT: i32 = 100;
+const IID_TAB_INVEN_PAT: i32 = 101;
+// const IID_PANE_EQUIP: i32 = 200;
+const IID_BTN_MINIMIZE: i32 = 213;
+const IID_BTN_MAXIMIZE: i32 = 214;
+const IID_PANE_INVEN: i32 = 300;
 
 pub struct UiStateInventory {
-    equipment_page: EquipmentPageType,
-    current_page: InventoryPageType,
+    dialog: Option<Dialog>,
     item_slot_map: EnumMap<InventoryPageType, Vec<ItemSlot>>,
+    current_equipment_tab: i32,
+    current_vehicle_tab: i32,
+    current_inventory_tab: i32,
+    minimised: bool,
 }
 
 impl Default for UiStateInventory {
     fn default() -> Self {
         Self {
-            equipment_page: EquipmentPageType::Equipment,
-            current_page: InventoryPageType::Equipment,
+            dialog: None,
             item_slot_map: enum_map! {
                 page_type => (0..INVENTORY_PAGE_SIZE)
                 .map(|index| ItemSlot::Inventory(page_type, index))
                 .collect(),
             },
+            current_equipment_tab: IID_TAB_EQUIP_AVATAR,
+            current_vehicle_tab: IID_TAB_INVEN_PAT,
+            current_inventory_tab: IID_TAB_INVEN_EQUIP,
+            minimised: false,
         }
     }
 }
 
-const EQUIPMENT_GRID_SLOTS: [[std::option::Option<rose_game_common::components::ItemSlot>; 4]; 4] = [
-    [
-        Some(ItemSlot::Equipment(EquipmentIndex::Face)),
-        Some(ItemSlot::Equipment(EquipmentIndex::Head)),
-        Some(ItemSlot::Equipment(EquipmentIndex::Back)),
-        Some(ItemSlot::Ammo(AmmoIndex::Arrow)),
-    ],
-    [
-        Some(ItemSlot::Equipment(EquipmentIndex::Weapon)),
-        Some(ItemSlot::Equipment(EquipmentIndex::Body)),
-        Some(ItemSlot::Equipment(EquipmentIndex::SubWeapon)),
-        Some(ItemSlot::Ammo(AmmoIndex::Bullet)),
-    ],
-    [
-        Some(ItemSlot::Equipment(EquipmentIndex::Hands)),
-        Some(ItemSlot::Equipment(EquipmentIndex::Feet)),
-        None,
-        Some(ItemSlot::Ammo(AmmoIndex::Throw)),
-    ],
-    [
-        Some(ItemSlot::Equipment(EquipmentIndex::Ring)),
-        Some(ItemSlot::Equipment(EquipmentIndex::Necklace)),
-        Some(ItemSlot::Equipment(EquipmentIndex::Earring)),
-        None,
-    ],
+const EQUIPMENT_GRID_SLOTS: [(rose_game_common::components::ItemSlot, egui::Pos2); 14] = [
+    (
+        ItemSlot::Equipment(EquipmentIndex::Face),
+        egui::pos2(19.0, 67.0),
+    ),
+    (
+        ItemSlot::Equipment(EquipmentIndex::Head),
+        egui::pos2(69.0, 67.0),
+    ),
+    (
+        ItemSlot::Equipment(EquipmentIndex::Back),
+        egui::pos2(119.0, 67.0),
+    ),
+    (ItemSlot::Ammo(AmmoIndex::Arrow), egui::pos2(169.0, 67.0)),
+    (
+        ItemSlot::Equipment(EquipmentIndex::Weapon),
+        egui::pos2(19.0, 113.0),
+    ),
+    (
+        ItemSlot::Equipment(EquipmentIndex::Body),
+        egui::pos2(69.0, 113.0),
+    ),
+    (
+        ItemSlot::Equipment(EquipmentIndex::SubWeapon),
+        egui::pos2(119.0, 113.0),
+    ),
+    (ItemSlot::Ammo(AmmoIndex::Bullet), egui::pos2(169.0, 113.0)),
+    (
+        ItemSlot::Equipment(EquipmentIndex::Hands),
+        egui::pos2(19.0, 159.0),
+    ),
+    (
+        ItemSlot::Equipment(EquipmentIndex::Feet),
+        egui::pos2(19.0, 159.0),
+    ),
+    (ItemSlot::Ammo(AmmoIndex::Throw), egui::pos2(169.0, 159.0)),
+    (
+        ItemSlot::Equipment(EquipmentIndex::Ring),
+        egui::pos2(19.0, 205.0),
+    ),
+    (
+        ItemSlot::Equipment(EquipmentIndex::Necklace),
+        egui::pos2(69.0, 205.0),
+    ),
+    (
+        ItemSlot::Equipment(EquipmentIndex::Earring),
+        egui::pos2(119.0, 205.0),
+    ),
 ];
 
-const VEHICLE_GRID_SLOTS: [[std::option::Option<rose_game_common::components::ItemSlot>; 4]; 4] = [
-    [
-        Some(ItemSlot::Vehicle(VehiclePartIndex::Body)),
-        None,
-        None,
-        None,
-    ],
-    [
-        Some(ItemSlot::Vehicle(VehiclePartIndex::Engine)),
-        None,
-        None,
-        None,
-    ],
-    [
-        Some(ItemSlot::Vehicle(VehiclePartIndex::Leg)),
-        None,
-        None,
-        None,
-    ],
-    [
-        Some(ItemSlot::Vehicle(VehiclePartIndex::Arms)),
-        None,
-        None,
-        None,
-    ],
+const VEHICLE_GRID_SLOTS: [(rose_game_common::components::ItemSlot, egui::Pos2); 4] = [
+    (
+        ItemSlot::Vehicle(VehiclePartIndex::Body),
+        egui::pos2(19.0, 68.0),
+    ),
+    (
+        ItemSlot::Vehicle(VehiclePartIndex::Engine),
+        egui::pos2(19.0, 114.0),
+    ),
+    (
+        ItemSlot::Vehicle(VehiclePartIndex::Leg),
+        egui::pos2(19.0, 160.0),
+    ),
+    (
+        ItemSlot::Vehicle(VehiclePartIndex::Arms),
+        egui::pos2(19.0, 206.0),
+    ),
 ];
 
 fn drag_accepts_equipment(drag_source: &DragAndDropId) -> bool {
@@ -158,13 +198,14 @@ impl GetItem for (&Equipment, &Inventory) {
 fn ui_add_inventory_slot(
     ui: &mut egui::Ui,
     inventory_slot: ItemSlot,
+    pos: egui::Pos2,
     equipment: &Equipment,
     inventory: &Inventory,
     cooldowns: &Cooldowns,
     game_connection: Option<&Res<GameConnection>>,
     game_data: &GameData,
     icons: &Icons,
-    ui_state_inventory: &mut UiStateInventory,
+    item_slot_map: &mut EnumMap<InventoryPageType, Vec<ItemSlot>>,
     ui_state_dnd: &mut UiStateDragAndDrop,
     chatbox_events: &mut EventWriter<ChatboxEvent>,
     player_command_events: &mut EventWriter<PlayerCommandEvent>,
@@ -228,19 +269,31 @@ fn ui_add_inventory_slot(
     }
 
     let mut dropped_item = None;
-    let response = ui.add(DragAndDropSlot::new(
-        DragAndDropId::Inventory(inventory_slot),
-        contents,
-        match item.as_ref() {
-            Some(Item::Stackable(stackable_item)) => Some(stackable_item.quantity as usize),
-            _ => None,
-        },
-        cooldown_percent,
-        drag_accepts,
-        &mut ui_state_dnd.dragged_item,
-        &mut dropped_item,
-        [40.0, 40.0],
-    ));
+    let response = ui
+        .allocate_ui_at_rect(
+            egui::Rect::from_min_size(ui.min_rect().min + pos.to_vec2(), egui::vec2(40.0, 40.0)),
+            |ui| {
+                egui::Widget::ui(
+                    DragAndDropSlot::new(
+                        DragAndDropId::Inventory(inventory_slot),
+                        contents,
+                        match item.as_ref() {
+                            Some(Item::Stackable(stackable_item)) => {
+                                Some(stackable_item.quantity as usize)
+                            }
+                            _ => None,
+                        },
+                        cooldown_percent,
+                        drag_accepts,
+                        &mut ui_state_dnd.dragged_item,
+                        &mut dropped_item,
+                        [40.0, 40.0],
+                    ),
+                    ui,
+                )
+            },
+        )
+        .inner;
 
     let mut equip_equipment_inventory_slot = None;
     let mut equip_ammo_inventory_slot = None;
@@ -523,7 +576,7 @@ fn ui_add_inventory_slot(
         swap_inventory_slots
     {
         if page_a == page_b {
-            let inventory_map = &mut ui_state_inventory.item_slot_map[page_a];
+            let inventory_map = &mut item_slot_map[page_a];
             let source_index = inventory_map
                 .iter()
                 .position(|slot| slot == &ItemSlot::Inventory(page_a, slot_a));
@@ -544,118 +597,164 @@ pub fn ui_inventory_system(
     mut ui_state_dnd: ResMut<UiStateDragAndDrop>,
     mut ui_state_windows: ResMut<UiStateWindows>,
     query_player: Query<(&Equipment, &Inventory, &Cooldowns), With<PlayerCharacter>>,
+    dialog_assets: Res<Assets<Dialog>>,
     game_connection: Option<Res<GameConnection>>,
     game_data: Res<GameData>,
     icons: Res<Icons>,
+    ui_resources: Res<UiResources>,
     mut chatbox_events: EventWriter<ChatboxEvent>,
     mut player_command_events: EventWriter<PlayerCommandEvent>,
 ) {
+    let ui_state_inventory = &mut *ui_state_inventory;
+    if ui_state_inventory.dialog.is_none() {
+        if let Some(dialog) = dialog_assets.get(&ui_resources.dialog_files["DLGITEM.XML"]) {
+            if !dialog.loaded {
+                return;
+            }
+
+            ui_state_inventory.dialog = Some(dialog.clone());
+        } else {
+            return;
+        }
+    }
+    let dialog = ui_state_inventory.dialog.as_mut().unwrap();
+
     let (player_equipment, player_inventory, player_cooldowns) = query_player.single();
 
+    let mut response_close_button = None;
+    let mut response_minimise_button = None;
+    let mut response_maximise_button = None;
+    let is_equipment_tab = ui_state_inventory.current_equipment_tab == IID_TAB_EQUIP_AVATAR;
+    let is_minimised = ui_state_inventory.minimised;
+
     egui::Window::new("Inventory")
+        .frame(egui::Frame::none())
         .open(&mut ui_state_windows.inventory_open)
+        .title_bar(false)
         .resizable(false)
+        .default_width(dialog.width)
+        .default_height(dialog.height)
         .show(egui_context.ctx_mut(), |ui| {
-            ui.horizontal(|ui| {
-                ui.selectable_value(
-                    &mut ui_state_inventory.equipment_page,
-                    EquipmentPageType::Equipment,
-                    "Equipment",
-                );
-                ui.selectable_value(
-                    &mut ui_state_inventory.equipment_page,
-                    EquipmentPageType::Vehicle,
-                    "Vehicle",
-                );
-            });
+            draw_dialog(
+                ui,
+                dialog,
+                DialogDataBindings {
+                    tabs: &mut [
+                        (
+                            IID_TABBEDPANE_EQUIP,
+                            &mut ui_state_inventory.current_equipment_tab,
+                        ),
+                        (
+                            IID_TABBEDPANE_INVEN_PAT,
+                            &mut ui_state_inventory.current_vehicle_tab,
+                        ),
+                        (
+                            IID_TABBEDPANE_INVEN_ITEM,
+                            &mut ui_state_inventory.current_inventory_tab,
+                        ),
+                    ],
+                    visible: &mut [
+                        (IID_TABBEDPANE_INVEN_ITEM, is_equipment_tab),
+                        (IID_TABBEDPANE_INVEN_PAT, !is_equipment_tab),
+                        (IID_BTN_MINIMIZE, !is_minimised),
+                        (IID_BTN_MAXIMIZE, is_minimised),
+                    ],
+                    response: &mut [
+                        (IID_BTN_CLOSE, &mut response_close_button),
+                        (IID_BTN_MINIMIZE, &mut response_minimise_button),
+                        (IID_BTN_MAXIMIZE, &mut response_maximise_button),
+                    ],
+                    ..Default::default()
+                },
+                |ui, bindings| {
+                    let mut current_page = InventoryPageType::Equipment;
 
-            let equipment_grid_slots = match ui_state_inventory.equipment_page {
-                EquipmentPageType::Equipment => &EQUIPMENT_GRID_SLOTS,
-                EquipmentPageType::Vehicle => &VEHICLE_GRID_SLOTS,
-            };
+                    match bindings.tab(IID_TABBEDPANE_EQUIP) {
+                        Some(&mut IID_TAB_EQUIP_AVATAR) => {
+                            if !ui_state_inventory.minimised {
+                                for (item_slot, pos) in EQUIPMENT_GRID_SLOTS.iter() {
+                                    ui_add_inventory_slot(
+                                        ui,
+                                        *item_slot,
+                                        *pos + egui::vec2(-1.0, -1.0),
+                                        player_equipment,
+                                        player_inventory,
+                                        player_cooldowns,
+                                        game_connection.as_ref(),
+                                        &game_data,
+                                        &icons,
+                                        &mut ui_state_inventory.item_slot_map,
+                                        &mut ui_state_dnd,
+                                        &mut chatbox_events,
+                                        &mut player_command_events,
+                                    );
+                                }
+                            }
 
-            egui::Grid::new("inventory_equipment_grid")
-                .num_columns(4)
-                .spacing([4.0, 4.0])
-                .show(ui, |ui| {
-                    for row in equipment_grid_slots.iter() {
-                        for item_slot in row.iter() {
-                            if let &Some(item_slot) = item_slot {
-                                ui_add_inventory_slot(
-                                    ui,
-                                    item_slot,
-                                    player_equipment,
-                                    player_inventory,
-                                    player_cooldowns,
-                                    game_connection.as_ref(),
-                                    &game_data,
-                                    &icons,
-                                    &mut ui_state_inventory,
-                                    &mut ui_state_dnd,
-                                    &mut chatbox_events,
-                                    &mut player_command_events,
-                                );
-                            } else {
-                                ui.label("");
+                            match bindings.tab(IID_TABBEDPANE_INVEN_ITEM) {
+                                Some(&mut IID_TAB_INVEN_EQUIP) => {
+                                    current_page = InventoryPageType::Equipment;
+                                }
+                                Some(&mut IID_TAB_INVEN_USE) => {
+                                    current_page = InventoryPageType::Consumables;
+                                }
+                                Some(&mut IID_TAB_INVEN_ETC) => {
+                                    current_page = InventoryPageType::Materials;
+                                }
+                                _ => {}
                             }
                         }
+                        Some(&mut IID_TAB_EQUIP_PAT) => {
+                            if !ui_state_inventory.minimised {
+                                for (item_slot, pos) in VEHICLE_GRID_SLOTS.iter() {
+                                    ui_add_inventory_slot(
+                                        ui,
+                                        *item_slot,
+                                        *pos - egui::vec2(-1.0, -1.0),
+                                        player_equipment,
+                                        player_inventory,
+                                        player_cooldowns,
+                                        game_connection.as_ref(),
+                                        &game_data,
+                                        &icons,
+                                        &mut ui_state_inventory.item_slot_map,
+                                        &mut ui_state_dnd,
+                                        &mut chatbox_events,
+                                        &mut player_command_events,
+                                    );
+                                }
+                            }
 
-                        ui.end_row();
+                            current_page = InventoryPageType::Vehicles;
+                        }
+                        _ => {}
                     }
-                });
 
-            let current_page = match ui_state_inventory.equipment_page {
-                EquipmentPageType::Equipment => {
-                    ui.horizontal(|ui| {
-                        ui.selectable_value(
-                            &mut ui_state_inventory.current_page,
-                            InventoryPageType::Equipment,
-                            "Equipment",
-                        );
-                        ui.selectable_value(
-                            &mut ui_state_inventory.current_page,
-                            InventoryPageType::Consumables,
-                            "Consumables",
-                        );
-                        ui.selectable_value(
-                            &mut ui_state_inventory.current_page,
-                            InventoryPageType::Materials,
-                            "ETC",
-                        );
-                    });
-                    ui_state_inventory.current_page
-                }
-                EquipmentPageType::Vehicle => {
-                    let mut vehicle_page = InventoryPageType::Vehicles;
-                    ui.horizontal(|ui| {
-                        ui.selectable_value(
-                            &mut vehicle_page,
-                            InventoryPageType::Vehicles,
-                            "Vehicle",
-                        );
-                    });
-                    vehicle_page
-                }
-            };
+                    let y_start = if ui_state_inventory.minimised {
+                        83.0
+                    } else {
+                        283.0
+                    };
 
-            egui::Grid::new("inventory_items_grid")
-                .num_columns(5)
-                .spacing([2.0, 2.0])
-                .show(ui, |ui| {
                     for row in 0..6 {
                         for column in 0..5 {
                             let inventory_slot =
                                 ui_state_inventory.item_slot_map[current_page][column + row * 5];
+
                             ui_add_inventory_slot(
                                 ui,
                                 inventory_slot,
+                                egui::pos2(
+                                    12.0 + column as f32 * 41.0,
+                                    y_start + row as f32 * 41.0,
+                                ),
                                 player_equipment,
                                 player_inventory,
                                 player_cooldowns,
                                 game_connection.as_ref(),
                                 &game_data,
                                 &icons,
-                                &mut ui_state_inventory,
+                                &mut ui_state_inventory.item_slot_map,
                                 &mut ui_state_dnd,
                                 &mut chatbox_events,
                                 &mut player_command_events,
@@ -664,8 +763,40 @@ pub fn ui_inventory_system(
 
                         ui.end_row();
                     }
-                });
 
-            ui.label(format!("Zuly: {}", player_inventory.money.0));
+                    ui.allocate_ui_at_rect(
+                        ui.min_rect().translate(egui::vec2(
+                            40.0,
+                            dialog.height - 25.0 - if is_minimised { 200.0 } else { 0.0 },
+                        )),
+                        |ui| {
+                            ui.horizontal_top(|ui| {
+                                ui.add(egui::Label::new(format!("{}", player_inventory.money.0)))
+                            })
+                            .inner
+                        },
+                    );
+                },
+            );
         });
+
+    if response_close_button.map_or(false, |r| r.clicked()) {
+        ui_state_windows.inventory_open = false;
+    }
+
+    if response_minimise_button.map_or(false, |r| r.clicked()) {
+        ui_state_inventory.minimised = true;
+
+        if let Some(Widget::Pane(pane)) = dialog.get_widget_mut(IID_PANE_INVEN) {
+            pane.y = 54.0;
+        }
+    }
+
+    if response_maximise_button.map_or(false, |r| r.clicked()) {
+        ui_state_inventory.minimised = false;
+
+        if let Some(Widget::Pane(pane)) = dialog.get_widget_mut(IID_PANE_INVEN) {
+            pane.y = 254.0;
+        }
+    }
 }

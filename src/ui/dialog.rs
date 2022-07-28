@@ -44,7 +44,7 @@ macro_rules! widget_to_rect {
     };
 }
 
-#[derive(Default, Deserialize, TypeUuid)]
+#[derive(Clone, Default, Deserialize, TypeUuid)]
 #[uuid = "95ddb227-6e9f-43ee-8026-28ddb6fc9634"]
 #[serde(rename = "Root_Element")]
 #[serde(default)]
@@ -78,10 +78,60 @@ pub struct Dialog {
 
     #[serde(rename = "$value")]
     pub widgets: Vec<Widget>,
+
+    #[serde(skip)]
+    pub loaded: bool,
+}
+
+pub trait GetWidget {
+    fn get_widget_mut(&mut self, id: i32) -> Option<&mut Widget>;
+}
+
+impl GetWidget for Vec<Widget> {
+    fn get_widget_mut(&mut self, id: i32) -> Option<&mut Widget> {
+        for widget in self.iter_mut() {
+            if widget.id() == id {
+                return Some(widget);
+            }
+
+            match widget {
+                Widget::Pane(pane) => {
+                    if let Some(widget) = pane.widgets.get_widget_mut(id) {
+                        return Some(widget);
+                    }
+                }
+                Widget::TabbedPane(tabbed_pane) => {
+                    for tab in tabbed_pane.tabs.iter_mut() {
+                        if let Some(widget) = tab.widgets.get_widget_mut(id) {
+                            return Some(widget);
+                        }
+                    }
+                }
+                Widget::Button(_)
+                | Widget::Caption(_)
+                | Widget::Checkbox(_)
+                | Widget::Gauge(_)
+                | Widget::Listbox(_)
+                | Widget::Textbox(_)
+                | Widget::Sprite(_)
+                | Widget::TabButton(_) => {
+                    continue;
+                }
+            }
+        }
+
+        None
+    }
+}
+
+impl GetWidget for Dialog {
+    fn get_widget_mut(&mut self, id: i32) -> Option<&mut Widget> {
+        self.widgets.get_widget_mut(id)
+    }
 }
 
 #[allow(clippy::large_enum_variant)]
-#[derive(Deserialize)]
+#[derive(Clone, Deserialize)]
 pub enum Widget {
     #[serde(rename = "BUTTON")]
     Button(Button),
@@ -105,7 +155,24 @@ pub enum Widget {
     Sprite(Sprite),
 }
 
-#[derive(Default, Deserialize)]
+impl Widget {
+    pub fn id(&self) -> i32 {
+        match self {
+            Widget::Button(x) => x.id,
+            Widget::Caption(x) => x.id,
+            Widget::Checkbox(x) => x.id,
+            Widget::Gauge(x) => x.id,
+            Widget::Listbox(x) => x.id,
+            Widget::Textbox(x) => x.id,
+            Widget::Pane(x) => x.id,
+            Widget::TabButton(x) => x.id,
+            Widget::TabbedPane(x) => x.id,
+            Widget::Sprite(x) => x.id,
+        }
+    }
+}
+
+#[derive(Clone, Default, Deserialize)]
 #[serde(rename = "BUTTON")]
 #[serde(default)]
 pub struct Button {
@@ -158,7 +225,7 @@ pub struct Button {
 
 widget_to_rect! { Button }
 
-#[derive(Default, Deserialize)]
+#[derive(Clone, Default, Deserialize)]
 #[serde(rename = "CAPTION")]
 #[serde(default)]
 pub struct Caption {
@@ -176,7 +243,7 @@ pub struct Caption {
     pub height: f32,
 }
 
-#[derive(Default, Deserialize)]
+#[derive(Clone, Default, Deserialize)]
 #[serde(rename = "CHECKBOX")]
 #[serde(default)]
 pub struct Checkbox {
@@ -211,7 +278,7 @@ pub struct Checkbox {
 
 widget_to_rect! { Checkbox }
 
-#[derive(Default, Deserialize)]
+#[derive(Clone, Default, Deserialize)]
 #[serde(rename = "GUAGE")] // Intentionally incorrect spelling
 #[serde(default)]
 pub struct Gauge {
@@ -246,7 +313,7 @@ pub struct Gauge {
 
 widget_to_rect! { Gauge }
 
-#[derive(Default, Deserialize)]
+#[derive(Clone, Default, Deserialize)]
 #[serde(rename = "LISTBOX")]
 #[serde(default)]
 pub struct Listbox {
@@ -286,7 +353,7 @@ pub struct Listbox {
 
 widget_to_rect! { Listbox }
 
-#[derive(Default, Deserialize)]
+#[derive(Clone, Default, Deserialize)]
 #[serde(rename = "EDITBOX")]
 #[serde(default)]
 pub struct Textbox {
@@ -328,7 +395,7 @@ pub struct Textbox {
 
 widget_to_rect! { Textbox }
 
-#[derive(Default, Deserialize)]
+#[derive(Clone, Default, Deserialize)]
 #[serde(rename = "PANE")]
 #[serde(default)]
 pub struct Pane {
@@ -355,7 +422,7 @@ pub struct Pane {
 
 widget_to_rect! { Pane }
 
-#[derive(Default, Deserialize)]
+#[derive(Clone, Default, Deserialize)]
 #[serde(rename = "TAB")]
 #[serde(default)]
 pub struct Tab {
@@ -382,7 +449,7 @@ impl Tab {
     }
 }
 
-#[derive(Default, Deserialize)]
+#[derive(Clone, Default, Deserialize)]
 #[serde(rename = "TABBUTTON")]
 #[serde(default)]
 pub struct TabButton {
@@ -424,7 +491,7 @@ pub struct TabButton {
 
 widget_to_rect! { TabButton }
 
-#[derive(Default, Deserialize)]
+#[derive(Clone, Default, Deserialize)]
 #[serde(rename = "TABBEDPANE")]
 #[serde(default)]
 pub struct TabbedPane {
@@ -445,7 +512,7 @@ pub struct TabbedPane {
     pub tabs: Vec<Tab>,
 }
 
-#[derive(Default, Deserialize)]
+#[derive(Clone, Default, Deserialize)]
 #[serde(rename = "IMAGE")]
 #[serde(default)]
 pub struct Sprite {
@@ -482,6 +549,7 @@ pub struct Sprite {
 
 widget_to_rect! { Sprite }
 
+#[derive(Clone)]
 pub struct LoadedSprite {
     texture_id: egui::TextureId,
     uv: egui::Rect,
@@ -489,42 +557,44 @@ pub struct LoadedSprite {
     height: f32,
 }
 
-fn get_loaded_sprite(
-    resources: &UiResources,
-    images: &Assets<Image>,
-    module_id: i32,
-    sprite_name: &str,
-) -> Option<LoadedSprite> {
-    let sprite_sheet_type = match module_id {
-        0 => UiSpriteSheetType::Ui,
-        3 => UiSpriteSheetType::ExUi,
-        _ => return None,
-    };
-    let sprite_sheet = &resources.sprite_sheets[sprite_sheet_type];
-    let sprite_index = sprite_sheet.sprites_by_name.get(sprite_name)?;
+impl LoadedSprite {
+    pub fn try_load(
+        resources: &UiResources,
+        images: &Assets<Image>,
+        module_id: i32,
+        sprite_name: &str,
+    ) -> Option<LoadedSprite> {
+        let sprite_sheet_type = match module_id {
+            0 => UiSpriteSheetType::Ui,
+            3 => UiSpriteSheetType::ExUi,
+            _ => return None,
+        };
+        let sprite_sheet = &resources.sprite_sheets[sprite_sheet_type];
+        let sprite_index = sprite_sheet.sprites_by_name.get(sprite_name)?;
 
-    let sprite = sprite_sheet.sprites.get(*sprite_index as usize)?;
-    let (image_handle, texture_id) = sprite_sheet
-        .loaded_textures
-        .get(sprite.texture_id as usize)?;
+        let sprite = sprite_sheet.sprites.get(*sprite_index as usize)?;
+        let (image_handle, texture_id) = sprite_sheet
+            .loaded_textures
+            .get(sprite.texture_id as usize)?;
 
-    let image_size = images.get(image_handle)?.size();
+        let image_size = images.get(image_handle)?.size();
 
-    Some(LoadedSprite {
-        texture_id: *texture_id,
-        uv: egui::Rect::from_min_max(
-            egui::pos2(
-                (sprite.left as f32 + 0.5) / image_size.x,
-                (sprite.top as f32 + 0.5) / image_size.y,
+        Some(LoadedSprite {
+            texture_id: *texture_id,
+            uv: egui::Rect::from_min_max(
+                egui::pos2(
+                    (sprite.left as f32 + 0.5) / image_size.x,
+                    (sprite.top as f32 + 0.5) / image_size.y,
+                ),
+                egui::pos2(
+                    (sprite.right as f32 - 0.5) / image_size.x,
+                    (sprite.bottom as f32 - 0.5) / image_size.y,
+                ),
             ),
-            egui::pos2(
-                (sprite.right as f32 + 0.5) / image_size.x,
-                (sprite.bottom as f32 + 0.5) / image_size.y,
-            ),
-        ),
-        width: (sprite.right - sprite.left) as f32,
-        height: (sprite.bottom - sprite.top) as f32,
-    })
+            width: (sprite.right - sprite.left) as f32,
+            height: (sprite.bottom - sprite.top) as f32,
+        })
+    }
 }
 
 #[derive(Default)]
@@ -541,31 +611,31 @@ fn load_widgets_sprites(
     for widget in widgets.iter_mut() {
         match widget {
             Widget::Button(button) => {
-                button.normal_sprite = get_loaded_sprite(
+                button.normal_sprite = LoadedSprite::try_load(
                     ui_resources,
                     images,
                     button.module_id,
                     &button.normal_sprite_name,
                 );
-                button.over_sprite = get_loaded_sprite(
+                button.over_sprite = LoadedSprite::try_load(
                     ui_resources,
                     images,
                     button.module_id,
                     &button.over_sprite_name,
                 );
-                button.blink_sprite = get_loaded_sprite(
+                button.blink_sprite = LoadedSprite::try_load(
                     ui_resources,
                     images,
                     button.module_id,
                     &button.blink_sprite_name,
                 );
-                button.down_sprite = get_loaded_sprite(
+                button.down_sprite = LoadedSprite::try_load(
                     ui_resources,
                     images,
                     button.module_id,
                     &button.down_sprite_name,
                 );
-                button.disable_sprite = get_loaded_sprite(
+                button.disable_sprite = LoadedSprite::try_load(
                     ui_resources,
                     images,
                     button.module_id,
@@ -573,13 +643,13 @@ fn load_widgets_sprites(
                 );
             }
             Widget::Checkbox(checkbox) => {
-                checkbox.checked_sprite = get_loaded_sprite(
+                checkbox.checked_sprite = LoadedSprite::try_load(
                     ui_resources,
                     images,
                     checkbox.module_id,
                     &checkbox.checked_sprite_name,
                 );
-                checkbox.unchecked_sprite = get_loaded_sprite(
+                checkbox.unchecked_sprite = LoadedSprite::try_load(
                     ui_resources,
                     images,
                     checkbox.module_id,
@@ -587,13 +657,13 @@ fn load_widgets_sprites(
                 );
             }
             Widget::Gauge(gauge) => {
-                gauge.foreground_sprite = get_loaded_sprite(
+                gauge.foreground_sprite = LoadedSprite::try_load(
                     ui_resources,
                     images,
                     gauge.module_id,
                     &gauge.foreground_sprite_name,
                 );
-                gauge.background_sprite = get_loaded_sprite(
+                gauge.background_sprite = LoadedSprite::try_load(
                     ui_resources,
                     images,
                     gauge.module_id,
@@ -601,26 +671,30 @@ fn load_widgets_sprites(
                 );
             }
             Widget::Sprite(sprite) => {
-                sprite.sprite =
-                    get_loaded_sprite(ui_resources, images, sprite.module_id, &sprite.sprite_name);
+                sprite.sprite = LoadedSprite::try_load(
+                    ui_resources,
+                    images,
+                    sprite.module_id,
+                    &sprite.sprite_name,
+                );
             }
             Widget::Pane(pane) => {
                 load_widgets_sprites(&mut pane.widgets, ui_resources, images);
             }
             Widget::TabButton(tab_button) => {
-                tab_button.normal_sprite = get_loaded_sprite(
+                tab_button.normal_sprite = LoadedSprite::try_load(
                     ui_resources,
                     images,
                     tab_button.module_id,
                     &tab_button.normal_sprite_name,
                 );
-                tab_button.over_sprite = get_loaded_sprite(
+                tab_button.over_sprite = LoadedSprite::try_load(
                     ui_resources,
                     images,
                     tab_button.module_id,
                     &tab_button.over_sprite_name,
                 );
-                tab_button.down_sprite = get_loaded_sprite(
+                tab_button.down_sprite = LoadedSprite::try_load(
                     ui_resources,
                     images,
                     tab_button.module_id,
@@ -674,6 +748,7 @@ pub fn load_dialog_sprites_system(
             let dialog = assets.get_mut(&handle).unwrap();
 
             load_widgets_sprites(&mut dialog.widgets, &ui_resources, &images);
+            dialog.loaded = true;
         }
     }
 }
@@ -875,76 +950,80 @@ impl<'a, 'b> egui::Widget for DrawTextbox<'a, 'b> {
     }
 }
 
-pub struct DialogDataBindings<
-    'a,
-    const N0: usize,
-    const N1: usize,
-    const N2: usize,
-    const N3: usize,
-    const N4: usize,
-> {
-    pub checked: [(i32, &'a mut bool); N0],
-    pub text: [(i32, &'a mut String); N1],
-    pub gauge: [(i32, &'a f32, &'a str); N2],
-    pub tabs: [(i32, &'a mut i32); N3],
-    pub response: [(i32, &'a mut Option<egui::Response>); N4],
+#[derive(Default)]
+pub struct DialogDataBindings<'a> {
+    pub checked: &'a mut [(i32, &'a mut bool)],
+    pub text: &'a mut [(i32, &'a mut String)],
+    pub gauge: &'a mut [(i32, &'a f32, &'a str)],
+    pub tabs: &'a mut [(i32, &'a mut i32)],
+    pub response: &'a mut [(i32, &'a mut Option<egui::Response>)],
+    pub visible: &'a mut [(i32, bool)],
 }
 
-impl<'a, const N0: usize, const N1: usize, const N2: usize, const N3: usize, const N4: usize>
-    DialogDataBindings<'a, N0, N1, N2, N3, N4>
-{
+impl<'a> DialogDataBindings<'a> {
     pub fn set_response(&mut self, id: i32, response: egui::Response) {
         if let Some((_, out)) = self.response.iter_mut().find(|(x, _)| *x == id) {
             **out = Some(response);
         }
     }
 
-    pub fn tab_binding(&mut self, id: i32) -> Option<&mut i32> {
+    pub fn tab(&mut self, id: i32) -> Option<&mut i32> {
         self.tabs
             .iter_mut()
             .find(|(x, _)| *x == id)
             .map(|(_, buffer)| &mut **buffer)
     }
+
+    pub fn text(&mut self, id: i32) -> Option<&mut String> {
+        self.text
+            .iter_mut()
+            .find(|(x, _)| *x == id)
+            .map(|(_, buffer)| &mut **buffer)
+    }
+
+    pub fn visible(&self, id: i32) -> bool {
+        self.visible
+            .iter()
+            .find(|(x, _)| *x == id)
+            .map_or(true, |(_, visible)| *visible)
+    }
 }
 
-fn draw_widgets<
-    'a,
-    const N0: usize,
-    const N1: usize,
-    const N2: usize,
-    const N3: usize,
-    const N4: usize,
->(
-    ui: &mut egui::Ui,
-    widgets: &[Widget],
-    bindings: &mut DialogDataBindings<'a, N0, N1, N2, N3, N4>,
-) {
+fn draw_widgets<'a>(ui: &mut egui::Ui, widgets: &[Widget], bindings: &mut DialogDataBindings<'a>) {
     for element in widgets.iter() {
         match element {
             Widget::Textbox(textbox) => {
+                if !bindings.visible(textbox.id) {
+                    continue;
+                }
+
                 let mut unbound_buffer = format!("<{} unbound>", textbox.id);
-                let buffer = bindings
-                    .text
-                    .iter_mut()
-                    .find(|(id, _)| *id == textbox.id)
-                    .map(|(_, buffer)| &mut **buffer)
-                    .unwrap_or(&mut unbound_buffer);
+                let buffer = bindings.text(textbox.id).unwrap_or(&mut unbound_buffer);
 
                 let response = egui::Widget::ui(DrawTextbox { textbox, buffer }, ui);
-
                 bindings.set_response(textbox.id, response);
             }
             Widget::Sprite(sprite) => {
-                let response = egui::Widget::ui(DrawSprite { sprite }, ui);
+                if !bindings.visible(sprite.id) {
+                    continue;
+                }
 
+                let response = egui::Widget::ui(DrawSprite { sprite }, ui);
                 bindings.set_response(sprite.id, response);
             }
             Widget::Button(button) => {
-                let response = egui::Widget::ui(DrawButton { button }, ui);
+                if !bindings.visible(button.id) {
+                    continue;
+                }
 
+                let response = egui::Widget::ui(DrawButton { button }, ui);
                 bindings.set_response(button.id, response);
             }
             Widget::Checkbox(checkbox) => {
+                if !bindings.visible(checkbox.id) {
+                    continue;
+                }
+
                 let mut unbound_checked = false;
                 let checked = bindings
                     .checked
@@ -958,6 +1037,10 @@ fn draw_widgets<
                 bindings.set_response(checkbox.id, response);
             }
             Widget::Gauge(gauge) => {
+                if !bindings.visible(gauge.id) {
+                    continue;
+                }
+
                 let (value, text) = bindings
                     .gauge
                     .iter()
@@ -965,63 +1048,71 @@ fn draw_widgets<
                     .map_or((0.5, ""), |(_, value, text)| (**value, &**text));
 
                 let response = egui::Widget::ui(DrawGauge { gauge, value, text }, ui);
-
                 bindings.set_response(gauge.id, response);
             }
             Widget::Listbox(listbox) => {
-                let response = egui::Widget::ui(DrawListbox { listbox }, ui);
+                if !bindings.visible(listbox.id) {
+                    continue;
+                }
 
+                let response = egui::Widget::ui(DrawListbox { listbox }, ui);
                 bindings.set_response(listbox.id, response);
             }
             Widget::Pane(pane) => {
+                if !bindings.visible(pane.id) {
+                    continue;
+                }
+
                 ui.allocate_ui_at_rect(pane.widget_rect(ui.min_rect().min), |ui| {
                     draw_widgets(ui, &pane.widgets, bindings)
                 });
             }
             Widget::TabbedPane(tabbed_pane) => {
-                if !tabbed_pane.tabs.is_empty() {
-                    let mut rect = ui.min_rect();
-                    rect.min.x += tabbed_pane.x;
-                    rect.min.y += tabbed_pane.y;
-
-                    ui.allocate_ui_at_rect(rect, |ui| {
-                        let mut current_tab = bindings
-                            .tab_binding(tabbed_pane.id)
-                            .map(|x| *x)
-                            .unwrap_or(tabbed_pane.tabs[0].id);
-
-                        // First draw the buttons
-                        for tab in tabbed_pane.tabs.iter() {
-                            if let Some(tab_button) = tab.tab_button() {
-                                let response = egui::Widget::ui(
-                                    DrawTabButton {
-                                        tab_button,
-                                        selected: current_tab == tab.id,
-                                    },
-                                    ui,
-                                );
-                                if response.clicked() {
-                                    current_tab = tab.id;
-                                }
-                                bindings.set_response(tab_button.id, response);
-                            }
-                        }
-
-                        // Update current tab
-                        if let Some(tab_id) = bindings.tab_binding(tabbed_pane.id) {
-                            *tab_id = current_tab;
-                        }
-
-                        // Next draw active tab
-                        for tab in tabbed_pane.tabs.iter() {
-                            if tab.id != current_tab {
-                                continue;
-                            }
-
-                            draw_widgets(ui, &tab.widgets, bindings)
-                        }
-                    });
+                if !bindings.visible(tabbed_pane.id) || tabbed_pane.tabs.is_empty() {
+                    continue;
                 }
+
+                let mut rect = ui.min_rect();
+                rect.min.x += tabbed_pane.x;
+                rect.min.y += tabbed_pane.y;
+
+                ui.allocate_ui_at_rect(rect, |ui| {
+                    let mut current_tab = bindings
+                        .tab(tabbed_pane.id)
+                        .map(|x| *x)
+                        .unwrap_or(tabbed_pane.tabs[0].id);
+
+                    // First draw the buttons
+                    for tab in tabbed_pane.tabs.iter() {
+                        if let Some(tab_button) = tab.tab_button() {
+                            let response = egui::Widget::ui(
+                                DrawTabButton {
+                                    tab_button,
+                                    selected: current_tab == tab.id,
+                                },
+                                ui,
+                            );
+                            if response.clicked() {
+                                current_tab = tab.id;
+                            }
+                            bindings.set_response(tab_button.id, response);
+                        }
+                    }
+
+                    // Update current tab
+                    if let Some(tab_id) = bindings.tab(tabbed_pane.id) {
+                        *tab_id = current_tab;
+                    }
+
+                    // Next draw active tab
+                    for tab in tabbed_pane.tabs.iter() {
+                        if tab.id != current_tab {
+                            continue;
+                        }
+
+                        draw_widgets(ui, &tab.widgets, bindings)
+                    }
+                });
             }
             Widget::TabButton(_) => {} // These are drawn by Widget::TabbedPane
             Widget::Caption(_) => {}
@@ -1029,26 +1120,16 @@ fn draw_widgets<
     }
 }
 
-pub fn draw_dialog<
-    'a,
-    const N0: usize,
-    const N1: usize,
-    const N2: usize,
-    const N3: usize,
-    const N4: usize,
-    R,
->(
+pub fn draw_dialog<'a, R>(
     ui: &mut egui::Ui,
     dialog: &Dialog,
-    mut bindings: DialogDataBindings<'a, N0, N1, N2, N3, N4>,
-    add_contents: impl FnOnce(&mut egui::Ui, &mut DialogDataBindings<'a, N0, N1, N2, N3, N4>) -> R,
+    mut bindings: DialogDataBindings<'a>,
+    add_contents: impl FnOnce(&mut egui::Ui, &mut DialogDataBindings<'a>) -> R,
 ) {
-    ui.style_mut()
-        .visuals
-        .widgets
-        .noninteractive
-        .fg_stroke
-        .color = egui::Color32::WHITE;
+    let style = ui.style_mut();
+    style.visuals.widgets.noninteractive.fg_stroke.color = egui::Color32::WHITE;
+    style.spacing.item_spacing = egui::Vec2::ZERO;
+    style.spacing.window_margin = egui::style::Margin::same(0.0);
 
     draw_widgets(ui, &dialog.widgets, &mut bindings);
 

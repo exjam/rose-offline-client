@@ -75,10 +75,8 @@ pub fn ui_player_info_system(
                 ui,
                 dialog,
                 DialogDataBindings {
-                    checked: [],
-                    text: [],
-                    response: [(IID_BTN_MENU, &mut response_menu_button)],
-                    gauge: [
+                    response: &mut [(IID_BTN_MENU, &mut response_menu_button)],
+                    gauge: &mut [
                         (
                             IID_GAUGE_HP,
                             &hp,
@@ -99,7 +97,7 @@ pub fn ui_player_info_system(
                         ),
                         (IID_GAUGE_EXP, &xp, &format!("{:.2}%", xp * 100.0)),
                     ],
-                    tabs: [],
+                    ..Default::default()
                 },
                 |ui, _| {
                     ui.put(
