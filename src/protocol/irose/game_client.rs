@@ -1,9 +1,9 @@
+use async_trait::async_trait;
 use num_traits::FromPrimitive;
-use rose_data::{QuestTriggerHash, SkillId};
 use std::net::SocketAddr;
-use thiserror::Error;
 use tokio::net::TcpStream;
 
+use rose_data::{QuestTriggerHash, SkillId};
 use rose_game_common::{
     components::MoveMode,
     messages::{
@@ -63,11 +63,7 @@ use rose_network_irose::{
     ClientPacketCodec, IROSE_112_TABLE,
 };
 
-#[derive(Debug, Error)]
-pub enum GameClientError {
-    #[error("client initiated disconnect")]
-    ClientInitiatedDisconnect,
-}
+use crate::protocol::{ProtocolClient, ProtocolClientError};
 
 pub struct GameClient {
     server_address: SocketAddr,
@@ -77,7 +73,6 @@ pub struct GameClient {
 }
 
 impl GameClient {
-    // TODO: Pass irose into this
     pub fn new(
         server_address: SocketAddr,
         packet_codec_seed: u32,
@@ -92,10 +87,10 @@ impl GameClient {
         }
     }
 
-    async fn handle_packet(&self, packet: Packet) -> Result<(), anyhow::Error> {
+    async fn handle_packet(&self, packet: &Packet) -> Result<(), anyhow::Error> {
         match FromPrimitive::from_u16(packet.command) {
             Some(ServerPackets::ConnectReply) => {
-                let response = PacketConnectionReply::try_from(&packet)?;
+                let response = PacketConnectionReply::try_from(packet)?;
                 let message = match response.result {
                     ConnectResult::Ok => Ok(ConnectionResponse {
                         packet_sequence_id: response.packet_sequence_id,
@@ -107,7 +102,7 @@ impl GameClient {
                     .ok();
             }
             Some(ServerPackets::SelectCharacter) => {
-                let response = PacketServerSelectCharacter::try_from(&packet)?;
+                let response = PacketServerSelectCharacter::try_from(packet)?;
                 self.server_message_tx
                     .send(ServerMessage::CharacterData(Box::new(CharacterData {
                         character_info: response.character_info,
@@ -129,7 +124,7 @@ impl GameClient {
                     .ok();
             }
             Some(ServerPackets::CharacterInventory) => {
-                let response = PacketServerCharacterInventory::try_from(&packet)?;
+                let response = PacketServerCharacterInventory::try_from(packet)?;
                 self.server_message_tx
                     .send(ServerMessage::CharacterDataItems(Box::new(
                         CharacterDataItems {
@@ -140,7 +135,7 @@ impl GameClient {
                     .ok();
             }
             Some(ServerPackets::QuestData) => {
-                let response = PacketServerCharacterQuestData::try_from(&packet)?;
+                let response = PacketServerCharacterQuestData::try_from(packet)?;
                 self.server_message_tx
                     .send(ServerMessage::CharacterDataQuest(Box::new(
                         CharacterDataQuest {
@@ -150,7 +145,7 @@ impl GameClient {
                     .ok();
             }
             Some(ServerPackets::JoinZone) => {
-                let response = PacketServerJoinZone::try_from(&packet)?;
+                let response = PacketServerJoinZone::try_from(packet)?;
                 self.server_message_tx
                     .send(ServerMessage::JoinZone(JoinZoneResponse {
                         entity_id: response.entity_id,
@@ -167,7 +162,7 @@ impl GameClient {
                     .ok();
             }
             Some(ServerPackets::MoveEntity) | Some(ServerPackets::MoveEntityWithMoveMode) => {
-                let response = PacketServerMoveEntity::try_from(&packet)?;
+                let response = PacketServerMoveEntity::try_from(packet)?;
                 self.server_message_tx
                     .send(ServerMessage::MoveEntity(MoveEntity {
                         entity_id: response.entity_id,
@@ -181,7 +176,7 @@ impl GameClient {
                     .ok();
             }
             Some(ServerPackets::StopMoveEntity) => {
-                let response = PacketServerStopMoveEntity::try_from(&packet)?;
+                let response = PacketServerStopMoveEntity::try_from(packet)?;
                 self.server_message_tx
                     .send(ServerMessage::StopMoveEntity(StopMoveEntity {
                         entity_id: response.entity_id,
@@ -192,7 +187,7 @@ impl GameClient {
                     .ok();
             }
             Some(ServerPackets::AttackEntity) => {
-                let response = PacketServerAttackEntity::try_from(&packet)?;
+                let response = PacketServerAttackEntity::try_from(packet)?;
                 self.server_message_tx
                     .send(ServerMessage::AttackEntity(AttackEntity {
                         entity_id: response.entity_id,
@@ -205,7 +200,7 @@ impl GameClient {
                     .ok();
             }
             Some(ServerPackets::PickupItemDropResult) => {
-                let message = PacketServerPickupItemDropResult::try_from(&packet)?;
+                let message = PacketServerPickupItemDropResult::try_from(packet)?;
                 self.server_message_tx
                     .send(ServerMessage::PickupItemDropResult(PickupItemDropResult {
                         item_entity_id: message.item_entity_id,
@@ -214,7 +209,7 @@ impl GameClient {
                     .ok();
             }
             Some(ServerPackets::SpawnEntityCharacter) => {
-                let message = PacketServerSpawnEntityCharacter::try_from(&packet)?;
+                let message = PacketServerSpawnEntityCharacter::try_from(packet)?;
                 self.server_message_tx
                     .send(ServerMessage::SpawnEntityCharacter(Box::new(
                         SpawnEntityCharacter {
@@ -238,7 +233,7 @@ impl GameClient {
                     .ok();
             }
             Some(ServerPackets::SpawnEntityNpc) => {
-                let message = PacketServerSpawnEntityNpc::try_from(&packet)?;
+                let message = PacketServerSpawnEntityNpc::try_from(packet)?;
                 self.server_message_tx
                     .send(ServerMessage::SpawnEntityNpc(SpawnEntityNpc {
                         entity_id: message.entity_id,
@@ -256,7 +251,7 @@ impl GameClient {
                     .ok();
             }
             Some(ServerPackets::SpawnEntityMonster) => {
-                let message = PacketServerSpawnEntityMonster::try_from(&packet)?;
+                let message = PacketServerSpawnEntityMonster::try_from(packet)?;
                 self.server_message_tx
                     .send(ServerMessage::SpawnEntityMonster(SpawnEntityMonster {
                         entity_id: message.entity_id,
@@ -273,7 +268,7 @@ impl GameClient {
                     .ok();
             }
             Some(ServerPackets::SpawnEntityItemDrop) => {
-                let message = PacketServerSpawnEntityItemDrop::try_from(&packet)?;
+                let message = PacketServerSpawnEntityItemDrop::try_from(packet)?;
                 self.server_message_tx
                     .send(ServerMessage::SpawnEntityItemDrop(SpawnEntityItemDrop {
                         entity_id: message.entity_id,
@@ -285,7 +280,7 @@ impl GameClient {
                     .ok();
             }
             Some(ServerPackets::DamageEntity) => {
-                let message = PacketServerDamageEntity::try_from(&packet)?;
+                let message = PacketServerDamageEntity::try_from(packet)?;
                 self.server_message_tx
                     .send(ServerMessage::DamageEntity(DamageEntity {
                         attacker_entity_id: message.attacker_entity_id,
@@ -298,7 +293,7 @@ impl GameClient {
                     .ok();
             }
             Some(ServerPackets::RemoveEntities) => {
-                let message = PacketServerRemoveEntities::try_from(&packet)?;
+                let message = PacketServerRemoveEntities::try_from(packet)?;
                 self.server_message_tx
                     .send(ServerMessage::RemoveEntities(RemoveEntities {
                         entity_ids: message.entity_ids,
@@ -306,7 +301,7 @@ impl GameClient {
                     .ok();
             }
             Some(ServerPackets::Teleport) => {
-                let message = PacketServerTeleport::try_from(&packet)?;
+                let message = PacketServerTeleport::try_from(packet)?;
                 self.server_message_tx
                     .send(ServerMessage::Teleport(Teleport {
                         entity_id: message.entity_id,
@@ -319,7 +314,7 @@ impl GameClient {
                     .ok();
             }
             Some(ServerPackets::LocalChat) => {
-                let message = PacketServerLocalChat::try_from(&packet)?;
+                let message = PacketServerLocalChat::try_from(packet)?;
                 self.server_message_tx
                     .send(ServerMessage::LocalChat(LocalChat {
                         entity_id: message.entity_id,
@@ -328,7 +323,7 @@ impl GameClient {
                     .ok();
             }
             Some(ServerPackets::ShoutChat) => {
-                let message = PacketServerShoutChat::try_from(&packet)?;
+                let message = PacketServerShoutChat::try_from(packet)?;
                 self.server_message_tx
                     .send(ServerMessage::ShoutChat(ShoutChat {
                         name: message.name.to_string(),
@@ -337,7 +332,7 @@ impl GameClient {
                     .ok();
             }
             Some(ServerPackets::AnnounceChat) => {
-                let message = PacketServerAnnounceChat::try_from(&packet)?;
+                let message = PacketServerAnnounceChat::try_from(packet)?;
                 self.server_message_tx
                     .send(ServerMessage::AnnounceChat(AnnounceChat {
                         name: message.name.map(|x| x.to_string()),
@@ -346,7 +341,7 @@ impl GameClient {
                     .ok();
             }
             Some(ServerPackets::Whisper) => {
-                let message = PacketServerWhisper::try_from(&packet)?;
+                let message = PacketServerWhisper::try_from(packet)?;
                 self.server_message_tx
                     .send(ServerMessage::Whisper(Whisper {
                         from: message.from.to_string(),
@@ -355,7 +350,7 @@ impl GameClient {
                     .ok();
             }
             Some(ServerPackets::UpdateAmmo) => {
-                let message = PacketServerUpdateAmmo::try_from(&packet)?;
+                let message = PacketServerUpdateAmmo::try_from(packet)?;
                 self.server_message_tx
                     .send(ServerMessage::UpdateAmmo(
                         message.entity_id,
@@ -365,7 +360,7 @@ impl GameClient {
                     .ok();
             }
             Some(ServerPackets::UpdateEquipment) => {
-                let message = PacketServerUpdateEquipment::try_from(&packet)?;
+                let message = PacketServerUpdateEquipment::try_from(packet)?;
                 self.server_message_tx
                     .send(ServerMessage::UpdateEquipment(UpdateEquipment {
                         entity_id: message.entity_id,
@@ -375,7 +370,7 @@ impl GameClient {
                     .ok();
             }
             Some(ServerPackets::UpdateInventory) | Some(ServerPackets::UpdateMoneyAndInventory) => {
-                let message = PacketServerUpdateInventory::try_from(&packet)?;
+                let message = PacketServerUpdateInventory::try_from(packet)?;
                 self.server_message_tx
                     .send(ServerMessage::UpdateInventory(
                         message.items,
@@ -384,13 +379,13 @@ impl GameClient {
                     .ok();
             }
             Some(ServerPackets::UpdateMoney) => {
-                let message = PacketServerUpdateMoney::try_from(&packet)?;
+                let message = PacketServerUpdateMoney::try_from(packet)?;
                 self.server_message_tx
                     .send(ServerMessage::UpdateMoney(message.money))
                     .ok();
             }
             Some(ServerPackets::UpdateVehiclePart) => {
-                let message = PacketServerUpdateVehiclePart::try_from(&packet)?;
+                let message = PacketServerUpdateVehiclePart::try_from(packet)?;
                 self.server_message_tx
                     .send(ServerMessage::UpdateVehiclePart(UpdateVehiclePart {
                         entity_id: message.entity_id,
@@ -400,7 +395,7 @@ impl GameClient {
                     .ok();
             }
             Some(ServerPackets::UpdateBasicStat) => {
-                let message = PacketServerUpdateBasicStat::try_from(&packet)?;
+                let message = PacketServerUpdateBasicStat::try_from(packet)?;
                 self.server_message_tx
                     .send(ServerMessage::UpdateBasicStat(UpdateBasicStat {
                         basic_stat_type: message.basic_stat_type,
@@ -410,7 +405,7 @@ impl GameClient {
             }
             Some(ServerPackets::UpdateAbilityValueRewardAdd)
             | Some(ServerPackets::UpdateAbilityValueRewardSet) => {
-                let message = PacketServerUpdateAbilityValue::try_from(&packet)?;
+                let message = PacketServerUpdateAbilityValue::try_from(packet)?;
                 if message.is_add {
                     self.server_message_tx
                         .send(ServerMessage::UpdateAbilityValue(
@@ -426,7 +421,7 @@ impl GameClient {
                 }
             }
             Some(ServerPackets::UpdateLevel) => {
-                let message = PacketServerUpdateLevel::try_from(&packet)?;
+                let message = PacketServerUpdateLevel::try_from(packet)?;
                 self.server_message_tx
                     .send(ServerMessage::UpdateLevel(UpdateLevel {
                         entity_id: message.entity_id,
@@ -438,7 +433,7 @@ impl GameClient {
                     .ok();
             }
             Some(ServerPackets::UpdateSpeed) => {
-                let message = PacketServerUpdateSpeed::try_from(&packet)?;
+                let message = PacketServerUpdateSpeed::try_from(packet)?;
                 self.server_message_tx
                     .send(ServerMessage::UpdateSpeed(UpdateSpeed {
                         entity_id: message.entity_id,
@@ -448,7 +443,7 @@ impl GameClient {
                     .ok();
             }
             Some(ServerPackets::UpdateStatusEffects) => {
-                let message = PacketServerUpdateStatusEffects::try_from(&packet)?;
+                let message = PacketServerUpdateStatusEffects::try_from(packet)?;
                 self.server_message_tx
                     .send(ServerMessage::UpdateStatusEffects(UpdateStatusEffects {
                         entity_id: message.entity_id,
@@ -459,7 +454,7 @@ impl GameClient {
                     .ok();
             }
             Some(ServerPackets::UpdateXpStamina) => {
-                let message = PacketServerUpdateXpStamina::try_from(&packet)?;
+                let message = PacketServerUpdateXpStamina::try_from(packet)?;
                 self.server_message_tx
                     .send(ServerMessage::UpdateXpStamina(UpdateXpStamina {
                         xp: message.xp,
@@ -469,7 +464,7 @@ impl GameClient {
                     .ok();
             }
             Some(ServerPackets::QuestResult) => {
-                let message = PacketServerQuestResult::try_from(&packet)?;
+                let message = PacketServerQuestResult::try_from(packet)?;
                 match message.result {
                     PacketServerQuestResultType::DeleteSuccess => {
                         self.server_message_tx
@@ -513,26 +508,26 @@ impl GameClient {
                 }
             }
             Some(ServerPackets::RunNpcDeathTrigger) => {
-                let message = PacketServerRunNpcDeathTrigger::try_from(&packet)?;
+                let message = PacketServerRunNpcDeathTrigger::try_from(packet)?;
 
                 self.server_message_tx
                     .send(ServerMessage::RunNpcDeathTrigger(message.npc_id))
                     .ok();
             }
             Some(ServerPackets::RewardMoney) => {
-                let message = PacketServerRewardMoney::try_from(&packet)?;
+                let message = PacketServerRewardMoney::try_from(packet)?;
                 self.server_message_tx
                     .send(ServerMessage::RewardMoney(message.money))
                     .ok();
             }
             Some(ServerPackets::RewardItems) => {
-                let message = PacketServerRewardItems::try_from(&packet)?;
+                let message = PacketServerRewardItems::try_from(packet)?;
                 self.server_message_tx
                     .send(ServerMessage::RewardItems(message.items))
                     .ok();
             }
             Some(ServerPackets::SetHotbarSlot) => {
-                let message = PacketServerSetHotbarSlot::try_from(&packet)?;
+                let message = PacketServerSetHotbarSlot::try_from(packet)?;
                 self.server_message_tx
                     .send(ServerMessage::SetHotbarSlot(
                         message.slot_index,
@@ -541,13 +536,13 @@ impl GameClient {
                     .ok();
             }
             Some(ServerPackets::LearnSkillResult) => {
-                let message = PacketServerLearnSkillResult::try_from(&packet)?;
+                let message = PacketServerLearnSkillResult::try_from(packet)?;
                 self.server_message_tx
                     .send(ServerMessage::LearnSkillResult(message.result))
                     .ok();
             }
             Some(ServerPackets::LevelUpSkillResult) => {
-                let message = PacketServerLevelUpSkillResult::try_from(&packet)?;
+                let message = PacketServerLevelUpSkillResult::try_from(packet)?;
                 self.server_message_tx
                     .send(ServerMessage::LevelUpSkillResult(LevelUpSkillResult {
                         result: message.result,
@@ -556,7 +551,7 @@ impl GameClient {
                     .ok();
             }
             Some(ServerPackets::UseEmote) => {
-                let message = PacketServerUseEmote::try_from(&packet)?;
+                let message = PacketServerUseEmote::try_from(packet)?;
                 self.server_message_tx
                     .send(ServerMessage::UseEmote(UseEmote {
                         entity_id: message.entity_id,
@@ -566,7 +561,7 @@ impl GameClient {
                     .ok();
             }
             Some(ServerPackets::UseItem) => {
-                let message = PacketServerUseItem::try_from(&packet)?;
+                let message = PacketServerUseItem::try_from(packet)?;
                 if let Some(inventory_slot) = message.inventory_slot {
                     self.server_message_tx
                         .send(ServerMessage::UseInventoryItem(UseInventoryItem {
@@ -585,7 +580,7 @@ impl GameClient {
                 }
             }
             Some(ServerPackets::ChangeNpcId) => {
-                let message = PacketServerChangeNpcId::try_from(&packet)?;
+                let message = PacketServerChangeNpcId::try_from(packet)?;
                 self.server_message_tx
                     .send(ServerMessage::ChangeNpcId(
                         message.client_entity_id,
@@ -594,7 +589,7 @@ impl GameClient {
                     .ok();
             }
             Some(ServerPackets::CastSkillSelf) => {
-                let message = PacketServerCastSkillSelf::try_from(&packet)?;
+                let message = PacketServerCastSkillSelf::try_from(packet)?;
                 self.server_message_tx
                     .send(ServerMessage::CastSkillSelf(CastSkillSelf {
                         entity_id: message.entity_id,
@@ -604,7 +599,7 @@ impl GameClient {
                     .ok();
             }
             Some(ServerPackets::CastSkillTargetEntity) => {
-                let message = PacketServerCastSkillTargetEntity::try_from(&packet)?;
+                let message = PacketServerCastSkillTargetEntity::try_from(packet)?;
                 self.server_message_tx
                     .send(ServerMessage::CastSkillTargetEntity(
                         CastSkillTargetEntity {
@@ -619,7 +614,7 @@ impl GameClient {
                     .ok();
             }
             Some(ServerPackets::CastSkillTargetPosition) => {
-                let message = PacketServerCastSkillTargetPosition::try_from(&packet)?;
+                let message = PacketServerCastSkillTargetPosition::try_from(packet)?;
                 self.server_message_tx
                     .send(ServerMessage::CastSkillTargetPosition(
                         CastSkillTargetPosition {
@@ -632,13 +627,13 @@ impl GameClient {
                     .ok();
             }
             Some(ServerPackets::StartCastingSkill) => {
-                let message = PacketServerStartCastingSkill::try_from(&packet)?;
+                let message = PacketServerStartCastingSkill::try_from(packet)?;
                 self.server_message_tx
                     .send(ServerMessage::StartCastingSkill(message.entity_id))
                     .ok();
             }
             Some(ServerPackets::CancelCastingSkill) => {
-                let message = PacketServerCancelCastingSkill::try_from(&packet)?;
+                let message = PacketServerCancelCastingSkill::try_from(packet)?;
                 self.server_message_tx
                     .send(ServerMessage::CancelCastingSkill(
                         message.entity_id,
@@ -647,7 +642,7 @@ impl GameClient {
                     .ok();
             }
             Some(ServerPackets::FinishCastingSkill) => {
-                let message = PacketServerFinishCastingSkill::try_from(&packet)?;
+                let message = PacketServerFinishCastingSkill::try_from(packet)?;
                 self.server_message_tx
                     .send(ServerMessage::FinishCastingSkill(
                         message.entity_id,
@@ -656,7 +651,7 @@ impl GameClient {
                     .ok();
             }
             Some(ServerPackets::ApplySkillEffect) => {
-                let message = PacketServerApplySkillEffect::try_from(&packet)?;
+                let message = PacketServerApplySkillEffect::try_from(packet)?;
                 self.server_message_tx
                     .send(ServerMessage::ApplySkillEffect(ApplySkillEffect {
                         entity_id: message.entity_id,
@@ -668,7 +663,7 @@ impl GameClient {
                     .ok();
             }
             Some(ServerPackets::ApplySkillDamage) => {
-                let message = PacketServerApplySkillDamage::try_from(&packet)?;
+                let message = PacketServerApplySkillDamage::try_from(packet)?;
                 self.server_message_tx
                     .send(ServerMessage::DamageEntity(DamageEntity {
                         attacker_entity_id: message.caster_entity_id,
@@ -681,7 +676,7 @@ impl GameClient {
                     .ok();
             }
             Some(ServerPackets::MoveToggle) => {
-                let message = PacketServerMoveToggle::try_from(&packet)?;
+                let message = PacketServerMoveToggle::try_from(packet)?;
                 match message.move_toggle_type {
                     PacketServerMoveToggleType::Walk => {
                         self.server_message_tx
@@ -718,13 +713,13 @@ impl GameClient {
                 }
             }
             Some(ServerPackets::NpcStoreTransactionError) => {
-                let message = PacketServerNpcStoreTransactionError::try_from(&packet)?;
+                let message = PacketServerNpcStoreTransactionError::try_from(packet)?;
                 self.server_message_tx
                     .send(ServerMessage::NpcStoreTransactionError(message.error))
                     .ok();
             }
             Some(ServerPackets::PartyRequest) => {
-                let message = match PacketServerPartyRequest::try_from(&packet)? {
+                let message = match PacketServerPartyRequest::try_from(packet)? {
                     PacketServerPartyRequest::Create(client_entity_id) => {
                         ServerMessage::PartyCreate(client_entity_id)
                     }
@@ -735,7 +730,7 @@ impl GameClient {
                 self.server_message_tx.send(message).ok();
             }
             Some(ServerPackets::PartyReply) => {
-                let message = match PacketServerPartyReply::try_from(&packet)? {
+                let message = match PacketServerPartyReply::try_from(packet)? {
                     PacketServerPartyReply::AcceptCreate(client_entity_id) => {
                         ServerMessage::PartyAcceptCreate(client_entity_id)
                     }
@@ -759,7 +754,7 @@ impl GameClient {
                 self.server_message_tx.send(message).ok();
             }
             Some(ServerPackets::PartyMembers) => {
-                let message = match PacketServerPartyMembers::try_from(&packet)? {
+                let message = match PacketServerPartyMembers::try_from(packet)? {
                     PacketServerPartyMembers::Leave(party_member_leave) => {
                         ServerMessage::PartyMemberLeave(party_member_leave)
                     }
@@ -770,13 +765,13 @@ impl GameClient {
                 self.server_message_tx.send(message).ok();
             }
             Some(ServerPackets::PartyMemberUpdateInfo) => {
-                let message = PacketServerPartyMemberUpdateInfo::try_from(&packet)?;
+                let message = PacketServerPartyMemberUpdateInfo::try_from(packet)?;
                 self.server_message_tx
                     .send(ServerMessage::PartyMemberUpdateInfo(message.member_info))
                     .ok();
             }
             Some(ServerPackets::PartyUpdateRules) => {
-                let message = PacketServerPartyUpdateRules::try_from(&packet)?;
+                let message = PacketServerPartyUpdateRules::try_from(packet)?;
                 self.server_message_tx
                     .send(ServerMessage::PartyUpdateRules(
                         message.item_sharing,
@@ -785,7 +780,7 @@ impl GameClient {
                     .ok();
             }
             Some(ServerPackets::AdjustPosition) => {
-                let message = PacketServerAdjustPosition::try_from(&packet)?;
+                let message = PacketServerAdjustPosition::try_from(packet)?;
                 self.server_message_tx
                     .send(ServerMessage::AdjustPosition(
                         message.client_entity_id,
@@ -793,7 +788,7 @@ impl GameClient {
                     ))
                     .ok();
             }
-            _ => log::info!("Unhandled game packet {:x}", packet.command),
+            _ => log::info!("Unhandled GameClient packet {:?}", packet),
         }
 
         Ok(())
@@ -1088,38 +1083,11 @@ impl GameClient {
                     .await?
             }
             unimplemented => {
-                log::warn!("Unimplemented GameClient ClientMessage {:?}", unimplemented);
+                log::info!("Unimplemented GameClient ClientMessage {:?}", unimplemented);
             }
         }
         Ok(())
     }
-
-    pub async fn run_connection(&mut self) -> Result<(), anyhow::Error> {
-        let socket = TcpStream::connect(&self.server_address).await?;
-        let mut connection = Connection::new(socket, self.packet_codec.as_ref());
-
-        loop {
-            tokio::select! {
-                packet = connection.read_packet() => {
-                    match packet {
-                        Ok(packet) => {
-                            self.handle_packet(packet).await?;
-                        },
-                        Err(error) => {
-                            return Err(error);
-                        }
-                    }
-                },
-                server_message = self.client_message_rx.recv() => {
-                    if let Some(message) = server_message {
-                        self.handle_client_message(&mut connection, message).await?;
-                    } else {
-                        return Err(GameClientError::ClientInitiatedDisconnect.into());
-                    }
-                }
-            };
-        }
-
-        // Ok(())
-    }
 }
+
+implement_protocol_client! { GameClient }

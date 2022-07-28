@@ -53,6 +53,7 @@ use events::{
 use free_camera::FreeCameraPlugin;
 use model_loader::ModelLoader;
 use orbit_camera::OrbitCameraPlugin;
+use protocol::ProtocolType;
 use render::{DamageDigitMaterial, RoseRenderPlugin};
 use resources::{
     load_ui_resources, run_network_thread, AppState, ClientEntityList, DamageDigitsSpawner,
@@ -209,6 +210,14 @@ fn main() {
             clap::Arg::new("enable-sound")
                 .long("enable-sound")
                 .help("Enable sound."),
+        )
+        .arg(
+            clap::Arg::new("protocol")
+            .long("protocol")
+            .takes_value(true)
+                .value_parser(["irose", "narose667"])
+                .default_value("irose")
+                .help("Select which protocol to use."),
         );
     let data_path_error = command.error(
         clap::ErrorKind::ArgumentNotFound,
@@ -236,6 +245,11 @@ fn main() {
     let auto_login = matches.is_present("auto-login");
     let passthrough_terrain_textures = matches.is_present("passthrough-terrain-textures");
     let enable_sound = matches.is_present("enable-sound");
+    let protocol_type = match matches.value_of("protocol") {
+        Some("irose") => ProtocolType::Irose,
+        Some("narose667") => ProtocolType::Narose667,
+        _ => ProtocolType::default(),
+    };
 
     let disable_vsync = matches.is_present("disable-vsync");
     let mut app_state = AppState::ZoneViewer;
@@ -588,7 +602,7 @@ fn main() {
     let (network_thread_tx, network_thread_rx) =
         tokio::sync::mpsc::unbounded_channel::<NetworkThreadMessage>();
     let network_thread = std::thread::spawn(move || run_network_thread(network_thread_rx));
-    app.insert_resource(NetworkThread::new(network_thread_tx.clone()));
+    app.insert_resource(NetworkThread::new(protocol_type, network_thread_tx.clone()));
 
     // Run network systems before Update, so we can add/remove entities
     app.add_stage_before(

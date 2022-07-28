@@ -1,4 +1,8 @@
+use async_trait::async_trait;
 use num_traits::FromPrimitive;
+use std::net::SocketAddr;
+use tokio::net::TcpStream;
+
 use rose_game_common::messages::{
     client::{ClientMessage, GetChannelList, JoinServer, LoginRequest},
     server::{
@@ -6,12 +10,8 @@ use rose_game_common::messages::{
         JoinServerResponse, LoginError, LoginResponse, ServerMessage,
     },
 };
-use std::net::SocketAddr;
-use thiserror::Error;
-use tokio::net::TcpStream;
-
 use rose_network_common::{Connection, Packet, PacketCodec};
-use rose_network_irose::{
+use rose_network_narose667::{
     login_client_packets::{
         PacketClientChannelList, PacketClientConnect, PacketClientLoginRequest,
         PacketClientSelectServer,
@@ -20,14 +20,10 @@ use rose_network_irose::{
         ConnectionResult, LoginResult, PacketConnectionReply, PacketServerChannelList,
         PacketServerLoginReply, PacketServerSelectServer, SelectServerResult, ServerPackets,
     },
-    ClientPacketCodec, IROSE_112_TABLE,
+    ClientPacketCodec,
 };
 
-#[derive(Debug, Error)]
-pub enum LoginClientError {
-    #[error("client initiated disconnect")]
-    ClientInitiatedDisconnect,
-}
+use crate::protocol::{ProtocolClient, ProtocolClientError};
 
 pub struct LoginClient {
     server_address: SocketAddr,
@@ -37,7 +33,6 @@ pub struct LoginClient {
 }
 
 impl LoginClient {
-    // TODO: Pass irose into this
     pub fn new(
         server_address: SocketAddr,
         client_message_rx: tokio::sync::mpsc::UnboundedReceiver<ClientMessage>,
@@ -47,14 +42,14 @@ impl LoginClient {
             server_address,
             client_message_rx,
             server_message_tx,
-            packet_codec: Box::new(ClientPacketCodec::default(&IROSE_112_TABLE)),
+            packet_codec: Box::new(ClientPacketCodec::default()),
         }
     }
 
-    async fn handle_packet(&self, packet: Packet) -> Result<(), anyhow::Error> {
+    async fn handle_packet(&self, packet: &Packet) -> Result<(), anyhow::Error> {
         match FromPrimitive::from_u16(packet.command) {
             Some(ServerPackets::NetworkStatus) => {
-                let response = PacketConnectionReply::try_from(&packet)?;
+                let response = PacketConnectionReply::try_from(packet)?;
                 let message = match response.status {
                     ConnectionResult::Accepted => Ok(ConnectionResponse {
                         packet_sequence_id: response.packet_sequence_id,
@@ -66,7 +61,7 @@ impl LoginClient {
                     .ok();
             }
             Some(ServerPackets::LoginReply) => {
-                let response = PacketServerLoginReply::try_from(&packet)?;
+                let response = PacketServerLoginReply::try_from(packet)?;
                 let message = match response.result {
                     LoginResult::Ok => Ok(LoginResponse {
                         server_list: response.servers,
@@ -81,7 +76,7 @@ impl LoginClient {
                     .ok();
             }
             Some(ServerPackets::ChannelList) => {
-                let response = PacketServerChannelList::try_from(&packet)?;
+                let response = PacketServerChannelList::try_from(packet)?;
                 if response.channels.is_empty() {
                     self.server_message_tx
                         .send(ServerMessage::ChannelList(Err(
@@ -102,7 +97,7 @@ impl LoginClient {
                 }
             }
             Some(ServerPackets::SelectServer) => {
-                let response = PacketServerSelectServer::try_from(&packet)?;
+                let response = PacketServerSelectServer::try_from(packet)?;
                 let message = match response.result {
                     SelectServerResult::Ok => Ok(JoinServerResponse {
                         login_token: response.login_token,
@@ -117,7 +112,7 @@ impl LoginClient {
                     .send(ServerMessage::JoinServer(message))
                     .ok();
             }
-            _ => println!("Unhandled packet {}", packet.command),
+            _ => log::info!("Unhandled LoginClient packet {:?}", packet),
         }
 
         Ok(())
@@ -161,39 +156,13 @@ impl LoginClient {
                     }))
                     .await?
             }
-            _ => {
-                println!("TODO: Send client message {:?}", message);
-            }
+            unimplemented => log::info!(
+                "Unimplemented LoginClient ClientMessage {:?}",
+                unimplemented
+            ),
         }
         Ok(())
     }
-
-    pub async fn run_connection(&mut self) -> Result<(), anyhow::Error> {
-        let socket = TcpStream::connect(&self.server_address).await?;
-        let mut connection = Connection::new(socket, self.packet_codec.as_ref());
-
-        loop {
-            tokio::select! {
-                packet = connection.read_packet() => {
-                    match packet {
-                        Ok(packet) => {
-                            self.handle_packet(packet).await?;
-                        },
-                        Err(error) => {
-                            return Err(error);
-                        }
-                    }
-                },
-                server_message = self.client_message_rx.recv() => {
-                    if let Some(message) = server_message {
-                        self.handle_client_message(&mut connection, message).await?;
-                    } else {
-                        return Err(LoginClientError::ClientInitiatedDisconnect.into());
-                    }
-                }
-            };
-        }
-
-        // Ok(())
-    }
 }
+
+implement_protocol_client! { LoginClient }
