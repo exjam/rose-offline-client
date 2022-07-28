@@ -10,12 +10,17 @@ use rose_game_common::components::{
 use crate::{
     components::{PlayerCharacter, SelectedTarget},
     resources::{GameData, UiResources},
-    ui::{draw_dialog, Dialog, DialogDataBindings},
+    ui::{draw_dialog, Dialog, DialogDataBindings, UiStateWindows},
 };
 
 const IID_GAUGE_HP: i32 = 6;
 const IID_GAUGE_MP: i32 = 7;
 const IID_GAUGE_EXP: i32 = 8;
+
+// const IID_BTN_SELFTARGET: i32 = 10;
+const IID_BTN_MENU: i32 = 11;
+// const IID_BTN_DIALOG2ICON: i32 = 12;
+// const IID_BTN_SCREENSHOT: i32 = 13;
 
 #[derive(WorldQuery)]
 pub struct PlayerQuery<'w> {
@@ -31,6 +36,7 @@ pub struct PlayerQuery<'w> {
 pub fn ui_player_info_system(
     mut commands: Commands,
     mut egui_context: ResMut<EguiContext>,
+    mut ui_state_windows: ResMut<UiStateWindows>,
     query_player: Query<PlayerQuery, With<PlayerCharacter>>,
     game_data: Res<GameData>,
     ui_resources: Res<UiResources>,
@@ -47,6 +53,8 @@ pub fn ui_player_info_system(
     } else {
         return;
     };
+
+    let mut response_menu_button = None;
 
     let response = egui::Window::new("Player Info")
         .anchor(egui::Align2::LEFT_TOP, [0.0, 0.0])
@@ -69,7 +77,7 @@ pub fn ui_player_info_system(
                 DialogDataBindings {
                     checked: [],
                     text: [],
-                    response: [],
+                    response: [(IID_BTN_MENU, &mut response_menu_button)],
                     gauge: [
                         (
                             IID_GAUGE_HP,
@@ -124,5 +132,9 @@ pub fn ui_player_info_system(
                 .entity(player.entity)
                 .insert(SelectedTarget::new(player.entity));
         }
+    }
+
+    if response_menu_button.map_or(false, |r| r.clicked()) {
+        ui_state_windows.menu_open = !ui_state_windows.menu_open;
     }
 }

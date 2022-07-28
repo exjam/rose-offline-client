@@ -30,6 +30,7 @@ pub struct UiResources {
     pub dialog_files: HashMap<String, Handle<Dialog>>,
     pub dialog_login: Handle<Dialog>,
     pub dialog_character_info: Handle<Dialog>,
+    pub dialog_game_menu: Handle<Dialog>,
     pub dialog_player_info: Handle<Dialog>,
 }
 
@@ -142,6 +143,7 @@ pub fn load_ui_resources(
         },
         sprite_sheets_load_group: load_group,
         dialog_character_info: dialog_files["DLGAVATA.XML"].clone(),
+        dialog_game_menu: dialog_files["DLGMENU.XML"].clone(),
         dialog_login: dialog_files["DLGLOGIN.XML"].clone(),
         dialog_player_info: dialog_files["DLGINFO.XML"].clone(),
         dialog_files,

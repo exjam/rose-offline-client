@@ -61,7 +61,6 @@ pub fn ui_quest_list_system(
     let player_quest_state = query_player.single();
 
     egui::Window::new("Quest List")
-        .id(ui_state_windows.quest_list_window_id)
         .open(&mut ui_state_windows.quest_list_open)
         .resizable(true)
         .show(egui_context.ctx_mut(), |ui| {

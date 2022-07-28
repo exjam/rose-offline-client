@@ -76,7 +76,6 @@ pub fn ui_skill_list_system(
     let player_skill_list = query_player.single();
 
     egui::Window::new("Skill List")
-        .id(ui_state_windows.skill_list_window_id)
         .open(&mut ui_state_windows.skill_list_open)
         .resizable(true)
         .show(egui_context.ctx_mut(), |ui| {

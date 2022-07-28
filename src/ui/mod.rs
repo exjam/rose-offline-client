@@ -19,6 +19,7 @@ mod ui_debug_zone_list_system;
 mod ui_debug_zone_time_system;
 mod ui_diagnostics_system;
 mod ui_drag_and_drop_system;
+mod ui_game_menu_system;
 mod ui_hotbar_system;
 mod ui_inventory_system;
 mod ui_minimap_system;
@@ -29,7 +30,16 @@ mod ui_quest_list_system;
 mod ui_selected_target_system;
 mod ui_settings_system;
 mod ui_skill_list_system;
-mod ui_window_system;
+
+#[derive(Default)]
+pub struct UiStateWindows {
+    pub character_info_open: bool,
+    pub inventory_open: bool,
+    pub skill_list_open: bool,
+    pub quest_list_open: bool,
+    pub settings_open: bool,
+    pub menu_open: bool,
+}
 
 pub use dialog::{
     draw_dialog, load_dialog_sprites_system, Button, Checkbox, Dialog, DialogDataBindings,
@@ -55,6 +65,7 @@ pub use ui_debug_zone_list_system::ui_debug_zone_list_system;
 pub use ui_debug_zone_time_system::ui_debug_zone_time_system;
 pub use ui_diagnostics_system::ui_diagnostics_system;
 pub use ui_drag_and_drop_system::{ui_drag_and_drop_system, UiStateDragAndDrop};
+pub use ui_game_menu_system::ui_game_menu_system;
 pub use ui_hotbar_system::ui_hotbar_system;
 pub use ui_inventory_system::ui_inventory_system;
 pub use ui_minimap_system::ui_minimap_system;
@@ -65,4 +76,3 @@ pub use ui_quest_list_system::ui_quest_list_system;
 pub use ui_selected_target_system::ui_selected_target_system;
 pub use ui_settings_system::ui_settings_system;
 pub use ui_skill_list_system::ui_skill_list_system;
-pub use ui_window_system::{ui_window_system, UiStateWindows};

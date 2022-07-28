@@ -553,7 +553,6 @@ pub fn ui_inventory_system(
     let (player_equipment, player_inventory, player_cooldowns) = query_player.single();
 
     egui::Window::new("Inventory")
-        .id(ui_state_windows.inventory_window_id)
         .open(&mut ui_state_windows.inventory_open)
         .resizable(false)
         .show(egui_context.ctx_mut(), |ui| {

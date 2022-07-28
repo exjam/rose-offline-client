@@ -88,10 +88,10 @@ use ui::{
     ui_debug_item_list_system, ui_debug_menu_system, ui_debug_npc_list_system,
     ui_debug_physics_system, ui_debug_render_system, ui_debug_skill_list_system,
     ui_debug_zone_lighting_system, ui_debug_zone_list_system, ui_debug_zone_time_system,
-    ui_diagnostics_system, ui_drag_and_drop_system, ui_hotbar_system, ui_inventory_system,
-    ui_minimap_system, ui_npc_store_system, ui_party_system, ui_player_info_system,
-    ui_quest_list_system, ui_selected_target_system, ui_settings_system, ui_skill_list_system,
-    ui_window_system, Dialog, DialogLoader, UiStateDebugWindows, UiStateDragAndDrop,
+    ui_diagnostics_system, ui_drag_and_drop_system, ui_game_menu_system, ui_hotbar_system,
+    ui_inventory_system, ui_minimap_system, ui_npc_store_system, ui_party_system,
+    ui_player_info_system, ui_quest_list_system, ui_selected_target_system, ui_settings_system,
+    ui_skill_list_system, Dialog, DialogLoader, UiStateDebugWindows, UiStateDragAndDrop,
     UiStateWindows,
 };
 use vfs_asset_io::VfsAssetIo;
@@ -585,6 +585,7 @@ fn main() {
                 .with_system(ui_chatbox_system.label("ui_system"))
                 .with_system(ui_character_info_system.label("ui_system"))
                 .with_system(ui_inventory_system.label("ui_system"))
+                .with_system(ui_game_menu_system.label("ui_system"))
                 .with_system(ui_hotbar_system.label("ui_system"))
                 .with_system(ui_minimap_system.label("ui_minimap_system"))
                 .with_system(ui_party_system.label("ui_system"))
@@ -592,7 +593,6 @@ fn main() {
                 .with_system(ui_quest_list_system.label("ui_system"))
                 .with_system(ui_selected_target_system.label("ui_system"))
                 .with_system(ui_skill_list_system.label("ui_system"))
-                .with_system(ui_window_system.label("ui_system"))
                 .with_system(ui_settings_system.label("ui_system"))
                 .with_system(conversation_dialog_system.label("ui_system")),
         );

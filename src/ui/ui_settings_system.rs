@@ -2,8 +2,7 @@ use bevy::prelude::{Local, Query, ResMut};
 use bevy_egui::{egui, EguiContext};
 
 use crate::{
-    audio::SoundGain, components::SoundCategory, resources::SoundSettings,
-    ui::ui_window_system::UiStateWindows,
+    audio::SoundGain, components::SoundCategory, resources::SoundSettings, ui::UiStateWindows,
 };
 
 #[derive(Copy, Clone, PartialEq, Debug)]
@@ -31,7 +30,6 @@ pub fn ui_settings_system(
     mut query_sounds: Query<(&SoundCategory, &mut SoundGain)>,
 ) {
     egui::Window::new("Settings")
-        .id(ui_state_windows.settings_window_id)
         .open(&mut ui_state_windows.settings_open)
         .resizable(false)
         .show(egui_context.ctx_mut(), |ui| {
