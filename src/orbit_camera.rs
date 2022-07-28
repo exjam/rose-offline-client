@@ -80,7 +80,12 @@ fn orbit_camera_update(
     time: Res<Time>,
     rapier_context: Res<RapierContext>,
 ) {
-    let window = windows.get_primary_mut().unwrap();
+    let window = if let Some(window) = windows.get_primary_mut() {
+        window
+    } else {
+        return;
+    };
+
     let (mut orbit_camera, mut camera_transform) = if let Ok((a, b)) = query.get_single_mut() {
         (a, b)
     } else {

@@ -62,7 +62,12 @@ fn free_camera_update(
     mut windows: ResMut<Windows>,
     mut egui_ctx: ResMut<EguiContext>,
 ) {
-    let window = windows.get_primary_mut().unwrap();
+    let window = if let Some(window) = windows.get_primary_mut() {
+        window
+    } else {
+        return;
+    };
+
     let (mut free_camera, mut camera_transform) = if let Ok((a, b)) = query.get_single_mut() {
         (a, b)
     } else {
