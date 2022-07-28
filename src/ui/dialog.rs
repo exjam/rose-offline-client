@@ -34,6 +34,7 @@ impl AssetLoader for DialogLoader {
 macro_rules! widget_to_rect {
     ( $x:ident ) => {
         impl $x {
+            #[allow(dead_code)]
             pub fn widget_rect(&self, min: egui::Pos2) -> egui::Rect {
                 egui::Rect::from_min_size(
                     min + egui::vec2(self.x, self.y) + egui::vec2(self.offset_x, self.offset_y),
@@ -107,14 +108,28 @@ impl GetWidget for Vec<Widget> {
                         }
                     }
                 }
+                Widget::Scrollbar(scrollbar) => {
+                    if let Some(widget) = scrollbar.scrollbox.get_widget_mut(id) {
+                        return Some(widget);
+                    }
+                }
+                Widget::Skill(skill) => {
+                    if let Some(widget) = skill.widgets.get_widget_mut(id) {
+                        return Some(widget);
+                    }
+                }
                 Widget::Button(_)
                 | Widget::Caption(_)
                 | Widget::Checkbox(_)
                 | Widget::Gauge(_)
                 | Widget::Listbox(_)
                 | Widget::Textbox(_)
+                | Widget::RadioBox(_)
+                | Widget::RadioButton(_)
+                | Widget::Scrollbox(_)
                 | Widget::Sprite(_)
-                | Widget::TabButton(_) => {
+                | Widget::TabButton(_)
+                | Widget::ZListbox(_) => {
                     continue;
                 }
             }
@@ -147,12 +162,24 @@ pub enum Widget {
     Textbox(Textbox),
     #[serde(rename = "PANE")]
     Pane(Pane),
+    #[serde(rename = "RADIOBOX")]
+    RadioBox(RadioBox),
+    #[serde(rename = "RADIOBUTTON")]
+    RadioButton(RadioButton),
+    #[serde(rename = "SCROLLBAR")]
+    Scrollbar(Scrollbar),
+    #[serde(rename = "SCROLLBOX")]
+    Scrollbox(Scrollbox),
+    #[serde(rename = "SKILL")]
+    Skill(Skill),
+    #[serde(rename = "IMAGE")]
+    Sprite(Sprite),
     #[serde(rename = "TABBUTTON")]
     TabButton(TabButton),
     #[serde(rename = "TABBEDPANE")]
     TabbedPane(TabbedPane),
-    #[serde(rename = "IMAGE")]
-    Sprite(Sprite),
+    #[serde(rename = "ZLISTBOX")]
+    ZListbox(ZListbox),
 }
 
 impl Widget {
@@ -165,9 +192,15 @@ impl Widget {
             Widget::Listbox(x) => x.id,
             Widget::Textbox(x) => x.id,
             Widget::Pane(x) => x.id,
+            Widget::RadioBox(x) => x.id,
+            Widget::RadioButton(x) => x.id,
+            Widget::Scrollbar(x) => x.id,
+            Widget::Scrollbox(x) => x.id,
+            Widget::Skill(x) => x.id,
+            Widget::Sprite(x) => x.id,
             Widget::TabButton(x) => x.id,
             Widget::TabbedPane(x) => x.id,
-            Widget::Sprite(x) => x.id,
+            Widget::ZListbox(x) => x.id,
         }
     }
 }
@@ -352,6 +385,146 @@ pub struct Listbox {
 }
 
 widget_to_rect! { Listbox }
+
+#[derive(Clone, Default, Deserialize)]
+#[serde(rename = "RADIOBOX")]
+#[serde(default)]
+pub struct RadioBox {
+    #[serde(rename = "ID")]
+    pub id: i32,
+    #[serde(rename = "NAME")]
+    pub name: String,
+}
+
+#[derive(Clone, Default, Deserialize)]
+#[serde(rename = "RADIOBUTTON")]
+#[serde(default)]
+pub struct RadioButton {
+    #[serde(rename = "ID")]
+    pub id: i32,
+    #[serde(rename = "NAME")]
+    pub name: String,
+    #[serde(rename = "X")]
+    pub x: f32,
+    #[serde(rename = "Y")]
+    pub y: f32,
+    #[serde(rename = "OFFSETX")]
+    pub offset_x: f32,
+    #[serde(rename = "OFFSETY")]
+    pub offset_y: f32,
+    #[serde(rename = "WIDTH")]
+    pub width: f32,
+    #[serde(rename = "HEIGHT")]
+    pub height: f32,
+
+    #[serde(rename = "RADIOBOXID")]
+    pub radio_box_id: i32,
+    #[serde(rename = "MODULEID")]
+    pub module_id: i32,
+    #[serde(rename = "NORMALGID")]
+    pub normal_sprite_name: String,
+    #[serde(rename = "OVERGID")]
+    pub over_sprite_name: String,
+    #[serde(rename = "DOWNGID")]
+    pub down_sprite_name: String,
+    #[serde(rename = "DISABLESID")]
+    pub disable_sound_id: i32,
+
+    #[serde(skip)]
+    pub normal_sprite: Option<LoadedSprite>,
+    #[serde(skip)]
+    pub over_sprite: Option<LoadedSprite>,
+    #[serde(skip)]
+    pub down_sprite: Option<LoadedSprite>,
+}
+
+widget_to_rect! { RadioButton }
+
+#[derive(Clone, Default, Deserialize)]
+#[serde(rename = "SCROLLBAR")]
+#[serde(default)]
+pub struct Scrollbar {
+    #[serde(rename = "ID")]
+    pub id: i32,
+    #[serde(rename = "NAME")]
+    pub name: String,
+    #[serde(rename = "X")]
+    pub x: f32,
+    #[serde(rename = "Y")]
+    pub y: f32,
+    #[serde(rename = "OFFSETX")]
+    pub offset_x: f32,
+    #[serde(rename = "OFFSETY")]
+    pub offset_y: f32,
+    #[serde(rename = "WIDTH")]
+    pub width: f32,
+    #[serde(rename = "HEIGHT")]
+    pub height: f32,
+
+    #[serde(rename = "LISTBOXID")]
+    pub listbox_id: i32,
+    #[serde(rename = "TYPE")]
+    pub scrollbar_type: i32,
+
+    #[serde(rename = "SCROLLBOX")]
+    pub scrollbox: Vec<Widget>,
+}
+
+widget_to_rect! { Scrollbar }
+
+#[derive(Clone, Default, Deserialize)]
+#[serde(rename = "SCROLLBOX")]
+#[serde(default)]
+pub struct Scrollbox {
+    #[serde(rename = "ID")]
+    pub id: i32,
+    #[serde(rename = "NAME")]
+    pub name: String,
+    #[serde(rename = "WIDTH")]
+    pub width: f32,
+    #[serde(rename = "HEIGHT")]
+    pub height: f32,
+    #[serde(rename = "MODULEID")]
+    pub module_id: i32,
+    #[serde(rename = "TICKMOVE")]
+    pub tick_move: i32,
+    #[serde(rename = "GID")]
+    pub sprite_name: String,
+    #[serde(rename = "BLINKGID")]
+    pub blink_sprite_name: String,
+    #[serde(rename = "BLINK")]
+    pub is_blink: i32,
+    #[serde(rename = "BLINKMID")]
+    pub blink_mid: i32,
+    #[serde(rename = "BLINKSWAPTIME")]
+    pub blink_swap_time: i32,
+
+    #[serde(skip)]
+    pub sprite: Option<LoadedSprite>,
+    #[serde(skip)]
+    pub blink_sprite: Option<LoadedSprite>,
+}
+
+#[derive(Clone, Default, Deserialize)]
+#[serde(rename = "SKILL")]
+#[serde(default)]
+pub struct Skill {
+    #[serde(rename = "INDEX")]
+    pub id: i32,
+    #[serde(rename = "OFFSETX")]
+    pub x: f32,
+    #[serde(rename = "OFFSETY")]
+    pub y: f32,
+    #[serde(rename = "LEVEL")]
+    pub level: i32,
+    #[serde(rename = "LIMITLEVEL")]
+    pub limit_level: i32,
+    #[serde(rename = "IMAGE")]
+    pub image: String,
+
+    #[serde(rename = "$value")]
+    pub widgets: Vec<Widget>,
+}
 
 #[derive(Clone, Default, Deserialize)]
 #[serde(rename = "EDITBOX")]
@@ -549,6 +722,32 @@ pub struct Sprite {
 
 widget_to_rect! { Sprite }
 
+#[derive(Clone, Default, Deserialize)]
+#[serde(rename = "ZLISTBOX")]
+#[serde(default)]
+pub struct ZListbox {
+    #[serde(rename = "ID")]
+    pub id: i32,
+    #[serde(rename = "NAME")]
+    pub name: String,
+    #[serde(rename = "X")]
+    pub x: f32,
+    #[serde(rename = "Y")]
+    pub y: f32,
+    #[serde(rename = "OFFSETX")]
+    pub offset_x: f32,
+    #[serde(rename = "OFFSETY")]
+    pub offset_y: f32,
+    #[serde(rename = "WIDTH")]
+    pub width: f32,
+    #[serde(rename = "HEIGHT")]
+    pub height: f32,
+    #[serde(rename = "EXTENT")]
+    pub extent: i32,
+}
+
+widget_to_rect! { ZListbox }
+
 #[derive(Clone)]
 pub struct LoadedSprite {
     texture_id: egui::TextureId,
@@ -670,6 +869,30 @@ fn load_widgets_sprites(
                     &gauge.background_sprite_name,
                 );
             }
+            Widget::Pane(pane) => {
+                load_widgets_sprites(&mut pane.widgets, ui_resources, images);
+            }
+            Widget::Scrollbar(scrollbar) => {
+                load_widgets_sprites(&mut scrollbar.scrollbox, ui_resources, images);
+            }
+            Widget::Scrollbox(scrollbox) => {
+                scrollbox.sprite = LoadedSprite::try_load(
+                    ui_resources,
+                    images,
+                    scrollbox.module_id,
+                    &scrollbox.sprite_name,
+                );
+                scrollbox.blink_sprite = LoadedSprite::try_load(
+                    ui_resources,
+                    images,
+                    scrollbox.module_id,
+                    &scrollbox.blink_sprite_name,
+                );
+            }
+            Widget::Skill(skill) => {
+                // TODO: Need to load skill.image (actually probably better through AssetLoader impl)
+                load_widgets_sprites(&mut skill.widgets, ui_resources, images);
+            }
             Widget::Sprite(sprite) => {
                 sprite.sprite = LoadedSprite::try_load(
                     ui_resources,
@@ -677,9 +900,6 @@ fn load_widgets_sprites(
                     sprite.module_id,
                     &sprite.sprite_name,
                 );
-            }
-            Widget::Pane(pane) => {
-                load_widgets_sprites(&mut pane.widgets, ui_resources, images);
             }
             Widget::TabButton(tab_button) => {
                 tab_button.normal_sprite = LoadedSprite::try_load(
@@ -712,7 +932,12 @@ fn load_widgets_sprites(
                     }
                 }
             }
-            Widget::Textbox(_) | Widget::Listbox(_) | Widget::Caption(_) => {}
+            Widget::Textbox(_)
+            | Widget::Listbox(_)
+            | Widget::Caption(_)
+            | Widget::ZListbox(_)
+            | Widget::RadioBox(_)
+            | Widget::RadioButton(_) => {}
         }
     }
 }
@@ -878,6 +1103,35 @@ impl<'a> egui::Widget for DrawListbox<'a> {
 
         if ui.is_rect_visible(rect) {
             // TODO: Implement list box... somehow...
+        }
+
+        response
+    }
+}
+
+struct DrawRadioButton<'a> {
+    radio_button: &'a RadioButton,
+    selected: bool,
+}
+
+impl<'a> egui::Widget for DrawRadioButton<'a> {
+    fn ui(self, ui: &mut egui::Ui) -> egui::Response {
+        let rect = self.radio_button.widget_rect(ui.min_rect().min);
+        let response = ui.allocate_rect(rect, egui::Sense::click());
+
+        if ui.is_rect_visible(rect) {
+            let sprite = if self.selected || response.is_pointer_button_down_on() {
+                self.radio_button.down_sprite.as_ref()
+            } else if response.hovered() || response.has_focus() {
+                self.radio_button.over_sprite.as_ref()
+            } else {
+                None
+            }
+            .or(self.radio_button.normal_sprite.as_ref());
+
+            if let Some(sprite) = sprite {
+                draw_loaded_sprite(ui, rect.min, sprite);
+            }
         }
 
         response
@@ -1114,8 +1368,31 @@ fn draw_widgets<'a>(ui: &mut egui::Ui, widgets: &[Widget], bindings: &mut Dialog
                     }
                 });
             }
+            Widget::RadioButton(radio_button) => {
+                if !bindings.visible(radio_button.id) {
+                    continue;
+                }
+
+                let response = egui::Widget::ui(
+                    DrawRadioButton {
+                        radio_button,
+                        selected: false,
+                    },
+                    ui,
+                );
+
+                bindings.set_response(radio_button.id, response);
+            }
+            Widget::Scrollbar(_) => {
+                // TODO: Draw scrollbar.scrollbox
+            }
+            Widget::Skill(_) => {
+                // TODO: Draw skill.id
+                // TODO: Draw skill.widgets
+            }
+            Widget::Scrollbox(_) => {} // These are drawn by Widget::Scrollbar
             Widget::TabButton(_) => {} // These are drawn by Widget::TabbedPane
-            Widget::Caption(_) => {}
+            Widget::Caption(_) | Widget::RadioBox(_) | Widget::ZListbox(_) => {}
         }
     }
 }
