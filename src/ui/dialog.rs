@@ -915,6 +915,26 @@ fn load_widgets_sprites(
             Widget::Pane(pane) => {
                 load_widgets_sprites(&mut pane.widgets, ui_resources, images);
             }
+            Widget::RadioButton(radio_button) => {
+                radio_button.normal_sprite = LoadedSprite::try_load(
+                    ui_resources,
+                    images,
+                    radio_button.module_id,
+                    &radio_button.normal_sprite_name,
+                );
+                radio_button.over_sprite = LoadedSprite::try_load(
+                    ui_resources,
+                    images,
+                    radio_button.module_id,
+                    &radio_button.over_sprite_name,
+                );
+                radio_button.down_sprite = LoadedSprite::try_load(
+                    ui_resources,
+                    images,
+                    radio_button.module_id,
+                    &radio_button.down_sprite_name,
+                );
+            }
             Widget::Scrollbar(scrollbar) => {
                 if let Some(scrollbox) = scrollbar.scrollbox.as_mut() {
                     scrollbox.sprite = LoadedSprite::try_load(
@@ -978,8 +998,7 @@ fn load_widgets_sprites(
             | Widget::Listbox(_)
             | Widget::Caption(_)
             | Widget::ZListbox(_)
-            | Widget::RadioBox(_)
-            | Widget::RadioButton(_) => {}
+            | Widget::RadioBox(_) => {}
         }
     }
 }
@@ -1151,25 +1170,31 @@ impl<'a> egui::Widget for DrawListbox<'a> {
     }
 }
 
-struct DrawRadioButton<'a> {
+struct DrawRadioButton<'a, 'b> {
     radio_button: &'a RadioButton,
-    selected: bool,
+    selected: &'b mut i32,
 }
 
-impl<'a> egui::Widget for DrawRadioButton<'a> {
+impl<'a, 'b> egui::Widget for DrawRadioButton<'a, 'b> {
     fn ui(self, ui: &mut egui::Ui) -> egui::Response {
         let rect = self.radio_button.widget_rect(ui.min_rect().min);
-        let response = ui.allocate_rect(rect, egui::Sense::click());
+        let mut response = ui.allocate_rect(rect, egui::Sense::click());
 
         if ui.is_rect_visible(rect) {
-            let sprite = if self.selected || response.is_pointer_button_down_on() {
-                self.radio_button.down_sprite.as_ref()
-            } else if response.hovered() || response.has_focus() {
-                self.radio_button.over_sprite.as_ref()
-            } else {
-                None
+            if response.clicked() {
+                *self.selected = self.radio_button.id;
+                response.mark_changed();
             }
-            .or(self.radio_button.normal_sprite.as_ref());
+
+            let sprite =
+                if *self.selected == self.radio_button.id || response.is_pointer_button_down_on() {
+                    self.radio_button.down_sprite.as_ref()
+                } else if response.hovered() || response.has_focus() {
+                    self.radio_button.over_sprite.as_ref()
+                } else {
+                    None
+                }
+                .or(self.radio_button.normal_sprite.as_ref());
 
             if let Some(sprite) = sprite {
                 draw_loaded_sprite(ui, rect.min, sprite);
@@ -1285,13 +1310,14 @@ impl<'a, 'b> egui::Widget for DrawTextbox<'a, 'b> {
 
 #[derive(Default)]
 pub struct DialogDataBindings<'a> {
+    pub visible: &'a mut [(i32, bool)],
     pub checked: &'a mut [(i32, &'a mut bool)],
     pub text: &'a mut [(i32, &'a mut String)],
     pub gauge: &'a mut [(i32, &'a f32, &'a str)],
     pub tabs: &'a mut [(i32, &'a mut i32)],
-    pub response: &'a mut [(i32, &'a mut Option<egui::Response>)],
-    pub visible: &'a mut [(i32, bool)],
+    pub radio: &'a mut [(i32, &'a mut i32)],
     pub scroll: &'a mut [(i32, (&'a mut i32, Range<i32>))],
+    pub response: &'a mut [(i32, &'a mut Option<egui::Response>)],
 }
 
 impl<'a> DialogDataBindings<'a> {
@@ -1299,6 +1325,13 @@ impl<'a> DialogDataBindings<'a> {
         if let Some((_, out)) = self.response.iter_mut().find(|(x, _)| *x == id) {
             **out = Some(response);
         }
+    }
+
+    pub fn get_radio(&mut self, id: i32) -> Option<&mut i32> {
+        self.radio
+            .iter_mut()
+            .find(|(x, _)| *x == id)
+            .map(|(_, buffer)| &mut **buffer)
     }
 
     pub fn get_scroll(&mut self, id: i32) -> Option<(&mut i32, Range<i32>)> {
@@ -1460,10 +1493,15 @@ fn draw_widgets<'a>(ui: &mut egui::Ui, widgets: &[Widget], bindings: &mut Dialog
                     continue;
                 }
 
+                let mut unbound_selected = 0;
+                let selected = bindings
+                    .get_radio(radio_button.radio_box_id)
+                    .unwrap_or(&mut unbound_selected);
+
                 let response = egui::Widget::ui(
                     DrawRadioButton {
                         radio_button,
-                        selected: false,
+                        selected,
                     },
                     ui,
                 );
