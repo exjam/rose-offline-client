@@ -34,6 +34,7 @@ pub struct UiResources {
     pub dialog_game_menu: Handle<Dialog>,
     pub dialog_minimap: Handle<Dialog>,
     pub dialog_player_info: Handle<Dialog>,
+    pub dialog_select_server: Handle<Dialog>,
     pub dialog_skill_list: Handle<Dialog>,
 }
 
@@ -151,6 +152,7 @@ pub fn load_ui_resources(
         dialog_login: dialog_files["DLGLOGIN.XML"].clone(),
         dialog_minimap: dialog_files["DLGMINIMAP.XML"].clone(),
         dialog_player_info: dialog_files["DLGINFO.XML"].clone(),
+        dialog_select_server: dialog_files["DLGSELSVR.XML"].clone(),
         dialog_skill_list: dialog_files["DLGSKILL.XML"].clone(),
         dialog_files,
     });

@@ -20,7 +20,7 @@ use crate::{
     resources::{
         Account, LoginConnection, NetworkThread, ServerConfiguration, ServerList, UiResources,
     },
-    ui::{draw_dialog, Dialog, DialogDataBindings},
+    ui::{draw_dialog, Dialog, DialogDataBindings, GetWidget, Widget},
 };
 
 enum LoginState {
@@ -236,76 +236,109 @@ pub fn login_system(
                 });
         }
         LoginState::ServerSelect => {
+            let dialog = if let Some(dialog) = dialog_assets.get(&ui_resources.dialog_select_server)
+            {
+                dialog
+            } else {
+                return;
+            };
+
+            let mut response_ok_button = None;
+            let mut response_cancel_button = None;
+            let mut try_select_server = ui_state.auto_login;
+
             egui::Window::new("Select Server")
                 .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
-                .collapsible(false)
+                .frame(egui::Frame::none())
+                .title_bar(false)
+                .resizable(false)
+                .default_width(dialog.width)
+                .default_height(dialog.height)
                 .show(egui_context.ctx_mut(), |ui| {
-                    let mut try_select_server =
-                        ui.input().key_pressed(egui::Key::Enter) || ui_state.auto_login;
-                    let server_list = server_list.as_ref().unwrap();
+                    draw_dialog(
+                        ui,
+                        dialog,
+                        DialogDataBindings {
+                            response: &mut [
+                                (10, &mut response_ok_button),
+                                (11, &mut response_cancel_button),
+                            ],
+                            ..Default::default()
+                        },
+                        |ui, _| {
+                            let server_list = server_list.as_ref().unwrap();
+                            let mut selected_world_server_id = ui_state.selected_world_server_id;
+                            let mut selected_game_server_id = ui_state.selected_game_server_id;
 
-                    ui.horizontal(|ui| {
-                        let mut selected_world_server_id = ui_state.selected_world_server_id;
-                        let mut selected_game_server_id = ui_state.selected_game_server_id;
+                            try_select_server =
+                                try_select_server || ui.input().key_pressed(egui::Key::Enter);
 
-                        ui.vertical(|ui| {
-                            ui.label("World Server");
-                            for world_server in server_list.world_servers.iter() {
-                                ui.selectable_value(
-                                    &mut selected_world_server_id,
-                                    world_server.id,
-                                    &world_server.name,
-                                );
-                            }
-                        });
+                            if let Some(Widget::Listbox(listbox)) = dialog.get_widget(2) {
+                                let listbox_rect = listbox.widget_rect(ui.min_rect().min);
 
-                        ui.vertical(|ui| {
-                            ui.label("Game Server");
-                            for world_server in server_list.world_servers.iter() {
-                                if world_server.id == selected_world_server_id {
-                                    for game_server in world_server.game_servers.iter() {
-                                        let response = ui.selectable_value(
-                                            &mut selected_game_server_id,
-                                            game_server.id,
-                                            &game_server.name,
-                                        );
-
-                                        if response.double_clicked() {
-                                            try_select_server = true;
+                                ui.allocate_ui_at_rect(listbox_rect, |ui| {
+                                    ui.vertical(|ui| {
+                                        for world_server in server_list.world_servers.iter() {
+                                            ui.selectable_value(
+                                                &mut selected_world_server_id,
+                                                world_server.id,
+                                                &world_server.name,
+                                            );
                                         }
-                                    }
-                                }
+                                    });
+                                });
                             }
-                        });
 
-                        ui_state.selected_world_server_id = selected_world_server_id;
-                        ui_state.selected_world_server_id = selected_world_server_id;
-                    });
+                            if let Some(Widget::Listbox(listbox)) = dialog.get_widget(3) {
+                                let listbox_rect = listbox.widget_rect(ui.min_rect().min);
 
-                    ui.horizontal(|ui| {
-                        if ui.button("Play").clicked() {
-                            try_select_server = true;
-                        }
+                                ui.allocate_ui_at_rect(listbox_rect, |ui| {
+                                    ui.vertical(|ui| {
+                                        for world_server in server_list.world_servers.iter() {
+                                            if world_server.id == selected_world_server_id {
+                                                for game_server in world_server.game_servers.iter()
+                                                {
+                                                    let response = ui.selectable_value(
+                                                        &mut selected_game_server_id,
+                                                        game_server.id,
+                                                        &game_server.name,
+                                                    );
 
-                        if ui.button("Logout").clicked() {
-                            commands.remove_resource::<LoginConnection>();
-                            try_select_server = false;
-                        }
-                    });
-
-                    if try_select_server {
-                        if let Some(connection) = login_connection.as_ref() {
-                            connection
-                                .client_message_tx
-                                .send(ClientMessage::JoinServer(JoinServer {
-                                    server_id: ui_state.selected_world_server_id,
-                                    channel_id: ui_state.selected_game_server_id,
-                                }))
-                                .ok();
-                            ui_state.state = LoginState::JoiningServer;
-                        }
-                    }
+                                                    if response.double_clicked() {
+                                                        try_select_server = true;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    });
+                                });
+                            }
+                            ui_state.selected_world_server_id = selected_world_server_id;
+                            ui_state.selected_game_server_id = selected_game_server_id;
+                        },
+                    );
                 });
+
+            if response_ok_button.map_or(false, |r| r.clicked()) {
+                try_select_server = true;
+            }
+            if response_cancel_button.map_or(false, |r| r.clicked()) {
+                try_select_server = false;
+                commands.remove_resource::<LoginConnection>();
+            }
+
+            if try_select_server {
+                if let Some(connection) = login_connection.as_ref() {
+                    connection
+                        .client_message_tx
+                        .send(ClientMessage::JoinServer(JoinServer {
+                            server_id: ui_state.selected_world_server_id,
+                            channel_id: ui_state.selected_game_server_id,
+                        }))
+                        .ok();
+                    ui_state.state = LoginState::JoiningServer;
+                }
+            }
         }
         LoginState::JoiningServer => {
             egui::Window::new("Connecting...")
