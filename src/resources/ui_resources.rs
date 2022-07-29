@@ -32,6 +32,7 @@ pub struct UiResources {
     pub dialog_character_info: Handle<Dialog>,
     pub dialog_game_menu: Handle<Dialog>,
     pub dialog_player_info: Handle<Dialog>,
+    pub dialog_skill_list: Handle<Dialog>,
 }
 
 fn load_ui_spritesheet(
@@ -146,6 +147,7 @@ pub fn load_ui_resources(
         dialog_game_menu: dialog_files["DLGMENU.XML"].clone(),
         dialog_login: dialog_files["DLGLOGIN.XML"].clone(),
         dialog_player_info: dialog_files["DLGINFO.XML"].clone(),
+        dialog_skill_list: dialog_files["DLGSKILL.XML"].clone(),
         dialog_files,
     });
 }

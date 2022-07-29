@@ -134,7 +134,7 @@ pub fn ui_character_info_system(
                         });
                     };
 
-                    match bindings.tab(IID_TABBEDPANE) {
+                    match bindings.get_tab(IID_TABBEDPANE) {
                         Some(&mut IID_TAB_BASICINFO) => {
                             draw_text_at(ui, 59.0, 67.0, &player.character_info.name);
                             draw_text_at(ui, 59.0, 88.0, "TODO: job name");

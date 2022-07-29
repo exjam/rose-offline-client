@@ -1,3 +1,5 @@
+use std::ops::Range;
+
 use bevy::{
     asset::{AssetLoader, BoxedFuture, LoadContext, LoadState, LoadedAsset},
     prelude::{AssetEvent, AssetServer, Assets, EventReader, Handle, Image, Local, Res, ResMut},
@@ -85,10 +87,55 @@ pub struct Dialog {
 }
 
 pub trait GetWidget {
+    fn get_widget(&self, id: i32) -> Option<&Widget>;
     fn get_widget_mut(&mut self, id: i32) -> Option<&mut Widget>;
 }
 
 impl GetWidget for Vec<Widget> {
+    fn get_widget(&self, id: i32) -> Option<&Widget> {
+        for widget in self.iter() {
+            if widget.id() == id {
+                return Some(widget);
+            }
+
+            match widget {
+                Widget::Pane(pane) => {
+                    if let Some(widget) = pane.widgets.get_widget(id) {
+                        return Some(widget);
+                    }
+                }
+                Widget::TabbedPane(tabbed_pane) => {
+                    for tab in tabbed_pane.tabs.iter() {
+                        if let Some(widget) = tab.widgets.get_widget(id) {
+                            return Some(widget);
+                        }
+                    }
+                }
+                Widget::Skill(skill) => {
+                    if let Some(widget) = skill.widgets.get_widget(id) {
+                        return Some(widget);
+                    }
+                }
+                Widget::Button(_)
+                | Widget::Caption(_)
+                | Widget::Checkbox(_)
+                | Widget::Gauge(_)
+                | Widget::Listbox(_)
+                | Widget::Textbox(_)
+                | Widget::RadioBox(_)
+                | Widget::RadioButton(_)
+                | Widget::Sprite(_)
+                | Widget::TabButton(_)
+                | Widget::ZListbox(_)
+                | Widget::Scrollbar(_) => {
+                    continue;
+                }
+            }
+        }
+
+        None
+    }
+
     fn get_widget_mut(&mut self, id: i32) -> Option<&mut Widget> {
         for widget in self.iter_mut() {
             if widget.id() == id {
@@ -108,11 +155,6 @@ impl GetWidget for Vec<Widget> {
                         }
                     }
                 }
-                Widget::Scrollbar(scrollbar) => {
-                    if let Some(widget) = scrollbar.scrollbox.get_widget_mut(id) {
-                        return Some(widget);
-                    }
-                }
                 Widget::Skill(skill) => {
                     if let Some(widget) = skill.widgets.get_widget_mut(id) {
                         return Some(widget);
@@ -126,10 +168,10 @@ impl GetWidget for Vec<Widget> {
                 | Widget::Textbox(_)
                 | Widget::RadioBox(_)
                 | Widget::RadioButton(_)
-                | Widget::Scrollbox(_)
                 | Widget::Sprite(_)
                 | Widget::TabButton(_)
-                | Widget::ZListbox(_) => {
+                | Widget::ZListbox(_)
+                | Widget::Scrollbar(_) => {
                     continue;
                 }
             }
@@ -140,6 +182,10 @@ impl GetWidget for Vec<Widget> {
 }
 
 impl GetWidget for Dialog {
+    fn get_widget(&self, id: i32) -> Option<&Widget> {
+        self.widgets.get_widget(id)
+    }
+
     fn get_widget_mut(&mut self, id: i32) -> Option<&mut Widget> {
         self.widgets.get_widget_mut(id)
     }
@@ -168,8 +214,6 @@ pub enum Widget {
     RadioButton(RadioButton),
     #[serde(rename = "SCROLLBAR")]
     Scrollbar(Scrollbar),
-    #[serde(rename = "SCROLLBOX")]
-    Scrollbox(Scrollbox),
     #[serde(rename = "SKILL")]
     Skill(Skill),
     #[serde(rename = "IMAGE")]
@@ -195,7 +239,6 @@ impl Widget {
             Widget::RadioBox(x) => x.id,
             Widget::RadioButton(x) => x.id,
             Widget::Scrollbar(x) => x.id,
-            Widget::Scrollbox(x) => x.id,
             Widget::Skill(x) => x.id,
             Widget::Sprite(x) => x.id,
             Widget::TabButton(x) => x.id,
@@ -466,8 +509,8 @@ pub struct Scrollbar {
     #[serde(rename = "TYPE")]
     pub scrollbar_type: i32,
 
-    #[serde(rename = "SCROLLBOX")]
-    pub scrollbox: Vec<Widget>,
+    #[serde(rename = "$value")]
+    pub scrollbox: Option<Scrollbox>,
 }
 
 widget_to_rect! { Scrollbar }
@@ -873,21 +916,20 @@ fn load_widgets_sprites(
                 load_widgets_sprites(&mut pane.widgets, ui_resources, images);
             }
             Widget::Scrollbar(scrollbar) => {
-                load_widgets_sprites(&mut scrollbar.scrollbox, ui_resources, images);
-            }
-            Widget::Scrollbox(scrollbox) => {
-                scrollbox.sprite = LoadedSprite::try_load(
-                    ui_resources,
-                    images,
-                    scrollbox.module_id,
-                    &scrollbox.sprite_name,
-                );
-                scrollbox.blink_sprite = LoadedSprite::try_load(
-                    ui_resources,
-                    images,
-                    scrollbox.module_id,
-                    &scrollbox.blink_sprite_name,
-                );
+                if let Some(scrollbox) = scrollbar.scrollbox.as_mut() {
+                    scrollbox.sprite = LoadedSprite::try_load(
+                        ui_resources,
+                        images,
+                        scrollbox.module_id,
+                        &scrollbox.sprite_name,
+                    );
+                    scrollbox.blink_sprite = LoadedSprite::try_load(
+                        ui_resources,
+                        images,
+                        scrollbox.module_id,
+                        &scrollbox.blink_sprite_name,
+                    );
+                }
             }
             Widget::Skill(skill) => {
                 // TODO: Need to load skill.image (actually probably better through AssetLoader impl)
@@ -1138,6 +1180,43 @@ impl<'a> egui::Widget for DrawRadioButton<'a> {
     }
 }
 
+struct DrawScrollbar<'a, 'b> {
+    scrollbar: &'a Scrollbar,
+    current: &'b mut i32,
+    range: Range<i32>,
+}
+
+impl<'a, 'b> egui::Widget for DrawScrollbar<'a, 'b> {
+    fn ui(self, ui: &mut egui::Ui) -> egui::Response {
+        let rect = self.scrollbar.widget_rect(ui.min_rect().min);
+        let response = ui.allocate_rect(rect, egui::Sense::click_and_drag());
+
+        if let Some(scrollbox) = self.scrollbar.scrollbox.as_ref() {
+            let start = rect.min.y + scrollbox.height / 2.0;
+            let end = rect.max.y - scrollbox.height / 2.0;
+            let range_size = (self.range.end - self.range.start) as f32;
+
+            if let Some(pointer_position_2d) = response.interact_pointer_pos() {
+                // Calculate value from position
+                let pos = pointer_position_2d.y.clamp(start, end);
+                let value = self.range.start + (range_size * (pos - start) / (end - start)) as i32;
+                *self.current = value;
+            }
+
+            if ui.is_rect_visible(rect) {
+                // Calculate position from value
+                let pos = rect.min.y + *self.current as f32 * ((end - start) / range_size);
+
+                if let Some(sprite) = scrollbox.sprite.as_ref() {
+                    draw_loaded_sprite(ui, egui::pos2(rect.min.x, pos), sprite);
+                }
+            }
+        }
+
+        response
+    }
+}
+
 struct DrawSprite<'a> {
     sprite: &'a Sprite,
 }
@@ -1212,6 +1291,7 @@ pub struct DialogDataBindings<'a> {
     pub tabs: &'a mut [(i32, &'a mut i32)],
     pub response: &'a mut [(i32, &'a mut Option<egui::Response>)],
     pub visible: &'a mut [(i32, bool)],
+    pub scroll: &'a mut [(i32, (&'a mut i32, Range<i32>))],
 }
 
 impl<'a> DialogDataBindings<'a> {
@@ -1221,21 +1301,28 @@ impl<'a> DialogDataBindings<'a> {
         }
     }
 
-    pub fn tab(&mut self, id: i32) -> Option<&mut i32> {
+    pub fn get_scroll(&mut self, id: i32) -> Option<(&mut i32, Range<i32>)> {
+        self.scroll
+            .iter_mut()
+            .find(|(x, _)| *x == id)
+            .map(|(_, (current, range))| (&mut **current, range.clone()))
+    }
+
+    pub fn get_tab(&mut self, id: i32) -> Option<&mut i32> {
         self.tabs
             .iter_mut()
             .find(|(x, _)| *x == id)
             .map(|(_, buffer)| &mut **buffer)
     }
 
-    pub fn text(&mut self, id: i32) -> Option<&mut String> {
+    pub fn get_text(&mut self, id: i32) -> Option<&mut String> {
         self.text
             .iter_mut()
             .find(|(x, _)| *x == id)
             .map(|(_, buffer)| &mut **buffer)
     }
 
-    pub fn visible(&self, id: i32) -> bool {
+    pub fn get_visible(&self, id: i32) -> bool {
         self.visible
             .iter()
             .find(|(x, _)| *x == id)
@@ -1247,18 +1334,18 @@ fn draw_widgets<'a>(ui: &mut egui::Ui, widgets: &[Widget], bindings: &mut Dialog
     for element in widgets.iter() {
         match element {
             Widget::Textbox(textbox) => {
-                if !bindings.visible(textbox.id) {
+                if !bindings.get_visible(textbox.id) {
                     continue;
                 }
 
                 let mut unbound_buffer = format!("<{} unbound>", textbox.id);
-                let buffer = bindings.text(textbox.id).unwrap_or(&mut unbound_buffer);
+                let buffer = bindings.get_text(textbox.id).unwrap_or(&mut unbound_buffer);
 
                 let response = egui::Widget::ui(DrawTextbox { textbox, buffer }, ui);
                 bindings.set_response(textbox.id, response);
             }
             Widget::Sprite(sprite) => {
-                if !bindings.visible(sprite.id) {
+                if !bindings.get_visible(sprite.id) {
                     continue;
                 }
 
@@ -1266,7 +1353,7 @@ fn draw_widgets<'a>(ui: &mut egui::Ui, widgets: &[Widget], bindings: &mut Dialog
                 bindings.set_response(sprite.id, response);
             }
             Widget::Button(button) => {
-                if !bindings.visible(button.id) {
+                if !bindings.get_visible(button.id) {
                     continue;
                 }
 
@@ -1274,7 +1361,7 @@ fn draw_widgets<'a>(ui: &mut egui::Ui, widgets: &[Widget], bindings: &mut Dialog
                 bindings.set_response(button.id, response);
             }
             Widget::Checkbox(checkbox) => {
-                if !bindings.visible(checkbox.id) {
+                if !bindings.get_visible(checkbox.id) {
                     continue;
                 }
 
@@ -1291,7 +1378,7 @@ fn draw_widgets<'a>(ui: &mut egui::Ui, widgets: &[Widget], bindings: &mut Dialog
                 bindings.set_response(checkbox.id, response);
             }
             Widget::Gauge(gauge) => {
-                if !bindings.visible(gauge.id) {
+                if !bindings.get_visible(gauge.id) {
                     continue;
                 }
 
@@ -1305,7 +1392,7 @@ fn draw_widgets<'a>(ui: &mut egui::Ui, widgets: &[Widget], bindings: &mut Dialog
                 bindings.set_response(gauge.id, response);
             }
             Widget::Listbox(listbox) => {
-                if !bindings.visible(listbox.id) {
+                if !bindings.get_visible(listbox.id) {
                     continue;
                 }
 
@@ -1313,7 +1400,7 @@ fn draw_widgets<'a>(ui: &mut egui::Ui, widgets: &[Widget], bindings: &mut Dialog
                 bindings.set_response(listbox.id, response);
             }
             Widget::Pane(pane) => {
-                if !bindings.visible(pane.id) {
+                if !bindings.get_visible(pane.id) {
                     continue;
                 }
 
@@ -1322,7 +1409,7 @@ fn draw_widgets<'a>(ui: &mut egui::Ui, widgets: &[Widget], bindings: &mut Dialog
                 });
             }
             Widget::TabbedPane(tabbed_pane) => {
-                if !bindings.visible(tabbed_pane.id) || tabbed_pane.tabs.is_empty() {
+                if !bindings.get_visible(tabbed_pane.id) || tabbed_pane.tabs.is_empty() {
                     continue;
                 }
 
@@ -1332,7 +1419,7 @@ fn draw_widgets<'a>(ui: &mut egui::Ui, widgets: &[Widget], bindings: &mut Dialog
 
                 ui.allocate_ui_at_rect(rect, |ui| {
                     let mut current_tab = bindings
-                        .tab(tabbed_pane.id)
+                        .get_tab(tabbed_pane.id)
                         .map(|x| *x)
                         .unwrap_or(tabbed_pane.tabs[0].id);
 
@@ -1354,7 +1441,7 @@ fn draw_widgets<'a>(ui: &mut egui::Ui, widgets: &[Widget], bindings: &mut Dialog
                     }
 
                     // Update current tab
-                    if let Some(tab_id) = bindings.tab(tabbed_pane.id) {
+                    if let Some(tab_id) = bindings.get_tab(tabbed_pane.id) {
                         *tab_id = current_tab;
                     }
 
@@ -1369,7 +1456,7 @@ fn draw_widgets<'a>(ui: &mut egui::Ui, widgets: &[Widget], bindings: &mut Dialog
                 });
             }
             Widget::RadioButton(radio_button) => {
-                if !bindings.visible(radio_button.id) {
+                if !bindings.get_visible(radio_button.id) {
                     continue;
                 }
 
@@ -1383,14 +1470,27 @@ fn draw_widgets<'a>(ui: &mut egui::Ui, widgets: &[Widget], bindings: &mut Dialog
 
                 bindings.set_response(radio_button.id, response);
             }
-            Widget::Scrollbar(_) => {
-                // TODO: Draw scrollbar.scrollbox
+            Widget::Scrollbar(scrollbar) => {
+                if !bindings.get_visible(scrollbar.id) {
+                    continue;
+                }
+
+                if let Some((current, range)) = bindings.get_scroll(scrollbar.id) {
+                    let response = egui::Widget::ui(
+                        DrawScrollbar {
+                            current,
+                            range,
+                            scrollbar,
+                        },
+                        ui,
+                    );
+                    bindings.set_response(scrollbar.id, response);
+                }
             }
             Widget::Skill(_) => {
                 // TODO: Draw skill.id
                 // TODO: Draw skill.widgets
             }
-            Widget::Scrollbox(_) => {} // These are drawn by Widget::Scrollbar
             Widget::TabButton(_) => {} // These are drawn by Widget::TabbedPane
             Widget::Caption(_) | Widget::RadioBox(_) | Widget::ZListbox(_) => {}
         }

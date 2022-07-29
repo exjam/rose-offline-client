@@ -669,7 +669,7 @@ pub fn ui_inventory_system(
                 |ui, bindings| {
                     let mut current_page = InventoryPageType::Equipment;
 
-                    match bindings.tab(IID_TABBEDPANE_EQUIP) {
+                    match bindings.get_tab(IID_TABBEDPANE_EQUIP) {
                         Some(&mut IID_TAB_EQUIP_AVATAR) => {
                             if !ui_state_inventory.minimised {
                                 for (item_slot, pos) in EQUIPMENT_GRID_SLOTS.iter() {
@@ -691,7 +691,7 @@ pub fn ui_inventory_system(
                                 }
                             }
 
-                            match bindings.tab(IID_TABBEDPANE_INVEN_ITEM) {
+                            match bindings.get_tab(IID_TABBEDPANE_INVEN_ITEM) {
                                 Some(&mut IID_TAB_INVEN_EQUIP) => {
                                     current_page = InventoryPageType::Equipment;
                                 }
