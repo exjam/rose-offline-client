@@ -587,7 +587,7 @@ fn main() {
                 .with_system(ui_inventory_system.label("ui_system"))
                 .with_system(ui_game_menu_system.label("ui_system"))
                 .with_system(ui_hotbar_system.label("ui_system"))
-                .with_system(ui_minimap_system.label("ui_minimap_system"))
+                .with_system(ui_minimap_system.label("ui_system"))
                 .with_system(ui_party_system.label("ui_system"))
                 .with_system(ui_player_info_system.label("ui_system"))
                 .with_system(ui_quest_list_system.label("ui_system"))

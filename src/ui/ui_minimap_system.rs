@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use bevy::{
     math::{Vec2, Vec3Swizzles},
     prelude::{
@@ -10,13 +12,30 @@ use rose_data::ZoneId;
 
 use crate::{
     components::{PlayerCharacter, Position},
-    resources::{CurrentZone, GameData, Icons},
+    resources::{CurrentZone, GameData, Icons, UiResources},
+    ui::{draw_dialog, Dialog, DialogDataBindings},
     zone_loader::ZoneLoaderAsset,
 };
 
-const PLAYER_ICON_SIZE: egui::Vec2 = egui::Vec2::new(16.0, 16.0);
+use super::{dialog::GetWidget, Widget};
+
+const PLAYER_ICON_SIZE: Vec2 = Vec2::new(16.0, 16.0);
 const MAP_BLOCK_PIXELS: f32 = 64.0;
 const MAP_OUTLINE_PIXELS: f32 = MAP_BLOCK_PIXELS;
+
+const ZONE_NAME_WIDTH: f32 = 102.0;
+const ZONE_NAME_EXPANDED_WIDTH: f32 = 172.0;
+
+const IID_PANE_BIG: i32 = 50;
+// const IID_CAPTION_BIG: i32 = 51;
+const IID_BTN_NORMAL: i32 = 52;
+const IID_BTN_MINIMIZE_BIG: i32 = 53;
+const IID_PANE_BIG_CHILDPANE: i32 = 60;
+const IID_PANE_SMALL: i32 = 100;
+// const IID_CAPTION_SMALL: i32 = 101;
+const IID_BTN_EXPAND: i32 = 102;
+const IID_BTN_MINIMIZE_SMALL: i32 = 103;
+const IID_PANE_SMALL_CHILDPANE: i32 = 110;
 
 #[derive(Default)]
 pub struct UiStateMinimap {
@@ -28,6 +47,37 @@ pub struct UiStateMinimap {
     pub max_world_pos: Vec2,
     pub distance_per_pixel: f32,
     pub last_player_position: Vec2,
+    pub is_expanded: bool,
+    pub is_minimised: bool,
+    pub scroll: Vec2,
+    pub zone_name_text_galley: Option<Arc<egui::Galley>>,
+    pub zone_name_text_expanded_galley: Option<Arc<egui::Galley>>,
+}
+
+fn generate_text_galley(
+    ctx: &egui::Context,
+    width: f32,
+    height: f32,
+    text: String,
+) -> Arc<egui::Galley> {
+    let style = ctx.style();
+    let text_format = egui::text::TextFormat {
+        font_id: egui::FontSelection::Default.resolve(&style),
+        color: egui::Color32::WHITE,
+        background: egui::Color32::TRANSPARENT,
+        italics: false,
+        underline: egui::Stroke::none(),
+        strikethrough: egui::Stroke::none(),
+        valign: egui::Align::Center,
+    };
+
+    let mut text_job = egui::text::LayoutJob::single_section(text, text_format);
+    text_job.first_row_min_height = height;
+    text_job.wrap.max_width = width;
+    text_job.wrap.max_rows = 1;
+    text_job.wrap.break_anywhere = true;
+
+    ctx.fonts().layout_job(text_job)
 }
 
 pub fn ui_minimap_system(
@@ -41,7 +91,16 @@ pub fn ui_minimap_system(
     zone_loader_assets: Res<Assets<ZoneLoaderAsset>>,
     game_data: Res<GameData>,
     icons: Res<Icons>,
+    ui_resources: Res<UiResources>,
+    dialog_assets: Res<Assets<Dialog>>,
 ) {
+    let ui_state = &mut *ui_state;
+    let dialog = if let Some(dialog) = dialog_assets.get(&ui_resources.dialog_minimap) {
+        dialog
+    } else {
+        return;
+    };
+
     if current_zone.is_none() {
         return;
     }
@@ -57,15 +116,33 @@ pub fn ui_minimap_system(
         ui_state.minimap_texture = Default::default();
         ui_state.minimap_image_size = Default::default();
 
-        if let Some(zone_data) = game_data.zone_list.get_zone(current_zone.id) {
+        let zone_name = if let Some(zone_data) = game_data.zone_list.get_zone(current_zone.id) {
             if let Some(minimap_path) = zone_data.minimap_path.as_ref() {
                 ui_state.minimap_image = asset_server.load(minimap_path.path());
                 ui_state.minimap_texture =
                     egui_context.add_image(ui_state.minimap_image.clone_weak());
             }
-        }
 
+            zone_data.name.clone()
+        } else {
+            "???".to_string()
+        };
+
+        let ctx = egui_context.ctx_mut();
+        ui_state.zone_name_text_galley = Some(generate_text_galley(
+            ctx,
+            ZONE_NAME_WIDTH,
+            16.0,
+            zone_name.clone(),
+        ));
+        ui_state.zone_name_text_expanded_galley = Some(generate_text_galley(
+            ctx,
+            ZONE_NAME_EXPANDED_WIDTH,
+            16.0,
+            zone_name,
+        ));
         ui_state.zone_id = Some(current_zone.id);
+        ui_state.last_player_position = Vec2::default();
     }
 
     if ui_state.minimap_image_size.is_none() {
@@ -108,136 +185,244 @@ pub fn ui_minimap_system(
         false
     };
 
-    egui::Window::new(
-        game_data
-            .zone_list
-            .get_zone(current_zone.id)
-            .map(|x| x.name.as_str())
-            .unwrap_or("???"),
-    )
-    .id(egui::Id::new("minimap"))
-    .anchor(egui::Align2::RIGHT_TOP, [-10.0, 10.0])
-    .default_size([225.0, 225.0])
-    .show(egui_context.ctx_mut(), |ui| {
-        let minimap_visible_size = ui.available_size();
-        let minimap_min_rect = ui.min_rect();
+    let (dialog_width, dialog_height) = if ui_state.is_expanded {
+        if let Some(Widget::Pane(pane)) = dialog.get_widget(IID_PANE_BIG) {
+            (pane.width, pane.height)
+        } else {
+            (dialog.width, dialog.height)
+        }
+    } else if let Some(Widget::Pane(pane)) = dialog.get_widget(IID_PANE_SMALL) {
+        (pane.width, pane.height)
+    } else {
+        (dialog.width, dialog.height)
+    };
 
-        if let Some(minimap_image_size) = ui_state.minimap_image_size {
-            let mut scroll_area = egui::ScrollArea::both();
+    let mut response_expand_button = None;
+    let mut response_shrink_button = None;
+    let mut response_big_minimise_button = None;
+    let mut response_small_minimise_button = None;
+    let minimised = ui_state.minimap_image_size.is_none() || ui_state.is_minimised;
 
+    egui::Window::new("Minimap")
+        .anchor(egui::Align2::RIGHT_TOP, [0.0, 0.0])
+        .frame(egui::Frame::none())
+        .title_bar(false)
+        .resizable(false)
+        .default_width(dialog_width)
+        .default_height(dialog_height)
+        .show(egui_context.ctx_mut(), |ui| {
+            let minimap_size = Vec2::new(dialog_width - 2.0, dialog_height - 22.0);
+            let image_size = ui_state.minimap_image_size.unwrap_or(minimap_size);
+            let minimap_rect = egui::Rect::from_min_size(
+                ui.min_rect().min + egui::vec2(1.0, 21.0),
+                egui::vec2(minimap_size.x, minimap_size.y),
+            );
             let minimap_player_pos = if let Some(player_position) = player_position {
-                let minimap_player_x = minimap_min_rect.left()
-                    + MAP_OUTLINE_PIXELS
+                let minimap_player_x = MAP_OUTLINE_PIXELS
                     + f32::max(
                         0.0,
                         (player_position.x - ui_state.min_world_pos.x)
                             / ui_state.distance_per_pixel,
                     );
-                let minimap_player_y = minimap_min_rect.top()
-                    + MAP_OUTLINE_PIXELS
+                let minimap_player_y = MAP_OUTLINE_PIXELS
                     + f32::max(
                         0.0,
                         (ui_state.min_world_pos.y - player_position.y)
                             / ui_state.distance_per_pixel,
                     );
-                Some(egui::pos2(minimap_player_x, minimap_player_y))
+                Some(Vec2::new(minimap_player_x, minimap_player_y))
             } else {
                 None
             };
 
-            if player_position_changed {
-                if let Some(target_center) = minimap_player_pos {
-                    let scroll_max_x = f32::max(0.0, minimap_image_size.x - minimap_visible_size.x);
-                    let scroll_max_y = f32::max(0.0, minimap_image_size.y - minimap_visible_size.y);
-                    let visible_center = minimap_min_rect.left_top() + (minimap_visible_size / 2.0);
-                    let mut scroll_offset = target_center - visible_center;
-                    scroll_offset.x = f32::min(scroll_max_x, f32::max(0.0, scroll_offset.x));
-                    scroll_offset.y = f32::min(scroll_max_y, f32::max(0.0, scroll_offset.y));
-                    scroll_area = scroll_area.scroll_offset(scroll_offset);
+            if !minimised {
+                let response = ui.allocate_rect(minimap_rect, egui::Sense::click_and_drag());
+
+                if response.dragged() {
+                    let delta = ui.input().pointer.delta();
+                    ui_state.scroll.x -= delta.x;
+                    ui_state.scroll.y -= delta.y;
+                } else if player_position_changed {
+                    if let Some(target_center) = minimap_player_pos {
+                        let visible_center = ui_state.scroll + (minimap_size / 2.0);
+                        ui_state.scroll += target_center - visible_center;
+                    }
+                }
+
+                ui_state.scroll.x = ui_state
+                    .scroll
+                    .x
+                    .clamp(0.0, (image_size.x - minimap_size.x).max(0.0));
+                ui_state.scroll.y = ui_state
+                    .scroll
+                    .y
+                    .clamp(0.0, (image_size.y - minimap_size.y).max(0.0));
+
+                let minimap_uv = egui::Rect::from_min_max(
+                    egui::pos2(
+                        ui_state.scroll.x / image_size.x,
+                        ui_state.scroll.y / image_size.y,
+                    ),
+                    egui::pos2(
+                        (ui_state.scroll.x + minimap_size.x) / image_size.x,
+                        (ui_state.scroll.y + minimap_size.y) / image_size.y,
+                    ),
+                );
+
+                if ui.is_rect_visible(minimap_rect) {
+                    let mut mesh = egui::epaint::Mesh::with_texture(ui_state.minimap_texture);
+                    mesh.add_rect_with_uv(minimap_rect, minimap_uv, egui::Color32::WHITE);
+                    ui.painter().add(egui::epaint::Shape::mesh(mesh));
                 }
             }
 
-            scroll_area.show_viewport(ui, |ui, visible_rect| {
-                let scroll_offset = visible_rect.left_top().to_vec2();
+            draw_dialog(
+                ui,
+                dialog,
+                DialogDataBindings {
+                    response: &mut [
+                        (IID_BTN_EXPAND, &mut response_expand_button),
+                        (IID_BTN_NORMAL, &mut response_shrink_button),
+                        (IID_BTN_MINIMIZE_BIG, &mut response_big_minimise_button),
+                        (IID_BTN_MINIMIZE_SMALL, &mut response_small_minimise_button),
+                    ],
+                    visible: &mut [
+                        (IID_PANE_SMALL, !ui_state.is_expanded),
+                        (IID_PANE_BIG, ui_state.is_expanded),
+                        (IID_PANE_BIG_CHILDPANE, !ui_state.is_minimised),
+                        (IID_PANE_SMALL_CHILDPANE, !ui_state.is_minimised),
+                    ],
+                    ..Default::default()
+                },
+                |ui, _bindings| {
+                    let zone_name_width = if ui_state.is_expanded {
+                        ZONE_NAME_EXPANDED_WIDTH
+                    } else {
+                        ZONE_NAME_WIDTH
+                    };
+                    let zone_name_rect = egui::Rect::from_min_size(
+                        egui::pos2(5.0, 2.0),
+                        egui::vec2(zone_name_width, 16.0),
+                    )
+                    .translate(ui.min_rect().min.to_vec2());
 
-                ui.image(
-                    ui_state.minimap_texture,
-                    egui::Vec2::new(minimap_image_size.x, minimap_image_size.y),
-                );
+                    ui.allocate_ui_at_rect(zone_name_rect, |ui| {
+                        let galley = if ui_state.is_expanded {
+                            ui_state.zone_name_text_expanded_galley.as_ref()
+                        } else {
+                            ui_state.zone_name_text_galley.as_ref()
+                        };
 
+                        if let Some(galley) = galley {
+                            ui.horizontal_top(|ui| ui.label(galley.clone()));
+                        }
+                    });
+                },
+            );
+
+            if !minimised {
                 // Draw player position arrow texture on a rotated rectangle to face camera position
                 if let Some(minimap_player_pos) = minimap_player_pos {
-                    let minimap_player_pos = minimap_player_pos - scroll_offset;
+                    let minimap_player_pos = Vec2::new(minimap_rect.min.x, minimap_rect.min.y)
+                        + minimap_player_pos
+                        - ui_state.scroll;
                     let widget_rect = egui::Rect::from_min_size(
-                        minimap_player_pos - PLAYER_ICON_SIZE / 2.0,
-                        PLAYER_ICON_SIZE,
+                        (minimap_player_pos - PLAYER_ICON_SIZE / 2.0)
+                            .to_array()
+                            .into(),
+                        PLAYER_ICON_SIZE.to_array().into(),
                     );
 
-                    ui.allocate_ui_at_rect(widget_rect, |ui| {
-                        ui.centered_and_justified(|ui| {
-                            let (rect, response) =
-                                ui.allocate_exact_size(PLAYER_ICON_SIZE, egui::Sense::hover());
-
-                            // Calculate rotated rectangle from camera angle
-                            let sin_a = camera_angle.sin();
-                            let cos_a = camera_angle.cos();
-
-                            let mut corners = [
-                                [-PLAYER_ICON_SIZE.x / 2.0, -PLAYER_ICON_SIZE.y / 2.0],
-                                [PLAYER_ICON_SIZE.x / 2.0, -PLAYER_ICON_SIZE.y / 2.0],
-                                [-PLAYER_ICON_SIZE.x / 2.0, PLAYER_ICON_SIZE.y / 2.0],
-                                [PLAYER_ICON_SIZE.x / 2.0, PLAYER_ICON_SIZE.y / 2.0],
-                            ];
-
-                            for corner in corners.iter_mut() {
-                                let rotated_x = corner[0] * cos_a - corner[1] * sin_a;
-                                let rotated_y = corner[0] * sin_a + corner[1] * cos_a;
-                                *corner = [rotated_x, rotated_y];
-                            }
-
-                            if ui.is_rect_visible(rect) {
-                                let mut mesh =
-                                    egui::Mesh::with_texture(icons.minimap_player_icon.1);
-                                let uv = egui::Rect::from_min_max(
-                                    egui::pos2(0.0, 0.0),
-                                    egui::pos2(1.0, 1.0),
+                    if minimap_rect.contains_rect(widget_rect) {
+                        ui.allocate_ui_at_rect(widget_rect, |ui| {
+                            ui.centered_and_justified(|ui| {
+                                let (rect, response) = ui.allocate_exact_size(
+                                    PLAYER_ICON_SIZE.to_array().into(),
+                                    egui::Sense::hover(),
                                 );
 
-                                let color = egui::Color32::WHITE;
-                                let idx = mesh.vertices.len() as u32;
-                                mesh.add_triangle(idx, idx + 1, idx + 2);
-                                mesh.add_triangle(idx + 2, idx + 1, idx + 3);
+                                // Calculate rotated rectangle from camera angle
+                                let sin_a = camera_angle.sin();
+                                let cos_a = camera_angle.cos();
 
-                                mesh.vertices.push(egui::epaint::Vertex {
-                                    pos: minimap_player_pos + egui::Vec2::from(corners[0]),
-                                    uv: uv.left_top(),
-                                    color,
-                                });
-                                mesh.vertices.push(egui::epaint::Vertex {
-                                    pos: minimap_player_pos + egui::Vec2::from(corners[1]),
-                                    uv: uv.right_top(),
-                                    color,
-                                });
-                                mesh.vertices.push(egui::epaint::Vertex {
-                                    pos: minimap_player_pos + egui::Vec2::from(corners[2]),
-                                    uv: uv.left_bottom(),
-                                    color,
-                                });
-                                mesh.vertices.push(egui::epaint::Vertex {
-                                    pos: minimap_player_pos + egui::Vec2::from(corners[3]),
-                                    uv: uv.right_bottom(),
-                                    color,
-                                });
+                                let mut corners = [
+                                    [-PLAYER_ICON_SIZE.x / 2.0, -PLAYER_ICON_SIZE.y / 2.0],
+                                    [PLAYER_ICON_SIZE.x / 2.0, -PLAYER_ICON_SIZE.y / 2.0],
+                                    [-PLAYER_ICON_SIZE.x / 2.0, PLAYER_ICON_SIZE.y / 2.0],
+                                    [PLAYER_ICON_SIZE.x / 2.0, PLAYER_ICON_SIZE.y / 2.0],
+                                ];
 
-                                ui.painter().add(egui::Shape::mesh(mesh));
-                            }
+                                for corner in corners.iter_mut() {
+                                    let rotated_x = corner[0] * cos_a - corner[1] * sin_a;
+                                    let rotated_y = corner[0] * sin_a + corner[1] * cos_a;
+                                    *corner = [rotated_x, rotated_y];
+                                }
 
-                            response
-                        })
-                        .inner
-                    });
+                                if ui.is_rect_visible(rect) {
+                                    let mut mesh =
+                                        egui::Mesh::with_texture(icons.minimap_player_icon.1);
+                                    let uv = egui::Rect::from_min_max(
+                                        egui::pos2(0.0, 0.0),
+                                        egui::pos2(1.0, 1.0),
+                                    );
+
+                                    let color = egui::Color32::WHITE;
+                                    let idx = mesh.vertices.len() as u32;
+                                    mesh.add_triangle(idx, idx + 1, idx + 2);
+                                    mesh.add_triangle(idx + 2, idx + 1, idx + 3);
+
+                                    mesh.vertices.push(egui::epaint::Vertex {
+                                        pos: (minimap_player_pos + Vec2::from(corners[0]))
+                                            .to_array()
+                                            .into(),
+                                        uv: uv.left_top(),
+                                        color,
+                                    });
+                                    mesh.vertices.push(egui::epaint::Vertex {
+                                        pos: (minimap_player_pos + Vec2::from(corners[1]))
+                                            .to_array()
+                                            .into(),
+                                        uv: uv.right_top(),
+                                        color,
+                                    });
+                                    mesh.vertices.push(egui::epaint::Vertex {
+                                        pos: (minimap_player_pos + Vec2::from(corners[2]))
+                                            .to_array()
+                                            .into(),
+                                        uv: uv.left_bottom(),
+                                        color,
+                                    });
+                                    mesh.vertices.push(egui::epaint::Vertex {
+                                        pos: (minimap_player_pos + Vec2::from(corners[3]))
+                                            .to_array()
+                                            .into(),
+                                        uv: uv.right_bottom(),
+                                        color,
+                                    });
+
+                                    ui.painter().add(egui::Shape::mesh(mesh));
+                                }
+
+                                response
+                            })
+                            .inner
+                        });
+                    }
                 }
-            });
-        }
-    });
+            }
+        });
+
+    if response_expand_button.map_or(false, |r| r.clicked()) {
+        ui_state.is_expanded = true;
+    }
+
+    if response_shrink_button.map_or(false, |r| r.clicked()) {
+        ui_state.is_expanded = false;
+    }
+
+    if response_big_minimise_button.map_or(false, |r| r.clicked())
+        || response_small_minimise_button.map_or(false, |r| r.clicked())
+    {
+        ui_state.is_minimised = !ui_state.is_minimised;
+    }
 }
