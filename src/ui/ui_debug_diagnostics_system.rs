@@ -4,7 +4,17 @@ use bevy::{
 };
 use bevy_egui::{egui, EguiContext};
 
-pub fn ui_diagnostics_system(mut egui_context: ResMut<EguiContext>, diagnostics: Res<Diagnostics>) {
+use crate::ui::UiStateDebugWindows;
+
+pub fn ui_debug_diagnostics_system(
+    mut egui_context: ResMut<EguiContext>,
+    ui_state_debug_windows: ResMut<UiStateDebugWindows>,
+    diagnostics: Res<Diagnostics>,
+) {
+    if !ui_state_debug_windows.debug_ui_open {
+        return;
+    }
+
     egui::Window::new("Diagnostics")
         .vscroll(true)
         .resizable(false)

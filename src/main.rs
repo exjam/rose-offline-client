@@ -84,11 +84,11 @@ use systems::{
 use ui::{
     load_dialog_sprites_system, ui_character_info_system, ui_chatbox_system,
     ui_debug_camera_info_system, ui_debug_client_entity_list_system,
-    ui_debug_command_viewer_system, ui_debug_dialog_list_system, ui_debug_entity_inspector_system,
-    ui_debug_item_list_system, ui_debug_menu_system, ui_debug_npc_list_system,
-    ui_debug_physics_system, ui_debug_render_system, ui_debug_skill_list_system,
-    ui_debug_zone_lighting_system, ui_debug_zone_list_system, ui_debug_zone_time_system,
-    ui_diagnostics_system, ui_drag_and_drop_system, ui_game_menu_system, ui_hotbar_system,
+    ui_debug_command_viewer_system, ui_debug_diagnostics_system, ui_debug_dialog_list_system,
+    ui_debug_entity_inspector_system, ui_debug_item_list_system, ui_debug_menu_system,
+    ui_debug_npc_list_system, ui_debug_physics_system, ui_debug_render_system,
+    ui_debug_skill_list_system, ui_debug_zone_lighting_system, ui_debug_zone_list_system,
+    ui_debug_zone_time_system, ui_drag_and_drop_system, ui_game_menu_system, ui_hotbar_system,
     ui_inventory_system, ui_minimap_system, ui_npc_store_system, ui_party_system,
     ui_player_info_system, ui_quest_list_system, ui_selected_target_system, ui_settings_system,
     ui_skill_list_system, Dialog, DialogLoader, UiStateDebugWindows, UiStateDragAndDrop,
@@ -473,7 +473,7 @@ fn main() {
         .add_system(ui_debug_zone_lighting_system.label("ui_system"))
         .add_system(ui_debug_zone_list_system.label("ui_system"))
         .add_system(ui_debug_zone_time_system.label("ui_system"))
-        .add_system(ui_diagnostics_system.label("ui_system"))
+        .add_system(ui_debug_diagnostics_system.label("ui_system"))
         .add_system(
             ui_debug_entity_inspector_system
                 .exclusive_system()
