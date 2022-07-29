@@ -793,10 +793,10 @@ widget_to_rect! { ZListbox }
 
 #[derive(Clone)]
 pub struct LoadedSprite {
-    texture_id: egui::TextureId,
-    uv: egui::Rect,
-    width: f32,
-    height: f32,
+    pub texture_id: egui::TextureId,
+    pub uv: egui::Rect,
+    pub width: f32,
+    pub height: f32,
 }
 
 impl LoadedSprite {
@@ -836,6 +836,21 @@ impl LoadedSprite {
             width: (sprite.right - sprite.left) as f32,
             height: (sprite.bottom - sprite.top) as f32,
         })
+    }
+
+    pub fn draw(&self, ui: &mut egui::Ui, pos: egui::Pos2) {
+        use egui::epaint::*;
+        let rect = egui::Rect::from_min_size(pos, egui::vec2(self.width, self.height));
+        let mut mesh = Mesh::with_texture(self.texture_id);
+        mesh.add_rect_with_uv(rect, self.uv, Color32::WHITE);
+        ui.painter().add(Shape::mesh(mesh));
+    }
+
+    pub fn draw_stretched(&self, ui: &mut egui::Ui, rect: egui::Rect) {
+        use egui::epaint::*;
+        let mut mesh = Mesh::with_texture(self.texture_id);
+        mesh.add_rect_with_uv(rect, self.uv, Color32::WHITE);
+        ui.painter().add(Shape::mesh(mesh));
     }
 }
 
@@ -1039,21 +1054,6 @@ pub fn load_dialog_sprites_system(
     }
 }
 
-fn draw_loaded_sprite(ui: &mut egui::Ui, pos: egui::Pos2, sprite: &LoadedSprite) {
-    use egui::epaint::*;
-    let rect = egui::Rect::from_min_size(pos, egui::vec2(sprite.width, sprite.height));
-    let mut mesh = Mesh::with_texture(sprite.texture_id);
-    mesh.add_rect_with_uv(rect, sprite.uv, Color32::WHITE);
-    ui.painter().add(Shape::mesh(mesh));
-}
-
-fn draw_loaded_sprite_stretched(ui: &mut egui::Ui, rect: egui::Rect, sprite: &LoadedSprite) {
-    use egui::epaint::*;
-    let mut mesh = Mesh::with_texture(sprite.texture_id);
-    mesh.add_rect_with_uv(rect, sprite.uv, Color32::WHITE);
-    ui.painter().add(Shape::mesh(mesh));
-}
-
 struct DrawButton<'a> {
     button: &'a Button,
 }
@@ -1076,7 +1076,7 @@ impl<'a> egui::Widget for DrawButton<'a> {
             .or(self.button.normal_sprite.as_ref());
 
             if let Some(sprite) = sprite {
-                draw_loaded_sprite(ui, rect.min, sprite);
+                sprite.draw(ui, rect.min);
             }
         }
 
@@ -1107,7 +1107,7 @@ impl<'a, 'b> egui::Widget for DrawCheckbox<'a, 'b> {
             };
 
             if let Some(sprite) = sprite {
-                draw_loaded_sprite(ui, rect.min, sprite);
+                sprite.draw(ui, rect.min);
             }
         }
 
@@ -1128,14 +1128,14 @@ impl<'a> egui::Widget for DrawGauge<'a> {
 
         if ui.is_rect_visible(rect) {
             if let Some(sprite) = self.gauge.background_sprite.as_ref() {
-                draw_loaded_sprite_stretched(ui, rect, sprite);
+                sprite.draw_stretched(ui, rect);
             }
 
             if self.value * self.gauge.width > 0.5 {
                 if let Some(sprite) = self.gauge.foreground_sprite.as_ref() {
                     let mut stretched_rect = rect;
                     stretched_rect.set_width(self.value * self.gauge.width);
-                    draw_loaded_sprite_stretched(ui, stretched_rect, sprite);
+                    sprite.draw_stretched(ui, stretched_rect);
                 }
             }
 
@@ -1197,7 +1197,7 @@ impl<'a, 'b> egui::Widget for DrawRadioButton<'a, 'b> {
                 .or(self.radio_button.normal_sprite.as_ref());
 
             if let Some(sprite) = sprite {
-                draw_loaded_sprite(ui, rect.min, sprite);
+                sprite.draw(ui, rect.min);
             }
         }
 
@@ -1233,7 +1233,7 @@ impl<'a, 'b> egui::Widget for DrawScrollbar<'a, 'b> {
                 let pos = rect.min.y + *self.current as f32 * ((end - start) / range_size);
 
                 if let Some(sprite) = scrollbox.sprite.as_ref() {
-                    draw_loaded_sprite(ui, egui::pos2(rect.min.x, pos), sprite);
+                    sprite.draw(ui, egui::pos2(rect.min.x, pos));
                 }
             }
         }
@@ -1253,7 +1253,7 @@ impl<'a> egui::Widget for DrawSprite<'a> {
 
         if ui.is_rect_visible(rect) {
             if let Some(sprite) = self.sprite.sprite.as_ref() {
-                draw_loaded_sprite(ui, rect.min, sprite);
+                sprite.draw(ui, rect.min);
             }
         }
 
@@ -1282,7 +1282,7 @@ impl<'a> egui::Widget for DrawTabButton<'a> {
             .or(self.tab_button.normal_sprite.as_ref());
 
             if let Some(sprite) = sprite {
-                draw_loaded_sprite(ui, rect.min, sprite);
+                sprite.draw(ui, rect.min);
             }
         }
 
