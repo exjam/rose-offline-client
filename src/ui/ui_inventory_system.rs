@@ -15,8 +15,8 @@ use crate::{
     events::{ChatboxEvent, PlayerCommandEvent},
     resources::{GameConnection, GameData, Icons, UiResources},
     ui::{
-        dialog::GetWidget, draw_dialog, ui_add_item_tooltip, Dialog, DialogDataBindings,
-        DragAndDropId, DragAndDropSlot, UiStateDragAndDrop, UiStateWindows, Widget,
+        dialog::GetWidget, ui_add_item_tooltip, Dialog, DialogDataBindings, DragAndDropId,
+        DragAndDropSlot, UiStateDragAndDrop, UiStateWindows, Widget,
     },
 };
 
@@ -635,9 +635,8 @@ pub fn ui_inventory_system(
         .default_width(dialog.width)
         .default_height(dialog.height)
         .show(egui_context.ctx_mut(), |ui| {
-            draw_dialog(
+            dialog.draw(
                 ui,
-                dialog,
                 DialogDataBindings {
                     tabs: &mut [
                         (

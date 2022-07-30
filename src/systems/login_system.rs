@@ -20,7 +20,7 @@ use crate::{
     resources::{
         Account, LoginConnection, NetworkThread, ServerConfiguration, ServerList, UiResources,
     },
-    ui::{draw_dialog, Dialog, DialogDataBindings, GetWidget, Widget},
+    ui::{Dialog, DialogDataBindings, GetWidget, Widget},
 };
 
 enum LoginState {
@@ -167,9 +167,8 @@ pub fn login_system(
                 .default_width(dialog.width)
                 .default_height(dialog.height)
                 .show(egui_context.ctx_mut(), |ui| {
-                    draw_dialog(
+                    dialog.draw(
                         ui,
-                        dialog,
                         DialogDataBindings {
                             checked: &mut [(
                                 IID_CHECKBOX_SAVE_LASTCONECTID,
@@ -255,9 +254,8 @@ pub fn login_system(
                 .default_width(dialog.width)
                 .default_height(dialog.height)
                 .show(egui_context.ctx_mut(), |ui| {
-                    draw_dialog(
+                    dialog.draw(
                         ui,
-                        dialog,
                         DialogDataBindings {
                             response: &mut [
                                 (10, &mut response_ok_button),

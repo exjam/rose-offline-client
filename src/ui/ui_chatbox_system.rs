@@ -6,7 +6,7 @@ use rose_game_common::messages::client::ClientMessage;
 use crate::{
     events::ChatboxEvent,
     resources::{GameConnection, UiResources},
-    ui::{draw_dialog, Dialog, DialogDataBindings},
+    ui::{Dialog, DialogDataBindings},
 };
 
 const MAX_CHATBOX_ENTRIES: usize = 100;
@@ -233,9 +233,8 @@ pub fn ui_chatbox_system(
                     _ => Some(CHAT_COLOR_NORMAL),
                 };
 
-            draw_dialog(
+            dialog.draw(
                 ui,
-                dialog,
                 DialogDataBindings {
                     text: &mut [(IID_EDITBOX, &mut ui_state_chatbox.textbox_text)],
                     radio: &mut [(IID_RADIOBOX, &mut ui_state_chatbox.selected_channel)],

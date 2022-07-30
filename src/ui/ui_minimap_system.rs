@@ -13,7 +13,7 @@ use rose_data::ZoneId;
 use crate::{
     components::{PlayerCharacter, Position},
     resources::{CurrentZone, GameData, Icons, UiResources},
-    ui::{draw_dialog, Dialog, DialogDataBindings},
+    ui::{Dialog, DialogDataBindings},
     zone_loader::ZoneLoaderAsset,
 };
 
@@ -276,9 +276,8 @@ pub fn ui_minimap_system(
                 }
             }
 
-            draw_dialog(
+            dialog.draw(
                 ui,
-                dialog,
                 DialogDataBindings {
                     response: &mut [
                         (IID_BTN_EXPAND, &mut response_expand_button),

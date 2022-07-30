@@ -15,7 +15,7 @@ use rose_game_common::{
 use crate::{
     components::PlayerCharacter,
     resources::{GameConnection, GameData, UiResources},
-    ui::{draw_dialog, Dialog, DialogDataBindings, UiStateWindows},
+    ui::{Dialog, DialogDataBindings, UiStateWindows},
 };
 
 const IID_BTN_CLOSE: i32 = 10;
@@ -106,9 +106,8 @@ pub fn ui_character_info_system(
                 .calculate_levelup_require_xp(player.level.level);
             let stamina = player.stamina.stamina as f32 / MAX_STAMINA as f32;
 
-            draw_dialog(
+            dialog.draw(
                 ui,
-                dialog,
                 DialogDataBindings {
                     response: &mut [
                         (IID_BTN_CLOSE, &mut response_close_button),

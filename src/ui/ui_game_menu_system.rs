@@ -3,7 +3,7 @@ use bevy_egui::{egui, EguiContext};
 
 use crate::{
     resources::UiResources,
-    ui::{draw_dialog, Dialog, DialogDataBindings, UiStateWindows},
+    ui::{Dialog, DialogDataBindings, UiStateWindows},
 };
 
 const IID_BTN_CHAR: i32 = 10;
@@ -55,9 +55,8 @@ pub fn ui_game_menu_system(
         .default_width(dialog.width)
         .default_height(dialog.height)
         .show(egui_context.ctx_mut(), |ui| {
-            draw_dialog(
+            dialog.draw(
                 ui,
-                dialog,
                 DialogDataBindings {
                     response: &mut [
                         (IID_BTN_CHAR, &mut response_button_character_info),

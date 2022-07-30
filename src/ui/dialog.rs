@@ -1535,18 +1535,20 @@ fn draw_widgets<'a>(ui: &mut egui::Ui, widgets: &[Widget], bindings: &mut Dialog
     }
 }
 
-pub fn draw_dialog<'a, R>(
-    ui: &mut egui::Ui,
-    dialog: &Dialog,
-    mut bindings: DialogDataBindings<'a>,
-    add_contents: impl FnOnce(&mut egui::Ui, &mut DialogDataBindings<'a>) -> R,
-) {
-    let style = ui.style_mut();
-    style.visuals.widgets.noninteractive.fg_stroke.color = egui::Color32::WHITE;
-    style.spacing.item_spacing = egui::Vec2::ZERO;
-    style.spacing.window_margin = egui::style::Margin::same(0.0);
+impl Dialog {
+    pub fn draw<R>(
+        &self,
+        ui: &mut egui::Ui,
+        mut bindings: DialogDataBindings,
+        add_contents: impl FnOnce(&mut egui::Ui, &mut DialogDataBindings) -> R,
+    ) {
+        let style = ui.style_mut();
+        style.visuals.widgets.noninteractive.fg_stroke.color = egui::Color32::WHITE;
+        style.spacing.item_spacing = egui::Vec2::ZERO;
+        style.spacing.window_margin = egui::style::Margin::same(0.0);
 
-    draw_widgets(ui, &dialog.widgets, &mut bindings);
+        draw_widgets(ui, &self.widgets, &mut bindings);
 
-    add_contents(ui, &mut bindings);
+        add_contents(ui, &mut bindings);
+    }
 }

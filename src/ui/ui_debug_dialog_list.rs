@@ -1,7 +1,7 @@
 use bevy::prelude::{AssetServer, Assets, Handle, Local, Res, ResMut};
 use bevy_egui::{egui, EguiContext};
 
-use crate::ui::{draw_dialog, Dialog, DialogDataBindings, UiStateDebugWindows};
+use crate::ui::{Dialog, DialogDataBindings, UiStateDebugWindows};
 
 #[derive(Default)]
 pub struct UiStateDebugDialogs {
@@ -76,7 +76,7 @@ pub fn ui_debug_dialog_list_system(
             .default_width(dialog.width)
             .default_height(dialog.height)
             .show(egui_context.ctx_mut(), |ui| {
-                draw_dialog(ui, dialog, DialogDataBindings::default(), |_, _| {})
+                dialog.draw(ui, DialogDataBindings::default(), |_, _| {})
             });
     }
 }

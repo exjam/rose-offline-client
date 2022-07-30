@@ -12,8 +12,8 @@ use crate::{
     events::PlayerCommandEvent,
     resources::{GameData, Icons, UiResources},
     ui::{
-        dialog::GetWidget, draw_dialog, ui_add_skill_tooltip, Dialog, DialogDataBindings,
-        DragAndDropId, DragAndDropSlot, UiStateDragAndDrop, UiStateWindows, Widget,
+        dialog::GetWidget, ui_add_skill_tooltip, Dialog, DialogDataBindings, DragAndDropId,
+        DragAndDropSlot, UiStateDragAndDrop, UiStateWindows, Widget,
     },
 };
 
@@ -153,9 +153,8 @@ pub fn ui_skill_list_system(
         .default_width(dialog.width)
         .default_height(dialog.height)
         .show(egui_context.ctx_mut(), |ui| {
-            draw_dialog(
+            dialog.draw(
                 ui,
-                dialog,
                 DialogDataBindings {
                     tabs: &mut [(IID_TABBEDPANE, &mut ui_state_skill_list.current_page)],
                     scroll: &mut [

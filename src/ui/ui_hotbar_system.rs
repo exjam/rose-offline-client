@@ -15,8 +15,8 @@ use crate::{
     events::PlayerCommandEvent,
     resources::{GameData, Icons, UiResources},
     ui::{
-        draw_dialog, ui_add_item_tooltip, ui_add_skill_tooltip, ui_inventory_system::GetItem,
-        Dialog, DialogDataBindings, DragAndDropId, DragAndDropSlot, UiStateDragAndDrop,
+        ui_add_item_tooltip, ui_add_skill_tooltip, ui_inventory_system::GetItem, Dialog,
+        DialogDataBindings, DragAndDropId, DragAndDropSlot, UiStateDragAndDrop,
     },
 };
 
@@ -266,9 +266,8 @@ pub fn ui_hotbar_system(
         .default_height(dialog.height)
         .default_pos(default_position)
         .show(egui_context.ctx_mut(), |ui| {
-            draw_dialog(
+            dialog.draw(
                 ui,
-                dialog,
                 DialogDataBindings {
                     visible: &mut [
                         (IID_BG_HORIZONTAL, !is_vertical),

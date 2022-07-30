@@ -10,7 +10,7 @@ use rose_game_common::components::{
 use crate::{
     components::{PlayerCharacter, SelectedTarget},
     resources::{GameData, UiResources},
-    ui::{draw_dialog, Dialog, DialogDataBindings, UiStateWindows},
+    ui::{Dialog, DialogDataBindings, UiStateWindows},
 };
 
 const IID_GAUGE_HP: i32 = 6;
@@ -71,9 +71,8 @@ pub fn ui_player_info_system(
                 .calculate_levelup_require_xp(player.level.level);
             let xp = player.experience_points.xp as f32 / need_xp as f32;
 
-            draw_dialog(
+            dialog.draw(
                 ui,
-                dialog,
                 DialogDataBindings {
                     response: &mut [(IID_BTN_MENU, &mut response_menu_button)],
                     gauge: &mut [

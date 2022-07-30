@@ -42,8 +42,8 @@ pub struct UiStateWindows {
 }
 
 pub use dialog::{
-    draw_dialog, load_dialog_sprites_system, Button, Checkbox, Dialog, DialogDataBindings,
-    DialogLoader, GetWidget, Sprite, Textbox, Widget,
+    load_dialog_sprites_system, Button, Checkbox, Dialog, DialogDataBindings, DialogLoader,
+    GetWidget, Sprite, Textbox, Widget,
 };
 pub use drag_and_drop_slot::{DragAndDropId, DragAndDropSlot};
 pub use tooltips::{ui_add_item_tooltip, ui_add_skill_tooltip};
