@@ -31,6 +31,8 @@ pub struct UiResources {
     pub dialog_login: Handle<Dialog>,
     pub dialog_character_info: Handle<Dialog>,
     pub dialog_chatbox: Handle<Dialog>,
+    pub dialog_select_avatar: Handle<Dialog>,
+    pub dialog_create_avatar: Handle<Dialog>,
     pub dialog_game_menu: Handle<Dialog>,
     pub dialog_minimap: Handle<Dialog>,
     pub dialog_player_info: Handle<Dialog>,
@@ -148,10 +150,14 @@ pub fn load_ui_resources(
         sprite_sheets_load_group: load_group,
         dialog_character_info: dialog_files["DLGAVATA.XML"].clone(),
         dialog_chatbox: dialog_files["DLGCHAT.XML"].clone(),
+        dialog_create_avatar: dialog_files[
+            "DLGCREATEAVATAR.XML"].clone(),
         dialog_game_menu: dialog_files["DLGMENU.XML"].clone(),
         dialog_login: dialog_files["DLGLOGIN.XML"].clone(),
         dialog_minimap: dialog_files["DLGMINIMAP.XML"].clone(),
         dialog_player_info: dialog_files["DLGINFO.XML"].clone(),
+        dialog_select_avatar: dialog_files[
+            "DLGSELAVATAR.XML"].clone(),
         dialog_select_server: dialog_files["DLGSELSVR.XML"].clone(),
         dialog_skill_list: dialog_files["DLGSKILL.XML"].clone(),
         dialog_files,
