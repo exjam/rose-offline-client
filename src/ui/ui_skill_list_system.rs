@@ -26,17 +26,17 @@ const IID_TABBEDPANE: i32 = 20;
 const IID_TAB_BASIC: i32 = 21;
 // const IID_BTN_BASIC: i32 = 25;
 const IID_ZLISTBOX_BASIC: i32 = 26;
-const IID_SCROLLBAR_BASIC: i32 = 27;
+// const IID_SCROLLBAR_BASIC: i32 = 27;
 
 const IID_TAB_ACTIVE: i32 = 31;
 // const IID_BTN_ACTIVE: i32 = 35;
-// const IID_ZLISTBOX_ACTIVE: i32 = 36;
-const IID_SCROLLBAR_ACTIVE: i32 = 37;
+const IID_ZLISTBOX_ACTIVE: i32 = 36;
+// const IID_SCROLLBAR_ACTIVE: i32 = 37;
 
 const IID_TAB_PASSIVE: i32 = 41;
 // const IID_BTN_PASSIVE: i32 = 45;
-// const IID_ZLISTBOX_PASSIVE: i32 = 46;
-const IID_SCROLLBAR_PASSIVE: i32 = 47;
+const IID_ZLISTBOX_PASSIVE: i32 = 46;
+// const IID_SCROLLBAR_PASSIVE: i32 = 47;
 
 pub struct UiStateSkillList {
     current_page: i32,
@@ -142,7 +142,7 @@ pub fn ui_skill_list_system(
         } else {
             1
         };
-    let scrollbar_range = 0..(SKILL_PAGE_SIZE as i32 - listbox_extent);
+    let scrollbar_range = 0..SKILL_PAGE_SIZE as i32;
 
     let mut response_close_button = None;
 
@@ -160,24 +160,27 @@ pub fn ui_skill_list_system(
                     tabs: &mut [(IID_TABBEDPANE, &mut ui_state_skill_list.current_page)],
                     scroll: &mut [
                         (
-                            IID_SCROLLBAR_BASIC,
+                            IID_ZLISTBOX_BASIC,
                             (
                                 &mut ui_state_skill_list.scroll_index_basic,
                                 scrollbar_range.clone(),
+                                listbox_extent,
                             ),
                         ),
                         (
-                            IID_SCROLLBAR_ACTIVE,
+                            IID_ZLISTBOX_ACTIVE,
                             (
                                 &mut ui_state_skill_list.scroll_index_active,
                                 scrollbar_range.clone(),
+                                listbox_extent,
                             ),
                         ),
                         (
-                            IID_SCROLLBAR_PASSIVE,
+                            IID_ZLISTBOX_PASSIVE,
                             (
                                 &mut ui_state_skill_list.scroll_index_passive,
                                 scrollbar_range.clone(),
+                                listbox_extent,
                             ),
                         ),
                     ],
@@ -188,18 +191,16 @@ pub fn ui_skill_list_system(
                     let (page, index) = match bindings.get_tab(IID_TABBEDPANE) {
                         Some(&mut IID_TAB_BASIC) => (
                             SkillPageType::Basic,
-                            bindings.get_scroll(IID_SCROLLBAR_BASIC).map_or(0, |s| *s.0),
+                            bindings.get_scroll(IID_ZLISTBOX_BASIC).map_or(0, |s| *s.0),
                         ),
                         Some(&mut IID_TAB_ACTIVE) => (
                             SkillPageType::Active,
-                            bindings
-                                .get_scroll(IID_SCROLLBAR_ACTIVE)
-                                .map_or(0, |s| *s.0),
+                            bindings.get_scroll(IID_ZLISTBOX_ACTIVE).map_or(0, |s| *s.0),
                         ),
                         Some(&mut IID_TAB_PASSIVE) => (
                             SkillPageType::Passive,
                             bindings
-                                .get_scroll(IID_SCROLLBAR_PASSIVE)
+                                .get_scroll(IID_ZLISTBOX_PASSIVE)
                                 .map_or(0, |s| *s.0),
                         ),
                         _ => (SkillPageType::Basic, 0),

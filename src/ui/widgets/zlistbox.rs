@@ -36,5 +36,30 @@ impl LoadWidget for ZListbox {
 }
 
 impl DrawWidget for ZListbox {
-    fn draw_widget(&self, _ui: &mut egui::Ui, _bindings: &mut DataBindings) {}
+    fn draw_widget(&self, ui: &mut egui::Ui, bindings: &mut DataBindings) {
+        let rect = self.widget_rect(ui.min_rect().min);
+
+        let (scroll_index, scroll_range) = bindings
+            .get_scroll(self.id)
+            .as_ref()
+            .map(|(scroll_index, scroll_range, _)| (**scroll_index, scroll_range.clone()))
+            .unwrap_or((0, 0..self.extent));
+
+        ui.allocate_ui_at_rect(rect, |ui| {
+            ui.vertical(|ui| {
+                if let Some((current_index, draw_list_item)) = bindings.get_zlist(self.id) {
+                    for i in 0..self.extent {
+                        let index = scroll_index + i;
+                        if index >= scroll_range.end {
+                            break;
+                        }
+
+                        if draw_list_item(ui, index, index == *current_index).clicked() {
+                            *current_index = index;
+                        }
+                    }
+                }
+            });
+        });
+    }
 }

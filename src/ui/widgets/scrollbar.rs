@@ -51,28 +51,32 @@ impl DrawWidget for Scrollbar {
             return;
         }
 
-        if let Some((current, range)) = bindings.get_scroll(self.id) {
+        if let Some((current, range, extent)) = bindings.get_scroll(self.listbox_id) {
             let rect = self.widget_rect(ui.min_rect().min);
             let response = ui.allocate_rect(rect, egui::Sense::click_and_drag());
+            let range = range.start..(range.end - extent).max(range.start);
 
-            if let Some(scrollbox) = self.scrollbox.as_ref() {
-                let start = rect.min.y + scrollbox.height / 2.0;
-                let end = rect.max.y - scrollbox.height / 2.0;
-                let range_size = (range.end - range.start) as f32;
+            if !range.is_empty() {
+                if let Some(scrollbox) = self.scrollbox.as_ref() {
+                    let start = rect.min.y + scrollbox.height / 2.0;
+                    let end = rect.max.y - scrollbox.height / 2.0;
+                    let range_size = (range.end - range.start) as f32;
 
-                if let Some(pointer_position_2d) = response.interact_pointer_pos() {
-                    // Calculate value from position
-                    let pos = pointer_position_2d.y.clamp(start, end);
-                    let value = range.start + (range_size * (pos - start) / (end - start)) as i32;
-                    *current = value;
-                }
+                    if let Some(pointer_position_2d) = response.interact_pointer_pos() {
+                        // Calculate value from position
+                        let pos = pointer_position_2d.y.clamp(start, end);
+                        let value =
+                            range.start + (range_size * (pos - start) / (end - start)) as i32;
+                        *current = value;
+                    }
 
-                if ui.is_rect_visible(rect) {
-                    // Calculate position from value
-                    let pos = rect.min.y + *current as f32 * ((end - start) / range_size);
+                    if ui.is_rect_visible(rect) {
+                        // Calculate position from value
+                        let pos = rect.min.y + *current as f32 * ((end - start) / range_size);
 
-                    if let Some(sprite) = scrollbox.sprite.as_ref() {
-                        sprite.draw(ui, egui::pos2(rect.min.x, pos));
+                        if let Some(sprite) = scrollbox.sprite.as_ref() {
+                            sprite.draw(ui, egui::pos2(rect.min.x, pos));
+                        }
                     }
                 }
             }

@@ -31,10 +31,14 @@ impl UiSprite {
     }
 }
 
-#[derive(Enum)]
+#[derive(Copy, Clone, Debug, PartialEq, Enum)]
 pub enum UiSpriteSheetType {
     Ui,
     ExUi,
+    Item,
+    Skill,
+    StateIcon,
+    ItemSocket,
 }
 
 pub struct UiTexture {
@@ -47,7 +51,7 @@ pub struct UiSpriteSheet {
     pub textures: Vec<TsiTexture>,
     pub sprites: Vec<TsiSprite>,
     pub loaded_textures: Vec<UiTexture>,
-    pub sprites_by_name: IdFile,
+    pub sprites_by_name: Option<IdFile>,
 }
 
 pub struct UiResources {
@@ -71,13 +75,30 @@ impl UiResources {
     pub fn get_sprite(&self, module_id: i32, sprite_name: &str) -> Option<UiSprite> {
         let sprite_sheet_type = match module_id {
             0 => UiSpriteSheetType::Ui,
+            1 => UiSpriteSheetType::Item,
             3 => UiSpriteSheetType::ExUi,
+            4 => UiSpriteSheetType::Skill,
+            5 => UiSpriteSheetType::StateIcon,
+            6 => UiSpriteSheetType::ItemSocket,
             _ => return None,
         };
         let sprite_sheet = &self.sprite_sheets[sprite_sheet_type];
-        let sprite_index = sprite_sheet.sprites_by_name.get(sprite_name)?;
+        let sprite_index = sprite_sheet
+            .sprites_by_name
+            .as_ref()
+            .unwrap()
+            .get(sprite_name)?;
 
-        let sprite = sprite_sheet.sprites.get(*sprite_index as usize)?;
+        self.get_sprite_by_index(sprite_sheet_type, *sprite_index as usize)
+    }
+
+    pub fn get_sprite_by_index(
+        &self,
+        sprite_sheet_type: UiSpriteSheetType,
+        sprite_index: usize,
+    ) -> Option<UiSprite> {
+        let sprite_sheet = &self.sprite_sheets[sprite_sheet_type];
+        let sprite = sprite_sheet.sprites.get(sprite_index)?;
         let texture = sprite_sheet
             .loaded_textures
             .get(sprite.texture_id as usize)?;
@@ -109,7 +130,11 @@ fn load_ui_spritesheet(
     id_path: &str,
 ) -> Result<UiSpriteSheet, anyhow::Error> {
     let tsi_file = vfs.read_file::<TsiFile, _>(tsi_path)?;
-    let id_file = vfs.read_file::<IdFile, _>(id_path)?;
+    let id_file = if id_path.is_empty() {
+        None
+    } else {
+        Some(vfs.read_file::<IdFile, _>(id_path)?)
+    };
 
     let mut loaded_textures = Vec::new();
     for tsi_texture in tsi_file.textures.iter() {
@@ -230,8 +255,12 @@ pub fn load_ui_resources(
     commands.insert_resource(UiResources {
         loaded_all_textures: false,
         sprite_sheets: enum_map! {
-            UiSpriteSheetType::Ui => load_ui_spritesheet(vfs, &asset_server, &mut egui_context, "3DDATA/CONTROL/RES/UI.TSI", "3DDATA/CONTROL/XML/UI_STRID.ID").expect("Failed to load UI sprite sheet"),
-            UiSpriteSheetType::ExUi => load_ui_spritesheet(vfs, &asset_server, &mut egui_context,  "3DDATA/CONTROL/RES/EXUI.TSI", "3DDATA/CONTROL/XML/EXUI_STRID.ID").expect("Failed to load EXUI sprite sheet"),
+            UiSpriteSheetType::Ui => load_ui_spritesheet(vfs, &asset_server, &mut egui_context, "3DDATA/CONTROL/RES/UI.TSI", "3DDATA/CONTROL/XML/UI_STRID.ID").expect("Failed to load UI.TSI sprite sheet"),
+            UiSpriteSheetType::ExUi => load_ui_spritesheet(vfs, &asset_server, &mut egui_context,  "3DDATA/CONTROL/RES/EXUI.TSI", "3DDATA/CONTROL/XML/EXUI_STRID.ID").expect("Failed to load EXUI.TSI sprite sheet"),
+            UiSpriteSheetType::StateIcon => load_ui_spritesheet(vfs, &asset_server, &mut egui_context,  "3DDATA/CONTROL/RES/STATEICON.TSI", "").expect("Failed to load STATEICON.TSI sprite sheet"),
+            UiSpriteSheetType::Skill => load_ui_spritesheet(vfs, &asset_server, &mut egui_context,  "3DDATA/CONTROL/RES/SKILLICON.TSI", "").expect("Failed to load SKILLICON.TSI sprite sheet"),
+            UiSpriteSheetType::Item => load_ui_spritesheet(vfs, &asset_server, &mut egui_context,  "3DDATA/CONTROL/RES/ITEM1.TSI", "").expect("Failed to load ITEM1.TSI sprite sheet"),
+            UiSpriteSheetType::ItemSocket => load_ui_spritesheet(vfs, &asset_server, &mut egui_context,  "3DDATA/CONTROL/RES/SOKETJAM.TSI", "").expect("Failed to load SOKETJAM.TSI sprite sheet"),
         },
         dialog_character_info: dialog_files["DLGAVATA.XML"].clone(),
         dialog_chatbox: dialog_files["DLGCHAT.XML"].clone(),

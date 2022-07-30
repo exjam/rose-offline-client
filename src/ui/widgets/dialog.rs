@@ -1,16 +1,39 @@
 use bevy::reflect::TypeUuid;
 use bevy_egui::egui;
-use serde::Deserialize;
+use serde::{Deserialize, Deserializer};
 
 use super::{DataBindings, DrawWidget, GetWidget, Widget};
+
+pub fn default_on_error<'de, D, T>(deserializer: D) -> Result<T, D::Error>
+where
+    D: Deserializer<'de>,
+    T: Deserialize<'de> + Default,
+{
+    #[derive(Debug, serde::Deserialize)]
+    #[serde(untagged)]
+    enum GoodOrError<T> {
+        Good(T),
+        // This consumes one "item" when `T` errors while deserializing.
+        // This is necessary to make this work, when instead of having a direct value
+        // like integer or string, the deserializer sees a list or map.
+        Error(serde::de::IgnoredAny),
+    }
+
+    Ok(match Deserialize::deserialize(deserializer) {
+        Ok(GoodOrError::Good(res)) => res,
+        _ => Default::default(),
+    })
+}
 
 #[derive(Clone, Default, Deserialize, TypeUuid)]
 #[uuid = "95ddb227-6e9f-43ee-8026-28ddb6fc9634"]
 #[serde(rename = "Root_Element")]
 #[serde(default)]
 pub struct Dialog {
+    #[serde(deserialize_with = "default_on_error")]
     #[serde(rename = "X")]
     pub x: f32,
+    #[serde(deserialize_with = "default_on_error")]
     #[serde(rename = "Y")]
     pub y: f32,
     #[serde(rename = "WIDTH")]

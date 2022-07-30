@@ -10,7 +10,14 @@ pub struct DataBindings<'a> {
     pub gauge: &'a mut [(i32, &'a f32, &'a str)],
     pub tabs: &'a mut [(i32, &'a mut i32)],
     pub radio: &'a mut [(i32, &'a mut i32)],
-    pub scroll: &'a mut [(i32, (&'a mut i32, Range<i32>))],
+    pub scroll: &'a mut [(i32, (&'a mut i32, Range<i32>, i32))], // (current_scroll, scroll_range, num_visible)
+    pub zlist: &'a mut [(
+        i32,
+        (
+            &'a mut i32,
+            &'a dyn Fn(&mut egui::Ui, i32, bool) -> egui::Response,
+        ),
+    )],
     pub response: &'a mut [(i32, &'a mut Option<egui::Response>)],
 }
 
@@ -28,11 +35,11 @@ impl<'a> DataBindings<'a> {
             .map(|(_, buffer)| &mut **buffer)
     }
 
-    pub fn get_scroll(&mut self, id: i32) -> Option<(&mut i32, Range<i32>)> {
+    pub fn get_scroll(&mut self, id: i32) -> Option<(&mut i32, Range<i32>, i32)> {
         self.scroll
             .iter_mut()
             .find(|(x, _)| *x == id)
-            .map(|(_, (current, range))| (&mut **current, range.clone()))
+            .map(|(_, (current, range, visible))| (&mut **current, range.clone(), *visible))
     }
 
     pub fn get_tab(&mut self, pane_id: i32) -> Option<&mut i32> {
@@ -54,5 +61,25 @@ impl<'a> DataBindings<'a> {
             .iter()
             .find(|(x, _)| *x == id)
             .map_or(true, |(_, visible)| *visible)
+    }
+
+    pub fn get_zlist(
+        &mut self,
+        id: i32,
+    ) -> Option<(
+        &mut i32,
+        &dyn Fn(&mut egui::Ui, i32, bool) -> egui::Response,
+    )> {
+        self.zlist
+            .iter_mut()
+            .find(|(x, _)| *x == id)
+            .map(|(_, (a, b))| (&mut **a, &**b))
+    }
+
+    pub fn get_zlist_selected_index(&mut self, id: i32) -> Option<i32> {
+        self.zlist
+            .iter_mut()
+            .find(|(x, _)| *x == id)
+            .map(|(_, (a, _))| **a)
     }
 }
