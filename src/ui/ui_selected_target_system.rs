@@ -93,15 +93,12 @@ pub fn ui_selected_target_system(
                                         ),
                                 );
 
-                                let hp_percent = health_points.hp as f32
-                                    / ability_values.get_max_health() as f32;
-
                                 // HP gauge background
                                 let gauge_rect = egui::Rect::from_min_size(
                                     egui::pos2(
                                         rect.min.x + rect.width() / 2.0
                                             - hp_gauge_background.width / 2.0,
-                                        rect.max.y - 20.0,
+                                        rect.max.y - 24.0,
                                     ),
                                     egui::vec2(
                                         hp_gauge_background.width,
@@ -111,6 +108,8 @@ pub fn ui_selected_target_system(
                                 hp_gauge_background.draw_stretched(ui, gauge_rect);
 
                                 // HP gauge foreground
+                                let hp_percent = health_points.hp as f32
+                                    / ability_values.get_max_health() as f32;
                                 let mut fg_gauge_rect = gauge_rect;
                                 fg_gauge_rect.set_width(hp_gauge_foreground.width * hp_percent);
                                 let mut mesh = egui::epaint::Mesh::with_texture(
