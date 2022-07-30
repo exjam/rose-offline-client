@@ -56,9 +56,9 @@ use orbit_camera::OrbitCameraPlugin;
 use protocol::ProtocolType;
 use render::{DamageDigitMaterial, RoseRenderPlugin};
 use resources::{
-    load_ui_resources, run_network_thread, AppState, ClientEntityList, DamageDigitsSpawner,
-    DebugRenderConfig, GameData, Icons, NetworkThread, NetworkThreadMessage, RenderConfiguration,
-    ServerConfiguration, SoundSettings, WorldTime, ZoneTime,
+    load_ui_resources, run_network_thread, update_ui_resources, AppState, ClientEntityList,
+    DamageDigitsSpawner, DebugRenderConfig, GameData, Icons, NetworkThread, NetworkThreadMessage,
+    RenderConfiguration, ServerConfiguration, SoundSettings, WorldTime, ZoneTime,
 };
 use scripting::RoseScriptingPlugin;
 use systems::{
@@ -91,7 +91,7 @@ use ui::{
     ui_debug_zone_time_system, ui_drag_and_drop_system, ui_game_menu_system, ui_hotbar_system,
     ui_inventory_system, ui_minimap_system, ui_npc_store_system, ui_party_system,
     ui_player_info_system, ui_quest_list_system, ui_selected_target_system, ui_settings_system,
-    ui_skill_list_system, Dialog, DialogLoader, UiStateDebugWindows, UiStateDragAndDrop,
+    ui_skill_list_system, widgets::Dialog, DialogLoader, UiStateDebugWindows, UiStateDragAndDrop,
     UiStateWindows,
 };
 use vfs_asset_io::VfsAssetIo;
@@ -453,6 +453,7 @@ fn main() {
                 .after(pending_damage_system)
                 .after(hit_event_system),
         )
+        .add_system(update_ui_resources)
         .add_system(spawn_effect_system)
         .add_system(npc_idle_sound_system)
         .add_system(world_time_system)

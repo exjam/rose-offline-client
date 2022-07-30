@@ -1,21 +1,20 @@
-use bevy::prelude::{Assets, Commands, Entity, Image, Local, Query, Res, ResMut, With};
+use bevy::prelude::{Commands, Entity, Local, Query, Res, ResMut, With};
 use bevy_egui::{egui, EguiContext};
 
 use rose_game_common::components::{AbilityValues, HealthPoints, Npc};
 
 use crate::{
     components::{ClientEntityName, Command, PlayerCharacter, SelectedTarget},
-    resources::UiResources,
-    ui::dialog::LoadedSprite,
+    resources::{UiResources, UiSprite},
 };
 
 #[derive(Default)]
 pub struct UiSelectedTargetState {
-    pub sprite_top: Option<LoadedSprite>,
-    pub sprite_middle: Option<LoadedSprite>,
-    pub sprite_bottom: Option<LoadedSprite>,
-    pub hp_gauge_background: Option<LoadedSprite>,
-    pub hp_gauge_foreground: Option<LoadedSprite>,
+    pub sprite_top: Option<UiSprite>,
+    pub sprite_middle: Option<UiSprite>,
+    pub sprite_bottom: Option<UiSprite>,
+    pub hp_gauge_background: Option<UiSprite>,
+    pub hp_gauge_foreground: Option<UiSprite>,
 }
 
 pub fn ui_selected_target_system(
@@ -31,21 +30,15 @@ pub fn ui_selected_target_system(
         Option<&Npc>,
     )>,
     ui_resources: Res<UiResources>,
-    images: Res<Assets<Image>>,
 ) {
     let (player_entity, player_target) = query_player.single();
 
     if ui_state.sprite_top.is_none() {
-        ui_state.sprite_top =
-            LoadedSprite::try_load(&ui_resources, &images, 0, "UI18_PARTYOPTION_TOP");
-        ui_state.sprite_middle =
-            LoadedSprite::try_load(&ui_resources, &images, 0, "UI18_PARTYOPTION_MIDDLE");
-        ui_state.sprite_bottom =
-            LoadedSprite::try_load(&ui_resources, &images, 0, "UI18_PARTYOPTION_BOTTOM");
-        ui_state.hp_gauge_background =
-            LoadedSprite::try_load(&ui_resources, &images, 0, "UI00_GUAGE_BACKGROUND");
-        ui_state.hp_gauge_foreground =
-            LoadedSprite::try_load(&ui_resources, &images, 0, "UI00_GUAGE_RED");
+        ui_state.sprite_top = ui_resources.get_sprite(0, "UI18_PARTYOPTION_TOP");
+        ui_state.sprite_middle = ui_resources.get_sprite(0, "UI18_PARTYOPTION_MIDDLE");
+        ui_state.sprite_bottom = ui_resources.get_sprite(0, "UI18_PARTYOPTION_BOTTOM");
+        ui_state.hp_gauge_background = ui_resources.get_sprite(0, "UI00_GUAGE_BACKGROUND");
+        ui_state.hp_gauge_foreground = ui_resources.get_sprite(0, "UI00_GUAGE_RED");
     }
 
     if let Some(player_target) = player_target {

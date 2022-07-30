@@ -40,7 +40,9 @@ pub use render_configuration::RenderConfiguration;
 pub use server_configuration::ServerConfiguration;
 pub use server_list::{ServerList, ServerListGameServer, ServerListWorldServer};
 pub use sound_settings::SoundSettings;
-pub use ui_resources::{load_ui_resources, UiResources, UiSpriteSheet, UiSpriteSheetType};
+pub use ui_resources::{
+    load_ui_resources, update_ui_resources, UiResources, UiSprite, UiSpriteSheet, UiSpriteSheetType,
+};
 pub use world_connection::WorldConnection;
 pub use world_rates::WorldRates;
 pub use world_time::WorldTime;

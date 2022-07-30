@@ -15,7 +15,10 @@ use rose_game_common::{
 use crate::{
     components::PlayerCharacter,
     resources::{GameConnection, GameData, UiResources},
-    ui::{Dialog, DialogDataBindings, UiStateWindows},
+    ui::{
+        widgets::{DataBindings, Dialog, DrawText},
+        UiStateWindows,
+    },
 };
 
 const IID_BTN_CLOSE: i32 = 10;
@@ -108,7 +111,7 @@ pub fn ui_character_info_system(
 
             dialog.draw(
                 ui,
-                DialogDataBindings {
+                DataBindings {
                     response: &mut [
                         (IID_BTN_CLOSE, &mut response_close_button),
                         (IID_BTN_UP_STR, &mut response_raise_str_button),
@@ -126,117 +129,85 @@ pub fn ui_character_info_system(
                     tabs: &mut [(IID_TABBEDPANE, &mut ui_state.current_tab)],
                     ..Default::default()
                 },
-                |ui, bindings| {
-                    let draw_text_at = |ui: &mut egui::Ui, x, y, text: &str| {
-                        ui.allocate_ui_at_rect(ui.min_rect().translate(egui::vec2(x, y)), |ui| {
-                            ui.horizontal_top(|ui| ui.add(egui::Label::new(text))).inner
-                        });
-                    };
-
-                    match bindings.get_tab(IID_TABBEDPANE) {
-                        Some(&mut IID_TAB_BASICINFO) => {
-                            draw_text_at(ui, 59.0, 67.0, &player.character_info.name);
-                            draw_text_at(ui, 59.0, 88.0, "TODO: job name");
-                            draw_text_at(ui, 59.0, 109.0, "TODO: clan name");
-                            draw_text_at(ui, 59.0, 172.0, &format!("{}", player.level.level));
-                            draw_text_at(
-                                ui,
-                                59.0,
-                                193.0,
-                                &format!("{} / {}", player.experience_points.xp, need_xp),
-                            );
-                        }
-                        Some(&mut IID_TAB_ABILITY) => {
-                            draw_text_at(
-                                ui,
-                                58.0,
-                                67.0,
-                                &format!("{}", player.ability_values.get_strength()),
-                            );
-                            draw_text_at(
-                                ui,
-                                58.0,
-                                88.0,
-                                &format!("{}", player.ability_values.get_dexterity()),
-                            );
-                            draw_text_at(
-                                ui,
-                                58.0,
-                                109.0,
-                                &format!("{}", player.ability_values.get_intelligence()),
-                            );
-                            draw_text_at(
-                                ui,
-                                58.0,
-                                130.0,
-                                &format!("{}", player.ability_values.get_concentration()),
-                            );
-                            draw_text_at(
-                                ui,
-                                58.0,
-                                151.0,
-                                &format!("{}", player.ability_values.get_charm()),
-                            );
-                            draw_text_at(
-                                ui,
-                                58.0,
-                                172.0,
-                                &format!("{}", player.ability_values.get_sense()),
-                            );
-                            draw_text_at(
-                                ui,
-                                69.0,
-                                211.0,
-                                &format!("{}", player.stat_points.points),
-                            );
-
-                            draw_text_at(
-                                ui,
-                                171.0,
-                                67.0,
-                                &format!("{}", player.ability_values.get_attack_power()),
-                            );
-                            draw_text_at(
-                                ui,
-                                171.0,
-                                88.0,
-                                &format!("{}", player.ability_values.get_defence()),
-                            );
-                            draw_text_at(
-                                ui,
-                                171.0,
-                                109.0,
-                                &format!("{}", player.ability_values.get_resistance()),
-                            );
-                            draw_text_at(
-                                ui,
-                                171.0,
-                                130.0,
-                                &format!("{}", player.ability_values.get_hit()),
-                            );
-                            draw_text_at(
-                                ui,
-                                171.0,
-                                151.0,
-                                &format!("{}", player.ability_values.get_critical()),
-                            );
-                            draw_text_at(
-                                ui,
-                                171.0,
-                                172.0,
-                                &format!("{}", player.ability_values.get_avoid()),
-                            );
-                            draw_text_at(
-                                ui,
-                                171.0,
-                                193.0,
-                                &format!("{}", player.ability_values.get_attack_speed()),
-                            );
-                            draw_text_at(ui, 171.0, 214.0, &format!("{}", player.move_speed.speed));
-                        }
-                        Some(&mut IID_TAB_UNION) => {}
-                        _ => {}
+                |ui, bindings| match bindings.get_tab(IID_TABBEDPANE) {
+                    Some(&mut IID_TAB_BASICINFO) => {
+                        ui.add_label_at(egui::pos2(59.0, 67.0), &player.character_info.name);
+                        ui.add_label_at(egui::pos2(59.0, 88.0), "TODO: job name");
+                        ui.add_label_at(egui::pos2(59.0, 109.0), "TODO: clan name");
+                        ui.add_label_at(
+                            egui::pos2(59.0, 172.0),
+                            &format!("{}", player.level.level),
+                        );
+                        ui.add_label_at(
+                            egui::pos2(59.0, 193.0),
+                            &format!("{} / {}", player.experience_points.xp, need_xp),
+                        );
                     }
+                    Some(&mut IID_TAB_ABILITY) => {
+                        ui.add_label_at(
+                            egui::pos2(58.0, 67.0),
+                            &format!("{}", player.ability_values.get_strength()),
+                        );
+                        ui.add_label_at(
+                            egui::pos2(58.0, 88.0),
+                            &format!("{}", player.ability_values.get_dexterity()),
+                        );
+                        ui.add_label_at(
+                            egui::pos2(58.0, 109.0),
+                            &format!("{}", player.ability_values.get_intelligence()),
+                        );
+                        ui.add_label_at(
+                            egui::pos2(58.0, 130.0),
+                            &format!("{}", player.ability_values.get_concentration()),
+                        );
+                        ui.add_label_at(
+                            egui::pos2(58.0, 151.0),
+                            &format!("{}", player.ability_values.get_charm()),
+                        );
+                        ui.add_label_at(
+                            egui::pos2(58.0, 172.0),
+                            &format!("{}", player.ability_values.get_sense()),
+                        );
+                        ui.add_label_at(
+                            egui::pos2(69.0, 211.0),
+                            &format!("{}", player.stat_points.points),
+                        );
+
+                        ui.add_label_at(
+                            egui::pos2(171.0, 67.0),
+                            &format!("{}", player.ability_values.get_attack_power()),
+                        );
+                        ui.add_label_at(
+                            egui::pos2(171.0, 88.0),
+                            &format!("{}", player.ability_values.get_defence()),
+                        );
+                        ui.add_label_at(
+                            egui::pos2(171.0, 109.0),
+                            &format!("{}", player.ability_values.get_resistance()),
+                        );
+                        ui.add_label_at(
+                            egui::pos2(171.0, 130.0),
+                            &format!("{}", player.ability_values.get_hit()),
+                        );
+                        ui.add_label_at(
+                            egui::pos2(171.0, 151.0),
+                            &format!("{}", player.ability_values.get_critical()),
+                        );
+                        ui.add_label_at(
+                            egui::pos2(171.0, 172.0),
+                            &format!("{}", player.ability_values.get_avoid()),
+                        );
+                        ui.add_label_at(
+                            egui::pos2(171.0, 193.0),
+                            &format!("{}", player.ability_values.get_attack_speed()),
+                        );
+                        ui.add_label_at(
+                            egui::pos2(171.0, 214.0),
+                            &format!("{}", player.move_speed.speed),
+                        );
+                    }
+                    Some(&mut IID_TAB_UNION) => {}
+                    _ => {}
                 },
             );
         });

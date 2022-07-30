@@ -12,8 +12,9 @@ use crate::{
     events::PlayerCommandEvent,
     resources::{GameData, Icons, UiResources},
     ui::{
-        dialog::GetWidget, ui_add_skill_tooltip, Dialog, DialogDataBindings, DragAndDropId,
-        DragAndDropSlot, UiStateDragAndDrop, UiStateWindows, Widget,
+        ui_add_skill_tooltip,
+        widgets::{DataBindings, Dialog, DrawText, Widget},
+        DragAndDropId, DragAndDropSlot, UiStateDragAndDrop, UiStateWindows,
     },
 };
 
@@ -155,7 +156,7 @@ pub fn ui_skill_list_system(
         .show(egui_context.ctx_mut(), |ui| {
             dialog.draw(
                 ui,
-                DialogDataBindings {
+                DataBindings {
                     tabs: &mut [(IID_TABBEDPANE, &mut ui_state_skill_list.current_page)],
                     scroll: &mut [
                         (
@@ -184,12 +185,6 @@ pub fn ui_skill_list_system(
                     ..Default::default()
                 },
                 |ui, bindings| {
-                    let draw_text_at = |ui: &mut egui::Ui, x, y, text: &str| {
-                        ui.allocate_ui_at_rect(ui.min_rect().translate(egui::vec2(x, y)), |ui| {
-                            ui.horizontal_top(|ui| ui.add(egui::Label::new(text))).inner
-                        });
-                    };
-
                     let (page, index) = match bindings.get_tab(IID_TABBEDPANE) {
                         Some(&mut IID_TAB_BASIC) => (
                             SkillPageType::Basic,
@@ -221,7 +216,10 @@ pub fn ui_skill_list_system(
                             .as_ref()
                             .and_then(|skill| game_data.skills.get_skill(*skill));
                         if let Some(skill_data) = skill_data {
-                            draw_text_at(ui, start_x + 46.0, start_y + 5.0, &skill_data.name);
+                            ui.add_label_at(
+                                egui::pos2(start_x + 46.0, start_y + 5.0),
+                                &skill_data.name,
+                            );
                         }
 
                         // TODO: Skill usage requirements
@@ -239,10 +237,8 @@ pub fn ui_skill_list_system(
                         );
                     }
 
-                    draw_text_at(
-                        ui,
-                        40.0,
-                        dialog.height - 25.0,
+                    ui.add_label_at(
+                        egui::pos2(40.0, dialog.height - 25.0),
                         &format!("{}", player.skill_points.points),
                     );
                 },

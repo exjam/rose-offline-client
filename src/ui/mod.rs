@@ -1,4 +1,4 @@
-mod dialog;
+mod dialog_loader;
 mod drag_and_drop_slot;
 mod tooltips;
 mod ui_character_info_system;
@@ -30,6 +30,7 @@ mod ui_quest_list_system;
 mod ui_selected_target_system;
 mod ui_settings_system;
 mod ui_skill_list_system;
+pub mod widgets;
 
 #[derive(Default)]
 pub struct UiStateWindows {
@@ -41,10 +42,7 @@ pub struct UiStateWindows {
     pub menu_open: bool,
 }
 
-pub use dialog::{
-    load_dialog_sprites_system, Button, Checkbox, Dialog, DialogDataBindings, DialogLoader,
-    GetWidget, Sprite, Textbox, Widget,
-};
+pub use dialog_loader::{load_dialog_sprites_system, DialogInstance, DialogLoader};
 pub use drag_and_drop_slot::{DragAndDropId, DragAndDropSlot};
 pub use tooltips::{ui_add_item_tooltip, ui_add_skill_tooltip};
 pub use ui_character_info_system::ui_character_info_system;
@@ -76,3 +74,4 @@ pub use ui_quest_list_system::ui_quest_list_system;
 pub use ui_selected_target_system::ui_selected_target_system;
 pub use ui_settings_system::ui_settings_system;
 pub use ui_skill_list_system::ui_skill_list_system;
+pub use widgets::DataBindings;

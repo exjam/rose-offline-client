@@ -10,7 +10,10 @@ use rose_game_common::components::{
 use crate::{
     components::{PlayerCharacter, SelectedTarget},
     resources::{GameData, UiResources},
-    ui::{Dialog, DialogDataBindings, UiStateWindows},
+    ui::{
+        widgets::{DataBindings, Dialog, DrawText},
+        UiStateWindows,
+    },
 };
 
 const IID_GAUGE_HP: i32 = 6;
@@ -73,7 +76,7 @@ pub fn ui_player_info_system(
 
             dialog.draw(
                 ui,
-                DialogDataBindings {
+                DataBindings {
                     response: &mut [(IID_BTN_MENU, &mut response_menu_button)],
                     gauge: &mut [
                         (
@@ -99,25 +102,16 @@ pub fn ui_player_info_system(
                     ..Default::default()
                 },
                 |ui, _| {
-                    ui.put(
-                        egui::Rect::from_min_max(
-                            ui.min_rect().min + egui::vec2(15.0, 8.0),
-                            ui.min_rect().min + egui::vec2(150.0, 25.0),
-                        ),
-                        egui::Label::new(
-                            egui::RichText::new(&player.character_info.name)
-                                .color(egui::Color32::from_rgb(0, 255, 42)),
-                        ),
+                    ui.add_label_in(
+                        egui::Rect::from_min_max(egui::pos2(15.0, 8.0), egui::pos2(150.0, 25.0)),
+                        egui::RichText::new(&player.character_info.name)
+                            .color(egui::Color32::from_rgb(0, 255, 42)),
                     );
-                    ui.put(
-                        egui::Rect::from_min_max(
-                            ui.min_rect().min + egui::vec2(180.0, 8.0),
-                            ui.min_rect().min + egui::vec2(230.0, 25.0),
-                        ),
-                        egui::Label::new(
-                            egui::RichText::new(&format!("{}", player.level.level))
-                                .color(egui::Color32::YELLOW),
-                        ),
+
+                    ui.add_label_in(
+                        egui::Rect::from_min_max(egui::pos2(180.0, 8.0), egui::pos2(230.0, 25.0)),
+                        egui::RichText::new(&format!("{}", player.level.level))
+                            .color(egui::Color32::YELLOW),
                     );
                 },
             )

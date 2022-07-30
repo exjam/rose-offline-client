@@ -15,8 +15,9 @@ use crate::{
     events::{ChatboxEvent, PlayerCommandEvent},
     resources::{GameConnection, GameData, Icons, UiResources},
     ui::{
-        dialog::GetWidget, ui_add_item_tooltip, Dialog, DialogDataBindings, DragAndDropId,
-        DragAndDropSlot, UiStateDragAndDrop, UiStateWindows, Widget,
+        ui_add_item_tooltip,
+        widgets::{DataBindings, Dialog, Widget},
+        DialogInstance, DragAndDropId, DragAndDropSlot, UiStateDragAndDrop, UiStateWindows,
     },
 };
 
@@ -43,7 +44,7 @@ const IID_BTN_MAXIMIZE: i32 = 214;
 const IID_PANE_INVEN: i32 = 300;
 
 pub struct UiStateInventory {
-    dialog: Option<Dialog>,
+    dialog_instance: DialogInstance,
     item_slot_map: EnumMap<InventoryPageType, Vec<ItemSlot>>,
     current_equipment_tab: i32,
     current_vehicle_tab: i32,
@@ -54,7 +55,7 @@ pub struct UiStateInventory {
 impl Default for UiStateInventory {
     fn default() -> Self {
         Self {
-            dialog: None,
+            dialog_instance: DialogInstance::new("DLGITEM.XML".into()),
             item_slot_map: enum_map! {
                 page_type => (0..INVENTORY_PAGE_SIZE)
                 .map(|index| ItemSlot::Inventory(page_type, index))
@@ -606,18 +607,14 @@ pub fn ui_inventory_system(
     mut player_command_events: EventWriter<PlayerCommandEvent>,
 ) {
     let ui_state_inventory = &mut *ui_state_inventory;
-    if ui_state_inventory.dialog.is_none() {
-        if let Some(dialog) = dialog_assets.get(&ui_resources.dialog_files["DLGITEM.XML"]) {
-            if !dialog.loaded {
-                return;
-            }
-
-            ui_state_inventory.dialog = Some(dialog.clone());
-        } else {
-            return;
-        }
-    }
-    let dialog = ui_state_inventory.dialog.as_mut().unwrap();
+    let dialog = if let Some(dialog) = ui_state_inventory
+        .dialog_instance
+        .get_mut(&dialog_assets, &ui_resources)
+    {
+        dialog
+    } else {
+        return;
+    };
 
     let (player_equipment, player_inventory, player_cooldowns) = query_player.single();
 
@@ -637,7 +634,7 @@ pub fn ui_inventory_system(
         .show(egui_context.ctx_mut(), |ui| {
             dialog.draw(
                 ui,
-                DialogDataBindings {
+                DataBindings {
                     tabs: &mut [
                         (
                             IID_TABBEDPANE_EQUIP,

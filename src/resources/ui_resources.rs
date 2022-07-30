@@ -1,15 +1,35 @@
 use std::collections::HashMap;
 
-use bevy::{
-    asset::HandleId,
-    prelude::{AssetServer, Commands, Handle, Image, Res, ResMut},
-};
-use bevy_egui::{egui::TextureId, EguiContext};
+use bevy::prelude::{AssetServer, Assets, Commands, Handle, Image, Res, ResMut, Vec2};
+use bevy_egui::{egui, EguiContext};
 use enum_map::{enum_map, Enum, EnumMap};
 
 use rose_file_readers::{IdFile, TsiFile, TsiSprite, TsiTexture, VfsIndex};
 
-use crate::{ui::Dialog, VfsResource};
+use crate::{ui::widgets::Dialog, VfsResource};
+
+#[derive(Clone)]
+pub struct UiSprite {
+    pub texture_id: egui::TextureId,
+    pub uv: egui::Rect,
+    pub width: f32,
+    pub height: f32,
+}
+
+impl UiSprite {
+    pub fn draw(&self, ui: &mut egui::Ui, pos: egui::Pos2) {
+        let rect = egui::Rect::from_min_size(pos, egui::vec2(self.width, self.height));
+        let mut mesh = egui::epaint::Mesh::with_texture(self.texture_id);
+        mesh.add_rect_with_uv(rect, self.uv, egui::Color32::WHITE);
+        ui.painter().add(egui::epaint::Shape::mesh(mesh));
+    }
+
+    pub fn draw_stretched(&self, ui: &mut egui::Ui, rect: egui::Rect) {
+        let mut mesh = egui::epaint::Mesh::with_texture(self.texture_id);
+        mesh.add_rect_with_uv(rect, self.uv, egui::Color32::WHITE);
+        ui.painter().add(egui::epaint::Shape::mesh(mesh));
+    }
+}
 
 #[derive(Enum)]
 pub enum UiSpriteSheetType {
@@ -17,16 +37,23 @@ pub enum UiSpriteSheetType {
     ExUi,
 }
 
+pub struct UiTexture {
+    pub handle: Handle<Image>,
+    pub texture_id: egui::TextureId,
+    pub size: Option<Vec2>,
+}
+
 pub struct UiSpriteSheet {
     pub textures: Vec<TsiTexture>,
     pub sprites: Vec<TsiSprite>,
-    pub loaded_textures: Vec<(Handle<Image>, TextureId)>,
+    pub loaded_textures: Vec<UiTexture>,
     pub sprites_by_name: IdFile,
 }
 
 pub struct UiResources {
+    pub loaded_all_textures: bool,
     pub sprite_sheets: EnumMap<UiSpriteSheetType, UiSpriteSheet>,
-    pub sprite_sheets_load_group: Vec<HandleId>,
+
     pub dialog_files: HashMap<String, Handle<Dialog>>,
     pub dialog_login: Handle<Dialog>,
     pub dialog_character_info: Handle<Dialog>,
@@ -40,11 +67,44 @@ pub struct UiResources {
     pub dialog_skill_list: Handle<Dialog>,
 }
 
+impl UiResources {
+    pub fn get_sprite(&self, module_id: i32, sprite_name: &str) -> Option<UiSprite> {
+        let sprite_sheet_type = match module_id {
+            0 => UiSpriteSheetType::Ui,
+            3 => UiSpriteSheetType::ExUi,
+            _ => return None,
+        };
+        let sprite_sheet = &self.sprite_sheets[sprite_sheet_type];
+        let sprite_index = sprite_sheet.sprites_by_name.get(sprite_name)?;
+
+        let sprite = sprite_sheet.sprites.get(*sprite_index as usize)?;
+        let texture = sprite_sheet
+            .loaded_textures
+            .get(sprite.texture_id as usize)?;
+        let texture_size = texture.size?;
+
+        Some(UiSprite {
+            texture_id: texture.texture_id,
+            uv: egui::Rect::from_min_max(
+                egui::pos2(
+                    (sprite.left as f32 + 0.5) / texture_size.x,
+                    (sprite.top as f32 + 0.5) / texture_size.y,
+                ),
+                egui::pos2(
+                    (sprite.right as f32 - 0.5) / texture_size.x,
+                    (sprite.bottom as f32 - 0.5) / texture_size.y,
+                ),
+            ),
+            width: (sprite.right - sprite.left) as f32,
+            height: (sprite.bottom - sprite.top) as f32,
+        })
+    }
+}
+
 fn load_ui_spritesheet(
     vfs: &VfsIndex,
     asset_server: &AssetServer,
     egui_context: &mut EguiContext,
-    load_group: &mut Vec<HandleId>,
     tsi_path: &str,
     id_path: &str,
 ) -> Result<UiSpriteSheet, anyhow::Error> {
@@ -53,11 +113,13 @@ fn load_ui_spritesheet(
 
     let mut loaded_textures = Vec::new();
     for tsi_texture in tsi_file.textures.iter() {
-        let image_handle =
-            asset_server.load(&format!("3DDATA/CONTROL/RES/{}", tsi_texture.filename));
-        let texture_id = egui_context.add_image(image_handle.clone_weak());
-        load_group.push(image_handle.id);
-        loaded_textures.push((image_handle, texture_id));
+        let handle = asset_server.load(&format!("3DDATA/CONTROL/RES/{}", tsi_texture.filename));
+        let texture_id = egui_context.add_image(handle.clone_weak());
+        loaded_textures.push(UiTexture {
+            handle,
+            texture_id,
+            size: None,
+        });
     }
 
     Ok(UiSpriteSheet {
@@ -68,6 +130,30 @@ fn load_ui_spritesheet(
     })
 }
 
+pub fn update_ui_resources(mut ui_resources: ResMut<UiResources>, images: Res<Assets<Image>>) {
+    if ui_resources.loaded_all_textures {
+        return;
+    }
+
+    let mut loaded_all = true;
+
+    for (_, spritesheet) in ui_resources.sprite_sheets.iter_mut() {
+        for texture in spritesheet.loaded_textures.iter_mut() {
+            if texture.size.is_some() {
+                continue;
+            }
+
+            if let Some(image) = images.get(&texture.handle) {
+                texture.size = Some(image.size());
+            } else {
+                loaded_all = false;
+            }
+        }
+    }
+
+    ui_resources.loaded_all_textures = loaded_all;
+}
+
 pub fn load_ui_resources(
     mut commands: Commands,
     vfs_resource: Res<VfsResource>,
@@ -75,7 +161,6 @@ pub fn load_ui_resources(
     mut egui_context: ResMut<EguiContext>,
 ) {
     let vfs = &vfs_resource.vfs;
-    let mut load_group = Vec::new();
 
     let dialog_filenames = [
         "DELIVERYSTORE.XML",
@@ -143,11 +228,11 @@ pub fn load_ui_resources(
     }
 
     commands.insert_resource(UiResources {
+        loaded_all_textures: false,
         sprite_sheets: enum_map! {
-            UiSpriteSheetType::Ui => load_ui_spritesheet(vfs, &asset_server, &mut egui_context, &mut load_group, "3DDATA/CONTROL/RES/UI.TSI", "3DDATA/CONTROL/XML/UI_STRID.ID").expect("Failed to load UI sprite sheet"),
-            UiSpriteSheetType::ExUi => load_ui_spritesheet(vfs, &asset_server, &mut egui_context, &mut load_group,  "3DDATA/CONTROL/RES/EXUI.TSI", "3DDATA/CONTROL/XML/EXUI_STRID.ID").expect("Failed to load EXUI sprite sheet"),
+            UiSpriteSheetType::Ui => load_ui_spritesheet(vfs, &asset_server, &mut egui_context, "3DDATA/CONTROL/RES/UI.TSI", "3DDATA/CONTROL/XML/UI_STRID.ID").expect("Failed to load UI sprite sheet"),
+            UiSpriteSheetType::ExUi => load_ui_spritesheet(vfs, &asset_server, &mut egui_context,  "3DDATA/CONTROL/RES/EXUI.TSI", "3DDATA/CONTROL/XML/EXUI_STRID.ID").expect("Failed to load EXUI sprite sheet"),
         },
-        sprite_sheets_load_group: load_group,
         dialog_character_info: dialog_files["DLGAVATA.XML"].clone(),
         dialog_chatbox: dialog_files["DLGCHAT.XML"].clone(),
         dialog_create_avatar: dialog_files[

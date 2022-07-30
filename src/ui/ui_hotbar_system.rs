@@ -1,7 +1,7 @@
 use bevy::{
     ecs::query::WorldQuery,
     input::Input,
-    prelude::{Assets, EventWriter, Image, KeyCode, Local, Query, Res, ResMut, With},
+    prelude::{Assets, EventWriter, KeyCode, Local, Query, Res, ResMut, With},
 };
 use bevy_egui::{egui, EguiContext};
 
@@ -15,14 +15,11 @@ use crate::{
     events::PlayerCommandEvent,
     resources::{GameData, Icons, UiResources},
     ui::{
-        ui_add_item_tooltip, ui_add_skill_tooltip, ui_inventory_system::GetItem, Dialog,
-        DialogDataBindings, DragAndDropId, DragAndDropSlot, UiStateDragAndDrop,
+        ui_add_item_tooltip, ui_add_skill_tooltip,
+        ui_inventory_system::GetItem,
+        widgets::{DataBindings, Dialog, Widget},
+        DialogInstance, DragAndDropId, DragAndDropSlot, UiStateDragAndDrop,
     },
-};
-
-use super::{
-    dialog::{GetWidget, LoadedSprite},
-    Widget,
 };
 
 const IID_BG_VERTICAL: i32 = 5;
@@ -34,11 +31,20 @@ const IID_BTN_VERTICAL_PREV: i32 = 13;
 const IID_BTN_VERTICAL_NEXT: i32 = 14;
 const IID_NUMBER: i32 = 20;
 
-#[derive(Default)]
 pub struct UiStateHotBar {
-    dialog: Option<Dialog>,
+    dialog_instance: DialogInstance,
     current_page: usize,
     is_vertical: bool,
+}
+
+impl Default for UiStateHotBar {
+    fn default() -> Self {
+        Self {
+            dialog_instance: DialogInstance::new("DLGQUICKBAR.XML".into()),
+            current_page: 0,
+            is_vertical: false,
+        }
+    }
 }
 
 #[derive(WorldQuery)]
@@ -199,21 +205,16 @@ pub fn ui_hotbar_system(
     icons: Res<Icons>,
     ui_resources: Res<UiResources>,
     dialog_assets: Res<Assets<Dialog>>,
-    images: Res<Assets<Image>>,
 ) {
     let ui_state_hot_bar = &mut *ui_state_hot_bar;
-    if ui_state_hot_bar.dialog.is_none() {
-        if let Some(dialog) = dialog_assets.get(&ui_resources.dialog_files["DLGQUICKBAR.XML"]) {
-            if !dialog.loaded {
-                return;
-            }
-
-            ui_state_hot_bar.dialog = Some(dialog.clone());
-        } else {
-            return;
-        }
-    }
-    let dialog = ui_state_hot_bar.dialog.as_mut().unwrap();
+    let dialog = if let Some(dialog) = ui_state_hot_bar
+        .dialog_instance
+        .get_mut(&dialog_assets, &ui_resources)
+    {
+        dialog
+    } else {
+        return;
+    };
 
     let mut player = if let Ok(player) = query_player.get_single_mut() {
         player
@@ -268,7 +269,7 @@ pub fn ui_hotbar_system(
         .show(egui_context.ctx_mut(), |ui| {
             dialog.draw(
                 ui,
-                DialogDataBindings {
+                DataBindings {
                     visible: &mut [
                         (IID_BG_HORIZONTAL, !is_vertical),
                         (IID_BTN_HORIZONTAL_PREV, !is_vertical),
@@ -343,7 +344,7 @@ pub fn ui_hotbar_system(
             }
         }
 
-        if let Some(Widget::Sprite(sprite)) = dialog.get_widget_mut(IID_NUMBER) {
+        if let Some(Widget::Image(sprite)) = dialog.get_widget_mut(IID_NUMBER) {
             if ui_state_hot_bar.is_vertical {
                 sprite.x = 21.0;
                 sprite.y = 20.0;
@@ -355,12 +356,12 @@ pub fn ui_hotbar_system(
     }
 
     if ui_state_hot_bar.current_page != previous_page {
-        if let Some(Widget::Sprite(sprite)) = dialog.get_widget_mut(IID_NUMBER) {
+        if let Some(Widget::Image(sprite)) = dialog.get_widget_mut(IID_NUMBER) {
             sprite.sprite = match ui_state_hot_bar.current_page {
-                0 => LoadedSprite::try_load(&ui_resources, &images, 0, "UI21_NUMBER_1"),
-                1 => LoadedSprite::try_load(&ui_resources, &images, 0, "UI21_NUMBER_2"),
-                2 => LoadedSprite::try_load(&ui_resources, &images, 0, "UI21_NUMBER_3"),
-                3 => LoadedSprite::try_load(&ui_resources, &images, 0, "UI21_NUMBER_4"),
+                0 => ui_resources.get_sprite(0, "UI21_NUMBER_1"),
+                1 => ui_resources.get_sprite(0, "UI21_NUMBER_2"),
+                2 => ui_resources.get_sprite(0, "UI21_NUMBER_3"),
+                3 => ui_resources.get_sprite(0, "UI21_NUMBER_4"),
                 _ => None,
             };
         }

@@ -13,11 +13,9 @@ use rose_data::ZoneId;
 use crate::{
     components::{PlayerCharacter, Position},
     resources::{CurrentZone, GameData, Icons, UiResources},
-    ui::{Dialog, DialogDataBindings},
+    ui::widgets::{DataBindings, Dialog, Widget},
     zone_loader::ZoneLoaderAsset,
 };
-
-use super::{dialog::GetWidget, Widget};
 
 const PLAYER_ICON_SIZE: Vec2 = Vec2::new(16.0, 16.0);
 const MAP_BLOCK_PIXELS: f32 = 64.0;
@@ -278,7 +276,7 @@ pub fn ui_minimap_system(
 
             dialog.draw(
                 ui,
-                DialogDataBindings {
+                DataBindings {
                     response: &mut [
                         (IID_BTN_EXPAND, &mut response_expand_button),
                         (IID_BTN_NORMAL, &mut response_shrink_button),

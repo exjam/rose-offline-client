@@ -30,7 +30,7 @@ use crate::{
     orbit_camera::OrbitCamera,
     ray_from_screenspace::ray_from_screenspace,
     resources::{AppState, CharacterList, ServerConfiguration, UiResources, WorldConnection},
-    ui::{Dialog, DialogDataBindings},
+    ui::widgets::{DataBindings, Dialog, DrawText},
 };
 
 #[derive(Copy, Clone, PartialEq)]
@@ -406,7 +406,7 @@ pub fn character_select_system(
                 .show(egui_context.ctx_mut(), |ui| {
                     dialog.draw(
                         ui,
-                        DialogDataBindings {
+                        DataBindings {
                             text: &mut [(
                                 IID_EDITBOX,
                                 &mut character_select_state.create_character_name,
@@ -429,61 +429,51 @@ pub fn character_select_system(
                             ..Default::default()
                         },
                         |ui, _| {
-                            ui.put(
+                            ui.add_label_in(
                                 egui::Rect::from_min_size(
-                                    ui.min_rect().min + egui::vec2(172.0, 155.0),
+                                    egui::pos2(172.0, 155.0),
                                     egui::vec2(63.0, 19.0),
                                 ),
-                                egui::Label::new(
-                                    match character_select_state.create_character_gender {
-                                        CharacterGender::Male => "Male",
-                                        CharacterGender::Female => "Female",
-                                    },
-                                ),
+                                match character_select_state.create_character_gender {
+                                    CharacterGender::Male => "Male",
+                                    CharacterGender::Female => "Female",
+                                },
                             );
-
-                            ui.put(
+                            ui.add_label_in(
                                 egui::Rect::from_min_size(
-                                    ui.min_rect().min + egui::vec2(172.0, 185.0),
+                                    egui::pos2(172.0, 185.0),
                                     egui::vec2(63.0, 19.0),
                                 ),
-                                egui::Label::new(&format!(
+                                &format!(
                                     "{}",
                                     character_select_state.create_character_face_index + 1
-                                )),
+                                ),
                             );
-
-                            ui.put(
+                            ui.add_label_in(
                                 egui::Rect::from_min_size(
-                                    ui.min_rect().min + egui::vec2(172.0, 215.0),
+                                    egui::pos2(172.0, 215.0),
                                     egui::vec2(63.0, 19.0),
                                 ),
-                                egui::Label::new(&format!(
+                                &format!(
                                     "{}",
                                     character_select_state.create_character_hair_index + 1
-                                )),
-                            );
-
-                            ui.put(
-                                egui::Rect::from_min_size(
-                                    ui.min_rect().min + egui::vec2(172.0, 245.0),
-                                    egui::vec2(63.0, 19.0),
-                                ),
-                                egui::Label::new(
-                                    CREATE_CHARACTER_STARTPOS_LIST
-                                        [character_select_state.create_character_startpos_index],
                                 ),
                             );
-
-                            ui.put(
+                            ui.add_label_in(
                                 egui::Rect::from_min_size(
-                                    ui.min_rect().min + egui::vec2(172.0, 275.0),
+                                    egui::pos2(172.0, 245.0),
                                     egui::vec2(63.0, 19.0),
                                 ),
-                                egui::Label::new(
-                                    CREATE_CHARACTER_BIRTHSTONE_LIST
-                                        [character_select_state.create_character_birthstone_index],
+                                CREATE_CHARACTER_STARTPOS_LIST
+                                    [character_select_state.create_character_startpos_index],
+                            );
+                            ui.add_label_in(
+                                egui::Rect::from_min_size(
+                                    egui::pos2(172.0, 275.0),
+                                    egui::vec2(63.0, 19.0),
                                 ),
+                                CREATE_CHARACTER_BIRTHSTONE_LIST
+                                    [character_select_state.create_character_birthstone_index],
                             );
                         },
                     )

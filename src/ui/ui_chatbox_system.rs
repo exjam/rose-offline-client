@@ -6,7 +6,7 @@ use rose_game_common::messages::client::ClientMessage;
 use crate::{
     events::ChatboxEvent,
     resources::{GameConnection, UiResources},
-    ui::{Dialog, DialogDataBindings},
+    ui::widgets::{DataBindings, Dialog},
 };
 
 const MAX_CHATBOX_ENTRIES: usize = 100;
@@ -235,7 +235,7 @@ pub fn ui_chatbox_system(
 
             dialog.draw(
                 ui,
-                DialogDataBindings {
+                DataBindings {
                     text: &mut [(IID_EDITBOX, &mut ui_state_chatbox.textbox_text)],
                     radio: &mut [(IID_RADIOBOX, &mut ui_state_chatbox.selected_channel)],
                     response: &mut [
