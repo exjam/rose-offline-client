@@ -17,7 +17,9 @@ use rose_game_common::{
 use crate::{
     components::{PlayerCharacter, Position},
     events::NpcStoreEvent,
-    resources::{ClientEntityList, GameConnection, GameData, Icons, WorldRates},
+    resources::{
+        ClientEntityList, GameConnection, GameData, UiResources, UiSpriteSheetType, WorldRates,
+    },
     ui::{
         ui_add_item_tooltip, ui_drag_and_drop_system::UiStateDragAndDrop, DragAndDropId,
         DragAndDropSlot,
@@ -57,7 +59,7 @@ fn ui_add_store_item_slot(
     buy_list: &mut [Option<PendingBuyItem>; NUM_BUY_ITEMS],
     player: Option<&NpcStorePlayerWorldQueryItem>,
     game_data: &GameData,
-    icons: &Icons,
+    ui_resources: &UiResources,
     world_rates: Option<&Res<WorldRates>>,
 ) {
     let item_reference =
@@ -65,8 +67,9 @@ fn ui_add_store_item_slot(
     let item_data =
         item_reference.and_then(|item_reference| game_data.items.get_base_item(*item_reference));
     let item = item_data.and_then(|item_data| Item::from_item_data(item_data, 999));
-    let contents =
-        item_data.and_then(|item_data| icons.get_item_icon(item_data.icon_index as usize));
+    let sprite = item_data.and_then(|item_data| {
+        ui_resources.get_sprite_by_index(UiSpriteSheetType::Item, item_data.icon_index as usize)
+    });
     let quantity = item.as_ref().and_then(|item| {
         if item.get_item_type().is_stackable_item() {
             Some(item.get_quantity() as usize)
@@ -94,7 +97,7 @@ fn ui_add_store_item_slot(
     let mut dropped_item = None;
     let response = ui.add(DragAndDropSlot::new(
         DragAndDropId::NpcStore(store_tab_index, store_tab_slot),
-        contents,
+        sprite,
         quantity,
         None,
         |_| false,
@@ -144,7 +147,7 @@ fn ui_add_buy_item_slot(
     buy_slot_index: usize,
     player: Option<&NpcStorePlayerWorldQueryItem>,
     game_data: &GameData,
-    icons: &Icons,
+    ui_resources: &UiResources,
     world_rates: Option<&Res<WorldRates>>,
 ) -> i64 {
     let pending_buy_item = &mut buy_list[buy_slot_index];
@@ -163,8 +166,9 @@ fn ui_add_buy_item_slot(
     let item_data =
         item_reference.and_then(|item_reference| game_data.items.get_base_item(*item_reference));
     let item = item_data.and_then(|item_data| Item::from_item_data(item_data, 999));
-    let contents =
-        item_data.and_then(|item_data| icons.get_item_icon(item_data.icon_index as usize));
+    let sprite = item_data.and_then(|item_data| {
+        ui_resources.get_sprite_by_index(UiSpriteSheetType::Item, item_data.icon_index as usize)
+    });
     let quantity = item.as_ref().and_then(|item| {
         if item.get_item_type().is_stackable_item() {
             Some(pending_buy_item.as_ref().unwrap().quantity)
@@ -192,7 +196,7 @@ fn ui_add_buy_item_slot(
     let mut dropped_item = None;
     let response = ui.add(DragAndDropSlot::new(
         DragAndDropId::NpcStoreBuyList(buy_slot_index),
-        contents,
+        sprite,
         quantity,
         None,
         buy_slot_drag_accepts,
@@ -231,7 +235,7 @@ fn ui_add_sell_item_slot(
     sell_slot_index: usize,
     player: Option<&NpcStorePlayerWorldQueryItem>,
     game_data: &GameData,
-    icons: &Icons,
+    ui_resources: &UiResources,
     world_rates: Option<&Res<WorldRates>>,
 ) -> i64 {
     let pending_sell_item = &mut sell_list[sell_slot_index];
@@ -241,8 +245,9 @@ fn ui_add_sell_item_slot(
             .and_then(|pending_sell_item| player.inventory.get_item(pending_sell_item.item_slot))
     });
     let item_data = item.and_then(|item| game_data.items.get_base_item(item.get_item_reference()));
-    let contents =
-        item_data.and_then(|item_data| icons.get_item_icon(item_data.icon_index as usize));
+    let sprite = item_data.and_then(|item_data| {
+        ui_resources.get_sprite_by_index(UiSpriteSheetType::Item, item_data.icon_index as usize)
+    });
     let quantity = item.as_ref().and_then(|item| {
         if item.get_item_type().is_stackable_item() {
             Some(pending_sell_item.as_ref().unwrap().quantity)
@@ -271,7 +276,7 @@ fn ui_add_sell_item_slot(
     let mut dropped_item = None;
     let response = ui.add(DragAndDropSlot::new(
         DragAndDropId::NpcStoreSellList(sell_slot_index),
-        contents,
+        sprite,
         quantity,
         None,
         sell_slot_drag_accepts,
@@ -326,7 +331,7 @@ pub fn ui_npc_store_system(
     client_entity_list: Res<ClientEntityList>,
     game_connection: Option<Res<GameConnection>>,
     game_data: Res<GameData>,
-    icons: Res<Icons>,
+    ui_resources: Res<UiResources>,
     world_rates: Option<Res<WorldRates>>,
 ) {
     for event in npc_store_events.iter() {
@@ -395,7 +400,7 @@ pub fn ui_npc_store_system(
                                                             &mut ui_state.buy_list,
                                                             player.as_ref(),
                                                             &game_data,
-                                                            &icons,
+                                                            &ui_resources,
                                                             world_rates.as_ref(),
                                                         );
                                                     }
@@ -431,7 +436,7 @@ pub fn ui_npc_store_system(
                                         i,
                                         player.as_ref(),
                                         &game_data,
-                                        &icons,
+                                        &ui_resources,
                                         world_rates.as_ref(),
                                     );
                                 }
@@ -461,7 +466,7 @@ pub fn ui_npc_store_system(
                                         i,
                                         player.as_ref(),
                                         &game_data,
-                                        &icons,
+                                        &ui_resources,
                                         world_rates.as_ref(),
                                     );
                                 }

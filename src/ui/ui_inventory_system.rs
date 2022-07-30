@@ -13,7 +13,7 @@ use rose_game_common::{
 use crate::{
     components::{ConsumableCooldownGroup, Cooldowns, PlayerCharacter},
     events::{ChatboxEvent, PlayerCommandEvent},
-    resources::{GameConnection, GameData, Icons, UiResources},
+    resources::{GameConnection, GameData, UiResources, UiSpriteSheetType},
     ui::{
         ui_add_item_tooltip,
         widgets::{DataBindings, Dialog, Widget},
@@ -205,7 +205,7 @@ fn ui_add_inventory_slot(
     cooldowns: &Cooldowns,
     game_connection: Option<&Res<GameConnection>>,
     game_data: &GameData,
-    icons: &Icons,
+    ui_resources: &UiResources,
     item_slot_map: &mut EnumMap<InventoryPageType, Vec<ItemSlot>>,
     ui_state_dnd: &mut UiStateDragAndDrop,
     chatbox_events: &mut EventWriter<ChatboxEvent>,
@@ -227,8 +227,9 @@ fn ui_add_inventory_slot(
     let item_data = item
         .as_ref()
         .and_then(|item| game_data.items.get_base_item(item.get_item_reference()));
-    let contents =
-        item_data.and_then(|item_data| icons.get_item_icon(item_data.icon_index as usize));
+    let sprite = item_data.and_then(|item_data| {
+        ui_resources.get_sprite_by_index(UiSpriteSheetType::Item, item_data.icon_index as usize)
+    });
 
     let mut cooldown_percent = None;
     if let Some(item) = item.as_ref() {
@@ -277,7 +278,7 @@ fn ui_add_inventory_slot(
                 egui::Widget::ui(
                     DragAndDropSlot::new(
                         DragAndDropId::Inventory(inventory_slot),
-                        contents,
+                        sprite,
                         match item.as_ref() {
                             Some(Item::Stackable(stackable_item)) => {
                                 Some(stackable_item.quantity as usize)
@@ -601,7 +602,6 @@ pub fn ui_inventory_system(
     dialog_assets: Res<Assets<Dialog>>,
     game_connection: Option<Res<GameConnection>>,
     game_data: Res<GameData>,
-    icons: Res<Icons>,
     ui_resources: Res<UiResources>,
     mut chatbox_events: EventWriter<ChatboxEvent>,
     mut player_command_events: EventWriter<PlayerCommandEvent>,
@@ -678,7 +678,7 @@ pub fn ui_inventory_system(
                                         player_cooldowns,
                                         game_connection.as_ref(),
                                         &game_data,
-                                        &icons,
+                                        &ui_resources,
                                         &mut ui_state_inventory.item_slot_map,
                                         &mut ui_state_dnd,
                                         &mut chatbox_events,
@@ -712,7 +712,7 @@ pub fn ui_inventory_system(
                                         player_cooldowns,
                                         game_connection.as_ref(),
                                         &game_data,
-                                        &icons,
+                                        &ui_resources,
                                         &mut ui_state_inventory.item_slot_map,
                                         &mut ui_state_dnd,
                                         &mut chatbox_events,
@@ -749,7 +749,7 @@ pub fn ui_inventory_system(
                                 player_cooldowns,
                                 game_connection.as_ref(),
                                 &game_data,
-                                &icons,
+                                &ui_resources,
                                 &mut ui_state_inventory.item_slot_map,
                                 &mut ui_state_dnd,
                                 &mut chatbox_events,

@@ -12,12 +12,11 @@ use rose_data::ZoneId;
 
 use crate::{
     components::{PlayerCharacter, Position},
-    resources::{CurrentZone, GameData, Icons, UiResources},
+    resources::{CurrentZone, GameData, UiResources},
     ui::widgets::{DataBindings, Dialog, Widget},
     zone_loader::ZoneLoaderAsset,
 };
 
-const PLAYER_ICON_SIZE: Vec2 = Vec2::new(16.0, 16.0);
 const MAP_BLOCK_PIXELS: f32 = 64.0;
 const MAP_OUTLINE_PIXELS: f32 = MAP_BLOCK_PIXELS;
 
@@ -88,7 +87,6 @@ pub fn ui_minimap_system(
     current_zone: Option<Res<CurrentZone>>,
     zone_loader_assets: Res<Assets<ZoneLoaderAsset>>,
     game_data: Res<GameData>,
-    icons: Res<Icons>,
     ui_resources: Res<UiResources>,
     dialog_assets: Res<Assets<Dialog>>,
 ) {
@@ -320,21 +318,24 @@ pub fn ui_minimap_system(
             if !minimised {
                 // Draw player position arrow texture on a rotated rectangle to face camera position
                 if let Some(minimap_player_pos) = minimap_player_pos {
+                    let minimap_player_sprite = ui_resources.get_minimap_player_sprite().unwrap();
+                    let player_icon_size =
+                        Vec2::new(minimap_player_sprite.width, minimap_player_sprite.height);
                     let minimap_player_pos = Vec2::new(minimap_rect.min.x, minimap_rect.min.y)
                         + minimap_player_pos
                         - ui_state.scroll;
                     let widget_rect = egui::Rect::from_min_size(
-                        (minimap_player_pos - PLAYER_ICON_SIZE / 2.0)
+                        (minimap_player_pos - player_icon_size / 2.0)
                             .to_array()
                             .into(),
-                        PLAYER_ICON_SIZE.to_array().into(),
+                        player_icon_size.to_array().into(),
                     );
 
                     if minimap_rect.contains_rect(widget_rect) {
                         ui.allocate_ui_at_rect(widget_rect, |ui| {
                             ui.centered_and_justified(|ui| {
                                 let (rect, response) = ui.allocate_exact_size(
-                                    PLAYER_ICON_SIZE.to_array().into(),
+                                    player_icon_size.to_array().into(),
                                     egui::Sense::hover(),
                                 );
 
@@ -343,10 +344,10 @@ pub fn ui_minimap_system(
                                 let cos_a = camera_angle.cos();
 
                                 let mut corners = [
-                                    [-PLAYER_ICON_SIZE.x / 2.0, -PLAYER_ICON_SIZE.y / 2.0],
-                                    [PLAYER_ICON_SIZE.x / 2.0, -PLAYER_ICON_SIZE.y / 2.0],
-                                    [-PLAYER_ICON_SIZE.x / 2.0, PLAYER_ICON_SIZE.y / 2.0],
-                                    [PLAYER_ICON_SIZE.x / 2.0, PLAYER_ICON_SIZE.y / 2.0],
+                                    [-player_icon_size.x / 2.0, -player_icon_size.y / 2.0],
+                                    [player_icon_size.x / 2.0, -player_icon_size.y / 2.0],
+                                    [-player_icon_size.x / 2.0, player_icon_size.y / 2.0],
+                                    [player_icon_size.x / 2.0, player_icon_size.y / 2.0],
                                 ];
 
                                 for corner in corners.iter_mut() {
@@ -357,11 +358,8 @@ pub fn ui_minimap_system(
 
                                 if ui.is_rect_visible(rect) {
                                     let mut mesh =
-                                        egui::Mesh::with_texture(icons.minimap_player_icon.1);
-                                    let uv = egui::Rect::from_min_max(
-                                        egui::pos2(0.0, 0.0),
-                                        egui::pos2(1.0, 1.0),
-                                    );
+                                        egui::Mesh::with_texture(minimap_player_sprite.texture_id);
+                                    let uv = minimap_player_sprite.uv;
 
                                     let color = egui::Color32::WHITE;
                                     let idx = mesh.vertices.len() as u32;

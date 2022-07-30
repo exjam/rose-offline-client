@@ -15,7 +15,6 @@ use bevy::{
     render::{render_resource::WgpuFeatures, settings::WgpuSettings},
     window::WindowDescriptor,
 };
-use bevy_egui::EguiContext;
 use bevy_rapier3d::plugin::PhysicsStages;
 use enum_map::enum_map;
 use std::{path::Path, sync::Arc};
@@ -57,7 +56,7 @@ use protocol::ProtocolType;
 use render::{DamageDigitMaterial, RoseRenderPlugin};
 use resources::{
     load_ui_resources, run_network_thread, update_ui_resources, AppState, ClientEntityList,
-    DamageDigitsSpawner, DebugRenderConfig, GameData, Icons, NetworkThread, NetworkThreadMessage,
+    DamageDigitsSpawner, DebugRenderConfig, GameData, NetworkThread, NetworkThreadMessage,
     RenderConfiguration, ServerConfiguration, SoundSettings, WorldTime, ZoneTime,
 };
 use scripting::RoseScriptingPlugin;
@@ -627,7 +626,6 @@ fn load_game_data(
     mut commands: Commands,
     vfs_resource: Res<VfsResource>,
     asset_server: Res<AssetServer>,
-    mut egui_context: ResMut<EguiContext>,
     mut damage_digit_materials: ResMut<Assets<DamageDigitMaterial>>,
 ) {
     let item_database = Arc::new(
@@ -733,35 +731,6 @@ fn load_game_data(
     commands.insert_resource(AmbientLight {
         color: Color::rgb(1.0, 1.0, 1.0),
         brightness: 0.9,
-    });
-
-    // Load icons
-    let mut item_pages = Vec::new();
-    for i in 1..=14 {
-        let image_handle = asset_server.load(&format!("3DDATA/CONTROL/RES/ICON{:02}.DDS", i));
-        let texture_id = egui_context.add_image(image_handle.clone_weak());
-        item_pages.push((image_handle, texture_id));
-    }
-
-    let mut skill_pages = Vec::new();
-    for i in 1..=2 {
-        let image_handle = asset_server.load(&format!("3DDATA/CONTROL/RES/SKILL{:02}.DDS", i));
-        let texture_id = egui_context.add_image(image_handle.clone_weak());
-        skill_pages.push((image_handle, texture_id));
-    }
-
-    let window_icons_image = asset_server.load("3DDATA/CONTROL/RES/UI21.DDS");
-    let window_icons_texture_id = egui_context.add_image(window_icons_image.clone_weak());
-
-    let minimap_player_icon_image = asset_server.load("3DDATA/CONTROL/RES/MINIMAP_ARROW.TGA");
-    let minimap_player_icon_texture_id =
-        egui_context.add_image(minimap_player_icon_image.clone_weak());
-
-    commands.insert_resource(Icons {
-        item_pages,
-        skill_pages,
-        window_icons_image: (window_icons_image, window_icons_texture_id),
-        minimap_player_icon: (minimap_player_icon_image, minimap_player_icon_texture_id),
     });
 
     commands.insert_resource(DamageDigitsSpawner::load(

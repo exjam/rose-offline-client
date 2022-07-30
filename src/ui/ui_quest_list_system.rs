@@ -36,7 +36,7 @@ fn ui_add_quest_item_slot(
     ui_resources: &UiResources,
 ) {
     let item_data = item.and_then(|item| game_data.items.get_base_item(item.get_item_reference()));
-    let contents = item_data.and_then(|item_data| {
+    let sprite = item_data.and_then(|item_data| {
         ui_resources.get_sprite_by_index(UiSpriteSheetType::Item, item_data.icon_index as usize)
     });
     let quantity = item.and_then(|item| {
@@ -56,7 +56,7 @@ fn ui_add_quest_item_slot(
                 egui::Widget::ui(
                     DragAndDropSlot::new(
                         DragAndDropId::NotDraggable,
-                        contents.map(|c| (c.texture_id, c.uv)),
+                        sprite,
                         quantity,
                         None,
                         |_| false,

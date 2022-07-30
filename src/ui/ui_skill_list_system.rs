@@ -10,7 +10,7 @@ use rose_game_common::components::{SkillList, SkillPoints, SkillSlot, SKILL_PAGE
 use crate::{
     components::PlayerCharacter,
     events::PlayerCommandEvent,
-    resources::{GameData, Icons, UiResources},
+    resources::{GameData, UiResources, UiSpriteSheetType},
     ui::{
         ui_add_skill_tooltip,
         widgets::{DataBindings, Dialog, DrawText, Widget},
@@ -62,7 +62,7 @@ fn ui_add_skill_list_slot(
     skill_slot: SkillSlot,
     player: &PlayerQueryItem,
     game_data: &GameData,
-    icons: &Icons,
+    ui_resources: &UiResources,
     ui_state_dnd: &mut UiStateDragAndDrop,
     player_command_events: &mut EventWriter<PlayerCommandEvent>,
 ) {
@@ -70,8 +70,9 @@ fn ui_add_skill_list_slot(
     let skill_data = skill
         .as_ref()
         .and_then(|skill| game_data.skills.get_skill(*skill));
-    let contents =
-        skill_data.and_then(|skill_data| icons.get_skill_icon(skill_data.icon_number as usize));
+    let sprite = skill_data.and_then(|skill_data| {
+        ui_resources.get_sprite_by_index(UiSpriteSheetType::Skill, skill_data.icon_number as usize)
+    });
     let mut dropped_item = None;
     let response = ui
         .allocate_ui_at_rect(
@@ -80,7 +81,7 @@ fn ui_add_skill_list_slot(
                 egui::Widget::ui(
                     DragAndDropSlot::new(
                         DragAndDropId::Skill(skill_slot),
-                        contents,
+                        sprite,
                         None,
                         None, // TODO: Show skill cooldown
                         |_| false,
@@ -119,7 +120,6 @@ pub fn ui_skill_list_system(
     mut player_command_events: EventWriter<PlayerCommandEvent>,
     query_player: Query<PlayerQuery, With<PlayerCharacter>>,
     game_data: Res<GameData>,
-    icons: Res<Icons>,
     ui_resources: Res<UiResources>,
     dialog_assets: Res<Assets<Dialog>>,
 ) {
@@ -228,11 +228,11 @@ pub fn ui_skill_list_system(
 
                         ui_add_skill_list_slot(
                             ui,
-                            ui.min_rect().min + egui::vec2(start_x, 4.0 + start_y),
+                            ui.min_rect().min + egui::vec2(start_x, start_y + 3.0),
                             skill_slot,
                             &player,
                             &game_data,
-                            &icons,
+                            &ui_resources,
                             &mut ui_state_dnd,
                             &mut player_command_events,
                         );

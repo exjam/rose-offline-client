@@ -2,6 +2,8 @@ use bevy_egui::egui;
 
 use rose_game_common::components::{ItemSlot, SkillSlot};
 
+use crate::resources::UiSprite;
+
 #[derive(Copy, Clone, Debug)]
 pub enum DragAndDropId {
     NotDraggable,
@@ -17,7 +19,7 @@ pub struct DragAndDropSlot<'a> {
     dnd_id: DragAndDropId,
     size: egui::Vec2,
     border_width: f32,
-    contents: Option<(egui::TextureId, egui::Rect)>,
+    sprite: Option<UiSprite>,
     cooldown_percent: Option<f32>,
     quantity: Option<usize>,
     quantity_margin: f32,
@@ -29,7 +31,7 @@ pub struct DragAndDropSlot<'a> {
 impl<'a> DragAndDropSlot<'a> {
     pub fn new(
         dnd_id: DragAndDropId,
-        contents: Option<(egui::TextureId, egui::Rect)>,
+        sprite: Option<UiSprite>,
         quantity: Option<usize>,
         cooldown_percent: Option<f32>,
         accepts: fn(&DragAndDropId) -> bool,
@@ -41,7 +43,7 @@ impl<'a> DragAndDropSlot<'a> {
             dnd_id,
             size: size.into(),
             border_width: 1.0,
-            contents,
+            sprite,
             cooldown_percent,
             quantity,
             quantity_margin: 2.0,
@@ -146,7 +148,7 @@ impl<'w> DragAndDropSlot<'w> {
     pub fn draw(&self, ui: &mut egui::Ui, accepts_dragged_item: bool) -> (bool, egui::Response) {
         let (rect, response) = ui.allocate_exact_size(
             self.size,
-            if self.contents.is_some() && !matches!(self.dnd_id, DragAndDropId::NotDraggable) {
+            if self.sprite.is_some() && !matches!(self.dnd_id, DragAndDropId::NotDraggable) {
                 egui::Sense::click_and_drag()
             } else {
                 egui::Sense::click()
@@ -177,10 +179,10 @@ impl<'w> DragAndDropSlot<'w> {
                 }
             };
 
-            if let Some((texture_id, uv)) = self.contents {
+            if let Some(sprite) = self.sprite.as_ref() {
                 let content_rect = rect;
-                let mut mesh = Mesh::with_texture(texture_id);
-                mesh.add_rect_with_uv(content_rect, uv, egui::Color32::WHITE);
+                let mut mesh = Mesh::with_texture(sprite.texture_id);
+                mesh.add_rect_with_uv(content_rect, sprite.uv, egui::Color32::WHITE);
                 ui.painter().add(Shape::mesh(mesh));
 
                 if let Some(cooldown_percent) = self.cooldown_percent {
@@ -233,12 +235,13 @@ impl<'w> DragAndDropSlot<'w> {
                                 egui::Order::Tooltip,
                                 egui::Id::new("dnd_tooltip"),
                             ));
-                            let mut tooltip_mesh = egui::epaint::Mesh::with_texture(texture_id);
+                            let mut tooltip_mesh =
+                                egui::epaint::Mesh::with_texture(sprite.texture_id);
                             tooltip_mesh.add_rect_with_uv(
                                 response
                                     .rect
                                     .translate(pointer_pos - response.rect.center()),
-                                uv,
+                                sprite.uv,
                                 egui::Color32::WHITE,
                             );
                             tooltip_painter.add(egui::epaint::Shape::mesh(tooltip_mesh));

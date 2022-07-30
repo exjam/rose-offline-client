@@ -8,7 +8,6 @@ mod debug_inspector;
 mod debug_render;
 mod game_connection;
 mod game_data;
-mod icons;
 mod login_connection;
 mod network_thread;
 mod render_configuration;
@@ -33,7 +32,6 @@ pub use debug_render::{
 };
 pub use game_connection::GameConnection;
 pub use game_data::GameData;
-pub use icons::Icons;
 pub use login_connection::LoginConnection;
 pub use network_thread::{run_network_thread, NetworkThread, NetworkThreadMessage};
 pub use render_configuration::RenderConfiguration;

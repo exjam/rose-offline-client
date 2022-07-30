@@ -4,7 +4,7 @@ use bevy::prelude::{AssetServer, Assets, Commands, Handle, Image, Res, ResMut, V
 use bevy_egui::{egui, EguiContext};
 use enum_map::{enum_map, Enum, EnumMap};
 
-use rose_file_readers::{IdFile, TsiFile, TsiSprite, TsiTexture, VfsIndex};
+use rose_file_readers::{IdFile, TsiFile, TsiSprite, VfsIndex};
 
 use crate::{ui::widgets::Dialog, VfsResource};
 
@@ -39,6 +39,7 @@ pub enum UiSpriteSheetType {
     Skill,
     StateIcon,
     ItemSocket,
+    MinimapArrow,
 }
 
 pub struct UiTexture {
@@ -48,7 +49,6 @@ pub struct UiTexture {
 }
 
 pub struct UiSpriteSheet {
-    pub textures: Vec<TsiTexture>,
     pub sprites: Vec<TsiSprite>,
     pub loaded_textures: Vec<UiTexture>,
     pub sprites_by_name: Option<IdFile>,
@@ -112,12 +112,25 @@ impl UiResources {
                     (sprite.top as f32 + 0.5) / texture_size.y,
                 ),
                 egui::pos2(
-                    (sprite.right as f32 - 0.5) / texture_size.x,
-                    (sprite.bottom as f32 - 0.5) / texture_size.y,
+                    (sprite.right as f32 + 0.5) / texture_size.x,
+                    (sprite.bottom as f32 + 0.5) / texture_size.y,
                 ),
             ),
-            width: (sprite.right - sprite.left) as f32,
-            height: (sprite.bottom - sprite.top) as f32,
+            width: ((sprite.right + 1) - sprite.left) as f32,
+            height: ((sprite.bottom + 1) - sprite.top) as f32,
+        })
+    }
+
+    pub fn get_minimap_player_sprite(&self) -> Option<UiSprite> {
+        let texture = &self.sprite_sheets[UiSpriteSheetType::MinimapArrow].loaded_textures[0];
+        let texture_size = texture.size?;
+
+        Some(UiSprite {
+            texture_id: self.sprite_sheets[UiSpriteSheetType::MinimapArrow].loaded_textures[0]
+                .texture_id,
+            uv: egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0)),
+            width: texture_size.x,
+            height: texture_size.y,
         })
     }
 }
@@ -148,7 +161,6 @@ fn load_ui_spritesheet(
     }
 
     Ok(UiSpriteSheet {
-        textures: tsi_file.textures,
         sprites: tsi_file.sprites,
         loaded_textures,
         sprites_by_name: id_file,
@@ -261,6 +273,20 @@ pub fn load_ui_resources(
             UiSpriteSheetType::Skill => load_ui_spritesheet(vfs, &asset_server, &mut egui_context,  "3DDATA/CONTROL/RES/SKILLICON.TSI", "").expect("Failed to load SKILLICON.TSI sprite sheet"),
             UiSpriteSheetType::Item => load_ui_spritesheet(vfs, &asset_server, &mut egui_context,  "3DDATA/CONTROL/RES/ITEM1.TSI", "").expect("Failed to load ITEM1.TSI sprite sheet"),
             UiSpriteSheetType::ItemSocket => load_ui_spritesheet(vfs, &asset_server, &mut egui_context,  "3DDATA/CONTROL/RES/SOKETJAM.TSI", "").expect("Failed to load SOKETJAM.TSI sprite sheet"),
+            UiSpriteSheetType::MinimapArrow => {
+                let handle = asset_server.load("3DDATA/CONTROL/RES/MINIMAP_ARROW.TGA");
+                let texture_id = egui_context.add_image(handle.clone_weak());
+
+                UiSpriteSheet {
+                    sprites: vec![
+                        TsiSprite { texture_id: 0, left: 0, top: 0, right: 0, bottom: 0, name: String::default() },
+                    ],
+                    loaded_textures: vec![
+                        UiTexture { handle, texture_id, size: None },
+                    ],
+                    sprites_by_name: None,
+                }
+            }
         },
         dialog_character_info: dialog_files["DLGAVATA.XML"].clone(),
         dialog_chatbox: dialog_files["DLGCHAT.XML"].clone(),

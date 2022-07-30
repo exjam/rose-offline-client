@@ -6,7 +6,7 @@ use rose_data_irose::encode_item_type;
 use rose_game_common::{components::Equipment, messages::client::ClientMessage};
 
 use crate::{
-    resources::{AppState, GameConnection, GameData, Icons},
+    resources::{AppState, GameConnection, GameData, UiResources, UiSpriteSheetType},
     ui::{ui_add_item_tooltip, UiStateDebugWindows},
 };
 
@@ -34,7 +34,7 @@ pub fn ui_debug_item_list_system(
     app_state: Res<State<AppState>>,
     game_connection: Option<Res<GameConnection>>,
     game_data: Res<GameData>,
-    icons: Res<Icons>,
+    ui_resources: Res<UiResources>,
 ) {
     if !ui_state_debug_windows.debug_ui_open {
         return;
@@ -211,11 +211,13 @@ pub fn ui_debug_item_list_system(
                     {
                         body.row(45.0, |mut row| {
                             row.col(|ui| {
-                                if let Some((icon_texture_id, icon_uv)) =
-                                    icons.get_item_icon(item_data.icon_index as usize)
-                                {
+                                if let Some(sprite) = ui_resources.get_sprite_by_index(
+                                    UiSpriteSheetType::Item,
+                                    item_data.icon_index as usize,
+                                ) {
                                     ui.add(
-                                        egui::Image::new(icon_texture_id, [40.0, 40.0]).uv(icon_uv),
+                                        egui::Image::new(sprite.texture_id, [40.0, 40.0])
+                                            .uv(sprite.uv),
                                     )
                                     .on_hover_ui(|ui| {
                                         if let Some(item) = Item::from_item_data(item_data, 1) {

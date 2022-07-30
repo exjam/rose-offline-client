@@ -13,7 +13,7 @@ use rose_game_common::components::{
 use crate::{
     components::{ConsumableCooldownGroup, Cooldowns, PlayerCharacter},
     events::PlayerCommandEvent,
-    resources::{GameData, Icons, UiResources},
+    resources::{GameData, UiResources, UiSpriteSheetType},
     ui::{
         ui_add_item_tooltip, ui_add_skill_tooltip,
         ui_inventory_system::GetItem,
@@ -70,21 +70,25 @@ fn ui_add_hotbar_slot(
     hotbar_index: (usize, usize),
     player: &mut PlayerQueryItem,
     game_data: &GameData,
-    icons: &Icons,
+    ui_resources: &UiResources,
     ui_state_dnd: &mut UiStateDragAndDrop,
     use_slot: bool,
     player_command_events: &mut EventWriter<PlayerCommandEvent>,
 ) {
     let hotbar_slot = player.hotbar.pages[hotbar_index.0][hotbar_index.1].as_ref();
-    let (contents, quantity, cooldown_percent) = match hotbar_slot {
+    let (sprite, quantity, cooldown_percent) = match hotbar_slot {
         Some(HotbarSlot::Skill(skill_slot)) => {
             let skill = player.skill_list.get_skill(*skill_slot);
             let skill_data = skill
                 .as_ref()
                 .and_then(|skill| game_data.skills.get_skill(*skill));
             (
-                skill_data
-                    .and_then(|skill_data| icons.get_skill_icon(skill_data.icon_number as usize)),
+                skill_data.and_then(|skill_data| {
+                    ui_resources.get_sprite_by_index(
+                        UiSpriteSheetType::Skill,
+                        skill_data.icon_number as usize,
+                    )
+                }),
                 None,
                 skill_data.and_then(|skill_data| match &skill_data.cooldown {
                     SkillCooldown::Skill(_) => {
@@ -102,7 +106,10 @@ fn ui_add_hotbar_slot(
                 .as_ref()
                 .and_then(|item| game_data.items.get_base_item(item.get_item_reference()));
             (
-                item_data.and_then(|item_data| icons.get_item_icon(item_data.icon_index as usize)),
+                item_data.and_then(|item_data| {
+                    ui_resources
+                        .get_sprite_by_index(UiSpriteSheetType::Item, item_data.icon_index as usize)
+                }),
                 match item.as_ref() {
                     Some(Item::Stackable(stackable_item)) => Some(stackable_item.quantity as usize),
                     _ => None,
@@ -125,7 +132,7 @@ fn ui_add_hotbar_slot(
                 egui::Widget::ui(
                     DragAndDropSlot::new(
                         DragAndDropId::Hotbar(hotbar_index.0, hotbar_index.1),
-                        contents,
+                        sprite,
                         quantity,
                         cooldown_percent,
                         hotbar_drag_accepts,
@@ -202,7 +209,6 @@ pub fn ui_hotbar_system(
     mut player_command_events: EventWriter<PlayerCommandEvent>,
     keyboard_input: Res<Input<KeyCode>>,
     game_data: Res<GameData>,
-    icons: Res<Icons>,
     ui_resources: Res<UiResources>,
     dialog_assets: Res<Assets<Dialog>>,
 ) {
@@ -303,7 +309,7 @@ pub fn ui_hotbar_system(
                             hotbar_index,
                             &mut player,
                             &game_data,
-                            &icons,
+                            &ui_resources,
                             &mut ui_state_dnd,
                             use_hotbar_index.map_or(false, |use_index| use_index == i),
                             &mut player_command_events,

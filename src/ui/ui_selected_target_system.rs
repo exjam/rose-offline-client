@@ -83,11 +83,14 @@ pub fn ui_selected_target_system(
                             if ui.is_rect_visible(rect) {
                                 sprite_top.draw(ui, rect.min);
                                 sprite_middle
-                                    .draw(ui, rect.min + egui::vec2(0.0, sprite_top.height));
+                                    .draw(ui, rect.min + egui::vec2(0.0, sprite_top.height - 1.0));
                                 sprite_bottom.draw(
                                     ui,
                                     rect.min
-                                        + egui::vec2(0.0, sprite_top.height + sprite_middle.height),
+                                        + egui::vec2(
+                                            0.0,
+                                            sprite_top.height + sprite_middle.height - 2.0,
+                                        ),
                                 );
 
                                 let hp_percent = health_points.hp as f32
