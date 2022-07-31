@@ -237,7 +237,7 @@ pub fn character_select_system(
     query_camera: Query<(Entity, &Camera, &GlobalTransform, Option<&ActiveMotion>), With<Camera3d>>,
     mut query_create_character_info: Query<&mut CharacterInfo>,
     world_connection: Option<Res<WorldConnection>>,
-    character_list: Option<Res<CharacterList>>,
+    mut character_list: Option<ResMut<CharacterList>>,
     (server_configuration, asset_server): (Res<ServerConfiguration>, Res<AssetServer>),
     ui_resources: Res<UiResources>,
     dialog_assets: Res<Assets<Dialog>>,
@@ -289,9 +289,14 @@ pub fn character_select_system(
                 }
             },
             WorldConnectionEvent::DeleteCharacterResponse(response) => match response {
-                Ok(_) => {
-                    // We lazy and let GetCharacterList do the work for us
-                    if let Some(world_connection) = world_connection.as_ref() {
+                Ok(response) => {
+                    if let Some(character_list) = character_list.as_mut() {
+                        for character in character_list.characters.iter_mut() {
+                            if character.info.name == response.name {
+                                character.delete_time = response.delete_time.clone();
+                            }
+                        }
+                    } else if let Some(world_connection) = world_connection.as_ref() {
                         world_connection
                             .client_message_tx
                             .send(ClientMessage::GetCharacterList)
@@ -881,10 +886,20 @@ pub fn character_select_system(
                             ui.label(
                                 egui::RichText::new(&selected_character.info.name)
                                     .font(egui::FontId::proportional(20.0))
-                                    .color(egui::Color32::YELLOW),
+                                    .color(if selected_character.delete_time.is_none() {
+                                        egui::Color32::YELLOW
+                                    } else {
+                                        egui::Color32::RED
+                                    }),
                             );
                             ui.label(format!("Level: {}", selected_character.level.level));
                             ui.label(format!("Job: {}", selected_character.info.job));
+                            if let Some(delete_time) = selected_character.delete_time.as_ref() {
+                                let duration = delete_time.get_time_until_delete();
+                                let seconds = duration.as_secs() % 60;
+                                let minutes = (duration.as_secs() / 60) % 60;
+                                ui.label(format!("Deleted in {:02}m {:02}s", minutes, seconds));
+                            }
                         },
                     );
                 }
