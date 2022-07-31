@@ -1,13 +1,18 @@
 use async_trait::async_trait;
 use num_traits::FromPrimitive;
+use rose_network_irose::world_client_packets::PacketClientDeleteCharacter;
 use std::net::SocketAddr;
 use tokio::net::TcpStream;
 
-use rose_game_common::messages::{
-    client::{ClientMessage, ConnectionRequest, CreateCharacter},
-    server::{
-        ConnectionRequestError, ConnectionResponse, CreateCharacterError, CreateCharacterResponse,
-        JoinServerResponse, ServerMessage,
+use rose_game_common::{
+    components::CharacterDeleteTime,
+    messages::{
+        client::{ClientMessage, ConnectionRequest, CreateCharacter, DeleteCharacter},
+        server::{
+            ConnectionRequestError, ConnectionResponse, CreateCharacterError,
+            CreateCharacterResponse, DeleteCharacterError, DeleteCharacterResponse,
+            JoinServerResponse, ServerMessage,
+        },
     },
 };
 use rose_network_common::{Connection, Packet, PacketCodec};
@@ -18,7 +23,8 @@ use rose_network_narose667::{
     },
     world_server_packets::{
         ConnectResult, CreateCharacterResult, PacketConnectionReply, PacketServerCharacterList,
-        PacketServerCreateCharacterReply, PacketServerMoveServer, ServerPackets,
+        PacketServerCreateCharacterReply, PacketServerDeleteCharacterReply, PacketServerMoveServer,
+        ServerPackets,
     },
     ClientPacketCodec,
 };
@@ -92,7 +98,23 @@ impl WorldClient {
                     .send(ServerMessage::CreateCharacter(message))
                     .ok();
             }
-            // ServerPackets::DeleteCharacterReply -> ServerMessage::DeleteCharacter
+            Some(ServerPackets::DeleteCharacterReply) => {
+                let response = PacketServerDeleteCharacterReply::try_from(packet)?;
+                let result = match response.seconds_until_delete {
+                    Some(0) => Ok(DeleteCharacterResponse {
+                        name: response.name.into(),
+                        delete_time: None,
+                    }),
+                    Some(delete_time) => Ok(DeleteCharacterResponse {
+                        name: response.name.into(),
+                        delete_time: Some(CharacterDeleteTime::from_seconds_remaining(delete_time)),
+                    }),
+                    None => Err(DeleteCharacterError::Failed("Failed".into())),
+                };
+                self.server_message_tx
+                    .send(ServerMessage::DeleteCharacter(result))
+                    .ok();
+            }
             // ServerPackets::ReturnToCharacterSelect -> ServerMessage::ReturnToCharacterSelect
             _ => log::info!("Unhandled WorldClient packet {:?}", packet),
         }
@@ -148,7 +170,19 @@ impl WorldClient {
                     }))
                     .await?
             }
-            // ClientMessage::DeleteCharacter -> ClientPackets::DeleteCharacter
+            ClientMessage::DeleteCharacter(DeleteCharacter {
+                slot,
+                name,
+                is_delete,
+            }) => {
+                connection
+                    .write_packet(Packet::from(&PacketClientDeleteCharacter {
+                        slot,
+                        name: &name,
+                        is_delete,
+                    }))
+                    .await?
+            }
             unimplemented => {
                 log::info!(
                     "Unimplemented WorldClient ClientMessage {:?}",

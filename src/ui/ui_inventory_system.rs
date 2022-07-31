@@ -55,7 +55,7 @@ pub struct UiStateInventory {
 impl Default for UiStateInventory {
     fn default() -> Self {
         Self {
-            dialog_instance: DialogInstance::new("DLGITEM.XML".into()),
+            dialog_instance: DialogInstance::new("DLGITEM.XML"),
             item_slot_map: enum_map! {
                 page_type => (0..INVENTORY_PAGE_SIZE)
                 .map(|index| ItemSlot::Inventory(page_type, index))

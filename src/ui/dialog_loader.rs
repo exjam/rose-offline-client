@@ -37,9 +37,9 @@ pub struct DialogInstance {
 }
 
 impl DialogInstance {
-    pub fn new(filename: String) -> DialogInstance {
+    pub fn new(filename: impl Into<String>) -> DialogInstance {
         DialogInstance {
-            filename,
+            filename: filename.into(),
             instance: None,
         }
     }

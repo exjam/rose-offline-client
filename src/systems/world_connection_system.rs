@@ -58,9 +58,10 @@ pub fn world_connection_system(
                 world_connection_events
                     .send(WorldConnectionEvent::CreateCharacterResponse(response));
             }
-            // TODO:
-            // ServerMessage::DeleteCharacter
-            //
+            Ok(ServerMessage::DeleteCharacter(response)) => {
+                world_connection_events
+                    .send(WorldConnectionEvent::DeleteCharacterResponse(response));
+            }
             // ServerMessage::ReturnToCharacterSelect
             Ok(message) => {
                 log::warn!("Received unexpected world server message: {:#?}", message);

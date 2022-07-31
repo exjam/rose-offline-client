@@ -40,7 +40,7 @@ pub struct UiStateHotBar {
 impl Default for UiStateHotBar {
     fn default() -> Self {
         Self {
-            dialog_instance: DialogInstance::new("DLGQUICKBAR.XML".into()),
+            dialog_instance: DialogInstance::new("DLGQUICKBAR.XML"),
             current_page: 0,
             is_vertical: false,
         }

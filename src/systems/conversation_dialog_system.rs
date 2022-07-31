@@ -347,7 +347,7 @@ pub struct UiConversationDialogState {
 impl Default for UiConversationDialogState {
     fn default() -> Self {
         Self {
-            dialog_instance: DialogInstance::new("DLGDIALOG.XML".into()),
+            dialog_instance: DialogInstance::new("DLGDIALOG.XML"),
             sprites: None,
         }
     }
@@ -527,6 +527,9 @@ pub fn conversation_dialog_system(
             .unwrap_or("Event Dialog");
 
         let mut response_close_button = None;
+        let screen_rect = egui_context.ctx_mut().input().screen_rect();
+        let default_x = screen_rect.width() / 2.0 - dialog.width / 2.0;
+        let default_y = screen_rect.height() / 2.0 - dialog_height / 2.0;
 
         egui::Window::new("Conversation Dialog")
             .frame(egui::Frame::none())
@@ -535,6 +538,7 @@ pub fn conversation_dialog_system(
             .resizable(false)
             .min_width(dialog.width)
             .min_height(dialog_height)
+            .default_pos([default_x, default_y])
             .show(egui_context.ctx_mut(), |ui| {
                 dialog.draw(
                     ui,

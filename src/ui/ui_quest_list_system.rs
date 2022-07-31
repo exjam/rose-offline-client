@@ -87,7 +87,7 @@ pub struct UiQuestListState {
 impl Default for UiQuestListState {
     fn default() -> Self {
         Self {
-            dialog_instance: DialogInstance::new("DLGQUEST.XML".into()),
+            dialog_instance: DialogInstance::new("DLGQUEST.XML"),
             scroll_index: 0,
             selected_index: 0,
             minimised: false,

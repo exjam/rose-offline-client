@@ -1,7 +1,6 @@
 use std::time::{Duration, Instant};
 
 use bevy::{
-    app::AppExit,
     input::Input,
     math::{Quat, Vec3},
     prelude::{
@@ -18,7 +17,7 @@ use rose_data::{CharacterMotionAction, ZoneId};
 use rose_game_common::{
     components::{CharacterGender, CharacterInfo, Equipment},
     messages::{
-        client::{ClientMessage, CreateCharacter, SelectCharacter},
+        client::{ClientMessage, CreateCharacter, DeleteCharacter, SelectCharacter},
         server::CreateCharacterError,
     },
 };
@@ -30,7 +29,10 @@ use crate::{
     orbit_camera::OrbitCamera,
     ray_from_screenspace::ray_from_screenspace,
     resources::{AppState, CharacterList, ServerConfiguration, UiResources, WorldConnection},
-    ui::widgets::{DataBindings, Dialog, DrawText},
+    ui::{
+        widgets::{DataBindings, Dialog, DrawText, Widget},
+        DialogInstance,
+    },
 };
 
 #[derive(Copy, Clone, PartialEq)]
@@ -44,14 +46,8 @@ enum CharacterSelectState {
     Loading,
 }
 
-#[derive(Copy, Clone, PartialEq)]
-enum SelectedCharacterIndex {
-    None,
-    Some(usize),
-}
-
 pub struct CharacterSelect {
-    selected_character_index: SelectedCharacterIndex,
+    selected_character_index: Option<usize>,
     last_selected_time: Option<Instant>,
     try_play_character: bool,
     state: CharacterSelectState,
@@ -65,12 +61,13 @@ pub struct CharacterSelect {
     create_character_startpos_index: usize,
     create_character_birthstone_index: usize,
     create_character_error_message: String,
+    select_dialog_instance: DialogInstance,
 }
 
 impl Default for CharacterSelect {
     fn default() -> Self {
         Self {
-            selected_character_index: SelectedCharacterIndex::None,
+            selected_character_index: None,
             last_selected_time: None,
             try_play_character: false,
             state: CharacterSelectState::Entering,
@@ -84,6 +81,7 @@ impl Default for CharacterSelect {
             create_character_startpos_index: 0,
             create_character_birthstone_index: 0,
             create_character_error_message: String::new(),
+            select_dialog_instance: DialogInstance::new("DLGSELAVATAR.XML"),
         }
     }
 }
@@ -193,26 +191,36 @@ pub fn character_select_models_system(
     mut commands: Commands,
     mut model_list: ResMut<CharacterSelectModelList>,
     character_list: Option<Res<CharacterList>>,
-    query_characters: Query<(Entity, Option<&ActiveMotion>, &CharacterModel), With<SkinnedMesh>>,
+    query_characters: Query<(Option<&ActiveMotion>, &CharacterModel), With<SkinnedMesh>>,
 ) {
     // Ensure all character list models are up to date
     if let Some(character_list) = character_list.as_ref() {
         for (index, character) in character_list.characters.iter().enumerate() {
+            let entity = model_list.models[index].1;
+
+            // If the character list has changed, recreate model
             if model_list.models[index].0.as_ref() != Some(&character.info.name) {
                 commands
                     .entity(model_list.models[index].1)
                     .insert_bundle((character.info.clone(), character.equipment.clone()));
                 model_list.models[index].0 = Some(character.info.name.clone());
             }
-        }
-    }
 
-    // Ensure all models are playing correct animation
-    for (entity, active_motion, character_model) in query_characters.iter() {
-        if active_motion.is_none() {
-            commands.entity(entity).insert(ActiveMotion::new_repeating(
-                character_model.action_motions[CharacterMotionAction::Stop1].clone(),
-            ));
+            if character.delete_time.is_some() {}
+
+            if let Ok((active_motion, character_model)) = query_characters.get(entity) {
+                let desired_motion = if character.delete_time.is_some() {
+                    &character_model.action_motions[CharacterMotionAction::Sit]
+                } else {
+                    &character_model.action_motions[CharacterMotionAction::Stop1]
+                };
+
+                if active_motion.map_or(true, |x| x.motion.id != desired_motion.id) {
+                    commands
+                        .entity(entity)
+                        .insert(ActiveMotion::new_repeating(desired_motion.clone()));
+                }
+            }
         }
     }
 }
@@ -231,7 +239,6 @@ pub fn character_select_system(
     world_connection: Option<Res<WorldConnection>>,
     character_list: Option<Res<CharacterList>>,
     (server_configuration, asset_server): (Res<ServerConfiguration>, Res<AssetServer>),
-    mut app_exit_events: EventWriter<AppExit>,
     ui_resources: Res<UiResources>,
     dialog_assets: Res<Assets<Dialog>>,
 ) {
@@ -242,6 +249,62 @@ pub fn character_select_system(
         return;
     }
 
+    for event in world_connection_events.iter() {
+        match event {
+            WorldConnectionEvent::CreateCharacterResponse(response) => match response {
+                Ok(_) => {
+                    let (camera_entity, _, _, _) = query_camera.single();
+                    commands
+                        .entity(camera_entity)
+                        .insert(ActiveMotion::new_once(
+                            asset_server.load("3DDATA/TITLE/CAMERA01_OUTCREATE01.ZMO"),
+                        ));
+                    character_select_state.state = CharacterSelectState::CharacterSelect;
+
+                    if let Some(world_connection) = world_connection.as_ref() {
+                        world_connection
+                            .client_message_tx
+                            .send(ClientMessage::GetCharacterList)
+                            .ok();
+                    }
+                }
+                Err(CreateCharacterError::Failed) => {
+                    character_select_state.create_character_error_message =
+                        "Unknown error creating character".into();
+                    character_select_state.state = CharacterSelectState::CharacterCreate;
+                }
+                Err(CreateCharacterError::AlreadyExists) => {
+                    character_select_state.create_character_error_message =
+                        "Character name already exists".into();
+                    character_select_state.state = CharacterSelectState::CharacterCreate;
+                }
+                Err(CreateCharacterError::NoMoreSlots) => {
+                    character_select_state.create_character_error_message =
+                        "Cannot create more characters".into();
+                    character_select_state.state = CharacterSelectState::CharacterCreate;
+                }
+                Err(CreateCharacterError::InvalidValue) => {
+                    character_select_state.create_character_error_message = "Invalid value".into();
+                    character_select_state.state = CharacterSelectState::CharacterCreate;
+                }
+            },
+            WorldConnectionEvent::DeleteCharacterResponse(response) => match response {
+                Ok(_) => {
+                    // We lazy and let GetCharacterList do the work for us
+                    if let Some(world_connection) = world_connection.as_ref() {
+                        world_connection
+                            .client_message_tx
+                            .send(ClientMessage::GetCharacterList)
+                            .ok();
+                    }
+                }
+                Err(_) => {
+                    // TODO: Show delete character error message
+                }
+            },
+        }
+    }
+
     match character_select_state.state {
         CharacterSelectState::Entering => {
             let (_, _, _, camera_motion) = query_camera.single();
@@ -250,112 +313,169 @@ pub fn character_select_system(
             }
         }
         CharacterSelectState::CharacterSelect => {
+            const IID_BTN_CREATE: i32 = 10;
+            const IID_BTN_DELETE: i32 = 11;
+            const IID_BTN_OK: i32 = 12;
+            const IID_BTN_CANCEL: i32 = 13;
+
+            let dialog = if let Some(dialog) = character_select_state
+                .select_dialog_instance
+                .get_mut(&dialog_assets, &ui_resources)
+            {
+                dialog
+            } else {
+                return;
+            };
+
+            let screen_size = egui_context.ctx_mut().input().screen_rect().size();
+
+            if let Some(Widget::Button(button)) = dialog.get_widget_mut(IID_BTN_CANCEL) {
+                button.x = screen_size.x / 5.0 - button.width / 2.0;
+                button.y = screen_size.y - button.height;
+            }
+
+            if let Some(Widget::Button(button)) = dialog.get_widget_mut(IID_BTN_CREATE) {
+                button.x = screen_size.x * 2.0 / 5.0 - button.width / 2.0;
+                button.y = screen_size.y - button.height;
+            }
+
+            if let Some(Widget::Button(button)) = dialog.get_widget_mut(IID_BTN_DELETE) {
+                button.x = screen_size.x * 3.0 / 5.0 - button.width / 2.0;
+                button.y = screen_size.y - button.height;
+            }
+
+            if let Some(Widget::Button(button)) = dialog.get_widget_mut(IID_BTN_OK) {
+                button.x = screen_size.x * 4.0 / 5.0 - button.width / 2.0;
+                button.y = screen_size.y - button.height;
+            }
+
+            let mut response_create_button = None;
+            let mut response_delete_button = None;
+            let mut response_ok_button = None;
+            let mut response_cancel_button = None;
+
             egui::Window::new("Character Select")
-                .anchor(egui::Align2::CENTER_BOTTOM, [0.0, -30.0])
-                .collapsible(false)
-                .title_bar(false)
+                .anchor(egui::Align2::LEFT_BOTTOM, [0.0, -24.0 - 40.0])
                 .frame(egui::Frame::none())
+                .title_bar(false)
+                .resizable(false)
+                .default_width(screen_size.x)
+                .default_height(40.0)
                 .show(egui_context.ctx_mut(), |ui| {
-                    let mut try_play_character = character_select_state.try_play_character;
-                    character_select_state.try_play_character = false;
+                    dialog.draw(
+                        ui,
+                        DataBindings {
+                            response: &mut [
+                                (IID_BTN_CREATE, &mut response_create_button),
+                                (IID_BTN_DELETE, &mut response_delete_button),
+                                (IID_BTN_OK, &mut response_ok_button),
+                                (IID_BTN_CANCEL, &mut response_cancel_button),
+                            ],
+                            ..Default::default()
+                        },
+                        |_, _| {},
+                    );
+                });
 
-                    if server_configuration.auto_login {
-                        if let Some(preset_character_name) =
-                            server_configuration.preset_character_name.as_ref()
-                        {
-                            let mut selected_character_index = None;
+            let mut try_play_character = character_select_state.try_play_character;
+            character_select_state.try_play_character = false;
 
-                            if let Some(character_list) = character_list.as_ref() {
-                                for (i, character) in character_list.characters.iter().enumerate() {
-                                    if &character.info.name == preset_character_name {
-                                        selected_character_index = Some(i);
-                                    }
-                                }
-                            }
+            if server_configuration.auto_login {
+                if let Some(preset_character_name) =
+                    server_configuration.preset_character_name.as_ref()
+                {
+                    let mut selected_character_index = None;
 
-                            if let Some(selected_character_index) = selected_character_index {
-                                character_select_state.selected_character_index =
-                                    SelectedCharacterIndex::Some(selected_character_index);
-                                try_play_character = true;
+                    if let Some(character_list) = character_list.as_ref() {
+                        for (i, character) in character_list.characters.iter().enumerate() {
+                            if &character.info.name == preset_character_name {
+                                selected_character_index = Some(i);
                             }
                         }
                     }
 
-                    ui.horizontal(|ui| {
-                        if let Some(text_style) =
-                            ui.style_mut().text_styles.get_mut(&egui::TextStyle::Button)
-                        {
-                            text_style.size = 40.0;
+                    if let Some(selected_character_index) = selected_character_index {
+                        character_select_state.selected_character_index =
+                            Some(selected_character_index);
+                        try_play_character = true;
+                    }
+                }
+            }
+
+            if response_create_button.map_or(false, |r| r.clicked())
+                && character_list.as_ref().map_or(true, |character_list| {
+                    character_list.characters.len() < CHARACTER_POSITIONS.len()
+                })
+            {
+                let (camera_entity, _, _, _) = query_camera.single();
+                commands
+                    .entity(camera_entity)
+                    .insert(ActiveMotion::new_once(
+                        asset_server.load("3DDATA/TITLE/CAMERA01_CREATE01.ZMO"),
+                    ));
+
+                character_select_state.state = CharacterSelectState::CharacterCreate;
+            }
+
+            if response_delete_button.map_or(false, |r| r.clicked()) {
+                if let Some(selected_character_index) =
+                    character_select_state.selected_character_index
+                {
+                    if let Some(connection) = world_connection.as_ref() {
+                        if let Some(character_list) = character_list.as_ref() {
+                            if let Some(selected_character) =
+                                character_list.characters.get(selected_character_index)
+                            {
+                                connection
+                                    .client_message_tx
+                                    .send(ClientMessage::DeleteCharacter(DeleteCharacter {
+                                        slot: selected_character_index as u8,
+                                        name: selected_character.info.name.clone(),
+                                        is_delete: selected_character.delete_time.is_none(),
+                                    }))
+                                    .ok();
+                            }
                         }
-                        ui.spacing_mut().item_spacing.x = 50.0;
-                        ui.spacing_mut().button_padding.x = 20.0;
-                        ui.spacing_mut().button_padding.y = 10.0;
+                    }
+                }
+            }
 
-                        ui.add_enabled_ui(
-                            matches!(
-                                character_select_state.selected_character_index,
-                                SelectedCharacterIndex::Some(_)
-                            ),
-                            |ui| {
-                                if ui.button("Play").clicked() {
-                                    try_play_character = true;
-                                }
-                            },
-                        );
+            if response_ok_button.map_or(false, |r| r.clicked())
+                && character_select_state.selected_character_index.is_some()
+            {
+                try_play_character = true;
+            }
 
-                        ui.add_enabled_ui(
-                            character_list.as_ref().map_or(true, |character_list| {
-                                character_list.characters.len() < CHARACTER_POSITIONS.len()
-                            }),
-                            |ui| {
-                                if ui.button("Create").clicked() {
-                                    let (camera_entity, _, _, _) = query_camera.single();
-                                    commands
-                                        .entity(camera_entity)
-                                        .insert(ActiveMotion::new_once(
-                                            asset_server.load("3DDATA/TITLE/CAMERA01_CREATE01.ZMO"),
-                                        ));
+            if response_cancel_button.map_or(false, |r| r.clicked()) {
+                commands.remove_resource::<WorldConnection>();
+            }
+
+            if try_play_character {
+                if let Some(selected_character_index) =
+                    character_select_state.selected_character_index
+                {
+                    if let Some(connection) = world_connection.as_ref() {
+                        if let Some(character_list) = character_list.as_ref() {
+                            if let Some(selected_character) =
+                                character_list.characters.get(selected_character_index)
+                            {
+                                if selected_character.delete_time.is_none() {
+                                    connection
+                                        .client_message_tx
+                                        .send(ClientMessage::SelectCharacter(SelectCharacter {
+                                            slot: selected_character_index as u8,
+                                            name: selected_character.info.name.clone(),
+                                        }))
+                                        .ok();
 
                                     character_select_state.state =
-                                        CharacterSelectState::CharacterCreate;
-                                }
-                            },
-                        );
-
-                        if ui.button("Logout").clicked() {
-                            commands.remove_resource::<WorldConnection>();
-                        }
-
-                        if ui.button("Exit").clicked() {
-                            app_exit_events.send_default();
-                        }
-                    });
-
-                    if try_play_character {
-                        if let SelectedCharacterIndex::Some(selected_character_index) =
-                            character_select_state.selected_character_index
-                        {
-                            if let Some(connection) = world_connection.as_ref() {
-                                if let Some(character_list) = character_list.as_ref() {
-                                    if let Some(selected_character) =
-                                        character_list.characters.get(selected_character_index)
-                                    {
-                                        connection
-                                            .client_message_tx
-                                            .send(ClientMessage::SelectCharacter(SelectCharacter {
-                                                slot: selected_character_index as u8,
-                                                name: selected_character.info.name.clone(),
-                                            }))
-                                            .ok();
-
-                                        character_select_state.state =
-                                            CharacterSelectState::ConnectingGameServer;
-                                    }
+                                        CharacterSelectState::ConnectingGameServer;
                                 }
                             }
                         }
                     }
-                });
+                }
+            }
         }
         CharacterSelectState::CharacterCreate => {
             const IID_EDITBOX: i32 = 7;
@@ -584,7 +704,8 @@ pub fn character_select_system(
                         .client_message_tx
                         .send(ClientMessage::CreateCharacter(CreateCharacter {
                             gender: character_select_state.create_character_gender,
-                            birth_stone: 0,
+                            birth_stone: character_select_state.create_character_birthstone_index
+                                as u8,
                             hair: CREATE_CHARACTER_HAIR_LIST
                                 [character_select_state.create_character_hair_index],
                             face: CREATE_CHARACTER_FACE_LIST
@@ -684,49 +805,6 @@ pub fn character_select_system(
                 .show(egui_context.ctx_mut(), |ui| {
                     ui.label("Creating character");
                 });
-
-            // Process response from server
-            for event in world_connection_events.iter() {
-                let WorldConnectionEvent::CreateCharacterResponse(response) = event;
-                match response {
-                    Ok(_) => {
-                        let (camera_entity, _, _, _) = query_camera.single();
-                        commands
-                            .entity(camera_entity)
-                            .insert(ActiveMotion::new_once(
-                                asset_server.load("3DDATA/TITLE/CAMERA01_OUTCREATE01.ZMO"),
-                            ));
-                        character_select_state.state = CharacterSelectState::CharacterSelect;
-
-                        if let Some(world_connection) = world_connection.as_ref() {
-                            world_connection
-                                .client_message_tx
-                                .send(ClientMessage::GetCharacterList)
-                                .ok();
-                        }
-                    }
-                    Err(CreateCharacterError::Failed) => {
-                        character_select_state.create_character_error_message =
-                            "Unknown error creating character".into();
-                        character_select_state.state = CharacterSelectState::CharacterCreate;
-                    }
-                    Err(CreateCharacterError::AlreadyExists) => {
-                        character_select_state.create_character_error_message =
-                            "Character name already exists".into();
-                        character_select_state.state = CharacterSelectState::CharacterCreate;
-                    }
-                    Err(CreateCharacterError::NoMoreSlots) => {
-                        character_select_state.create_character_error_message =
-                            "Cannot create more characters".into();
-                        character_select_state.state = CharacterSelectState::CharacterCreate;
-                    }
-                    Err(CreateCharacterError::InvalidValue) => {
-                        character_select_state.create_character_error_message =
-                            "Invalid value".into();
-                        character_select_state.state = CharacterSelectState::CharacterCreate;
-                    }
-                }
-            }
         }
         CharacterSelectState::ConnectingGameServer => {
             egui::Window::new("Connecting...")
@@ -777,8 +855,7 @@ pub fn character_select_system(
     }
 
     for (_, camera, camera_transform, _) in query_camera.iter() {
-        if let SelectedCharacterIndex::Some(index) = character_select_state.selected_character_index
-        {
+        if let Some(index) = character_select_state.selected_character_index {
             if let Some(selected_character) = character_list
                 .as_ref()
                 .and_then(|character_list| character_list.characters.get(index))
@@ -868,7 +945,7 @@ pub fn character_select_input_system(
                         let now = Instant::now();
 
                         if character_select_state.selected_character_index
-                            == SelectedCharacterIndex::Some(select_character.index)
+                            == Some(select_character.index)
                         {
                             if let Some(last_selected_time) =
                                 character_select_state.last_selected_time
@@ -880,7 +957,7 @@ pub fn character_select_input_system(
                         }
 
                         character_select_state.selected_character_index =
-                            SelectedCharacterIndex::Some(select_character.index);
+                            Some(select_character.index);
                         character_select_state.last_selected_time = Some(now);
 
                         commands.entity(hit_entity).insert(ActiveMotion::new_once(
