@@ -10,7 +10,8 @@ use bevy::{
     prelude::{
         AddAsset, App, AssetServer, Assets, Camera3dBundle, Color, Commands, CoreStage,
         ExclusiveSystemDescriptorCoercion, IntoExclusiveSystem, Msaa,
-        ParallelSystemDescriptorCoercion, Res, ResMut, StageLabel, State, SystemSet, SystemStage,
+        ParallelSystemDescriptorCoercion, Res, ResMut, StageLabel, StartupStage, State, SystemSet,
+        SystemStage,
     },
     render::{render_resource::WgpuFeatures, settings::WgpuSettings},
     window::WindowDescriptor,
@@ -614,25 +615,28 @@ fn main() {
             .with_system(game_connection_system),
     );
 
-    app.add_startup_system(load_game_data)
-        .add_startup_system(load_ui_resources);
+    app.add_startup_system(load_ui_resources);
+    match protocol_type {
+        ProtocolType::Irose => app.add_startup_system(load_game_data_irose),
+        ProtocolType::Narose667 => app.add_startup_system(load_game_data_narose667),
+    };
+    app.add_startup_system_to_stage(StartupStage::PostStartup, load_common_game_data);
     app.run();
 
     network_thread_tx.send(NetworkThreadMessage::Exit).ok();
     network_thread.join().ok();
 }
 
-fn load_game_data(
+fn load_game_data_irose(
     mut commands: Commands,
     vfs_resource: Res<VfsResource>,
     asset_server: Res<AssetServer>,
-    mut damage_digit_materials: ResMut<Assets<DamageDigitMaterial>>,
 ) {
-    let item_database = Arc::new(
+    let items = Arc::new(
         rose_data_irose::get_item_database(&vfs_resource.vfs)
             .expect("Failed to load item database"),
     );
-    let npc_database = Arc::new(
+    let npcs = Arc::new(
         rose_data_irose::get_npc_database(
             &vfs_resource.vfs,
             &NpcDatabaseOptions {
@@ -641,7 +645,7 @@ fn load_game_data(
         )
         .expect("Failed to load npc database"),
     );
-    let skill_database = Arc::new(
+    let skills = Arc::new(
         rose_data_irose::get_skill_database(&vfs_resource.vfs)
             .expect("Failed to load skill database"),
     );
@@ -664,22 +668,22 @@ fn load_game_data(
 
     commands.insert_resource(GameData {
         ability_value_calculator: rose_game_irose::data::get_ability_value_calculator(
-            item_database.clone(),
-            skill_database.clone(),
-            npc_database.clone(),
+            items.clone(),
+            skills.clone(),
+            npcs.clone(),
         ),
         animation_event_flags: rose_data_irose::get_animation_event_flags(),
-        character_motion_database: character_motion_database.clone(),
+        character_motion_database,
         data_decoder: rose_data_irose::get_data_decoder(),
         effect_database: rose_data_irose::get_effect_database(&vfs_resource.vfs)
             .expect("Failed to load effect database"),
-        items: item_database.clone(),
-        npcs: npc_database.clone(),
+        items,
+        npcs,
         quests: Arc::new(
             rose_data_irose::get_quest_database(&vfs_resource.vfs)
                 .expect("Failed to load quest database"),
         ),
-        skills: skill_database,
+        skills,
         skybox: rose_data_irose::get_skybox_database(&vfs_resource.vfs)
             .expect("Failed to load skybox database"),
         sounds: rose_data_irose::get_sound_database(&vfs_resource.vfs)
@@ -716,13 +720,112 @@ fn load_game_data(
             .read_file::<StbFile, _>("3DDATA/STB/LIST_MORPH_OBJECT.STB")
             .expect("Failed to load 3DDATA/STB/LIST_MORPH_OBJECT.STB"),
     });
+}
 
+fn load_game_data_narose667(
+    mut commands: Commands,
+    vfs_resource: Res<VfsResource>,
+    asset_server: Res<AssetServer>,
+) {
+    let items = Arc::new(
+        rose_data_narose667::get_item_database(&vfs_resource.vfs)
+            .expect("Failed to load item database"),
+    );
+    let npcs = Arc::new(
+        rose_data_narose667::get_npc_database(
+            &vfs_resource.vfs,
+            &NpcDatabaseOptions {
+                load_frame_data: false,
+            },
+        )
+        .expect("Failed to load npc database"),
+    );
+    let skills = Arc::new(
+        rose_data_narose667::get_skill_database(&vfs_resource.vfs)
+            .expect("Failed to load skill database"),
+    );
+    let character_motion_database = Arc::new(
+        rose_data_narose667::get_character_motion_database(
+            &vfs_resource.vfs,
+            &CharacterMotionDatabaseOptions {
+                load_frame_data: false,
+            },
+        )
+        .expect("Failed to load character motion list"),
+    );
+    let zone_list = Arc::new(
+        rose_data_narose667::get_zone_list(&vfs_resource.vfs).expect("Failed to load zone list"),
+    );
+
+    asset_server.add_loader(ZoneLoader {
+        zone_list: zone_list.clone(),
+    });
+
+    commands.insert_resource(GameData {
+        ability_value_calculator: rose_game_irose::data::get_ability_value_calculator(
+            items.clone(),
+            skills.clone(),
+            npcs.clone(),
+        ),
+        animation_event_flags: rose_data_narose667::get_animation_event_flags(),
+        character_motion_database,
+        data_decoder: rose_data_narose667::get_data_decoder(),
+        effect_database: rose_data_narose667::get_effect_database(&vfs_resource.vfs)
+            .expect("Failed to load effect database"),
+        items,
+        npcs,
+        quests: Arc::new(
+            rose_data_narose667::get_quest_database(&vfs_resource.vfs)
+                .expect("Failed to load quest database"),
+        ),
+        skills,
+        skybox: rose_data_narose667::get_skybox_database(&vfs_resource.vfs)
+            .expect("Failed to load skybox database"),
+        sounds: rose_data_narose667::get_sound_database(&vfs_resource.vfs)
+            .expect("Failed to load sound database"),
+        status_effects: Arc::new(
+            rose_data_narose667::get_status_effect_database(&vfs_resource.vfs)
+                .expect("Failed to load status effect database"),
+        ),
+        zone_list,
+        ltb_event: LtbFile::default(),
+        stl_quest: vfs_resource
+            .vfs
+            .read_file_with::<StlFile, _>(
+                "3DDATA/STB/LIST_QUEST_S.STL",
+                &StlReadOptions {
+                    language_filter: Some(vec![1]),
+                },
+            )
+            .expect("Failed to load quest string file"),
+        zsc_event_object: vfs_resource
+            .vfs
+            .read_file::<ZscFile, _>("3DDATA/SPECIAL/EVENT_OBJECT.ZSC")
+            .expect("Failed to load 3DDATA/SPECIAL/EVENT_OBJECT.ZSC"),
+        zsc_special_object: vfs_resource
+            .vfs
+            .read_file::<ZscFile, _>("3DDATA/SPECIAL/LIST_DECO_SPECIAL.ZSC")
+            .expect("Failed to load 3DDATA/SPECIAL/LIST_DECO_SPECIAL.ZSC"),
+        stb_morph_object: vfs_resource
+            .vfs
+            .read_file::<StbFile, _>("3DDATA/STB/LIST_MORPH_OBJECT.STB")
+            .expect("Failed to load 3DDATA/STB/LIST_MORPH_OBJECT.STB"),
+    });
+}
+
+fn load_common_game_data(
+    mut commands: Commands,
+    vfs_resource: Res<VfsResource>,
+    game_data: Res<GameData>,
+    asset_server: Res<AssetServer>,
+    mut damage_digit_materials: ResMut<Assets<DamageDigitMaterial>>,
+) {
     commands.insert_resource(
         ModelLoader::new(
             vfs_resource.vfs.clone(),
-            character_motion_database,
-            item_database,
-            npc_database,
+            game_data.character_motion_database.clone(),
+            game_data.items.clone(),
+            game_data.npcs.clone(),
         )
         .expect("Failed to create model loader"),
     );

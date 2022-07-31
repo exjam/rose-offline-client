@@ -56,7 +56,7 @@ pub struct UiSpriteSheet {
 
 pub struct UiResources {
     pub loaded_all_textures: bool,
-    pub sprite_sheets: EnumMap<UiSpriteSheetType, UiSpriteSheet>,
+    pub sprite_sheets: EnumMap<UiSpriteSheetType, Option<UiSpriteSheet>>,
 
     pub dialog_files: HashMap<String, Handle<Dialog>>,
     pub dialog_login: Handle<Dialog>,
@@ -81,7 +81,7 @@ impl UiResources {
             6 => UiSpriteSheetType::ItemSocket,
             _ => return None,
         };
-        let sprite_sheet = &self.sprite_sheets[sprite_sheet_type];
+        let sprite_sheet = self.sprite_sheets[sprite_sheet_type].as_ref()?;
         let sprite_index = sprite_sheet
             .sprites_by_name
             .as_ref()
@@ -96,7 +96,7 @@ impl UiResources {
         sprite_sheet_type: UiSpriteSheetType,
         sprite_index: usize,
     ) -> Option<UiSprite> {
-        let sprite_sheet = &self.sprite_sheets[sprite_sheet_type];
+        let sprite_sheet = self.sprite_sheets[sprite_sheet_type].as_ref()?;
         let sprite = sprite_sheet.sprites.get(sprite_index)?;
         let texture = sprite_sheet
             .loaded_textures
@@ -121,11 +121,15 @@ impl UiResources {
     }
 
     pub fn get_minimap_player_sprite(&self) -> Option<UiSprite> {
-        let texture = &self.sprite_sheets[UiSpriteSheetType::MinimapArrow].loaded_textures[0];
+        let texture = &self.sprite_sheets[UiSpriteSheetType::MinimapArrow]
+            .as_ref()?
+            .loaded_textures[0];
         let texture_size = texture.size?;
 
         Some(UiSprite {
-            texture_id: self.sprite_sheets[UiSpriteSheetType::MinimapArrow].loaded_textures[0]
+            texture_id: self.sprite_sheets[UiSpriteSheetType::MinimapArrow]
+                .as_ref()?
+                .loaded_textures[0]
                 .texture_id,
             uv: egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0)),
             width: texture_size.x,
@@ -173,7 +177,11 @@ pub fn update_ui_resources(mut ui_resources: ResMut<UiResources>, images: Res<As
 
     let mut loaded_all = true;
 
-    for (_, spritesheet) in ui_resources.sprite_sheets.iter_mut() {
+    for spritesheet in ui_resources
+        .sprite_sheets
+        .iter_mut()
+        .filter_map(|(_, spritesheet)| spritesheet.as_mut())
+    {
         for texture in spritesheet.loaded_textures.iter_mut() {
             if texture.size.is_some() {
                 continue;
@@ -266,17 +274,17 @@ pub fn load_ui_resources(
     commands.insert_resource(UiResources {
         loaded_all_textures: false,
         sprite_sheets: enum_map! {
-            UiSpriteSheetType::Ui => load_ui_spritesheet(vfs, &asset_server, &mut egui_context, "3DDATA/CONTROL/RES/UI.TSI", "3DDATA/CONTROL/XML/UI_STRID.ID").expect("Failed to load UI.TSI sprite sheet"),
-            UiSpriteSheetType::ExUi => load_ui_spritesheet(vfs, &asset_server, &mut egui_context,  "3DDATA/CONTROL/RES/EXUI.TSI", "3DDATA/CONTROL/XML/EXUI_STRID.ID").expect("Failed to load EXUI.TSI sprite sheet"),
-            UiSpriteSheetType::StateIcon => load_ui_spritesheet(vfs, &asset_server, &mut egui_context,  "3DDATA/CONTROL/RES/STATEICON.TSI", "").expect("Failed to load STATEICON.TSI sprite sheet"),
-            UiSpriteSheetType::Skill => load_ui_spritesheet(vfs, &asset_server, &mut egui_context,  "3DDATA/CONTROL/RES/SKILLICON.TSI", "").expect("Failed to load SKILLICON.TSI sprite sheet"),
-            UiSpriteSheetType::Item => load_ui_spritesheet(vfs, &asset_server, &mut egui_context,  "3DDATA/CONTROL/RES/ITEM1.TSI", "").expect("Failed to load ITEM1.TSI sprite sheet"),
-            UiSpriteSheetType::ItemSocket => load_ui_spritesheet(vfs, &asset_server, &mut egui_context,  "3DDATA/CONTROL/RES/SOKETJAM.TSI", "").expect("Failed to load SOKETJAM.TSI sprite sheet"),
+            UiSpriteSheetType::Ui => load_ui_spritesheet(vfs, &asset_server, &mut egui_context, "3DDATA/CONTROL/RES/UI.TSI", "3DDATA/CONTROL/XML/UI_STRID.ID").map_err(|e| { log::warn!("Error loading ui resource: {}", e); e }).ok(),
+            UiSpriteSheetType::ExUi => load_ui_spritesheet(vfs, &asset_server, &mut egui_context,  "3DDATA/CONTROL/RES/EXUI.TSI", "3DDATA/CONTROL/XML/EXUI_STRID.ID").map_err(|e| { log::warn!("Error loading ui resource: {}", e); e }).ok(),
+            UiSpriteSheetType::StateIcon => load_ui_spritesheet(vfs, &asset_server, &mut egui_context,  "3DDATA/CONTROL/RES/STATEICON.TSI", "").map_err(|e| { log::warn!("Error loading ui resource: {}", e); e }).ok(),
+            UiSpriteSheetType::Skill => load_ui_spritesheet(vfs, &asset_server, &mut egui_context,  "3DDATA/CONTROL/RES/SKILLICON.TSI", "").map_err(|e| { log::warn!("Error loading ui resource: {}", e); e }).ok(),
+            UiSpriteSheetType::Item => load_ui_spritesheet(vfs, &asset_server, &mut egui_context,  "3DDATA/CONTROL/RES/ITEM1.TSI", "").map_err(|e| { log::warn!("Error loading ui resource: {}", e); e }).ok(),
+            UiSpriteSheetType::ItemSocket => load_ui_spritesheet(vfs, &asset_server, &mut egui_context,  "3DDATA/CONTROL/RES/SOKETJAM.TSI", "").map_err(|e| { log::warn!("Error loading ui resource: {}", e); e }).ok(),
             UiSpriteSheetType::MinimapArrow => {
                 let handle = asset_server.load("3DDATA/CONTROL/RES/MINIMAP_ARROW.TGA");
                 let texture_id = egui_context.add_image(handle.clone_weak());
 
-                UiSpriteSheet {
+                Some(UiSpriteSheet {
                     sprites: vec![
                         TsiSprite { texture_id: 0, left: 0, top: 0, right: 0, bottom: 0, name: String::default() },
                     ],
@@ -284,7 +292,7 @@ pub fn load_ui_resources(
                         UiTexture { handle, texture_id, size: None },
                     ],
                     sprites_by_name: None,
-                }
+                })
             }
         },
         dialog_character_info: dialog_files["DLGAVATA.XML"].clone(),

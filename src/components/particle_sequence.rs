@@ -87,8 +87,8 @@ pub struct ParticleSequence {
     pub texture_atlas_cols: u32,
     pub texture_atlas_rows: u32,
     pub update_coords: PtlUpdateCoords,
-    pub num_loops: u32,
-    pub num_particles: u32,
+    pub num_loops: i32,
+    pub num_particles: i32,
 
     pub start_delay: f32,
     pub emit_counter: f32,
