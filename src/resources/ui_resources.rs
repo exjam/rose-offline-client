@@ -1,6 +1,9 @@
 use std::collections::HashMap;
 
-use bevy::prelude::{AssetServer, Assets, Commands, Handle, Image, Res, ResMut, Vec2};
+use bevy::{
+    asset::LoadState,
+    prelude::{AssetServer, Assets, Commands, Handle, Image, Res, ResMut, Vec2},
+};
 use bevy_egui::{egui, EguiContext};
 use enum_map::{enum_map, Enum, EnumMap};
 
@@ -170,7 +173,11 @@ fn load_ui_spritesheet(
     })
 }
 
-pub fn update_ui_resources(mut ui_resources: ResMut<UiResources>, images: Res<Assets<Image>>) {
+pub fn update_ui_resources(
+    mut ui_resources: ResMut<UiResources>,
+    images: Res<Assets<Image>>,
+    asset_server: Res<AssetServer>,
+) {
     if ui_resources.loaded_all_textures {
         return;
     }
@@ -189,6 +196,11 @@ pub fn update_ui_resources(mut ui_resources: ResMut<UiResources>, images: Res<As
 
             if let Some(image) = images.get(&texture.handle) {
                 texture.size = Some(image.size());
+            } else if matches!(
+                asset_server.get_load_state(&texture.handle),
+                LoadState::Failed
+            ) {
+                texture.size = Some(Vec2::ZERO);
             } else {
                 loaded_all = false;
             }

@@ -380,28 +380,23 @@ pub fn conversation_dialog_system(
     } else {
         return;
     };
-    let dialog_sprites = ui_state
-        .sprites
-        .get_or_insert_with(|| UiConversationDialogSprites {
-            message_top: ui_resources
-                .get_sprite(0, "UI13_NPC_SCRIPT_IMAGE_TOP")
-                .unwrap(),
-            message_middle: ui_resources
-                .get_sprite(0, "UI13_NPC_SCRIPT_IMAGE_MIDDLE")
-                .unwrap(),
-            message_bottom: ui_resources
-                .get_sprite(0, "UI13_NPC_SCRIPT_IMAGE_BOTTOM")
-                .unwrap(),
-            answer_top: ui_resources
-                .get_sprite(0, "UI13_NPC_SCRIPT_ANSWER_TOP")
-                .unwrap(),
-            answer_middle: ui_resources
-                .get_sprite(0, "UI13_NPC_SCRIPT_ANSWER_MIDDLE")
-                .unwrap(),
-            answer_bottom: ui_resources
-                .get_sprite(0, "UI13_NPC_SCRIPT_ANSWER_BOTTOM")
-                .unwrap(),
-        });
+
+    if ui_state.sprites.is_none() {
+        ui_state.sprites = (|| {
+            Some(UiConversationDialogSprites {
+                message_top: ui_resources.get_sprite(0, "UI13_NPC_SCRIPT_IMAGE_TOP")?,
+                message_middle: ui_resources.get_sprite(0, "UI13_NPC_SCRIPT_IMAGE_MIDDLE")?,
+                message_bottom: ui_resources.get_sprite(0, "UI13_NPC_SCRIPT_IMAGE_BOTTOM")?,
+                answer_top: ui_resources.get_sprite(0, "UI13_NPC_SCRIPT_ANSWER_TOP")?,
+                answer_middle: ui_resources.get_sprite(0, "UI13_NPC_SCRIPT_ANSWER_MIDDLE")?,
+                answer_bottom: ui_resources.get_sprite(0, "UI13_NPC_SCRIPT_ANSWER_BOTTOM")?,
+            })
+        })();
+        if ui_state.sprites.is_none() {
+            return;
+        }
+    }
+    let dialog_sprites = ui_state.sprites.as_ref().unwrap();
 
     let mut user_context = LuaVMContext {
         function_context: &mut lua_function_context,
