@@ -271,6 +271,16 @@ pub fn login_system(
                         },
                         |ui, _| {
                             let server_list = server_list.as_ref().unwrap();
+
+                            // Ensure selected_world_server_id exists, else select first one
+                            if !server_list.world_servers.iter().any(|world_server| {
+                                world_server.id == ui_state.selected_world_server_id
+                            }) {
+                                if let Some(world_server) = server_list.world_servers.first() {
+                                    ui_state.selected_world_server_id = world_server.id;
+                                }
+                            }
+
                             let mut selected_world_server_id = ui_state.selected_world_server_id;
                             let mut selected_game_server_id = ui_state.selected_game_server_id;
 
