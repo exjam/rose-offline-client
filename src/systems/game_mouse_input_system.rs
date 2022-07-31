@@ -1,4 +1,5 @@
 use bevy::{
+    ecs::query::WorldQuery,
     input::Input,
     math::Vec3,
     prelude::{
@@ -23,6 +24,13 @@ use crate::{
     ray_from_screenspace::ray_from_screenspace,
 };
 
+#[derive(WorldQuery)]
+pub struct PlayerQuery<'w> {
+    entity: Entity,
+    team: &'w Team,
+    selected_target: Option<&'w SelectedTarget>,
+}
+
 #[allow(clippy::too_many_arguments)]
 pub fn game_mouse_input_system(
     mut commands: Commands,
@@ -39,7 +47,7 @@ pub fn game_mouse_input_system(
         Option<&ItemDrop>,
         Option<&ZoneObject>,
     )>,
-    query_player: Query<(Entity, &Team, Option<&SelectedTarget>), With<PlayerCharacter>>,
+    query_player: Query<PlayerQuery, With<PlayerCharacter>>,
     mut player_command_events: EventWriter<PlayerCommandEvent>,
 ) {
     let cursor_position = windows.primary().cursor_position();
@@ -54,7 +62,11 @@ pub fn game_mouse_input_system(
         return;
     }
 
-    let (player_entity, player_team, player_selected_target) = query_player.single();
+    let player = if let Ok(player) = query_player.get_single() {
+        player
+    } else {
+        return;
+    };
 
     for (camera, camera_projection, camera_transform) in query_camera.iter() {
         if let Some((ray_origin, ray_direction)) = ray_from_screenspace(
@@ -122,7 +134,8 @@ pub fn game_mouse_input_system(
                         }
                     } else if let Some(hit_team) = hit_team {
                         if mouse_button_input.just_pressed(MouseButton::Left) {
-                            if player_selected_target
+                            if player
+                                .selected_target
                                 .map_or(false, |target| target.entity == hit_entity)
                             {
                                 if hit_team.id == Team::DEFAULT_NPC_TEAM_ID {
@@ -132,13 +145,13 @@ pub fn game_mouse_input_system(
                                             Some(hit_entity),
                                         ));
                                     }
-                                } else if hit_team.id != player_team.id {
+                                } else if hit_team.id != player.team.id {
                                     player_command_events
                                         .send(PlayerCommandEvent::Attack(hit_entity));
                                 }
                             } else {
                                 commands
-                                    .entity(player_entity)
+                                    .entity(player.entity)
                                     .insert(SelectedTarget::new(hit_entity));
                             }
                         }

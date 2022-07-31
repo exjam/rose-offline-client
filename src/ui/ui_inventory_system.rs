@@ -1,4 +1,7 @@
-use bevy::prelude::{Assets, EventWriter, Local, Query, Res, ResMut, With};
+use bevy::{
+    ecs::query::WorldQuery,
+    prelude::{Assets, EventWriter, Local, Query, Res, ResMut, With},
+};
 use bevy_egui::{egui, EguiContext};
 use enum_map::{enum_map, EnumMap};
 
@@ -200,9 +203,7 @@ fn ui_add_inventory_slot(
     ui: &mut egui::Ui,
     inventory_slot: ItemSlot,
     pos: egui::Pos2,
-    equipment: &Equipment,
-    inventory: &Inventory,
-    cooldowns: &Cooldowns,
+    player: &PlayerQueryItem,
     game_connection: Option<&Res<GameConnection>>,
     game_data: &GameData,
     ui_resources: &UiResources,
@@ -223,7 +224,7 @@ fn ui_add_inventory_slot(
         ItemSlot::Vehicle(_) => drag_accepts_vehicles,
     };
 
-    let item = (equipment, inventory).get_item(inventory_slot);
+    let item = (player.equipment, player.inventory).get_item(inventory_slot);
     let item_data = item
         .as_ref()
         .and_then(|item| game_data.items.get_base_item(item.get_item_reference()));
@@ -238,7 +239,8 @@ fn ui_add_inventory_slot(
                 game_data.items.get_consumable_item(item.get_item_number())
             {
                 if matches!(consumable_item_data.item_data.class, ItemClass::MagicItem) {
-                    cooldown_percent = cooldowns
+                    cooldown_percent = player
+                        .cooldowns
                         .get_consumable_cooldown_percent(ConsumableCooldownGroup::MagicItem);
                 } else if let Some(status_effect) = consumable_item_data
                     .apply_status_effect
@@ -248,23 +250,25 @@ fn ui_add_inventory_slot(
                 {
                     match status_effect.status_effect_type {
                         StatusEffectType::IncreaseHp => {
-                            cooldown_percent = cooldowns.get_consumable_cooldown_percent(
+                            cooldown_percent = player.cooldowns.get_consumable_cooldown_percent(
                                 ConsumableCooldownGroup::HealthRecovery,
                             )
                         }
                         StatusEffectType::IncreaseMp => {
-                            cooldown_percent = cooldowns.get_consumable_cooldown_percent(
+                            cooldown_percent = player.cooldowns.get_consumable_cooldown_percent(
                                 ConsumableCooldownGroup::ManaRecovery,
                             )
                         }
                         _ => {
-                            cooldown_percent = cooldowns
+                            cooldown_percent = player
+                                .cooldowns
                                 .get_consumable_cooldown_percent(ConsumableCooldownGroup::Others)
                         }
                     }
                 } else {
-                    cooldown_percent =
-                        cooldowns.get_consumable_cooldown_percent(ConsumableCooldownGroup::Others);
+                    cooldown_percent = player
+                        .cooldowns
+                        .get_consumable_cooldown_percent(ConsumableCooldownGroup::Others);
                 }
             }
         }
@@ -427,7 +431,7 @@ fn ui_add_inventory_slot(
     }
 
     if let Some(equip_inventory_slot) = equip_equipment_inventory_slot {
-        if let Some(item) = inventory.get_item(equip_inventory_slot) {
+        if let Some(item) = player.inventory.get_item(equip_inventory_slot) {
             let equipment_index = match item.get_item_type() {
                 ItemType::Face => Some(EquipmentIndex::Face),
                 ItemType::Head => Some(EquipmentIndex::Head),
@@ -469,7 +473,7 @@ fn ui_add_inventory_slot(
     }
 
     if let Some(equip_inventory_slot) = equip_ammo_inventory_slot {
-        if let Some(item) = inventory.get_item(equip_inventory_slot) {
+        if let Some(item) = player.inventory.get_item(equip_inventory_slot) {
             let ammo_index =
                 if let Some(item_data) = game_data.items.get_base_item(item.get_item_reference()) {
                     match item_data.class {
@@ -497,7 +501,7 @@ fn ui_add_inventory_slot(
     }
 
     if let Some(equip_inventory_slot) = equip_vehicle_inventory_slot {
-        if let Some(item) = inventory.get_item(equip_inventory_slot) {
+        if let Some(item) = player.inventory.get_item(equip_inventory_slot) {
             let vehicle_part_index = if let Some(item_data) =
                 game_data.items.get_base_item(item.get_item_reference())
             {
@@ -593,12 +597,19 @@ fn ui_add_inventory_slot(
     }
 }
 
+#[derive(WorldQuery)]
+pub struct PlayerQuery<'w> {
+    equipment: &'w Equipment,
+    inventory: &'w Inventory,
+    cooldowns: &'w Cooldowns,
+}
+
 pub fn ui_inventory_system(
     mut egui_context: ResMut<EguiContext>,
     mut ui_state_inventory: Local<UiStateInventory>,
     mut ui_state_dnd: ResMut<UiStateDragAndDrop>,
     mut ui_state_windows: ResMut<UiStateWindows>,
-    query_player: Query<(&Equipment, &Inventory, &Cooldowns), With<PlayerCharacter>>,
+    query_player: Query<PlayerQuery, With<PlayerCharacter>>,
     dialog_assets: Res<Assets<Dialog>>,
     game_connection: Option<Res<GameConnection>>,
     game_data: Res<GameData>,
@@ -615,8 +626,11 @@ pub fn ui_inventory_system(
     } else {
         return;
     };
-
-    let (player_equipment, player_inventory, player_cooldowns) = query_player.single();
+    let player = if let Ok(player) = query_player.get_single() {
+        player
+    } else {
+        return;
+    };
 
     let mut response_close_button = None;
     let mut response_minimise_button = None;
@@ -673,9 +687,7 @@ pub fn ui_inventory_system(
                                         ui,
                                         *item_slot,
                                         *pos + egui::vec2(-1.0, -1.0),
-                                        player_equipment,
-                                        player_inventory,
-                                        player_cooldowns,
+                                        &player,
                                         game_connection.as_ref(),
                                         &game_data,
                                         &ui_resources,
@@ -707,9 +719,7 @@ pub fn ui_inventory_system(
                                         ui,
                                         *item_slot,
                                         *pos - egui::vec2(-1.0, -1.0),
-                                        player_equipment,
-                                        player_inventory,
-                                        player_cooldowns,
+                                        &player,
                                         game_connection.as_ref(),
                                         &game_data,
                                         &ui_resources,
@@ -744,9 +754,7 @@ pub fn ui_inventory_system(
                                     12.0 + column as f32 * 41.0,
                                     y_start + row as f32 * 41.0,
                                 ),
-                                player_equipment,
-                                player_inventory,
-                                player_cooldowns,
+                                &player,
                                 game_connection.as_ref(),
                                 &game_data,
                                 &ui_resources,
@@ -767,7 +775,7 @@ pub fn ui_inventory_system(
                         )),
                         |ui| {
                             ui.horizontal_top(|ui| {
-                                ui.add(egui::Label::new(format!("{}", player_inventory.money.0)))
+                                ui.add(egui::Label::new(format!("{}", player.inventory.money.0)))
                             })
                             .inner
                         },

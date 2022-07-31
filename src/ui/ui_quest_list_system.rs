@@ -113,8 +113,11 @@ pub fn ui_quest_list_system(
     } else {
         return;
     };
-
-    let player_quest_state = query_player.single();
+    let player_quest_state = if let Ok(player) = query_player.get_single() {
+        player
+    } else {
+        return;
+    };
 
     let listbox_extent = if let Some(Widget::ZListbox(listbox)) = dialog.get_widget(IID_ZLIST_QUEST)
     {

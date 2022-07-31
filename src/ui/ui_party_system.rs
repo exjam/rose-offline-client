@@ -57,7 +57,11 @@ pub fn ui_party_system(
     game_connection: Option<Res<GameConnection>>,
     client_entity_list: Res<ClientEntityList>,
 ) {
-    let player = query_player.single();
+    let player = if let Ok(player) = query_player.get_single() {
+        player
+    } else {
+        return;
+    };
 
     // Add any new incoming invites
     for event in party_events.iter() {
