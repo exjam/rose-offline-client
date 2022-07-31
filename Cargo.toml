@@ -35,14 +35,14 @@ serde = "1.0"
 thiserror = "1.0"
 tokio = { version = "1.17", features = ["rt", "net", "sync", "macros", "io-util"] }
 quick-xml = { version = "0.23", features = ["serialize"] }
-rose-data = { git = "https://github.com/exjam/rose-offline", rev = "2f038e5eac5f39d1c952d98879b51ba9d8185b0c" }
-rose-data-irose = { git = "https://github.com/exjam/rose-offline", rev = "2f038e5eac5f39d1c952d98879b51ba9d8185b0c" }
-rose-file-readers = { git = "https://github.com/exjam/rose-offline", rev = "2f038e5eac5f39d1c952d98879b51ba9d8185b0c" }
-rose-game-common = { git = "https://github.com/exjam/rose-offline", rev = "2f038e5eac5f39d1c952d98879b51ba9d8185b0c" }
-rose-game-irose = { git = "https://github.com/exjam/rose-offline", rev = "2f038e5eac5f39d1c952d98879b51ba9d8185b0c" }
-rose-network-common = { git = "https://github.com/exjam/rose-offline", rev = "2f038e5eac5f39d1c952d98879b51ba9d8185b0c" }
-rose-network-irose = { git = "https://github.com/exjam/rose-offline", rev = "2f038e5eac5f39d1c952d98879b51ba9d8185b0c" }
-rose-network-narose667 = { git = "https://github.com/exjam/rose-offline", rev = "2f038e5eac5f39d1c952d98879b51ba9d8185b0c" }
+rose-data = { git = "https://github.com/exjam/rose-offline", rev = "d042066e6e29dd30e22276d26716feba14ccdbb4" }
+rose-data-irose = { git = "https://github.com/exjam/rose-offline", rev = "d042066e6e29dd30e22276d26716feba14ccdbb4" }
+rose-file-readers = { git = "https://github.com/exjam/rose-offline", rev = "d042066e6e29dd30e22276d26716feba14ccdbb4" }
+rose-game-common = { git = "https://github.com/exjam/rose-offline", rev = "d042066e6e29dd30e22276d26716feba14ccdbb4" }
+rose-game-irose = { git = "https://github.com/exjam/rose-offline", rev = "d042066e6e29dd30e22276d26716feba14ccdbb4" }
+rose-network-common = { git = "https://github.com/exjam/rose-offline", rev = "d042066e6e29dd30e22276d26716feba14ccdbb4" }
+rose-network-irose = { git = "https://github.com/exjam/rose-offline", rev = "d042066e6e29dd30e22276d26716feba14ccdbb4" }
+rose-network-narose667 = { git = "https://github.com/exjam/rose-offline", rev = "d042066e6e29dd30e22276d26716feba14ccdbb4" }
 
 [patch.crates-io]
 bevy = { git = "https://github.com/exjam/bevy", rev = "c0585313b183d8d1d550caba022e78a57002d8ec" }
