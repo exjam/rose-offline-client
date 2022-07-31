@@ -22,9 +22,9 @@ use rose_network_narose667::{
         PacketClientSelectCharacter,
     },
     world_server_packets::{
-        ConnectResult, CreateCharacterResult, PacketConnectionReply, PacketServerCharacterList,
-        PacketServerCreateCharacterReply, PacketServerDeleteCharacterReply, PacketServerMoveServer,
-        ServerPackets,
+        CharacterListResult, ConnectResult, CreateCharacterResult, PacketConnectionReply,
+        PacketServerCharacterList, PacketServerCreateCharacterReply,
+        PacketServerDeleteCharacterReply, PacketServerMoveServer, ServerPackets,
     },
     ClientPacketCodec,
 };
@@ -66,11 +66,20 @@ impl WorldClient {
                     .ok();
             }
             Some(ServerPackets::CharacterListReply) => {
-                self.server_message_tx
-                    .send(ServerMessage::CharacterList(
-                        PacketServerCharacterList::try_from(packet)?.characters,
-                    ))
-                    .ok();
+                let message = PacketServerCharacterList::try_from(packet)?;
+                match message.result {
+                    CharacterListResult::Start => {
+                        self.server_message_tx
+                            .send(ServerMessage::CharacterList(message.characters))
+                            .ok();
+                    }
+                    CharacterListResult::Continue => {
+                        self.server_message_tx
+                            .send(ServerMessage::CharacterListAppend(message.characters))
+                            .ok();
+                    }
+                    CharacterListResult::End => {}
+                };
             }
             Some(ServerPackets::MoveServer) => {
                 let response = PacketServerMoveServer::try_from(packet)?;
@@ -154,19 +163,23 @@ impl WorldClient {
             }
             ClientMessage::CreateCharacter(CreateCharacter {
                 gender,
-                birth_stone,
                 hair,
                 face,
                 name,
+                start_point,
+                hair_color,
+                weapon_type,
+                ..
             }) => {
                 connection
                     .write_packet(Packet::from(&PacketClientCreateCharacter {
-                        gender,
-                        birth_stone,
-                        hair,
-                        face,
                         name: &name,
-                        start_point: 0,
+                        gender,
+                        hair_color,
+                        hair_style: hair,
+                        face,
+                        weapon_type,
+                        start_point,
                     }))
                     .await?
             }

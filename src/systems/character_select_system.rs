@@ -95,8 +95,8 @@ pub struct CharacterSelectModelList {
     models: Vec<(Option<String>, Entity)>,
 }
 
-const CREATE_CHARACTER_FACE_LIST: [u8; 7] = [1, 8, 15, 22, 29, 36, 43];
-const CREATE_CHARACTER_HAIR_LIST: [u8; 5] = [0, 5, 10, 15, 20];
+const CREATE_CHARACTER_FACE_LIST: [i32; 7] = [1, 8, 15, 22, 29, 36, 43];
+const CREATE_CHARACTER_HAIR_LIST: [i32; 5] = [0, 5, 10, 15, 20];
 const CREATE_CHARACTER_STARTPOS_LIST: [&str; 5] =
     ["Brave", "Wisdom", "Faith", "Justice", "Liberty"];
 const CREATE_CHARACTER_BIRTHSTONE_LIST: [&str; 12] = [
@@ -710,12 +710,16 @@ pub fn character_select_system(
                         .send(ClientMessage::CreateCharacter(CreateCharacter {
                             gender: character_select_state.create_character_gender,
                             birth_stone: character_select_state.create_character_birthstone_index
-                                as u8,
+                                as i32,
                             hair: CREATE_CHARACTER_HAIR_LIST
                                 [character_select_state.create_character_hair_index],
                             face: CREATE_CHARACTER_FACE_LIST
                                 [character_select_state.create_character_face_index],
                             name: character_select_state.create_character_name.clone(),
+                            start_point: character_select_state.create_character_startpos_index
+                                as i32,
+                            hair_color: 1,
+                            weapon_type: 0,
                         }))
                         .ok();
                 }
@@ -753,9 +757,11 @@ pub fn character_select_system(
                     query_create_character_info.get_mut(create_character_entity)
                 {
                     let face = CREATE_CHARACTER_FACE_LIST
-                        [character_select_state.create_character_face_index];
+                        [character_select_state.create_character_face_index]
+                        as u8;
                     let hair = CREATE_CHARACTER_HAIR_LIST
-                        [character_select_state.create_character_hair_index];
+                        [character_select_state.create_character_hair_index]
+                        as u8;
 
                     if create_character_info.face != face {
                         create_character_info.face = face;
@@ -782,9 +788,11 @@ pub fn character_select_system(
                             birth_stone: 0,
                             job: 0,
                             face: CREATE_CHARACTER_FACE_LIST
-                                [character_select_state.create_character_face_index],
+                                [character_select_state.create_character_face_index]
+                                as u8,
                             hair: CREATE_CHARACTER_HAIR_LIST
-                                [character_select_state.create_character_hair_index],
+                                [character_select_state.create_character_hair_index]
+                                as u8,
                             rank: 0,
                             fame: 0,
                             fame_b: 0,

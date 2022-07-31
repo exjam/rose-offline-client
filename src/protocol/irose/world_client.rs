@@ -154,19 +154,21 @@ impl WorldClient {
             }
             ClientMessage::CreateCharacter(CreateCharacter {
                 gender,
-                birth_stone,
                 hair,
                 face,
                 name,
+                start_point,
+                birth_stone,
+                ..
             }) => {
                 connection
                     .write_packet(Packet::from(&PacketClientCreateCharacter {
                         gender,
-                        birth_stone,
-                        hair,
-                        face,
+                        birth_stone: birth_stone as u8,
+                        hair: hair as u8,
+                        face: face as u8,
                         name: &name,
-                        start_point: 0,
+                        start_point: start_point as u16,
                     }))
                     .await?
             }
