@@ -159,13 +159,16 @@ pub fn login_system(
             let mut response_cancel = None;
             let mut enter_pressed = false;
 
+            let screen_size = egui_context.ctx_mut().input().screen_rect().size();
+            let position = egui::pos2(screen_size.x - dialog.width - 100.0, 100.0);
+
             egui::Window::new("Login")
-                .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
                 .frame(egui::Frame::none())
                 .title_bar(false)
                 .resizable(false)
                 .default_width(dialog.width)
                 .default_height(dialog.height)
+                .fixed_pos(position)
                 .show(egui_context.ctx_mut(), |ui| {
                     dialog.draw(
                         ui,
@@ -246,13 +249,16 @@ pub fn login_system(
             let mut response_cancel_button = None;
             let mut try_select_server = ui_state.auto_login;
 
+            let screen_size = egui_context.ctx_mut().input().screen_rect().size();
+            let position = egui::pos2(screen_size.x - dialog.width - 60.0, 100.0);
+
             egui::Window::new("Select Server")
-                .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
                 .frame(egui::Frame::none())
                 .title_bar(false)
                 .resizable(false)
                 .default_width(dialog.width)
                 .default_height(dialog.height)
+                .fixed_pos(position)
                 .show(egui_context.ctx_mut(), |ui| {
                     dialog.draw(
                         ui,
