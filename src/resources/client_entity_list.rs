@@ -12,7 +12,7 @@ pub struct ClientEntityList {
 impl Default for ClientEntityList {
     fn default() -> Self {
         Self {
-            client_entities: vec![None; 4096],
+            client_entities: vec![None; u16::MAX as usize],
             player_entity: None,
             player_entity_id: None,
             zone_id: None,
