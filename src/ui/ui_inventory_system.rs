@@ -105,7 +105,7 @@ const EQUIPMENT_GRID_SLOTS: [(rose_game_common::components::ItemSlot, egui::Pos2
     ),
     (
         ItemSlot::Equipment(EquipmentIndex::Feet),
-        egui::pos2(19.0, 159.0),
+        egui::pos2(69.0, 159.0),
     ),
     (ItemSlot::Ammo(AmmoIndex::Throw), egui::pos2(169.0, 159.0)),
     (
