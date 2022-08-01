@@ -1,3 +1,4 @@
+use bevy::prelude::Transform;
 use std::sync::Arc;
 
 use rose_data::{
@@ -27,4 +28,5 @@ pub struct GameData {
     pub zsc_event_object: ZscFile,
     pub zsc_special_object: ZscFile,
     pub stb_morph_object: StbFile,
+    pub character_select_positions: Vec<Transform>,
 }

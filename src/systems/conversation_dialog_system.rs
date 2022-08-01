@@ -522,9 +522,9 @@ pub fn conversation_dialog_system(
             .unwrap_or("Event Dialog");
 
         let mut response_close_button = None;
-        let screen_rect = egui_context.ctx_mut().input().screen_rect();
-        let default_x = screen_rect.width() / 2.0 - dialog.width / 2.0;
-        let default_y = screen_rect.height() / 2.0 - dialog_height / 2.0;
+        let screen_size = egui_context.ctx_mut().input().screen_rect().size();
+        let default_x = screen_size.x / 2.0 - dialog.width / 2.0;
+        let default_y = screen_size.y / 2.0 - dialog_height / 2.0;
 
         egui::Window::new("Conversation Dialog")
             .frame(egui::Frame::none())

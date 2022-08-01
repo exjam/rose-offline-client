@@ -23,12 +23,17 @@ use rose_game_common::{
 };
 
 use crate::{
-    components::{ActiveMotion, CharacterModel, ColliderParent, COLLISION_FILTER_CLICKABLE},
+    components::{
+        ActiveMotion, CharacterModel, ColliderParent, COLLISION_FILTER_CLICKABLE,
+        COLLISION_GROUP_CHARACTER, COLLISION_GROUP_PLAYER,
+    },
     events::{GameConnectionEvent, LoadZoneEvent, WorldConnectionEvent},
     free_camera::FreeCamera,
     orbit_camera::OrbitCamera,
     ray_from_screenspace::ray_from_screenspace,
-    resources::{AppState, CharacterList, ServerConfiguration, UiResources, WorldConnection},
+    resources::{
+        AppState, CharacterList, GameData, ServerConfiguration, UiResources, WorldConnection,
+    },
     ui::{
         widgets::{DataBindings, Dialog, DrawText, Widget},
         DialogInstance,
@@ -114,19 +119,12 @@ const CREATE_CHARACTER_BIRTHSTONE_LIST: [&str; 12] = [
     "Turquoise",
 ];
 
-const CHARACTER_POSITIONS: [[f32; 3]; 5] = [
-    [5205.0, 1.0, -5205.0],
-    [5202.70, 1.0, -5206.53],
-    [5200.00, 1.0, -5207.07],
-    [5197.30, 1.0, -5206.53],
-    [5195.00, 1.0, -5205.00],
-];
-
 pub fn character_select_enter_system(
     mut commands: Commands,
     mut windows: ResMut<Windows>,
     query_cameras: Query<Entity, With<Camera3d>>,
     asset_server: Res<AssetServer>,
+    game_data: Res<GameData>,
 ) {
     if let Some(window) = windows.get_primary_mut() {
         window.set_cursor_lock_mode(false);
@@ -152,15 +150,13 @@ pub fn character_select_enter_system(
     commands.insert_resource(CharacterSelect::default());
 
     // Spawn entities to use for character list models
-    let mut models = Vec::with_capacity(CHARACTER_POSITIONS.len());
-    for (index, position) in CHARACTER_POSITIONS.into_iter().enumerate() {
+    let mut models = Vec::with_capacity(game_data.character_select_positions.len());
+    for (index, transform) in game_data.character_select_positions.iter().enumerate() {
         let entity = commands
             .spawn_bundle((
                 CharacterSelectCharacter { index },
                 GlobalTransform::default(),
-                Transform::from_translation(position.into())
-                    .with_rotation(Quat::from_rotation_y(std::f32::consts::PI))
-                    .with_scale(Vec3::new(1.5, 1.5, 1.5)),
+                *transform,
             ))
             .id();
         models.push((None, entity));
@@ -239,6 +235,7 @@ pub fn character_select_system(
     world_connection: Option<Res<WorldConnection>>,
     mut character_list: Option<ResMut<CharacterList>>,
     (server_configuration, asset_server): (Res<ServerConfiguration>, Res<AssetServer>),
+    game_data: Res<GameData>,
     ui_resources: Res<UiResources>,
     dialog_assets: Res<Assets<Dialog>>,
 ) {
@@ -336,22 +333,18 @@ pub fn character_select_system(
 
             if let Some(Widget::Button(button)) = dialog.get_widget_mut(IID_BTN_CANCEL) {
                 button.x = screen_size.x / 5.0 - button.width / 2.0;
-                button.y = screen_size.y - button.height;
             }
 
             if let Some(Widget::Button(button)) = dialog.get_widget_mut(IID_BTN_CREATE) {
                 button.x = screen_size.x * 2.0 / 5.0 - button.width / 2.0;
-                button.y = screen_size.y - button.height;
             }
 
             if let Some(Widget::Button(button)) = dialog.get_widget_mut(IID_BTN_DELETE) {
                 button.x = screen_size.x * 3.0 / 5.0 - button.width / 2.0;
-                button.y = screen_size.y - button.height;
             }
 
             if let Some(Widget::Button(button)) = dialog.get_widget_mut(IID_BTN_OK) {
                 button.x = screen_size.x * 4.0 / 5.0 - button.width / 2.0;
-                button.y = screen_size.y - button.height;
             }
 
             let mut response_create_button = None;
@@ -409,7 +402,7 @@ pub fn character_select_system(
 
             if response_create_button.map_or(false, |r| r.clicked())
                 && character_list.as_ref().map_or(true, |character_list| {
-                    character_list.characters.len() < CHARACTER_POSITIONS.len()
+                    character_list.characters.len() < game_data.character_select_positions.len()
                 })
             {
                 let (camera_entity, _, _, _) = query_camera.single();
@@ -518,7 +511,7 @@ pub fn character_select_system(
             let mut response_next_startpos = None;
             let mut response_next_birthstone = None;
 
-            let screen_size = egui_context.ctx_mut().input().screen_rect().max;
+            let screen_size = egui_context.ctx_mut().input().screen_rect().size();
 
             egui::Window::new("Character Create")
                 .frame(egui::Frame::none())
@@ -875,20 +868,17 @@ pub fn character_select_system(
             {
                 if let Some(screen_pos) = camera.world_to_viewport(
                     camera_transform,
-                    Vec3::new(
-                        CHARACTER_POSITIONS[index][0],
-                        CHARACTER_POSITIONS[index][1] + 4.0,
-                        CHARACTER_POSITIONS[index][2],
-                    ),
+                    game_data.character_select_positions[index].translation
+                        + Vec3::new(0.0, 4.0, 0.0),
                 ) {
-                    let screen_max_y = egui_context.ctx_mut().input().screen_rect().max.y;
+                    let screen_size = egui_context.ctx_mut().input().screen_rect().size();
 
                     egui::containers::popup::show_tooltip_at(
                         egui_context.ctx_mut(),
                         egui::Id::new("selected_character_plate"),
                         Some(egui::Pos2::new(
                             screen_pos.x - 30.0,
-                            screen_max_y - screen_pos.y,
+                            screen_size.y - screen_pos.y,
                         )),
                         |ui| {
                             ui.label(
@@ -957,7 +947,10 @@ pub fn character_select_input_system(
                     ray_direction,
                     10000000.0,
                     false,
-                    InteractionGroups::all().with_memberships(COLLISION_FILTER_CLICKABLE),
+                    InteractionGroups::new(
+                        COLLISION_FILTER_CLICKABLE,
+                        COLLISION_GROUP_CHARACTER | COLLISION_GROUP_PLAYER,
+                    ),
                     None,
                 ) {
                     let hit_entity = query_collider_parent

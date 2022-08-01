@@ -3,18 +3,28 @@ use num_traits::FromPrimitive;
 use std::net::SocketAddr;
 use tokio::net::TcpStream;
 
-use rose_game_common::messages::{
-    client::{ClientMessage, ConnectionRequest},
-    server::{
-        CharacterData, ConnectionRequestError, ConnectionResponse, JoinZoneResponse, ServerMessage,
+use rose_game_common::{
+    components::{Equipment, Inventory},
+    messages::{
+        client::{ClientMessage, ConnectionRequest, Move},
+        server::{
+            CharacterData, CharacterDataItems, ConnectionRequestError, ConnectionResponse,
+            JoinZoneResponse, MoveEntity, RemoveEntities, ServerMessage, SpawnEntityMonster,
+            SpawnEntityNpc, Teleport, UpdateSpeed,
+        },
     },
 };
 use rose_network_common::{Connection, Packet, PacketCodec};
 use rose_network_narose667::{
-    game_client_packets::{PacketClientConnectRequest, PacketClientJoinZone},
+    game_client_packets::{
+        PacketClientChat, PacketClientConnectRequest, PacketClientJoinZone, PacketClientMove,
+    },
     game_server_packets::{
-        ConnectResult, PacketConnectionReply, PacketServerJoinZone, PacketServerSelectCharacter,
-        ServerPackets,
+        CharacterInventoryUpdateType, ConnectResult, PacketConnectionReply,
+        PacketServerCharacterInventory, PacketServerJoinZone, PacketServerMoveEntity,
+        PacketServerRemoveEntities, PacketServerSelectCharacter, PacketServerSpawnEntityMonster,
+        PacketServerSpawnEntityNpc, PacketServerTeleport, PacketServerUpdateSkillList,
+        PacketServerUpdateSpeed, ServerPackets,
     },
     ClientPacketCodec,
 };
@@ -95,6 +105,114 @@ impl GameClient {
                     }))
                     .ok();
             }
+            Some(ServerPackets::CharacterInventory) => {
+                let response = PacketServerCharacterInventory::try_from(packet)?;
+
+                if matches!(response.update_type, CharacterInventoryUpdateType::Initial) {
+                    // Clear previous items
+                    self.server_message_tx
+                        .send(ServerMessage::CharacterDataItems(Box::new(
+                            CharacterDataItems {
+                                inventory: Inventory::default(),
+                                equipment: Equipment::default(),
+                            },
+                        )))
+                        .ok();
+                }
+
+                self.server_message_tx
+                    .send(ServerMessage::UpdateInventory(
+                        response.items,
+                        Some(response.money),
+                    ))
+                    .ok();
+            }
+            Some(ServerPackets::UpdateSkillList) => {
+                let response = PacketServerUpdateSkillList::try_from(packet)?;
+                self.server_message_tx
+                    .send(ServerMessage::UpdateSkillList(response.skill_data))
+                    .ok();
+            }
+            Some(ServerPackets::MoveEntity) | Some(ServerPackets::MoveEntityWithMoveMode) => {
+                let response = PacketServerMoveEntity::try_from(packet)?;
+                self.server_message_tx
+                    .send(ServerMessage::MoveEntity(MoveEntity {
+                        entity_id: response.entity_id,
+                        target_entity_id: response.target_entity_id,
+                        distance: response.distance,
+                        x: response.x,
+                        y: response.y,
+                        z: response.z,
+                        move_mode: response.move_mode,
+                    }))
+                    .ok();
+            }
+            Some(ServerPackets::SpawnEntityNpc) => {
+                let message = PacketServerSpawnEntityNpc::try_from(packet)?;
+                self.server_message_tx
+                    .send(ServerMessage::SpawnEntityNpc(SpawnEntityNpc {
+                        entity_id: message.entity_id,
+                        npc: message.npc,
+                        direction: message.direction,
+                        position: message.position,
+                        team: message.team,
+                        health: message.health,
+                        destination: message.destination,
+                        command: message.command,
+                        target_entity_id: message.target_entity_id,
+                        move_mode: message.move_mode,
+                        status_effects: message.status_effects,
+                    }))
+                    .ok();
+            }
+            Some(ServerPackets::SpawnEntityMonster) => {
+                let message = PacketServerSpawnEntityMonster::try_from(packet)?;
+                self.server_message_tx
+                    .send(ServerMessage::SpawnEntityMonster(SpawnEntityMonster {
+                        entity_id: message.entity_id,
+                        npc: message.npc,
+                        position: message.position,
+                        team: message.team,
+                        health: message.health,
+                        destination: message.destination,
+                        command: message.command,
+                        target_entity_id: message.target_entity_id,
+                        move_mode: message.move_mode,
+                        status_effects: message.status_effects,
+                    }))
+                    .ok();
+            }
+            Some(ServerPackets::RemoveEntities) => {
+                let message = PacketServerRemoveEntities::try_from(packet)?;
+                self.server_message_tx
+                    .send(ServerMessage::RemoveEntities(RemoveEntities {
+                        entity_ids: message.entity_ids,
+                    }))
+                    .ok();
+            }
+            Some(ServerPackets::UpdateSpeed) => {
+                let message = PacketServerUpdateSpeed::try_from(packet)?;
+                self.server_message_tx
+                    .send(ServerMessage::UpdateSpeed(UpdateSpeed {
+                        entity_id: message.entity_id,
+                        run_speed: message.run_speed,
+                        passive_attack_speed: message.passive_attack_speed,
+                    }))
+                    .ok();
+            }
+            Some(ServerPackets::Teleport) => {
+                let message = PacketServerTeleport::try_from(packet)?;
+                self.server_message_tx
+                    .send(ServerMessage::Teleport(Teleport {
+                        entity_id: message.entity_id,
+                        zone_id: message.zone_id,
+                        x: message.x,
+                        y: message.y,
+                        run_mode: message.run_mode,
+                        ride_mode: message.ride_mode,
+                    }))
+                    .ok();
+            }
             _ => log::info!("Unhandled game packet {:?}", packet),
         }
 
@@ -124,6 +242,26 @@ impl GameClient {
                         weight_rate: 0,
                         z: 0,
                     }))
+                    .await?
+            }
+            ClientMessage::Move(Move {
+                target_entity_id,
+                x,
+                y,
+                z,
+            }) => {
+                connection
+                    .write_packet(Packet::from(&PacketClientMove {
+                        target_entity_id,
+                        x,
+                        y,
+                        z,
+                    }))
+                    .await?
+            }
+            ClientMessage::Chat(ref text) => {
+                connection
+                    .write_packet(Packet::from(&PacketClientChat { text }))
                     .await?
             }
             unimplemented => {

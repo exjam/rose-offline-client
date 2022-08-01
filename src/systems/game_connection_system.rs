@@ -1553,6 +1553,22 @@ pub fn game_connection_system(
                     });
                 }
             }
+            Ok(ServerMessage::UpdateSkillList(skill_data)) => {
+                if let Some(player_entity) = client_entity_list.player_entity {
+                    commands.add(move |world: &mut World| {
+                        let mut player = world.entity_mut(player_entity);
+                        if let Some(mut skill_list) = player.get_mut::<SkillList>() {
+                            for update_skill in skill_data {
+                                if let Some(skill_slot) =
+                                    skill_list.get_slot_mut(update_skill.skill_slot)
+                                {
+                                    *skill_slot = update_skill.skill_id;
+                                }
+                            }
+                        }
+                    });
+                }
+            }
             Ok(message) => {
                 log::warn!("Received unimplemented game server message: {:#?}", message);
             }

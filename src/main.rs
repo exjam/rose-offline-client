@@ -10,8 +10,8 @@ use bevy::{
     prelude::{
         AddAsset, App, AssetServer, Assets, Camera3dBundle, Color, Commands, CoreStage,
         ExclusiveSystemDescriptorCoercion, IntoExclusiveSystem, Msaa,
-        ParallelSystemDescriptorCoercion, Res, ResMut, StageLabel, StartupStage, State, SystemSet,
-        SystemStage,
+        ParallelSystemDescriptorCoercion, Quat, Res, ResMut, StageLabel, StartupStage, State,
+        SystemSet, SystemStage, Transform, Vec3,
     },
     render::{render_resource::WgpuFeatures, settings::WgpuSettings},
     window::WindowDescriptor,
@@ -719,6 +719,23 @@ fn load_game_data_irose(
             .vfs
             .read_file::<StbFile, _>("3DDATA/STB/LIST_MORPH_OBJECT.STB")
             .expect("Failed to load 3DDATA/STB/LIST_MORPH_OBJECT.STB"),
+        character_select_positions: vec![
+            Transform::from_translation(Vec3::new(5205.0, 1.0, -5205.0))
+                .with_rotation(Quat::from_xyzw(0.0, 1.0, 0.0, 0.0))
+                .with_scale(Vec3::new(1.5, 1.5, 1.5)),
+            Transform::from_translation(Vec3::new(5202.70, 1.0, -5206.53))
+                .with_rotation(Quat::from_xyzw(0.0, 1.0, 0.0, 0.0))
+                .with_scale(Vec3::new(1.5, 1.5, 1.5)),
+            Transform::from_translation(Vec3::new(5200.00, 1.0, -5207.07))
+                .with_rotation(Quat::from_xyzw(0.0, 1.0, 0.0, 0.0))
+                .with_scale(Vec3::new(1.5, 1.5, 1.5)),
+            Transform::from_translation(Vec3::new(5197.30, 1.0, -5206.53))
+                .with_rotation(Quat::from_xyzw(0.0, 1.0, 0.0, 0.0))
+                .with_scale(Vec3::new(1.5, 1.5, 1.5)),
+            Transform::from_translation(Vec3::new(5195.00, 1.0, -5205.00))
+                .with_rotation(Quat::from_xyzw(0.0, 1.0, 0.0, 0.0))
+                .with_scale(Vec3::new(1.5, 1.5, 1.5)),
+        ],
     });
 }
 
@@ -810,6 +827,18 @@ fn load_game_data_narose667(
             .vfs
             .read_file::<StbFile, _>("3DDATA/STB/LIST_MORPH_OBJECT.STB")
             .expect("Failed to load 3DDATA/STB/LIST_MORPH_OBJECT.STB"),
+        character_select_positions: vec![
+            Transform::from_translation(Vec3::new(5151.096, 54.9779, -5201.3533))
+                .with_rotation(Quat::from_xyzw(0.0, 0.67353, 0.0, 0.73916)),
+            Transform::from_translation(Vec3::new(5151.586, 54.9779, -5202.6197))
+                .with_rotation(Quat::from_xyzw(0.0, 0.455356, 0.0, 0.89031)),
+            Transform::from_translation(Vec3::new(5152.644, 54.9779, -5234.7595))
+                .with_rotation(Quat::from_xyzw(0.0, 0.21768, 0.0, 0.97602)),
+            Transform::from_translation(Vec3::new(5153.9706, 54.9779, -5203.687))
+                .with_rotation(Quat::from_xyzw(0.0, -0.0587484, 0.0, 0.998273)),
+            Transform::from_translation(Vec3::new(5155.2416, 54.9779, -5203.1997))
+                .with_rotation(Quat::from_xyzw(0.0, -0.303677, 0.0, 0.952775)),
+        ],
     });
 }
 
