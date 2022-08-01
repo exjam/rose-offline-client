@@ -37,7 +37,7 @@ use bevy::{
         },
         renderer::{RenderDevice, RenderQueue},
         view::{ExtractedView, VisibleEntities},
-        RenderApp, RenderStage,
+        Extract, RenderApp, RenderStage,
     },
 };
 
@@ -78,7 +78,7 @@ pub struct SkyUniformData {
     pub day_weight: f32,
 }
 
-fn extract_sky_uniform_data(mut commands: Commands, zone_time: Res<ZoneTime>) {
+fn extract_sky_uniform_data(mut commands: Commands, zone_time: Extract<Res<ZoneTime>>) {
     let day_weight = match zone_time.state {
         ZoneTimeState::Morning => zone_time.state_percent_complete,
         ZoneTimeState::Day => 1.0,

@@ -19,7 +19,7 @@ use bevy::{
         error, AddAsset, App, AssetServer, Assets, Component, Entity, FromWorld, HandleUntyped,
         Mesh, Msaa, Plugin, Query, Res, ResMut, With, World,
     },
-    reflect::TypeUuid,
+    reflect::{Reflect, TypeUuid},
     render::{
         extract_component::{ExtractComponent, ExtractComponentPlugin},
         mesh::{GpuBufferInfo, MeshVertexBufferLayout},
@@ -45,7 +45,6 @@ use bevy::{
         RenderApp, RenderStage,
     },
 };
-use bevy_inspector_egui::Inspectable;
 
 use crate::render::{
     zone_lighting::{SetZoneLightingBindGroup, ZoneLightingUniformMeta},
@@ -185,7 +184,10 @@ impl SpecializedMeshPipeline for ObjectMaterialPipeline {
             descriptor.depth_stencil.as_mut().unwrap().depth_compare = CompareFunction::Always;
         }
 
-        descriptor.fragment.as_mut().unwrap().targets[0].blend = Some(BlendState {
+        descriptor.fragment.as_mut().unwrap().targets[0]
+            .as_mut()
+            .unwrap()
+            .blend = Some(BlendState {
             color: BlendComponent {
                 src_factor: BlendFactor::SrcAlpha,
                 dst_factor: BlendFactor::OneMinusSrcAlpha,
@@ -394,7 +396,7 @@ pub struct ObjectMaterialUniformData {
     pub lightmap_uv_scale: f32,
 }
 
-#[derive(Debug, Clone, TypeUuid, Inspectable)]
+#[derive(Debug, Clone, TypeUuid, Reflect)]
 #[uuid = "62a496fa-33e8-41a8-9a44-237d70214227"]
 pub struct ObjectMaterial {
     pub base_texture: Option<Handle<Image>>,

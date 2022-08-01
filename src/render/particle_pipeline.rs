@@ -22,7 +22,7 @@ use bevy::{
         view::{
             ComputedVisibility, ViewUniform, ViewUniformOffset, ViewUniforms, VisibilitySystems,
         },
-        RenderApp, RenderStage, RenderWorld,
+        Extract, RenderApp, RenderStage,
     },
 };
 use bytemuck::Pod;
@@ -308,7 +308,7 @@ impl SpecializedRenderPipeline for ParticlePipeline {
                 shader: PARTICLE_SHADER_HANDLE.typed::<Shader>(),
                 shader_defs: vec![],
                 entry_point: "fs_main".into(),
-                targets: vec![ColorTargetState {
+                targets: vec![Some(ColorTargetState {
                     format: TextureFormat::bevy_default(),
                     blend: Some(BlendState {
                         color: BlendComponent {
@@ -323,7 +323,7 @@ impl SpecializedRenderPipeline for ParticlePipeline {
                         },
                     }),
                     write_mask: ColorWrites::ALL,
-                }],
+                })],
             }),
             layout: Some(vec![
                 self.view_layout.clone(),
@@ -389,21 +389,20 @@ struct ExtractedParticles {
 }
 
 fn extract_particles(
-    mut render_world: ResMut<RenderWorld>,
-    materials: Res<Assets<ParticleMaterial>>,
-    images: Res<Assets<Image>>,
-    query: Query<(
-        &ComputedVisibility,
-        &ParticleRenderData,
-        &Handle<ParticleMaterial>,
-    )>,
+    mut extracted_particles: ResMut<ExtractedParticles>,
+    materials: Extract<Res<Assets<ParticleMaterial>>>,
+    images: Extract<Res<Assets<Image>>>,
+    query: Extract<
+        Query<(
+            &ComputedVisibility,
+            &ParticleRenderData,
+            &Handle<ParticleMaterial>,
+        )>,
+    >,
 ) {
-    let mut extracted_particles = render_world
-        .get_resource_mut::<ExtractedParticles>()
-        .unwrap();
     extracted_particles.particles.clear();
     for (visible, particles, material_handle) in query.iter() {
-        if !visible.is_visible {
+        if !visible.is_visible() {
             continue;
         }
 

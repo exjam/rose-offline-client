@@ -36,7 +36,7 @@ use bevy::{
         },
         renderer::{RenderDevice, RenderQueue},
         view::{ExtractedView, VisibleEntities},
-        RenderApp, RenderStage,
+        Extract, RenderApp, RenderStage,
     },
 };
 
@@ -90,7 +90,7 @@ pub struct WaterUniformData {
     pub next_weight: f32,
 }
 
-fn extract_water_uniform_data(mut commands: Commands, time: Res<Time>) {
+fn extract_water_uniform_data(mut commands: Commands, time: Extract<Res<Time>>) {
     let time = time.seconds_since_startup() * 10.0;
     let current_index = (time as i32) % 25;
     let next_index = (current_index + 1) % 25;
@@ -145,7 +145,10 @@ impl SpecializedMeshPipeline for WaterMaterialPipeline {
             descriptor.fragment.as_mut().unwrap().shader = fragment_shader.clone();
         }
 
-        descriptor.fragment.as_mut().unwrap().targets[0].blend = Some(BlendState {
+        descriptor.fragment.as_mut().unwrap().targets[0]
+            .as_mut()
+            .unwrap()
+            .blend = Some(BlendState {
             color: BlendComponent {
                 src_factor: BlendFactor::SrcAlpha,
                 dst_factor: BlendFactor::One,

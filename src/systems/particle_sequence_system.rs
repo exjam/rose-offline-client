@@ -351,11 +351,13 @@ pub fn particle_sequence_system(
                 let mut gravity_local = Vec3::default();
                 let mut world_direction = None;
                 if matches!(particle_sequence.update_coords, PtlUpdateCoords::World) {
+                    let (_, global_rotation, global_translation) =
+                        global_transform.to_scale_rotation_translation();
                     let rotation = Quat::from_xyzw(
-                        global_transform.rotation.x,
-                        -global_transform.rotation.z,
-                        global_transform.rotation.y,
-                        global_transform.rotation.w,
+                        global_rotation.x,
+                        -global_rotation.z,
+                        global_rotation.y,
+                        global_rotation.w,
                     );
                     world_direction = Some(rotation);
                     gravity_local = rotation.mul_vec3(Vec3::new(
@@ -364,9 +366,9 @@ pub fn particle_sequence_system(
                         rng_gen_range(&mut rng, &particle_sequence.gravity_z),
                     ));
                     position = rotation.mul_vec3(position);
-                    position.x += global_transform.translation.x * 100.0;
-                    position.y += global_transform.translation.z * -100.0;
-                    position.z += global_transform.translation.y * 100.0;
+                    position.x += global_translation.x * 100.0;
+                    position.y += global_translation.z * -100.0;
+                    position.z += global_translation.y * 100.0;
                 }
 
                 let life = rng_gen_range(&mut rng, &particle_sequence.particle_life);
@@ -390,7 +392,7 @@ pub fn particle_sequence_system(
         let render_transform = match particle_sequence.update_coords {
             PtlUpdateCoords::World => Transform::default(),
             PtlUpdateCoords::LocalPosition => {
-                Transform::from_translation(global_transform.translation)
+                Transform::from_translation(global_transform.translation())
             }
             PtlUpdateCoords::Local => (*global_transform).into(),
         };

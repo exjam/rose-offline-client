@@ -38,7 +38,7 @@ pub fn damage_digit_render_system(
         }
 
         let translation =
-            global_transform.translation + Vec3::new(0.0, damage_digits.model_height, 0.0);
+            global_transform.translation() + Vec3::new(0.0, damage_digits.model_height, 0.0);
 
         if damage_digits.damage == 0 {
             // Miss, split over 4 digits

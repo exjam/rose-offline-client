@@ -2,44 +2,44 @@
 #import bevy_pbr::mesh_view_bindings
 #import rose_client::zone_lighting
 
-[[group(2), binding(0)]]
+@group(2) @binding(0)
 var<uniform> mesh: Mesh;
 
 #import bevy_pbr::mesh_functions
 
 #ifdef SKINNED
-[[group(2), binding(1)]]
+@group(2) @binding(1)
 var<uniform> joint_matrices: SkinnedMesh;
 #import bevy_pbr::skinning
 #endif
 
 struct Vertex {
-    [[location(0)]] position: vec3<f32>;
-    [[location(1)]] normal: vec3<f32>;
-    [[location(2)]] uv: vec2<f32>;
+    @location(0) position: vec3<f32>,
+    @location(1) normal: vec3<f32>,
+    @location(2) uv: vec2<f32>,
 
 #ifdef HAS_OBJECT_LIGHTMAP
-    [[location(3)]] lightmap_uv: vec2<f32>;
+    @location(3) lightmap_uv: vec2<f32>,
 #endif
 
 #ifdef SKINNED
-    [[location(4)]] joint_indexes: vec4<u32>;
-    [[location(5)]] joint_weights: vec4<f32>;
+    @location(4) joint_indexes: vec4<u32>,
+    @location(5) joint_weights: vec4<f32>,
 #endif
 };
 
 struct VertexOutput {
-    [[builtin(position)]] clip_position: vec4<f32>;
-    [[location(0)]] world_position: vec4<f32>;
-    [[location(1)]] world_normal: vec3<f32>;
-    [[location(2)]] uv: vec2<f32>;
+    @builtin(position) clip_position: vec4<f32>,
+    @location(0) world_position: vec4<f32>,
+    @location(1) world_normal: vec3<f32>,
+    @location(2) uv: vec2<f32>,
 
 #ifdef HAS_OBJECT_LIGHTMAP
-    [[location(3)]] lightmap_uv: vec2<f32>;
+    @location(3) lightmap_uv: vec2<f32>,
 #endif
 };
 
-[[stage(vertex)]]
+@vertex
 fn vertex(vertex: Vertex) -> VertexOutput {
 
     var out: VertexOutput;
@@ -63,11 +63,11 @@ fn vertex(vertex: Vertex) -> VertexOutput {
 }
 
 struct StaticMeshMaterialData {
-    flags: u32;
-    alpha_cutoff: f32;
-    alpha_value: f32;
-    lightmap_uv_offset: vec2<f32>;
-    lightmap_uv_scale: f32;
+    flags: u32,
+    alpha_cutoff: f32,
+    alpha_value: f32,
+    lightmap_uv_offset: vec2<f32>,
+    lightmap_uv_scale: f32,
 };
 
 let OBJECT_MATERIAL_FLAGS_ALPHA_MODE_OPAQUE: u32              = 1u;
@@ -76,33 +76,33 @@ let OBJECT_MATERIAL_FLAGS_ALPHA_MODE_BLEND: u32               = 4u;
 let OBJECT_MATERIAL_FLAGS_HAS_ALPHA_VALUE: u32                = 8u;
 let OBJECT_MATERIAL_FLAGS_SPECULAR: u32                       = 16u;
 
-[[group(1), binding(0)]]
+@group(1) @binding(0)
 var<uniform> material: StaticMeshMaterialData;
-[[group(1), binding(1)]]
+@group(1) @binding(1)
 var base_texture: texture_2d<f32>;
-[[group(1), binding(2)]]
+@group(1) @binding(2)
 var base_sampler: sampler;
-[[group(1), binding(3)]]
+@group(1) @binding(3)
 var lightmap_texture: texture_2d<f32>;
-[[group(1), binding(4)]]
+@group(1) @binding(4)
 var lightmap_sampler: sampler;
-[[group(1), binding(5)]]
+@group(1) @binding(5)
 var specular_texture: texture_2d<f32>;
-[[group(1), binding(6)]]
+@group(1) @binding(6)
 var specular_sampler: sampler;
 
 struct FragmentInput {
-    [[builtin(position)]] frag_coord: vec4<f32>;
-    [[location(0)]] world_position: vec4<f32>;
-    [[location(1)]] world_normal: vec3<f32>;
-    [[location(2)]] uv: vec2<f32>;
+    @builtin(position) frag_coord: vec4<f32>,
+    @location(0) world_position: vec4<f32>,
+    @location(1) world_normal: vec3<f32>,
+    @location(2) uv: vec2<f32>,
 #ifdef HAS_OBJECT_LIGHTMAP
-    [[location(3)]] lightmap_uv: vec2<f32>;
+    @location(3) lightmap_uv: vec2<f32>,
 #endif
 };
 
-[[stage(fragment)]]
-fn fragment(in: FragmentInput) -> [[location(0)]] vec4<f32> {
+@fragment
+fn fragment(in: FragmentInput) -> @location(0) vec4<f32> {
     var output_color: vec4<f32> = textureSample(base_texture, base_sampler, in.uv);
 #ifdef HAS_OBJECT_LIGHTMAP
     output_color = output_color * textureSample(lightmap_texture, lightmap_sampler, (in.lightmap_uv + material.lightmap_uv_offset) * material.lightmap_uv_scale) * 2.0;

@@ -14,7 +14,7 @@ use bevy::{
             ShaderType,
         },
         renderer::{RenderDevice, RenderQueue},
-        RenderApp, RenderStage,
+        Extract, RenderApp, RenderStage,
     },
 };
 
@@ -147,7 +147,7 @@ impl FromWorld for ZoneLightingUniformMeta {
     }
 }
 
-fn extract_uniform_data(mut commands: Commands, zone_lighting: Res<ZoneLighting>) {
+fn extract_uniform_data(mut commands: Commands, zone_lighting: Extract<Res<ZoneLighting>>) {
     commands.insert_resource(ZoneLightingUniformData {
         map_ambient_color: zone_lighting.map_ambient_color.extend(1.0),
         character_ambient_color: zone_lighting.character_ambient_color.extend(1.0),

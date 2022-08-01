@@ -44,7 +44,7 @@ pub fn ray_from_screenspace(
     // Compute the ray's direction depending on the projection used.
     let ray_direction = match is_orthographic {
         true => view.transform_vector3(-Vec3::Z), // All screenspace rays are parallel in ortho
-        false => cursor_pos_near - camera_transform.translation, // Direction from camera to cursor
+        false => cursor_pos_near - camera_transform.translation(), // Direction from camera to cursor
     };
 
     Some((cursor_pos_near, ray_direction))

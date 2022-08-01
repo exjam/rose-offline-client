@@ -1,21 +1,21 @@
 #import bevy_pbr::mesh_types
 #import bevy_pbr::mesh_view_bindings
 
-[[group(2), binding(0)]]
+@group(2) @binding(0)
 var<uniform> mesh: Mesh;
 
 struct Vertex {
-    [[location(0)]] position: vec3<f32>;
-    [[location(1)]] uv: vec2<f32>;
+    @location(0) position: vec3<f32>,
+    @location(1) uv: vec2<f32>,
 };
 
 struct VertexOutput {
-    [[builtin(position)]] clip_position: vec4<f32>;
-    [[location(0)]] world_position: vec4<f32>;
-    [[location(1)]] uv: vec2<f32>;
+    @builtin(position) clip_position: vec4<f32>,
+    @location(0) world_position: vec4<f32>,
+    @location(1) uv: vec2<f32>,
 };
 
-[[stage(vertex)]]
+@vertex
 fn vertex(vertex: Vertex) -> VertexOutput {
     var out: VertexOutput;
     out.uv = vertex.uv;
@@ -25,28 +25,28 @@ fn vertex(vertex: Vertex) -> VertexOutput {
 }
 
 struct EffectMeshMaterialData {
-    flags: u32;
-    alpha_cutoff: f32;
+    flags: u32,
+    alpha_cutoff: f32,
 };
 
 let EFFECT_MESH_MATERIAL_FLAGS_ALPHA_MODE_OPAQUE: u32              = 1u;
 let EFFECT_MESH_MATERIAL_FLAGS_ALPHA_MODE_MASK: u32                = 2u;
 
-[[group(1), binding(0)]]
+@group(1) @binding(0)
 var<uniform> material: EffectMeshMaterialData;
-[[group(1), binding(1)]]
+@group(1) @binding(1)
 var base_texture: texture_2d<f32>;
-[[group(1), binding(2)]]
+@group(1) @binding(2)
 var base_sampler: sampler;
 
 struct FragmentInput {
-    [[builtin(position)]] frag_coord: vec4<f32>;
-    [[location(0)]] world_position: vec4<f32>;
-    [[location(1)]] uv: vec2<f32>;
+    @builtin(position) frag_coord: vec4<f32>,
+    @location(0) world_position: vec4<f32>,
+    @location(1) uv: vec2<f32>,
 };
 
-[[stage(fragment)]]
-fn fragment(in: FragmentInput) -> [[location(0)]] vec4<f32> {
+@fragment
+fn fragment(in: FragmentInput) -> @location(0) vec4<f32> {
     var output_color: vec4<f32> = pow(textureSample(base_texture, base_sampler, in.uv), vec4<f32>(2.2));
 
     if ((material.flags & EFFECT_MESH_MATERIAL_FLAGS_ALPHA_MODE_OPAQUE) != 0u) {

@@ -13,7 +13,7 @@ use bevy::{
 use bevy_egui::EguiContext;
 use bevy_rapier3d::{
     plugin::RapierContext,
-    prelude::{Collider, InteractionGroups},
+    prelude::{Collider, InteractionGroups, QueryFilter},
 };
 use dolly::prelude::{Arm, CameraRig, LeftHanded, Position, Smooth, YawPitch};
 
@@ -107,7 +107,7 @@ fn orbit_camera_update(
     if !orbit_camera.has_initial_position {
         if let Ok(follow_transform) = query_global_transform.get(orbit_camera.follow_entity) {
             orbit_camera.rig = CameraRig::builder()
-                .with(Position::new(follow_transform.translation))
+                .with(Position::new(follow_transform.translation()))
                 .with(YawPitch::new().yaw_degrees(45.0).pitch_degrees(-30.0))
                 .with(Smooth::new_position_rotation(1.0, 1.0))
                 .with(Arm::new(Vec3::Z * orbit_camera.follow_distance))
@@ -160,7 +160,7 @@ fn orbit_camera_update(
     let mut camera_collide_distance = orbit_camera.max_distance;
 
     if let Ok(follow_transform) = query_global_transform.get(orbit_camera.follow_entity) {
-        let follow_position = follow_transform.translation + orbit_camera.follow_offset;
+        let follow_position = follow_transform.translation() + orbit_camera.follow_offset;
         orbit_camera.rig.driver_mut::<Position>().position = follow_position;
 
         // Camera collision
@@ -172,11 +172,10 @@ fn orbit_camera_update(
             ray_direction,
             &Collider::ball(ball_radius),
             orbit_camera.max_distance,
-            InteractionGroups::new(
+            QueryFilter::new().groups(InteractionGroups::new(
                 COLLISION_FILTER_MOVEABLE | COLLISION_FILTER_COLLIDABLE,
                 u32::MAX & !COLLISION_GROUP_PHYSICS_TOY,
-            ),
-            None,
+            )),
         ) {
             camera_collide_distance = distance.toi;
         }

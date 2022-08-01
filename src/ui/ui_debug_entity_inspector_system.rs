@@ -1,10 +1,13 @@
-use bevy::prelude::{Entity, Mut, World};
+use bevy::prelude::World;
+
+/*use bevy::prelude::{Entity, Mut, World};
 use bevy_egui::{egui, EguiContext};
 use bevy_inspector_egui::{Context, Inspectable};
 
 use crate::{resources::DebugInspector, ui::UiStateDebugWindows};
-
-pub fn ui_debug_entity_inspector_system(world: &mut World) {
+*/
+pub fn ui_debug_entity_inspector_system(_world: &mut World) {
+    /*
     world.resource_scope(
         |world, mut ui_state_debug_windows: Mut<UiStateDebugWindows>| {
             world.resource_scope(|world, mut debug_inspector_state: Mut<DebugInspector>| {
@@ -17,7 +20,7 @@ pub fn ui_debug_entity_inspector_system(world: &mut World) {
 
                 let mut context = Context::new_world_access(Some(&ctx), world);
 
-                // This manually circumcents bevy's change detection and probably isn't sound.
+                // This manually circumvents bevy's change detection and probably isn't sound.
                 // Todo: add bevy API to allow this safely
                 #[allow(clippy::cast_ref_to_mut)]
                 let value = unsafe {
@@ -53,4 +56,5 @@ pub fn ui_debug_entity_inspector_system(world: &mut World) {
             });
         },
     );
+    */
 }

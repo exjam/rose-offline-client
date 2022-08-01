@@ -13,7 +13,7 @@ use bevy::{
 use bevy_egui::{egui, EguiContext};
 use bevy_rapier3d::{
     plugin::{RapierConfiguration, RapierContext},
-    prelude::{Collider, CollisionGroups, InteractionGroups, Restitution, RigidBody},
+    prelude::{Collider, CollisionGroups, InteractionGroups, QueryFilter, Restitution, RigidBody},
 };
 use rand::prelude::SliceRandom;
 use rose_data::NpcId;
@@ -196,8 +196,9 @@ pub fn ui_debug_physics_system(
                     ray_direction,
                     10000000.0,
                     false,
-                    InteractionGroups::all().with_memberships(COLLISION_FILTER_CLICKABLE),
-                    None,
+                    QueryFilter::new().groups(
+                        InteractionGroups::all().with_memberships(COLLISION_FILTER_CLICKABLE),
+                    ),
                 ) {
                     while ui_state_debug_physics.spawn_timer
                         >= ui_state_debug_physics.spawn_interval

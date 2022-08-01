@@ -19,7 +19,7 @@ use bevy::{
         renderer::{RenderDevice, RenderQueue},
         texture::{BevyDefault, Image},
         view::{ComputedVisibility, ViewUniform, ViewUniformOffset, ViewUniforms},
-        RenderApp, RenderStage, RenderWorld,
+        Extract, RenderApp, RenderStage,
     },
 };
 use bytemuck::Pod;
@@ -186,11 +186,11 @@ impl SpecializedRenderPipeline for DamageDigitPipeline {
                 shader: DAMAGE_DIGIT_SHADER_HANDLE.typed::<Shader>(),
                 shader_defs: vec![],
                 entry_point: "fs_main".into(),
-                targets: vec![ColorTargetState {
+                targets: vec![Some(ColorTargetState {
                     format: TextureFormat::bevy_default(),
                     blend: Some(BlendState::ALPHA_BLENDING),
                     write_mask: ColorWrites::ALL,
-                }],
+                })],
             }),
             layout: Some(vec![
                 self.view_layout.clone(),
@@ -245,18 +245,17 @@ struct ExtractedDamageDigits {
 }
 
 fn extract_damage_digits(
-    mut render_world: ResMut<RenderWorld>,
-    materials: Res<Assets<DamageDigitMaterial>>,
-    images: Res<Assets<Image>>,
-    query: Query<(
-        &ComputedVisibility,
-        &DamageDigitRenderData,
-        &Handle<DamageDigitMaterial>,
-    )>,
+    mut extracted_damage_digits: ResMut<ExtractedDamageDigits>,
+    materials: Extract<Res<Assets<DamageDigitMaterial>>>,
+    images: Extract<Res<Assets<Image>>>,
+    query: Extract<
+        Query<(
+            &ComputedVisibility,
+            &DamageDigitRenderData,
+            &Handle<DamageDigitMaterial>,
+        )>,
+    >,
 ) {
-    let mut extracted_damage_digits = render_world
-        .get_resource_mut::<ExtractedDamageDigits>()
-        .unwrap();
     extracted_damage_digits.particles.clear();
     for (_visible, particles, material_handle) in query.iter() {
         /*

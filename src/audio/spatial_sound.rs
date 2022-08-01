@@ -97,8 +97,8 @@ pub fn spatial_sound_system(
 ) {
     let player = &mut context.spatial;
     let listener_transform = camera.single();
-    let listener_rotation = listener_transform.rotation;
-    let listener_position = listener_transform.translation;
+    let (_, listener_rotation, listener_position) =
+        listener_transform.to_scale_rotation_translation();
 
     // We just guess velocity based on cameras last movement...
     // TODO: This will be garbage on teleport
@@ -117,7 +117,7 @@ pub fn spatial_sound_system(
         query_spatial_sounds.iter_mut()
     {
         let velocity = sound_velocity.map(|v| v.0).unwrap_or(Vec3::ZERO) - listener_velocity;
-        let position = global_transform.translation - listener_position;
+        let position = global_transform.translation() - listener_position;
         let repeating = spatial_sound.repeating;
         let SpatialSound {
             control_handle,

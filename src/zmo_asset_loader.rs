@@ -5,20 +5,19 @@ use bevy::{
     math::{Quat, Vec3},
     reflect::TypeUuid,
 };
-use bevy_inspector_egui::Inspectable;
 use rose_file_readers::{RoseFile, ZmoChannel, ZmoFile};
 
 #[derive(Default)]
 pub struct ZmoAssetLoader;
 
-#[derive(Debug, Clone, Default, Inspectable)]
+#[derive(Clone, Default)]
 pub struct ZmoAssetBone {
     translation: Vec<Vec3>,
     rotation: Vec<Quat>,
     scale: Vec<f32>,
 }
 
-#[derive(Debug, Clone, TypeUuid, Inspectable)]
+#[derive(TypeUuid)]
 #[uuid = "120cb5ff-e72d-4730-9756-648d0001fdfa"]
 pub struct ZmoAsset {
     num_frames: usize,

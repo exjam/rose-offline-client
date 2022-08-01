@@ -2,23 +2,17 @@ use bevy::{
     hierarchy::Parent,
     input::Input,
     prelude::{
-        App, Camera, Camera3d, GlobalTransform, Handle, MouseButton, Plugin, Query, Res, ResMut,
-        With,
+        App, Camera, Camera3d, GlobalTransform, MouseButton, Plugin, Query, Res, ResMut, With,
     },
     render::camera::Projection,
     window::Windows,
 };
 use bevy_egui::EguiContext;
-use bevy_inspector_egui::{InspectableRegistry, WorldInspectorParams};
-use bevy_rapier3d::prelude::{InteractionGroups, RapierContext};
+// use bevy_inspector_egui::{InspectableRegistry, WorldInspectorParams};
+use bevy_rapier3d::prelude::{InteractionGroups, QueryFilter, RapierContext};
 
 use crate::{
-    components::{
-        ZoneObject, ZoneObjectAnimatedObject, ZoneObjectPart, ZoneObjectPartCollisionShape,
-        ZoneObjectTerrain, COLLISION_FILTER_INSPECTABLE,
-    },
-    ray_from_screenspace::ray_from_screenspace,
-    render::ObjectMaterial,
+    components::COLLISION_FILTER_INSPECTABLE, ray_from_screenspace::ray_from_screenspace,
     resources::DebugInspector,
 };
 
@@ -28,7 +22,7 @@ impl Plugin for DebugInspectorPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(DebugInspector::default())
             .add_system(debug_inspector_picking_system);
-
+        /*
         let mut inspectable_registry = app
             .world
             .get_resource_or_insert_with(InspectableRegistry::default);
@@ -44,6 +38,7 @@ impl Plugin for DebugInspectorPlugin {
             .world
             .get_resource_or_insert_with(WorldInspectorParams::default);
         world_inspector_params.ignore_component::<bevy::render::primitives::Aabb>();
+        */
     }
 }
 
@@ -83,13 +78,14 @@ fn debug_inspector_picking_system(
                     ray_direction,
                     10000000.0,
                     false,
-                    InteractionGroups::all().with_memberships(COLLISION_FILTER_INSPECTABLE),
-                    None,
+                    QueryFilter::new().groups(
+                        InteractionGroups::all().with_memberships(COLLISION_FILTER_INSPECTABLE),
+                    ),
                 ) {
                     debug_inspector_state.entity = Some(
                         query_parent
                             .get(collider_entity)
-                            .map_or(collider_entity, |parent| parent.0),
+                            .map_or(collider_entity, |parent| parent.get()),
                     );
                 }
             }

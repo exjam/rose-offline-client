@@ -40,8 +40,8 @@ pub fn client_entity_event_system(
                                 SoundCategory::NpcSounds,
                                 sound_settings.gain(SoundCategory::NpcSounds),
                                 SpatialSound::new(asset_server.load(sound_data.path.path())),
-                                Transform::from_translation(global_transform.translation),
-                                GlobalTransform::from_translation(global_transform.translation),
+                                Transform::from_translation(global_transform.translation()),
+                                GlobalTransform::from_translation(global_transform.translation()),
                             ));
                         }
 
@@ -74,8 +74,8 @@ pub fn client_entity_event_system(
                             sound_category,
                             sound_settings.gain(sound_category),
                             SpatialSound::new(asset_server.load(sound_data.path.path())),
-                            Transform::from_translation(global_transform.translation),
-                            GlobalTransform::from_translation(global_transform.translation),
+                            Transform::from_translation(global_transform.translation()),
+                            GlobalTransform::from_translation(global_transform.translation()),
                         ));
                     }
                 }

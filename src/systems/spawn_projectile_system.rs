@@ -54,7 +54,7 @@ pub fn spawn_projectile_system(
                 event.apply_damage,
             ),
             event.move_speed,
-            Transform::from_translation(source_global_transform.translation),
+            Transform::from_translation(source_global_transform.translation()),
             GlobalTransform::default(),
             Visibility::default(),
             ComputedVisibility::default(),

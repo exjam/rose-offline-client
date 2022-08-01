@@ -1,6 +1,6 @@
 use std::cmp::Ordering;
 
-use bevy_inspector_egui::egui;
+use bevy_egui::egui;
 
 use rose_data::{
     BaseItemData, EquipmentItem, Item, ItemClass, ItemGradeData, ItemType, SkillData, SkillId,

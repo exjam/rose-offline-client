@@ -294,7 +294,12 @@ impl ModelLoader {
         skin: usize,
     ) -> PersonalStoreModel {
         let root_bone = commands
-            .spawn_bundle((Transform::default(), GlobalTransform::default()))
+            .spawn_bundle((
+                Visibility::default(),
+                ComputedVisibility::default(),
+                Transform::default(),
+                GlobalTransform::default(),
+            ))
             .id();
         commands.entity(model_entity).add_child(root_bone);
 
@@ -336,7 +341,12 @@ impl ModelLoader {
         };
 
         let root_bone = commands
-            .spawn_bundle((Transform::default(), GlobalTransform::default()))
+            .spawn_bundle((
+                Visibility::default(),
+                ComputedVisibility::default(),
+                Transform::default(),
+                GlobalTransform::default(),
+            ))
             .id();
         commands.entity(model_entity).add_child(root_bone);
 
@@ -631,7 +641,12 @@ fn spawn_skeleton(
 
         bone_entities.push(
             commands
-                .spawn_bundle((transform, GlobalTransform::default()))
+                .spawn_bundle((
+                    Visibility::default(),
+                    ComputedVisibility::default(),
+                    transform,
+                    GlobalTransform::default(),
+                ))
                 .id(),
         );
     }

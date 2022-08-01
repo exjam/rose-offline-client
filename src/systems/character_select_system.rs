@@ -4,15 +4,15 @@ use bevy::{
     input::Input,
     math::{Quat, Vec3},
     prelude::{
-        AssetServer, Assets, Camera, Camera3d, Commands, Component, DespawnRecursiveExt, Entity,
-        EventReader, EventWriter, GlobalTransform, MouseButton, Query, Res, ResMut, State,
-        Transform, With,
+        AssetServer, Assets, Camera, Camera3d, Commands, Component, ComputedVisibility,
+        DespawnRecursiveExt, Entity, EventReader, EventWriter, GlobalTransform, MouseButton, Query,
+        Res, ResMut, State, Transform, Visibility, With,
     },
     render::{camera::Projection, mesh::skinning::SkinnedMesh},
     window::Windows,
 };
 use bevy_egui::{egui, EguiContext};
-use bevy_rapier3d::prelude::{InteractionGroups, RapierContext};
+use bevy_rapier3d::prelude::{InteractionGroups, QueryFilter, RapierContext};
 use rose_data::{CharacterMotionAction, ZoneId};
 use rose_game_common::{
     components::{CharacterGender, CharacterInfo, Equipment},
@@ -155,8 +155,10 @@ pub fn character_select_enter_system(
         let entity = commands
             .spawn_bundle((
                 CharacterSelectCharacter { index },
-                GlobalTransform::default(),
                 *transform,
+                GlobalTransform::default(),
+                Visibility::default(),
+                ComputedVisibility::default(),
             ))
             .id();
         models.push((None, entity));
@@ -947,11 +949,10 @@ pub fn character_select_input_system(
                     ray_direction,
                     10000000.0,
                     false,
-                    InteractionGroups::new(
+                    QueryFilter::new().groups(InteractionGroups::new(
                         COLLISION_FILTER_CLICKABLE,
                         COLLISION_GROUP_CHARACTER | COLLISION_GROUP_PLAYER,
-                    ),
-                    None,
+                    )),
                 ) {
                     let hit_entity = query_collider_parent
                         .get(collider_entity)

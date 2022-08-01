@@ -43,7 +43,7 @@ pub fn projectile_system(
                     }
                 })
                 .and_then(|target_entity| query_global_transform.get(target_entity).ok())
-                .map(|transform| transform.translation)
+                .map(|transform| transform.translation())
         } else {
             destination.map(|destination| destination.position)
         };

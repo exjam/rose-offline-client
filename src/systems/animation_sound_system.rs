@@ -46,7 +46,7 @@ pub fn animation_sound_system(
 
                 let step_sound_data = if let Some(current_zone) = current_zone.as_ref() {
                     if let Some(current_zone_data) = zone_loader_assets.get(&current_zone.handle) {
-                        let translation = global_transform.translation;
+                        let translation = global_transform.translation();
                         let position =
                             Vec3::new(translation.x * 100.0, -translation.z * 100.0, translation.y);
 
@@ -84,8 +84,8 @@ pub fn animation_sound_system(
                         sound_category,
                         sound_settings.gain(sound_category),
                         SpatialSound::new(asset_server.load(sound_data.path.path())),
-                        Transform::from_translation(global_transform.translation),
-                        GlobalTransform::from_translation(global_transform.translation),
+                        Transform::from_translation(global_transform.translation()),
+                        GlobalTransform::from_translation(global_transform.translation()),
                     ));
                 }
             }
@@ -127,8 +127,8 @@ pub fn animation_sound_system(
                         sound_category,
                         sound_settings.gain(sound_category),
                         SpatialSound::new(asset_server.load(sound_data.path.path())),
-                        Transform::from_translation(global_transform.translation),
-                        GlobalTransform::from_translation(global_transform.translation),
+                        Transform::from_translation(global_transform.translation()),
+                        GlobalTransform::from_translation(global_transform.translation()),
                     ));
                 }
             }
@@ -178,8 +178,10 @@ pub fn animation_sound_system(
                             sound_category,
                             sound_settings.gain(sound_category),
                             SpatialSound::new(asset_server.load(sound_data.path.path())),
-                            Transform::from_translation(target_global_transform.translation),
-                            GlobalTransform::from_translation(target_global_transform.translation),
+                            Transform::from_translation(target_global_transform.translation()),
+                            GlobalTransform::from_translation(
+                                target_global_transform.translation(),
+                            ),
                         ));
                     }
                 }

@@ -74,7 +74,7 @@ pub fn spawn_effect_system(
                             commands
                                 .entity(effect_entity)
                                 .insert(Transform::from_translation(
-                                    at_global_transform.translation,
+                                    at_global_transform.translation(),
                                 ));
                         }
                     }

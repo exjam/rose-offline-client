@@ -4,7 +4,7 @@ use bevy::{
         Assets, Changed, Commands, Entity, EventWriter, Or, Query, Res, Time, Transform, With,
     },
 };
-use bevy_rapier3d::prelude::{Collider, InteractionGroups, RapierContext};
+use bevy_rapier3d::prelude::{Collider, InteractionGroups, QueryFilter, RapierContext};
 
 use rose_game_common::{components::Destination, messages::client::ClientMessage};
 
@@ -55,11 +55,10 @@ pub fn collision_height_only_system(
             ray_direction,
             100000000.0,
             false,
-            InteractionGroups::new(
+            QueryFilter::new().groups(InteractionGroups::new(
                 COLLISION_FILTER_MOVEABLE,
                 u32::MAX & !COLLISION_GROUP_PHYSICS_TOY,
-            ),
-            None,
+            )),
         ) {
             Some((ray_origin + ray_direction * distance).y)
         } else {
@@ -110,11 +109,10 @@ pub fn collision_player_system_join_zoin(
             ray_direction,
             100000000.0,
             false,
-            InteractionGroups::new(
+            QueryFilter::new().groups(InteractionGroups::new(
                 COLLISION_FILTER_MOVEABLE,
                 u32::MAX & !COLLISION_GROUP_PHYSICS_TOY,
-            ),
-            None,
+            )),
         ) {
             Some((ray_origin + ray_direction * distance).y)
         } else {
@@ -184,11 +182,10 @@ pub fn collision_player_system(
                 cast_direction,
                 &Collider::ball(collider_radius),
                 translation_delta.length(),
-                InteractionGroups::new(
+                QueryFilter::new().groups(InteractionGroups::new(
                     COLLISION_FILTER_COLLIDABLE,
                     u32::MAX & !COLLISION_GROUP_ZONE_TERRAIN & !COLLISION_GROUP_PHYSICS_TOY,
-                ),
-                None,
+                )),
             ) {
                 let collision_translation =
                     cast_origin + translation_delta * (distance.toi - 0.1).max(0.0);
@@ -223,11 +220,10 @@ pub fn collision_player_system(
             ray_direction,
             1.35 + fall_distance,
             false,
-            InteractionGroups::new(
+            QueryFilter::new().groups(InteractionGroups::new(
                 COLLISION_FILTER_MOVEABLE,
                 u32::MAX & !COLLISION_GROUP_PHYSICS_TOY,
-            ),
-            None,
+            )),
         ) {
             Some((ray_origin + ray_direction * distance).y)
         } else {
@@ -264,9 +260,11 @@ pub fn collision_player_system(
             ),
             Quat::default(),
             &Collider::ball(1.0),
-            InteractionGroups::all()
-                .with_filter(COLLISION_GROUP_ZONE_EVENT_OBJECT | COLLISION_GROUP_ZONE_WARP_OBJECT),
-            None,
+            QueryFilter::new().groups(
+                InteractionGroups::all().with_filter(
+                    COLLISION_GROUP_ZONE_EVENT_OBJECT | COLLISION_GROUP_ZONE_WARP_OBJECT,
+                ),
+            ),
             |hit_entity| {
                 let hit_entity = query_collider_parent
                     .get(hit_entity)

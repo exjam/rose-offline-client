@@ -157,7 +157,10 @@ impl SpecializedMeshPipeline for TerrainMaterialPipeline {
             descriptor.fragment.as_mut().unwrap().shader = fragment_shader.clone();
         }
 
-        descriptor.fragment.as_mut().unwrap().targets[0].blend = Some(BlendState {
+        descriptor.fragment.as_mut().unwrap().targets[0]
+            .as_mut()
+            .unwrap()
+            .blend = Some(BlendState {
             color: BlendComponent {
                 src_factor: BlendFactor::SrcAlpha,
                 dst_factor: BlendFactor::OneMinusSrcAlpha,

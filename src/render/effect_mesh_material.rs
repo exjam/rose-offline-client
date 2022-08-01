@@ -128,7 +128,10 @@ impl Material for EffectMeshMaterial {
         ];
 
         descriptor.vertex.buffers = vec![layout.get_layout(&vertex_attributes)?];
-        descriptor.fragment.as_mut().unwrap().targets[0].blend = Some(BlendState {
+        descriptor.fragment.as_mut().unwrap().targets[0]
+            .as_mut()
+            .unwrap()
+            .blend = Some(BlendState {
             color: BlendComponent {
                 src_factor: key.bind_group_data.src_blend_factor,
                 dst_factor: key.bind_group_data.dst_blend_factor,

@@ -1,20 +1,20 @@
 #define_import_path rose_client::zone_lighting
 
 struct ZoneLighting {
-    map_ambient_color: vec4<f32>;
-    character_ambient_color: vec4<f32>;
-    character_diffuse_color: vec4<f32>;
-    fog_color: vec4<f32>;
-    fog_density: f32;
-    fog_min_density: f32;
-    fog_max_density: f32;
-    fog_height_offset: f32;
-    fog_height_falloff: f32;
-    fog_alpha_range_start: f32;
-    fog_alpha_range_end: f32;
+    map_ambient_color: vec4<f32>,
+    character_ambient_color: vec4<f32>,
+    character_diffuse_color: vec4<f32>,
+    fog_color: vec4<f32>,
+    fog_density: f32,
+    fog_min_density: f32,
+    fog_max_density: f32,
+    fog_height_offset: f32,
+    fog_height_falloff: f32,
+    fog_alpha_range_start: f32,
+    fog_alpha_range_end: f32,
 };
 
-[[group(3), binding(0)]]
+@group(3) @binding(0)
 var<uniform> zone_lighting: ZoneLighting;
 
 fn apply_zone_lighting(world_position: vec4<f32>, fragment_color: vec4<f32>) -> vec4<f32> {

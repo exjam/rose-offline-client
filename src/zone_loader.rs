@@ -804,7 +804,11 @@ fn spawn_terrain(
                         (tile_x as f32 * 4.0 + x as f32) / 64.0,
                         (tile_y as f32 * 4.0 + y as f32) / 64.0,
                     ]);
-                    tile_ids.push([tile_array_index1, tile_array_index2, tile_rotation]);
+                    tile_ids.push([
+                        tile_array_index1 as i32,
+                        tile_array_index2 as i32,
+                        tile_rotation as i32,
+                    ]);
                 }
             }
 
@@ -1009,6 +1013,8 @@ fn spawn_object(
         object_type(ZoneObjectId { id: object_id }),
         object_transform,
         GlobalTransform::default(),
+        Visibility::default(),
+        ComputedVisibility::default(),
         RigidBody::Fixed,
     ));
 

@@ -2,25 +2,25 @@
 #import bevy_pbr::mesh_view_bindings
 #import rose_client::zone_lighting
 
-[[group(2), binding(0)]]
+@group(2) @binding(0)
 var<uniform> mesh: Mesh;
 
 struct Vertex {
-    [[location(0)]] position: vec3<f32>;
-    [[location(1)]] uv0: vec2<f32>;
-    [[location(2)]] uv1: vec2<f32>;
-    [[location(3)]] tile_info: vec3<i32>;
+    @location(0) position: vec3<f32>,
+    @location(1) uv0: vec2<f32>,
+    @location(2) uv1: vec2<f32>,
+    @location(3) tile_info: vec3<i32>,
 };
 
 struct VertexOutput {
-    [[builtin(position)]] clip_position: vec4<f32>;
-    [[location(0)]] world_position: vec4<f32>;
-    [[location(1)]] uv0: vec2<f32>;
-    [[location(2)]] uv1: vec2<f32>;
-    [[location(3)]] tile_info: vec3<i32>;
+    @builtin(position) clip_position: vec4<f32>,
+    @location(0) world_position: vec4<f32>,
+    @location(1) uv0: vec2<f32>,
+    @location(2) uv1: vec2<f32>,
+    @location(3) tile_info: vec3<i32>,
 };
 
-[[stage(vertex)]]
+@vertex
 fn vertex(vertex: Vertex) -> VertexOutput {
     let world_position = mesh.model * vec4<f32>(vertex.position, 1.0);
 
@@ -33,25 +33,25 @@ fn vertex(vertex: Vertex) -> VertexOutput {
     return out;
 }
 
-[[group(1), binding(0)]]
+@group(1) @binding(0)
 var lightmap_texture: texture_2d<f32>;
-[[group(1), binding(1)]]
+@group(1) @binding(1)
 var lightmap_sampler: sampler;
-[[group(1), binding(2)]]
+@group(1) @binding(2)
 var tile_array_texture: texture_2d_array<f32>;
-[[group(1), binding(3)]]
+@group(1) @binding(3)
 var tile_array_sampler: sampler;
 
 struct FragmentInput {
-    [[builtin(position)]] frag_coord: vec4<f32>;
-    [[location(0)]] world_position: vec4<f32>;
-    [[location(1)]] uv0: vec2<f32>;
-    [[location(2)]] uv1: vec2<f32>;
-    [[location(3)]] tile_info: vec3<i32>;
+    @builtin(position) frag_coord: vec4<f32>,
+    @location(0) world_position: vec4<f32>,
+    @location(1) uv0: vec2<f32>,
+    @location(2) uv1: vec2<f32>,
+    @location(3) tile_info: vec3<i32>,
 };
 
-[[stage(fragment)]]
-fn fragment(in: FragmentInput) -> [[location(0)]] vec4<f32> {
+@fragment
+fn fragment(in: FragmentInput) -> @location(0) vec4<f32> {
     var tile_layer1_id: i32 = in.tile_info.x;
     var tile_layer2_id: i32 = in.tile_info.y;
     var tile_rotation: i32 = in.tile_info.z;

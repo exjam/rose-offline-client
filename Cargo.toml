@@ -7,11 +7,11 @@ edition = "2021"
 anyhow = "1.0.4"
 arrayvec = "0.7"
 async-trait = "0.1"
-bevy = { version = "0.8.0-dev", features = ["dds", "tga"] }
-bevy_egui = "0.14.0"
-bevy-inspector-egui = "0.11.0"
+bevy = { version = "0.8.0", features = ["dds", "tga"] }
+bevy_egui = "0.15.0"
+# bevy-inspector-egui = "0.11.0"
 bevy_polyline = "0.3.0"
-bevy_rapier3d = "0.14.1"
+bevy_rapier3d = "0.16.0"
 bitflags = "1.2"
 bytemuck = { version = "1.7.0", features = ["derive"] }
 chrono = "0.4"
@@ -46,12 +46,11 @@ rose-network-irose = { git = "https://github.com/exjam/rose-offline", rev = "378
 rose-network-narose667 = { git = "https://github.com/exjam/rose-offline", rev = "378bd3e32e04377a3eedf48095edd7a190109303" }
 
 [patch.crates-io]
-bevy = { git = "https://github.com/exjam/bevy", rev = "c0585313b183d8d1d550caba022e78a57002d8ec" }
-bevy_polyline = { git = "https://github.com/exjam/bevy_polyline", rev = "c72c3bd865f1717961a547026e40d8e8d1dcbb91" }
-bevy_egui = { git = "https://github.com/exjam/bevy_egui", rev = "173f2df393f88b5001e73ca82c67314327133771" }
-bevy-inspector-egui = { git = "https://github.com/exjam/bevy-inspector-egui", rev = "dace3bec25a29da9fb2f18553967bb188c3428a5" }
-bevy_rapier3d = { git = "https://github.com/exjam/bevy_rapier", rev = "5a8a630b22da43da219c1847c8c9665fe67ad55a" }
-nalgebra = { git = "https://github.com/exjam/nalgebra", rev = "3623ab19e42eeea14a754a1fd9c29f4e9a2ce6d0" }
+bevy = { git = "https://github.com/exjam/bevy", rev = "e8c26f8f6dd5df2ed19b0cb318382b394b1cbe39" }
+bevy_polyline = { git = "https://github.com/exjam/bevy_polyline", rev = "3c7bae575481f5a561442a8327f0f465c092917b" }
+bevy_egui = { git = "https://github.com/exjam/bevy_egui", rev = "9e9c47b51f2cc18812070580cc9d0fa8feeebb13" }
+# bevy-inspector-egui = { git = "https://github.com/exjam/bevy-inspector-egui", rev = "dace3bec25a29da9fb2f18553967bb188c3428a5" }
+bevy_rapier3d = { git = "https://github.com/exjam/bevy_rapier", rev = "f0809f556fb2e97eba3fd1a07d50ab522e2f57df" }
 oddio = { git = "https://github.com/exjam/oddio", rev = "4f4eb4076c3a4068225a7c442a25e40422261c93" }
 
 
