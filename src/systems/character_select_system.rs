@@ -801,6 +801,8 @@ pub fn character_select_system(
                             .with_rotation(Quat::from_rotation_y(std::f32::consts::PI))
                             .with_scale(Vec3::new(1.5, 1.5, 1.5)),
                         GlobalTransform::default(),
+                        Visibility::default(),
+                        ComputedVisibility::default(),
                     ))
                     .id();
                 character_select_state.create_character_entity = Some(create_character_entity);
