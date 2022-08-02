@@ -1,6 +1,6 @@
 use bevy::{
     ecs::query::WorldQuery,
-    prelude::{Entity, EventReader, Query, Res, Time},
+    prelude::{Entity, EventReader, EventWriter, Query, Res, Time},
 };
 
 use rose_data::{AbilityType, AnimationEventFlags, SkillData, StatusEffectType};
@@ -11,7 +11,7 @@ use rose_game_common::components::{
 use crate::{
     bundles::ability_values_get_value,
     components::{PendingSkillEffectList, PendingSkillTargetList},
-    events::AnimationFrameEvent,
+    events::{AnimationFrameEvent, HitEvent},
     resources::GameData,
 };
 
@@ -143,6 +143,7 @@ pub fn pending_skill_effect_system(
     mut query_caster: Query<(Entity, &mut PendingSkillTargetList)>,
     mut query_target: Query<SkillEffectTarget>,
     mut animation_frame_events: EventReader<AnimationFrameEvent>,
+    mut hit_events: EventWriter<HitEvent>,
     game_data: Res<GameData>,
     time: Res<Time>,
 ) {
@@ -178,6 +179,12 @@ pub fn pending_skill_effect_system(
                         if let Some(skill_data) =
                             game_data.skills.get_skill(pending_skill_effect.skill_id)
                         {
+                            hit_events.send(HitEvent::with_skill(
+                                event.entity,
+                                target.entity,
+                                pending_skill_effect.skill_id,
+                            ));
+
                             apply_skill_effect(
                                 skill_data,
                                 &game_data,

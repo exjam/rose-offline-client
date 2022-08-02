@@ -1,5 +1,6 @@
 use bevy::prelude::{Component, Deref, DerefMut};
 
+use rose_data::SkillId;
 use rose_game_common::{data::Damage, messages::ClientEntityId};
 
 pub struct PendingDamage {
@@ -8,6 +9,7 @@ pub struct PendingDamage {
     pub damage: Damage,
     pub is_kill: bool,
     pub is_immediate: bool,
+    pub from_skill: Option<(SkillId, i32)>,
 }
 
 impl PendingDamage {
@@ -16,6 +18,7 @@ impl PendingDamage {
         damage: Damage,
         is_kill: bool,
         is_immediate: bool,
+        from_skill: Option<(SkillId, i32)>,
     ) -> Self {
         Self {
             age: 0.0,
@@ -23,6 +26,7 @@ impl PendingDamage {
             damage,
             is_kill,
             is_immediate,
+            from_skill,
         }
     }
 }

@@ -535,6 +535,7 @@ pub fn game_connection_system(
                                 message.damage,
                                 message.is_killed,
                                 message.is_immediate,
+                                message.from_skill,
                             ));
                         }
 

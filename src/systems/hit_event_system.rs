@@ -42,7 +42,6 @@ pub struct HitDefenderQuery<'w> {
 
 fn apply_damage(
     commands: &mut Commands,
-    _attacker_entity: Option<Entity>,
     defender: &mut HitDefenderQueryItem,
     damage: Damage,
     is_killed: bool,
@@ -108,6 +107,10 @@ pub fn hit_event_system(
             while i < defender.pending_damage_list.len() {
                 if client_entity_list.get(defender.pending_damage_list[i].attacker)
                     == Some(event.attacker)
+                    && event.skill_id
+                        == defender.pending_damage_list[i]
+                            .from_skill
+                            .map(|(damage_skill_id, _)| damage_skill_id)
                 {
                     let pending_damage = defender.pending_damage_list.remove(i);
                     damage.amount += pending_damage.damage.amount;
@@ -121,7 +124,6 @@ pub fn hit_event_system(
 
             apply_damage(
                 &mut commands,
-                Some(event.attacker),
                 &mut defender,
                 damage,
                 is_killed,

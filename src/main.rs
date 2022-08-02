@@ -426,7 +426,6 @@ fn main() {
                 .before(spawn_effect_system),
         )
         .add_system(animation_sound_system.after(animation_system))
-        .add_system(pending_skill_effect_system.after(animation_effect_system))
         .add_system(
             projectile_system
                 .after(animation_effect_system)
@@ -444,8 +443,14 @@ fn main() {
                 .after(projectile_system),
         )
         .add_system(
+            pending_skill_effect_system
+                .after(animation_effect_system)
+                .after(projectile_system),
+        )
+        .add_system(
             hit_event_system
                 .after(animation_effect_system)
+                .after(pending_skill_effect_system)
                 .after(projectile_system),
         )
         .add_system(

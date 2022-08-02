@@ -8,7 +8,6 @@ pub struct HitEvent {
     pub effect_id: Option<EffectId>,
     pub skill_id: Option<SkillId>,
     pub apply_damage: bool,
-    pub apply_skill_effect: bool,
 }
 
 impl HitEvent {
@@ -19,7 +18,6 @@ impl HitEvent {
             effect_id,
             skill_id: None,
             apply_damage: true,
-            apply_skill_effect: false,
         }
     }
 
@@ -30,7 +28,6 @@ impl HitEvent {
             effect_id: None,
             skill_id: Some(skill_id),
             apply_damage: true,
-            apply_skill_effect: true,
         }
     }
 
