@@ -5,8 +5,8 @@ use bevy::{
     math::{Quat, Vec3},
     prelude::{
         AssetServer, Assets, Camera, Camera3d, Commands, Component, ComputedVisibility,
-        DespawnRecursiveExt, Entity, EventReader, EventWriter, GlobalTransform, MouseButton, Query,
-        Res, ResMut, State, Transform, Visibility, With,
+        DespawnRecursiveExt, Entity, EventReader, EventWriter, GlobalTransform, Handle,
+        MouseButton, Query, Res, ResMut, State, Transform, Visibility, With,
     },
     render::{camera::Projection, mesh::skinning::SkinnedMesh},
     window::Windows,
@@ -38,6 +38,7 @@ use crate::{
         widgets::{DataBindings, Dialog, DrawText, Widget},
         DialogInstance,
     },
+    zmo_asset_loader::ZmoAsset,
 };
 
 #[derive(Copy, Clone, PartialEq)]
@@ -98,6 +99,7 @@ pub struct CharacterSelectCharacter {
 
 pub struct CharacterSelectModelList {
     models: Vec<(Option<String>, Entity)>,
+    select_motion: Handle<ZmoAsset>,
 }
 
 const CREATE_CHARACTER_FACE_LIST: [i32; 7] = [1, 8, 15, 22, 29, 36, 43];
@@ -163,7 +165,10 @@ pub fn character_select_enter_system(
             .id();
         models.push((None, entity));
     }
-    commands.insert_resource(CharacterSelectModelList { models });
+    commands.insert_resource(CharacterSelectModelList {
+        models,
+        select_motion: asset_server.load("3DDATA/MOTION/AVATAR/EVENT_SELECT_M1.ZMO"),
+    });
 }
 
 pub fn character_select_exit_system(
@@ -189,6 +194,7 @@ pub fn character_select_models_system(
     mut commands: Commands,
     mut model_list: ResMut<CharacterSelectModelList>,
     character_list: Option<Res<CharacterList>>,
+    character_select_state: Res<CharacterSelect>,
     query_characters: Query<(Option<&ActiveMotion>, &CharacterModel), With<SkinnedMesh>>,
 ) {
     // Ensure all character list models are up to date
@@ -204,11 +210,14 @@ pub fn character_select_models_system(
                 model_list.models[index].0 = Some(character.info.name.clone());
             }
 
-            if character.delete_time.is_some() {}
-
             if let Ok((active_motion, character_model)) = query_characters.get(entity) {
-                let desired_motion = if character.delete_time.is_some() {
+                let deleting = character.delete_time.is_some();
+                let selected = character_select_state.selected_character_index == Some(index);
+
+                let desired_motion = if deleting {
                     &character_model.action_motions[CharacterMotionAction::Sit]
+                } else if selected {
+                    &model_list.select_motion
                 } else {
                     &character_model.action_motions[CharacterMotionAction::Stop1]
                 };
@@ -914,10 +923,8 @@ pub fn character_select_system(
 
 #[allow(clippy::too_many_arguments)]
 pub fn character_select_input_system(
-    mut commands: Commands,
     mut character_select_state: ResMut<CharacterSelect>,
     mut egui_ctx: ResMut<EguiContext>,
-    asset_server: Res<AssetServer>,
     mouse_button_input: Res<Input<MouseButton>>,
     rapier_context: Res<RapierContext>,
     windows: Res<Windows>,
@@ -978,10 +985,6 @@ pub fn character_select_input_system(
                         character_select_state.selected_character_index =
                             Some(select_character.index);
                         character_select_state.last_selected_time = Some(now);
-
-                        commands.entity(hit_entity).insert(ActiveMotion::new_once(
-                            asset_server.load("3DDATA/MOTION/AVATAR/EVENT_SELECT_M1.ZMO"),
-                        ));
                     }
                 }
             }
