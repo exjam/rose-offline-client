@@ -1015,7 +1015,10 @@ fn spawn_object(
 
     let mut part_entities: ArrayVec<Entity, 32> = ArrayVec::new();
     let mut object_entity_commands = commands.spawn_bundle((
-        object_type(ZoneObjectId { id: ifo_object_id }),
+        object_type(ZoneObjectId {
+            ifo_object_id,
+            zsc_object_id,
+        }),
         object_transform,
         GlobalTransform::default(),
         Visibility::default(),
@@ -1142,6 +1145,9 @@ fn spawn_object(
 
             let mut part_commands = object_commands.spawn_bundle((
                 part_object_type(ZoneObjectPart {
+                    ifo_object_id,
+                    zsc_object_id,
+                    zsc_part_id: part_index,
                     mesh_path: zsc.meshes[mesh_id].path().to_string_lossy().into(),
                     // collision_shape.is_none(): cannot be hit with any raycast
                     // collision_shape.is_some(): can be hit with forward raycast

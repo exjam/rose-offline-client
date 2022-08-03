@@ -1,5 +1,4 @@
 use bevy::{
-    hierarchy::Parent,
     input::Input,
     prelude::{
         App, Camera, Camera3d, GlobalTransform, Handle, MouseButton, Plugin, Query, Res, ResMut,
@@ -14,8 +13,9 @@ use bevy_rapier3d::prelude::{InteractionGroups, QueryFilter, RapierContext};
 
 use crate::{
     components::{
-        ZoneObject, ZoneObjectAnimatedObject, ZoneObjectId, ZoneObjectPart,
-        ZoneObjectPartCollisionShape, ZoneObjectTerrain, COLLISION_FILTER_INSPECTABLE,
+        ColliderEntity, ColliderParent, ZoneObject, ZoneObjectAnimatedObject, ZoneObjectId,
+        ZoneObjectPart, ZoneObjectPartCollisionShape, ZoneObjectTerrain,
+        COLLISION_FILTER_INSPECTABLE,
     },
     ray_from_screenspace::ray_from_screenspace,
     render::{ObjectMaterial, ObjectMaterialBlend, ObjectMaterialGlow},
@@ -32,6 +32,8 @@ impl Plugin for DebugInspectorPlugin {
         let mut inspectable_registry = app
             .world
             .get_resource_or_insert_with(InspectableRegistry::default);
+        inspectable_registry.register::<ColliderEntity>();
+        inspectable_registry.register::<ColliderParent>();
         inspectable_registry.register::<ZoneObject>();
         inspectable_registry.register::<ZoneObjectTerrain>();
         inspectable_registry.register::<ZoneObjectAnimatedObject>();
@@ -58,7 +60,6 @@ fn debug_inspector_picking_system(
     rapier_context: Res<RapierContext>,
     windows: Res<Windows>,
     query_camera: Query<(&Camera, &Projection, &GlobalTransform), With<Camera3d>>,
-    query_parent: Query<&Parent>,
 ) {
     if !debug_inspector_state.enable_picking {
         // Picking disabled
@@ -90,11 +91,7 @@ fn debug_inspector_picking_system(
                         InteractionGroups::all().with_memberships(COLLISION_FILTER_INSPECTABLE),
                     ),
                 ) {
-                    debug_inspector_state.entity = Some(
-                        query_parent
-                            .get(collider_entity)
-                            .map_or(collider_entity, |parent| parent.get()),
-                    );
+                    debug_inspector_state.entity = Some(collider_entity);
                 }
             }
         }

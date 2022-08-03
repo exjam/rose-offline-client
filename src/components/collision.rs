@@ -1,6 +1,7 @@
 use bevy::prelude::{Component, Entity};
+use bevy_inspector_egui::Inspectable;
 
-#[derive(Component)]
+#[derive(Component, Inspectable)]
 pub struct ColliderEntity {
     pub entity: Entity,
 }
@@ -11,7 +12,7 @@ impl ColliderEntity {
     }
 }
 
-#[derive(Component)]
+#[derive(Component, Inspectable)]
 pub struct ColliderParent {
     pub entity: Entity,
 }

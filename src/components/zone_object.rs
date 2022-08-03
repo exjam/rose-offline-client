@@ -32,11 +32,15 @@ impl From<&Option<ZscCollisionShape>> for ZoneObjectPartCollisionShape {
 
 #[derive(Clone, Default, Inspectable)]
 pub struct ZoneObjectId {
-    pub id: usize,
+    pub ifo_object_id: usize,
+    pub zsc_object_id: usize,
 }
 
 #[derive(Clone, Default, Inspectable)]
 pub struct ZoneObjectPart {
+    pub ifo_object_id: usize,
+    pub zsc_object_id: usize,
+    pub zsc_part_id: usize,
     pub mesh_path: String,
     pub collision_shape: ZoneObjectPartCollisionShape,
     pub collision_not_moveable: bool,
