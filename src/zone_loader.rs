@@ -1049,7 +1049,15 @@ fn spawn_object(
                 handle
             });
             zone_loading_assets.push(mesh.clone_untyped());
-            let lit_part = lit_object.and_then(|lit_object| lit_object.parts.get(part_index));
+            let lit_part = lit_object.and_then(|lit_object| {
+                for part in lit_object.parts.iter() {
+                    if part_index == part.object_part_index as usize {
+                        return Some(part);
+                    }
+                }
+
+                lit_object.parts.get(part_index)
+            });
             let lightmap_texture = lit_part.map(|lit_part| {
                 asset_server.load(RgbTextureLoader::convert_path(
                     &lightmap_path.join(&lit_part.filename),
