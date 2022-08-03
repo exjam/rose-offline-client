@@ -215,7 +215,7 @@ fn main() {
             clap::Arg::new("protocol")
             .long("protocol")
             .takes_value(true)
-                .value_parser(["irose", "narose667"])
+                .value_parser(["irose"])
                 .default_value("irose")
                 .help("Select which protocol to use."),
         );
@@ -247,7 +247,6 @@ fn main() {
     let enable_sound = matches.is_present("enable-sound");
     let protocol_type = match matches.value_of("protocol") {
         Some("irose") => ProtocolType::Irose,
-        Some("narose667") => ProtocolType::Narose667,
         _ => ProtocolType::default(),
     };
 
@@ -309,7 +308,7 @@ fn main() {
         })
         .insert_resource(LogSettings {
             level: Level::INFO,
-            filter: "wgpu=error,packets=debug,quest=trace,lua=trace,animation=info".to_string(),
+            filter: "wgpu=error,packets=debug,quest=trace,lua=trace,animation=debug".to_string(),
         })
         .add_plugin(bevy::log::LogPlugin::default())
         .add_plugin(bevy::core::CorePlugin::default())
@@ -623,7 +622,6 @@ fn main() {
     app.add_startup_system(load_ui_resources);
     match protocol_type {
         ProtocolType::Irose => app.add_startup_system(load_game_data_irose),
-        ProtocolType::Narose667 => app.add_startup_system(load_game_data_narose667),
     };
     app.add_startup_system_to_stage(StartupStage::PostStartup, load_common_game_data);
     app.run();
@@ -740,109 +738,6 @@ fn load_game_data_irose(
             Transform::from_translation(Vec3::new(5195.00, 1.0, -5205.00))
                 .with_rotation(Quat::from_xyzw(0.0, 1.0, 0.0, 0.0))
                 .with_scale(Vec3::new(1.5, 1.5, 1.5)),
-        ],
-    });
-}
-
-fn load_game_data_narose667(
-    mut commands: Commands,
-    vfs_resource: Res<VfsResource>,
-    asset_server: Res<AssetServer>,
-) {
-    let items = Arc::new(
-        rose_data_narose667::get_item_database(&vfs_resource.vfs)
-            .expect("Failed to load item database"),
-    );
-    let npcs = Arc::new(
-        rose_data_narose667::get_npc_database(
-            &vfs_resource.vfs,
-            &NpcDatabaseOptions {
-                load_frame_data: false,
-            },
-        )
-        .expect("Failed to load npc database"),
-    );
-    let skills = Arc::new(
-        rose_data_narose667::get_skill_database(&vfs_resource.vfs)
-            .expect("Failed to load skill database"),
-    );
-    let character_motion_database = Arc::new(
-        rose_data_narose667::get_character_motion_database(
-            &vfs_resource.vfs,
-            &CharacterMotionDatabaseOptions {
-                load_frame_data: false,
-            },
-        )
-        .expect("Failed to load character motion list"),
-    );
-    let zone_list = Arc::new(
-        rose_data_narose667::get_zone_list(&vfs_resource.vfs).expect("Failed to load zone list"),
-    );
-
-    asset_server.add_loader(ZoneLoader {
-        zone_list: zone_list.clone(),
-    });
-
-    commands.insert_resource(GameData {
-        ability_value_calculator: rose_game_irose::data::get_ability_value_calculator(
-            items.clone(),
-            skills.clone(),
-            npcs.clone(),
-        ),
-        animation_event_flags: rose_data_narose667::get_animation_event_flags(),
-        character_motion_database,
-        data_decoder: rose_data_narose667::get_data_decoder(),
-        effect_database: rose_data_narose667::get_effect_database(&vfs_resource.vfs)
-            .expect("Failed to load effect database"),
-        items,
-        npcs,
-        quests: Arc::new(
-            rose_data_narose667::get_quest_database(&vfs_resource.vfs)
-                .expect("Failed to load quest database"),
-        ),
-        skills,
-        skybox: rose_data_narose667::get_skybox_database(&vfs_resource.vfs)
-            .expect("Failed to load skybox database"),
-        sounds: rose_data_narose667::get_sound_database(&vfs_resource.vfs)
-            .expect("Failed to load sound database"),
-        status_effects: Arc::new(
-            rose_data_narose667::get_status_effect_database(&vfs_resource.vfs)
-                .expect("Failed to load status effect database"),
-        ),
-        zone_list,
-        ltb_event: LtbFile::default(),
-        stl_quest: vfs_resource
-            .vfs
-            .read_file_with::<StlFile, _>(
-                "3DDATA/STB/LIST_QUEST_S.STL",
-                &StlReadOptions {
-                    language_filter: Some(vec![1]),
-                },
-            )
-            .expect("Failed to load quest string file"),
-        zsc_event_object: vfs_resource
-            .vfs
-            .read_file::<ZscFile, _>("3DDATA/SPECIAL/EVENT_OBJECT.ZSC")
-            .expect("Failed to load 3DDATA/SPECIAL/EVENT_OBJECT.ZSC"),
-        zsc_special_object: vfs_resource
-            .vfs
-            .read_file::<ZscFile, _>("3DDATA/SPECIAL/LIST_DECO_SPECIAL.ZSC")
-            .expect("Failed to load 3DDATA/SPECIAL/LIST_DECO_SPECIAL.ZSC"),
-        stb_morph_object: vfs_resource
-            .vfs
-            .read_file::<StbFile, _>("3DDATA/STB/LIST_MORPH_OBJECT.STB")
-            .expect("Failed to load 3DDATA/STB/LIST_MORPH_OBJECT.STB"),
-        character_select_positions: vec![
-            Transform::from_translation(Vec3::new(5151.096, 54.9779, -5201.3533))
-                .with_rotation(Quat::from_xyzw(0.0, 0.67353, 0.0, 0.73916)),
-            Transform::from_translation(Vec3::new(5151.586, 54.9779, -5202.6197))
-                .with_rotation(Quat::from_xyzw(0.0, 0.455356, 0.0, 0.89031)),
-            Transform::from_translation(Vec3::new(5152.644, 54.9779, -5234.7595))
-                .with_rotation(Quat::from_xyzw(0.0, 0.21768, 0.0, 0.97602)),
-            Transform::from_translation(Vec3::new(5153.9706, 54.9779, -5203.687))
-                .with_rotation(Quat::from_xyzw(0.0, -0.0587484, 0.0, 0.998273)),
-            Transform::from_translation(Vec3::new(5155.2416, 54.9779, -5203.1997))
-                .with_rotation(Quat::from_xyzw(0.0, -0.303677, 0.0, 0.952775)),
         ],
     });
 }

@@ -1,7 +1,7 @@
 use rose_game_common::messages::{client::ClientMessage, server::ServerMessage};
 
 use crate::{
-    protocol::{irose, narose667, ProtocolClient, ProtocolType},
+    protocol::{irose, ProtocolClient, ProtocolType},
     resources::{GameConnection, LoginConnection, WorldConnection},
 };
 
@@ -39,11 +39,6 @@ impl NetworkThread {
                 client_message_rx,
                 server_message_tx,
             )) as Box<dyn ProtocolClient + Send + Sync>,
-            ProtocolType::Narose667 => Box::new(narose667::LoginClient::new(
-                server_address,
-                client_message_rx,
-                server_message_tx,
-            )) as Box<dyn ProtocolClient + Send + Sync>,
         };
 
         self.control_tx
@@ -71,11 +66,6 @@ impl NetworkThread {
             ProtocolType::Irose => Box::new(irose::WorldClient::new(
                 server_address,
                 packet_codec_seed,
-                client_message_rx,
-                server_message_tx,
-            )) as Box<dyn ProtocolClient + Send + Sync>,
-            ProtocolType::Narose667 => Box::new(narose667::WorldClient::new(
-                server_address,
                 client_message_rx,
                 server_message_tx,
             )) as Box<dyn ProtocolClient + Send + Sync>,
@@ -111,11 +101,6 @@ impl NetworkThread {
             ProtocolType::Irose => Box::new(irose::GameClient::new(
                 server_address,
                 packet_codec_seed,
-                client_message_rx,
-                server_message_tx,
-            )) as Box<dyn ProtocolClient + Send + Sync>,
-            ProtocolType::Narose667 => Box::new(narose667::GameClient::new(
-                server_address,
                 client_message_rx,
                 server_message_tx,
             )) as Box<dyn ProtocolClient + Send + Sync>,

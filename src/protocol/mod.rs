@@ -55,12 +55,10 @@ macro_rules! implement_protocol_client {
 }
 
 pub mod irose;
-pub mod narose667;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum ProtocolType {
     Irose,
-    Narose667,
 }
 
 impl Default for ProtocolType {
