@@ -17,9 +17,9 @@ use bevy::{
     },
     prelude::{
         error, AddAsset, App, AssetServer, Assets, Component, Entity, FromWorld, HandleUntyped,
-        Mesh, Msaa, Plugin, Query, Res, ResMut, With, World,
+        Mesh, Msaa, Plugin, Query, Res, ResMut, Vec3, With, World,
     },
-    reflect::{Reflect, TypeUuid},
+    reflect::TypeUuid,
     render::{
         extract_component::{ExtractComponent, ExtractComponentPlugin},
         mesh::{GpuBufferInfo, MeshVertexBufferLayout},
@@ -45,6 +45,8 @@ use bevy::{
         RenderApp, RenderStage,
     },
 };
+use bevy_inspector_egui::Inspectable;
+use rose_file_readers::{ZscMaterialBlend, ZscMaterialGlow};
 
 use crate::render::{
     zone_lighting::{SetZoneLightingBindGroup, ZoneLightingUniformMeta},
@@ -396,7 +398,54 @@ pub struct ObjectMaterialUniformData {
     pub lightmap_uv_scale: f32,
 }
 
-#[derive(Debug, Clone, TypeUuid, Reflect)]
+#[derive(Copy, Clone, Debug, Default, Inspectable)]
+pub enum ObjectMaterialBlend {
+    #[default]
+    Normal,
+    Lighten,
+}
+
+impl From<ZscMaterialBlend> for ObjectMaterialBlend {
+    fn from(zsc: ZscMaterialBlend) -> Self {
+        match zsc {
+            ZscMaterialBlend::Normal => ObjectMaterialBlend::Normal,
+            ZscMaterialBlend::Lighten => ObjectMaterialBlend::Lighten,
+        }
+    }
+}
+
+#[derive(Copy, Clone, Debug, Inspectable)]
+pub enum ObjectMaterialGlow {
+    Simple(Vec3),
+    Light(Vec3),
+    Texture(Vec3),
+    TextureLight(Vec3),
+    Alpha(Vec3),
+}
+
+impl From<ZscMaterialGlow> for ObjectMaterialGlow {
+    fn from(zsc: ZscMaterialGlow) -> Self {
+        match zsc {
+            ZscMaterialGlow::Simple(value) => {
+                ObjectMaterialGlow::Simple(Vec3::new(value.x, value.y, value.z))
+            }
+            ZscMaterialGlow::Light(value) => {
+                ObjectMaterialGlow::Light(Vec3::new(value.x, value.y, value.z))
+            }
+            ZscMaterialGlow::Texture(value) => {
+                ObjectMaterialGlow::Texture(Vec3::new(value.x, value.y, value.z))
+            }
+            ZscMaterialGlow::TextureLight(value) => {
+                ObjectMaterialGlow::TextureLight(Vec3::new(value.x, value.y, value.z))
+            }
+            ZscMaterialGlow::Alpha(value) => {
+                ObjectMaterialGlow::Alpha(Vec3::new(value.x, value.y, value.z))
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone, TypeUuid, Inspectable)]
 #[uuid = "62a496fa-33e8-41a8-9a44-237d70214227"]
 pub struct ObjectMaterial {
     pub base_texture: Option<Handle<Image>>,
@@ -409,6 +458,8 @@ pub struct ObjectMaterial {
     pub z_write_enabled: bool,
     pub specular_enabled: bool,
     pub skinned: bool,
+    pub blend: ObjectMaterialBlend,
+    pub glow: Option<ObjectMaterialGlow>,
 
     // lightmap texture, uv offset, uv scale
     pub lightmap_texture: Option<Handle<Image>>,
@@ -428,6 +479,8 @@ impl Default for ObjectMaterial {
             z_write_enabled: true,
             specular_enabled: false,
             skinned: false,
+            blend: ObjectMaterialBlend::Normal,
+            glow: None,
             lightmap_texture: None,
             lightmap_uv_offset: Vec2::new(0.0, 0.0),
             lightmap_uv_scale: 1.0,

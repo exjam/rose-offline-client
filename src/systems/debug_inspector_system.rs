@@ -2,17 +2,23 @@ use bevy::{
     hierarchy::Parent,
     input::Input,
     prelude::{
-        App, Camera, Camera3d, GlobalTransform, MouseButton, Plugin, Query, Res, ResMut, With,
+        App, Camera, Camera3d, GlobalTransform, Handle, MouseButton, Plugin, Query, Res, ResMut,
+        With,
     },
     render::camera::Projection,
     window::Windows,
 };
 use bevy_egui::EguiContext;
-// use bevy_inspector_egui::{InspectableRegistry, WorldInspectorParams};
+use bevy_inspector_egui::{InspectableRegistry, WorldInspectorParams};
 use bevy_rapier3d::prelude::{InteractionGroups, QueryFilter, RapierContext};
 
 use crate::{
-    components::COLLISION_FILTER_INSPECTABLE, ray_from_screenspace::ray_from_screenspace,
+    components::{
+        ZoneObject, ZoneObjectAnimatedObject, ZoneObjectId, ZoneObjectPart,
+        ZoneObjectPartCollisionShape, ZoneObjectTerrain, COLLISION_FILTER_INSPECTABLE,
+    },
+    ray_from_screenspace::ray_from_screenspace,
+    render::{ObjectMaterial, ObjectMaterialBlend, ObjectMaterialGlow},
     resources::DebugInspector,
 };
 
@@ -22,23 +28,25 @@ impl Plugin for DebugInspectorPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(DebugInspector::default())
             .add_system(debug_inspector_picking_system);
-        /*
+
         let mut inspectable_registry = app
             .world
             .get_resource_or_insert_with(InspectableRegistry::default);
-        inspectable_registry.register::<ObjectMaterial>();
-        inspectable_registry.register::<Handle<ObjectMaterial>>();
         inspectable_registry.register::<ZoneObject>();
         inspectable_registry.register::<ZoneObjectTerrain>();
         inspectable_registry.register::<ZoneObjectAnimatedObject>();
         inspectable_registry.register::<ZoneObjectPart>();
         inspectable_registry.register::<ZoneObjectPartCollisionShape>();
+        inspectable_registry.register::<ZoneObjectId>();
+        inspectable_registry.register::<ObjectMaterial>();
+        inspectable_registry.register::<ObjectMaterialBlend>();
+        inspectable_registry.register::<ObjectMaterialGlow>();
+        inspectable_registry.register::<Handle<ObjectMaterial>>();
 
         let mut world_inspector_params = app
             .world
             .get_resource_or_insert_with(WorldInspectorParams::default);
         world_inspector_params.ignore_component::<bevy::render::primitives::Aabb>();
-        */
     }
 }
 

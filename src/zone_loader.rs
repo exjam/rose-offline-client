@@ -45,9 +45,9 @@ use crate::{
     effect_loader::spawn_effect,
     events::{LoadZoneEvent, ZoneEvent},
     render::{
-        EffectMeshMaterial, ObjectMaterial, ParticleMaterial, RgbTextureLoader, SkyMaterial,
-        TerrainMaterial, TextureArray, TextureArrayBuilder, WaterMaterial, MESH_ATTRIBUTE_UV_1,
-        TERRAIN_MESH_ATTRIBUTE_TILE_INFO,
+        EffectMeshMaterial, ObjectMaterial, ObjectMaterialBlend, ParticleMaterial,
+        RgbTextureLoader, SkyMaterial, TerrainMaterial, TextureArray, TextureArrayBuilder,
+        WaterMaterial, MESH_ATTRIBUTE_UV_1, TERRAIN_MESH_ATTRIBUTE_TILE_INFO,
     },
     resources::{CurrentZone, DebugInspector, GameData},
     VfsResource,
@@ -584,7 +584,7 @@ pub fn spawn_zone(
                         commands.entity(zone_entity).add_child(water_entity);
                     }
 
-                    for event_object in ifo.event_objects.iter() {
+                    for (ifo_object_id, event_object) in ifo.event_objects.iter().enumerate() {
                         let event_entity = spawn_object(
                             commands,
                             asset_server,
@@ -597,6 +597,7 @@ pub fn spawn_zone(
                             &lightmap_path,
                             None,
                             &event_object.object,
+                            ifo_object_id,
                             event_object.object.object_id as usize,
                             ZoneObject::EventObject,
                             ZoneObject::EventObjectPart,
@@ -610,7 +611,7 @@ pub fn spawn_zone(
                         commands.entity(zone_entity).add_child(event_entity);
                     }
 
-                    for warp_object in ifo.warps.iter() {
+                    for (ifo_object_id, warp_object) in ifo.warps.iter().enumerate() {
                         let warp_entity = spawn_object(
                             commands,
                             asset_server,
@@ -623,6 +624,7 @@ pub fn spawn_zone(
                             &lightmap_path,
                             None,
                             warp_object,
+                            ifo_object_id,
                             1,
                             ZoneObject::WarpObject,
                             ZoneObject::WarpObjectPart,
@@ -635,11 +637,11 @@ pub fn spawn_zone(
                         commands.entity(zone_entity).add_child(warp_entity);
                     }
 
-                    for (object_id, object_instance) in ifo.cnst_objects.iter().enumerate() {
+                    for (ifo_object_id, object_instance) in ifo.cnst_objects.iter().enumerate() {
                         let lit_object = block_data.lit_cnst.as_ref().and_then(|lit| {
                             lit.objects
                                 .iter()
-                                .find(|lit_object| lit_object.id as usize == object_id + 1)
+                                .find(|lit_object| lit_object.id as usize == ifo_object_id + 1)
                         });
 
                         let object_entity = spawn_object(
@@ -654,6 +656,7 @@ pub fn spawn_zone(
                             &lightmap_path,
                             lit_object,
                             object_instance,
+                            ifo_object_id,
                             object_instance.object_id as usize,
                             ZoneObject::CnstObject,
                             ZoneObject::CnstObjectPart,
@@ -662,11 +665,11 @@ pub fn spawn_zone(
                         commands.entity(zone_entity).add_child(object_entity);
                     }
 
-                    for (object_id, object_instance) in ifo.deco_objects.iter().enumerate() {
+                    for (ifo_object_id, object_instance) in ifo.deco_objects.iter().enumerate() {
                         let lit_object = block_data.lit_deco.as_ref().and_then(|lit| {
                             lit.objects
                                 .iter()
-                                .find(|lit_object| lit_object.id as usize == object_id + 1)
+                                .find(|lit_object| lit_object.id as usize == ifo_object_id + 1)
                         });
 
                         let object_entity = spawn_object(
@@ -681,6 +684,7 @@ pub fn spawn_zone(
                             &lightmap_path,
                             lit_object,
                             object_instance,
+                            ifo_object_id,
                             object_instance.object_id as usize,
                             ZoneObject::DecoObject,
                             ZoneObject::DecoObjectPart,
@@ -978,12 +982,13 @@ fn spawn_object(
     lightmap_path: &Path,
     lit_object: Option<&LitObject>,
     object_instance: &IfoObject,
-    object_id: usize,
+    ifo_object_id: usize,
+    zsc_object_id: usize,
     object_type: fn(ZoneObjectId) -> ZoneObject,
     part_object_type: fn(ZoneObjectPart) -> ZoneObject,
     collision_group: u32,
 ) -> Entity {
-    let object = &zsc.objects[object_id as usize];
+    let object = &zsc.objects[zsc_object_id as usize];
     let object_transform = Transform::default()
         .with_translation(
             Vec3::new(
@@ -1010,7 +1015,7 @@ fn spawn_object(
 
     let mut part_entities: ArrayVec<Entity, 32> = ArrayVec::new();
     let mut object_entity_commands = commands.spawn_bundle((
-        object_type(ZoneObjectId { id: object_id }),
+        object_type(ZoneObjectId { id: ifo_object_id }),
         object_transform,
         GlobalTransform::default(),
         Visibility::default(),
@@ -1095,15 +1100,13 @@ fn spawn_object(
                     z_write_enabled: zsc_material.z_write_enabled,
                     z_test_enabled: zsc_material.z_test_enabled,
                     specular_enabled: zsc_material.specular_enabled,
+                    blend: zsc_material.blend_mode.into(),
+                    glow: zsc_material.glow.map(|x| x.into()),
                     skinned: zsc_material.is_skin,
                     lightmap_uv_offset,
                     lightmap_uv_scale,
                 });
 
-                /*
-                pub blend_mode: SceneBlendMode,
-                pub glow: Option<ZscMaterialGlow>,
-                */
                 material_cache.insert(material_id, Some(handle.clone()));
                 handle
             });
@@ -1298,6 +1301,8 @@ fn spawn_animated_object(
         z_write_enabled,
         z_test_enabled,
         specular_enabled: false,
+        blend: ObjectMaterialBlend::Normal,
+        glow: None,
         skinned: false,
         lightmap_uv_offset: Vec2::new(0.0, 0.0),
         lightmap_uv_scale: 1.0,

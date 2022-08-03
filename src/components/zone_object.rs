@@ -1,8 +1,9 @@
-use bevy::{prelude::Component, reflect::Reflect};
+use bevy::prelude::Component;
 
+use bevy_inspector_egui::Inspectable;
 use rose_file_readers::ZscCollisionShape;
 
-#[derive(Clone, Reflect)]
+#[derive(Clone, Inspectable)]
 pub enum ZoneObjectPartCollisionShape {
     None,
     Sphere,
@@ -29,12 +30,12 @@ impl From<&Option<ZscCollisionShape>> for ZoneObjectPartCollisionShape {
     }
 }
 
-#[derive(Clone, Default, Reflect)]
+#[derive(Clone, Default, Inspectable)]
 pub struct ZoneObjectId {
     pub id: usize,
 }
 
-#[derive(Clone, Default, Reflect)]
+#[derive(Clone, Default, Inspectable)]
 pub struct ZoneObjectPart {
     pub mesh_path: String,
     pub collision_shape: ZoneObjectPartCollisionShape,
@@ -44,20 +45,20 @@ pub struct ZoneObjectPart {
     pub collision_no_camera: bool,
 }
 
-#[derive(Clone, Default, Reflect)]
+#[derive(Clone, Default, Inspectable)]
 pub struct ZoneObjectAnimatedObject {
     pub mesh_path: String,
     pub motion_path: String,
     pub texture_path: String,
 }
 
-#[derive(Clone, Default, Reflect)]
+#[derive(Clone, Default, Inspectable)]
 pub struct ZoneObjectTerrain {
     pub block_x: u32,
     pub block_y: u32,
 }
 
-#[derive(Clone, Component, Reflect)]
+#[derive(Clone, Component, Inspectable)]
 pub enum ZoneObject {
     AnimatedObject(ZoneObjectAnimatedObject),
     WarpObject(ZoneObjectId),
@@ -70,4 +71,10 @@ pub enum ZoneObject {
     DecoObjectPart(ZoneObjectPart),
     Terrain(ZoneObjectTerrain),
     Water,
+}
+
+impl Default for ZoneObject {
+    fn default() -> Self {
+        ZoneObject::Water
+    }
 }

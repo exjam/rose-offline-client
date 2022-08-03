@@ -9,7 +9,7 @@ arrayvec = "0.7"
 async-trait = "0.1"
 bevy = { version = "0.8.0", features = ["dds", "tga"] }
 bevy_egui = "0.15.0"
-# bevy-inspector-egui = "0.11.0"
+bevy-inspector-egui = "0.12.1"
 bevy_polyline = "0.3.0"
 bevy_rapier3d = "0.16.0"
 bitflags = "1.2"
@@ -49,7 +49,7 @@ rose-network-narose667 = { git = "https://github.com/exjam/rose-offline", rev = 
 bevy = { git = "https://github.com/exjam/bevy", rev = "e8c26f8f6dd5df2ed19b0cb318382b394b1cbe39" }
 bevy_polyline = { git = "https://github.com/exjam/bevy_polyline", rev = "3c7bae575481f5a561442a8327f0f465c092917b" }
 bevy_egui = { git = "https://github.com/exjam/bevy_egui", rev = "9e9c47b51f2cc18812070580cc9d0fa8feeebb13" }
-# bevy-inspector-egui = { git = "https://github.com/exjam/bevy-inspector-egui", rev = "dace3bec25a29da9fb2f18553967bb188c3428a5" }
+bevy-inspector-egui = { git = "https://github.com/exjam/bevy-inspector-egui", rev = "a1a4379b0fe787e4830ce7b919fa75cfc2b6390b" }
 bevy_rapier3d = { git = "https://github.com/exjam/bevy_rapier", rev = "f0809f556fb2e97eba3fd1a07d50ab522e2f57df" }
 oddio = { git = "https://github.com/exjam/oddio", rev = "4f4eb4076c3a4068225a7c442a25e40422261c93" }
 
