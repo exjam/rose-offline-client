@@ -14,10 +14,11 @@ use bevy::{
         SystemSet, SystemStage, Transform, Vec3,
     },
     render::{render_resource::WgpuFeatures, settings::WgpuSettings},
-    window::WindowDescriptor,
+    window::{WindowDescriptor, WindowMode},
 };
 use bevy_rapier3d::plugin::PhysicsStages;
 use enum_map::enum_map;
+use serde::Deserialize;
 use std::{
     path::{Path, PathBuf},
     sync::Arc,
@@ -107,6 +108,202 @@ use zone_loader::{zone_loader_system, ZoneLoader, ZoneLoaderAsset};
 
 use crate::components::SoundCategory;
 
+#[derive(Default, Deserialize)]
+#[serde(default)]
+pub struct AccountConfig {
+    pub username: String,
+    pub password: String,
+}
+
+#[derive(Default, Deserialize)]
+#[serde(default)]
+pub struct AutoLoginConfig {
+    pub enabled: bool,
+    pub channel_id: Option<usize>,
+    pub server_id: Option<usize>,
+    pub character_name: Option<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(tag = "type", content = "path")]
+pub enum FilesystemDeviceConfig {
+    #[serde(rename = "vfs")]
+    Vfs(String),
+    #[serde(rename = "directory")]
+    Directory(String),
+    #[serde(rename = "aruavfs")]
+    AruaVfs(String),
+    #[serde(rename = "titanvfs")]
+    TitanVfs(String),
+}
+
+#[derive(Deserialize)]
+#[serde(default)]
+pub struct FilesystemConfig {
+    pub devices: Vec<FilesystemDeviceConfig>,
+}
+
+impl Default for FilesystemConfig {
+    fn default() -> Self {
+        let mut devices = Vec::new();
+
+        if Path::new("data.idx").exists() {
+            devices.push(FilesystemDeviceConfig::Vfs("data.idx".into()));
+        }
+
+        Self { devices }
+    }
+}
+
+#[derive(Deserialize)]
+#[serde(default)]
+pub struct ServerConfig {
+    pub ip: String,
+    pub port: u16,
+}
+
+impl Default for ServerConfig {
+    fn default() -> Self {
+        Self {
+            ip: "127.0.0.1".into(),
+            port: 29000,
+        }
+    }
+}
+
+#[derive(Deserialize)]
+#[serde(default)]
+pub struct GameConfig {
+    pub data_version: String,
+    pub game_version: String,
+    pub network_version: String,
+    pub ui_version: String,
+}
+
+impl Default for GameConfig {
+    fn default() -> Self {
+        Self {
+            data_version: "irose".into(),
+            game_version: "irose".into(),
+            network_version: "irose".into(),
+            ui_version: "irose".into(),
+        }
+    }
+}
+
+#[derive(Deserialize)]
+#[serde(tag = "type")]
+pub enum GraphicsModeConfig {
+    #[serde(rename = "window")]
+    Window { width: f32, height: f32 },
+    #[serde(rename = "fullscreen")]
+    Fullscreen,
+}
+
+#[derive(Deserialize)]
+#[serde(default)]
+pub struct GraphicsConfig {
+    pub mode: GraphicsModeConfig,
+    pub passthrough_terrain_textures: bool,
+    pub disable_vsync: bool,
+}
+
+impl Default for GraphicsConfig {
+    fn default() -> Self {
+        Self {
+            mode: GraphicsModeConfig::Window {
+                width: 1920.0,
+                height: 1080.0,
+            },
+            passthrough_terrain_textures: false,
+            disable_vsync: false,
+        }
+    }
+}
+
+#[derive(Deserialize)]
+#[serde(default)]
+pub struct SoundVolumeConfig {
+    pub global: f32,
+    pub background_music: f32,
+    pub player_footstep: f32,
+    pub player_combat: f32,
+    pub other_footstep: f32,
+    pub other_combat: f32,
+    pub npc_sounds: f32,
+}
+
+impl Default for SoundVolumeConfig {
+    fn default() -> Self {
+        Self {
+            global: 0.6,
+            background_music: 0.15,
+            player_footstep: 0.9,
+            player_combat: 1.0,
+            other_footstep: 0.5,
+            other_combat: 0.5,
+            npc_sounds: 0.6,
+        }
+    }
+}
+
+#[derive(Deserialize)]
+#[serde(default)]
+pub struct SoundConfig {
+    pub enabled: bool,
+    pub volume: SoundVolumeConfig,
+}
+
+impl Default for SoundConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            volume: SoundVolumeConfig::default(),
+        }
+    }
+}
+
+#[derive(Default, Deserialize)]
+#[serde(default)]
+pub struct Config {
+    pub account: AccountConfig,
+    pub auto_login: AutoLoginConfig,
+    pub filesystem: FilesystemConfig,
+    pub game: GameConfig,
+    pub graphics: GraphicsConfig,
+    pub server: ServerConfig,
+    pub sound: SoundConfig,
+}
+
+fn load_config(path: &Path) -> Config {
+    let toml_str = match std::fs::read_to_string(path) {
+        Ok(toml_str) => toml_str,
+        Err(error) => {
+            println!(
+                "Failed to load configuration from {} with error: {}",
+                path.to_string_lossy(),
+                error
+            );
+            return Config::default();
+        }
+    };
+
+    match toml::from_str(&toml_str) {
+        Ok(config) => {
+            println!("Read configuration from {}", path.to_string_lossy());
+            config
+        }
+        Err(error) => {
+            println!(
+                "Failed to load configuration from {} with error: {}",
+                path.to_string_lossy(),
+                error
+            );
+            Config::default()
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash, StageLabel)]
 enum GameStages {
     Network,
@@ -120,7 +317,13 @@ enum ModelViewerStages {
 }
 
 fn main() {
-    let mut command = clap::Command::new("bevy_rose")
+    let command = clap::Command::new("bevy_rose")
+    .arg(
+        clap::Arg::new("config")
+            .long("config")
+            .help("Path to config.toml")
+            .takes_value(true),
+    )
         .arg(
             clap::Arg::new("data-idx")
                 .long("data-idx")
@@ -221,180 +424,263 @@ fn main() {
                 .help("Assume all terrain textures are the same format such that we can pass through compressed textures to the GPU without decompression on the CPU. Note: This is not true for default irose 129_129en assets."),
         )
         .arg(
-            clap::Arg::new("enable-sound")
-                .long("enable-sound")
-                .help("Enable sound."),
+            clap::Arg::new("disable-sound")
+                .long("disable-sound")
+                .help("Disable sound."),
         )
         .arg(
-            clap::Arg::new("protocol")
-            .long("protocol")
+            clap::Arg::new("data-version")
+            .long("data-version")
             .takes_value(true)
                 .value_parser(["irose"])
-                .default_value("irose")
-                .help("Select which protocol to use."),
+                .help("Select which game version to use for game data."),
+        )
+        .arg(
+            clap::Arg::new("game-version")
+            .long("game-version")
+            .takes_value(true)
+                .value_parser(["irose"])
+                .help("Select which game version to use for gameplay."),
+        )
+        .arg(
+            clap::Arg::new("network-version")
+            .long("network-version")
+            .takes_value(true)
+                .value_parser(["irose"])
+                .help("Select which game version to use for network."),
+        )
+        .arg(
+            clap::Arg::new("ui-version")
+            .long("ui-version")
+            .takes_value(true)
+                .value_parser(["irose"])
+                .help("Select which game version to use for ui."),
         );
-    let data_path_error = command.error(
-        clap::ErrorKind::ArgumentNotFound,
-        "Must specify at least one of --data-idx or --data-path",
-    );
     let matches = command.get_matches();
 
-    let ip = matches
-        .value_of("ip")
-        .map(|x| x.to_string())
-        .unwrap_or_else(|| "127.0.0.1".to_string());
-    let port = matches
-        .value_of("ip")
-        .map(|x| x.to_string())
-        .unwrap_or_else(|| "29000".to_string());
-    let preset_username = matches.value_of("username").map(|x| x.to_string());
-    let preset_password = matches.value_of("password").map(|x| x.to_string());
-    let preset_server_id = matches
+    let mut config = matches
+        .value_of("config")
+        .map(Path::new)
+        .map_or_else(Config::default, load_config);
+
+    if let Some(ip) = matches.value_of("ip") {
+        config.server.ip = ip.into();
+    }
+
+    if let Some(port) = matches.value_of("port").and_then(|s| s.parse::<u16>().ok()) {
+        config.server.port = port;
+    }
+
+    if let Some(username) = matches.value_of("username") {
+        config.account.username = username.into();
+    }
+
+    if let Some(password) = matches.value_of("password") {
+        config.account.password = password.into();
+    }
+
+    if matches.is_present("auto-login") {
+        config.auto_login.enabled = true;
+    }
+
+    if let Some(id) = matches
         .value_of("server-id")
-        .and_then(|x| x.parse::<usize>().ok());
-    let preset_channel_id = matches
+        .and_then(|s| s.parse::<usize>().ok())
+    {
+        config.auto_login.server_id = Some(id);
+    }
+
+    if let Some(id) = matches
         .value_of("channel-id")
-        .and_then(|x| x.parse::<usize>().ok());
-    let preset_character_name = matches.value_of("character-name").map(|x| x.to_string());
-    let auto_login = matches.is_present("auto-login");
-    let passthrough_terrain_textures = matches.is_present("passthrough-terrain-textures");
-    let enable_sound = matches.is_present("enable-sound");
-    let protocol_type = match matches.value_of("protocol") {
-        Some("irose") => ProtocolType::Irose,
-        _ => ProtocolType::default(),
-    };
+        .and_then(|s| s.parse::<usize>().ok())
+    {
+        config.auto_login.channel_id = Some(id);
+    }
 
-    let disable_vsync = matches.is_present("disable-vsync");
-    let mut app_state = AppState::ZoneViewer;
-    let view_zone_id = matches
-        .value_of("zone")
-        .and_then(|str| str.parse::<u16>().ok())
-        .and_then(ZoneId::new)
-        .unwrap_or_else(|| ZoneId::new(1).unwrap());
+    if let Some(character_name) = matches.value_of("character-name") {
+        config.auto_login.character_name = Some(character_name.into());
+    }
+
+    if matches.is_present("disable-vsync") {
+        config.graphics.disable_vsync = true;
+    }
+
+    if matches.is_present("passthrough-terrain-textures") {
+        config.graphics.passthrough_terrain_textures = true;
+    }
+
+    if matches.is_present("disable-sound") {
+        config.sound.enabled = false;
+    }
+
+    if let Some(version) = matches.value_of("data-version") {
+        config.game.data_version = version.to_string();
+    }
+
+    if let Some(version) = matches.value_of("game-version") {
+        config.game.game_version = version.to_string();
+    }
+
+    if let Some(version) = matches.value_of("network-version") {
+        config.game.network_version = version.to_string();
+    }
+
+    if let Some(version) = matches.value_of("ui-version") {
+        config.game.ui_version = version.to_string();
+    }
+
+    if let Some(vfs_path) = matches.value_of("data-idx") {
+        config
+            .filesystem
+            .devices
+            .insert(0, FilesystemDeviceConfig::Vfs(vfs_path.into()));
+    }
+
+    if let Some(aruavfs_path) = matches.value_of("data-aruavfs-idx") {
+        config
+            .filesystem
+            .devices
+            .insert(0, FilesystemDeviceConfig::AruaVfs(aruavfs_path.into()));
+    }
+
+    if let Some(titanvfs_path) = matches.value_of("data-titanvfs-idx") {
+        config
+            .filesystem
+            .devices
+            .insert(0, FilesystemDeviceConfig::TitanVfs(titanvfs_path.into()));
+    }
+
+    if let Some(directory_path) = matches.value_of("data-path") {
+        config
+            .filesystem
+            .devices
+            .insert(0, FilesystemDeviceConfig::Directory(directory_path.into()));
+    }
+
     if matches.is_present("game") {
-        app_state = AppState::GameLogin;
+        run_game(&config);
     } else if matches.is_present("model-viewer") {
-        app_state = AppState::ModelViewer;
+        run_model_viewer(&config);
     } else if matches.is_present("zone-viewer") {
-        app_state = AppState::ZoneViewer;
+        run_zone_viewer(
+            &config,
+            matches
+                .value_of("zone")
+                .and_then(|str| str.parse::<u16>().ok())
+                .and_then(ZoneId::new),
+        );
     }
+}
 
-    let mut data_idx_path = matches.value_of("data-idx").map(Path::new);
-    let data_extracted_path = matches.value_of("data-path").map(Path::new);
-    let data_aruavfs_idx_path = matches.value_of("data-aruavfs-idx").map(Path::new);
-    let data_titanvfs_idx_path = matches.value_of("data-titanvfs-idx").map(Path::new);
+pub fn run_game(config: &Config) {
+    run_client(config, AppState::GameLogin, None);
+}
 
+pub fn run_model_viewer(config: &Config) {
+    run_client(config, AppState::ModelViewer, None);
+}
+
+pub fn run_zone_viewer(config: &Config, zone_id: Option<ZoneId>) {
+    run_client(config, AppState::ZoneViewer, zone_id);
+}
+
+fn run_client(config: &Config, app_state: AppState, zone_id: Option<ZoneId>) {
     let mut vfs_devices: Vec<Box<dyn VirtualFilesystemDevice + Send + Sync>> = Vec::new();
+    for device_config in config.filesystem.devices.iter() {
+        match device_config {
+            FilesystemDeviceConfig::Directory(path) => {
+                log::info!("Loading game data from host directory {}", path);
+                vfs_devices.push(Box::new(HostFilesystemDevice::new(path.into())));
+            }
+            FilesystemDeviceConfig::AruaVfs(path) => {
+                let index_root_path = Path::new(path)
+                    .parent()
+                    .map(|path| path.into())
+                    .unwrap_or_else(PathBuf::new);
 
-    if let Some(data_extracted_path) = data_extracted_path {
-        log::info!(
-            "Loading game data from path {}",
-            data_extracted_path.to_string_lossy()
-        );
-        vfs_devices.push(Box::new(HostFilesystemDevice::new(
-            data_extracted_path.to_path_buf(),
-        )));
-    }
+                log::info!("Loading game data from AruaVfs {}", path);
+                vfs_devices.push(Box::new(
+                    AruaVfsIndex::load(Path::new(path), &index_root_path.join("data.rose"))
+                        .unwrap_or_else(|_| panic!("Failed to load AruaVfs at {}", path)),
+                ));
 
-    if let Some(data_aruavfs_idx_path) = data_aruavfs_idx_path {
-        let index_root_path = data_aruavfs_idx_path
-            .parent()
-            .map(|path| path.into())
-            .unwrap_or_else(PathBuf::new);
+                log::info!(
+                    "Loading game data from AruaVfs root path {}",
+                    index_root_path.to_string_lossy()
+                );
+                vfs_devices.push(Box::new(HostFilesystemDevice::new(index_root_path)));
+            }
+            FilesystemDeviceConfig::TitanVfs(path) => {
+                let index_root_path = Path::new(path)
+                    .parent()
+                    .map(|path| path.into())
+                    .unwrap_or_else(PathBuf::new);
 
-        log::info!(
-            "Loading game data from AruaVFS {}",
-            data_aruavfs_idx_path.to_string_lossy()
-        );
-        vfs_devices.push(Box::new(
-            AruaVfsIndex::load(
-                Path::new(data_aruavfs_idx_path),
-                &index_root_path.join("data.rose"),
-            )
-            .expect("Failed to load AruaVFS"),
-        ));
+                log::info!("Loading game data from TitanVfs {}", path);
+                vfs_devices.push(Box::new(
+                    TitanVfsIndex::load(Path::new(path), &index_root_path.join("data.trf"))
+                        .unwrap_or_else(|_| panic!("Failed to load TitanVfs at {}", path)),
+                ));
 
-        log::info!(
-            "Loading game data from AruaVFS root path {}",
-            index_root_path.to_string_lossy()
-        );
-        vfs_devices.push(Box::new(HostFilesystemDevice::new(index_root_path)));
-    }
+                log::info!("Loading game data from TitanVfs root path {}", path);
+                vfs_devices.push(Box::new(HostFilesystemDevice::new(index_root_path)));
+            }
+            FilesystemDeviceConfig::Vfs(path) => {
+                log::info!("Loading game data from Vfs {}", path);
+                vfs_devices.push(Box::new(
+                    VfsIndex::load(Path::new(path))
+                        .unwrap_or_else(|_| panic!("Failed to load Vfs at {}", path)),
+                ));
 
-    if let Some(data_titanvfs_idx_path) = data_titanvfs_idx_path {
-        let index_root_path = data_titanvfs_idx_path
-            .parent()
-            .map(|path| path.into())
-            .unwrap_or_else(PathBuf::new);
-
-        log::info!(
-            "Loading game data from TitanVfs {}",
-            data_titanvfs_idx_path.to_string_lossy()
-        );
-        vfs_devices.push(Box::new(
-            TitanVfsIndex::load(
-                Path::new(data_titanvfs_idx_path),
-                &index_root_path.join("data.trf"),
-            )
-            .expect("Failed to load TitanVFS"),
-        ));
-
-        log::info!(
-            "Loading game data from TitanVfs root path {}",
-            index_root_path.to_string_lossy()
-        );
-        vfs_devices.push(Box::new(HostFilesystemDevice::new(index_root_path)));
-    }
-
-    if vfs_devices.is_empty() && data_idx_path.is_none() && Path::new("data.idx").exists() {
-        data_idx_path = Some(Path::new("data.idx"));
-    }
-
-    if let Some(data_idx_path) = data_idx_path {
-        log::info!(
-            "Loading game data from vfs {}",
-            data_idx_path.to_string_lossy()
-        );
-        vfs_devices.push(Box::new(VfsIndex::load(data_idx_path).unwrap_or_else(
-            |_| panic!("Failed to load {}", data_idx_path.to_string_lossy()),
-        )));
-
-        let index_root_path = data_idx_path
-            .parent()
-            .map(|path| path.into())
-            .unwrap_or_else(PathBuf::new);
-        log::info!(
-            "Loading game data from vfs root path {}",
-            index_root_path.to_string_lossy()
-        );
-        vfs_devices.push(Box::new(HostFilesystemDevice::new(index_root_path)));
+                let index_root_path = Path::new(path)
+                    .parent()
+                    .map(|path| path.into())
+                    .unwrap_or_else(PathBuf::new);
+                log::info!("Loading game data from Vfs root path {}", path);
+                vfs_devices.push(Box::new(HostFilesystemDevice::new(index_root_path)));
+            }
+        }
     }
 
     if vfs_devices.is_empty() {
-        data_path_error.exit();
+        log::error!("No filesystem devices");
+        return;
     }
 
     let virtual_filesystem = Arc::new(VirtualFilesystem::new(vfs_devices));
 
+    let (window_width, window_height) =
+        if let GraphicsModeConfig::Window { width, height } = config.graphics.mode {
+            (width, height)
+        } else {
+            (1920.0, 1080.0)
+        };
+
     let mut app = App::new();
+
+    // Must Initialise asset server before asset plugin
+    app.insert_resource(VfsResource {
+        vfs: virtual_filesystem.clone(),
+    })
+    .insert_resource(AssetServer::new(VfsAssetIo::new(virtual_filesystem)));
 
     // Initialise bevy engine
     app.insert_resource(Msaa { samples: 4 })
-        .insert_resource(AssetServerSettings {
-            asset_folder: data_extracted_path
-                .map(|p| p.to_string_lossy().to_string())
-                .unwrap_or_else(|| "data".to_string()),
-            watch_for_changes: false,
-        })
+        .insert_resource(AssetServerSettings::default())
         .insert_resource(WindowDescriptor {
             title: "rose-offline-client".to_string(),
-            present_mode: if disable_vsync {
+            present_mode: if config.graphics.disable_vsync {
                 bevy::window::PresentMode::Immediate
             } else {
                 bevy::window::PresentMode::Fifo
             },
-            width: 1920.0,
-            height: 1080.0,
+            width: window_width,
+            height: window_height,
+            mode: if matches!(config.graphics.mode, GraphicsModeConfig::Fullscreen) {
+                WindowMode::BorderlessFullscreen
+            } else {
+                WindowMode::Windowed
+            },
             ..Default::default()
         })
         .insert_resource(ClearColor(Color::rgb(0.70, 0.90, 1.0)))
@@ -415,15 +701,9 @@ fn main() {
         .add_plugin(bevy::hierarchy::HierarchyPlugin::default())
         .add_plugin(bevy::diagnostic::DiagnosticsPlugin::default())
         .add_plugin(bevy::input::InputPlugin::default())
-        .add_plugin(bevy::window::WindowPlugin::default());
-
-    app.insert_resource(VfsResource {
-        vfs: virtual_filesystem.clone(),
-    })
-    .insert_resource(AssetServer::new(VfsAssetIo::new(virtual_filesystem)))
-    .add_plugin(bevy::asset::AssetPlugin::default());
-
-    app.add_plugin(bevy::scene::ScenePlugin::default())
+        .add_plugin(bevy::window::WindowPlugin::default())
+        .add_plugin(bevy::asset::AssetPlugin::default())
+        .add_plugin(bevy::scene::ScenePlugin::default())
         .add_plugin(bevy::winit::WinitPlugin::default())
         .add_plugin(bevy::render::RenderPlugin::default())
         .add_plugin(bevy::core_pipeline::CorePipelinePlugin::default())
@@ -447,65 +727,66 @@ fn main() {
     // Initialise rose stuff
     app.init_asset_loader::<ZmsAssetLoader>()
         .add_asset::<ZmoAsset>()
+        .add_asset::<ZmsMaterialNumFaces>()
         .init_asset_loader::<ZmoAssetLoader>()
         .add_asset::<ZoneLoaderAsset>()
         .init_asset_loader::<DialogLoader>()
         .add_asset::<Dialog>()
         .insert_resource(RenderConfiguration {
-            passthrough_terrain_textures,
+            passthrough_terrain_textures: config.graphics.passthrough_terrain_textures,
+        })
+        .insert_resource(ServerConfiguration {
+            ip: config.server.ip.clone(),
+            port: format!("{}", config.server.port),
+            preset_username: Some(config.account.username.clone()),
+            preset_password: Some(config.account.password.clone()),
+            preset_server_id: config.auto_login.server_id,
+            preset_channel_id: config.auto_login.channel_id,
+            preset_character_name: config.auto_login.character_name.clone(),
+            auto_login: config.auto_login.enabled,
+        })
+        .insert_resource(SoundSettings {
+            enabled: config.sound.enabled,
+            global_gain: config.sound.volume.global,
+            gains: enum_map! {
+                SoundCategory::BackgroundMusic => config.sound.volume.background_music,
+                SoundCategory::PlayerFootstep => config.sound.volume.player_footstep,
+                SoundCategory::PlayerCombat => config.sound.volume.player_combat,
+                SoundCategory::OtherFootstep => config.sound.volume.other_footstep,
+                SoundCategory::OtherCombat => config.sound.volume.other_combat,
+                SoundCategory::NpcSounds => config.sound.volume.npc_sounds,
+            },
         })
         .add_plugin(RoseRenderPlugin)
         .add_plugin(RoseScriptingPlugin)
-        .insert_resource(ServerConfiguration {
-            ip,
-            port,
-            preset_username,
-            preset_password,
-            preset_server_id,
-            preset_channel_id,
-            preset_character_name,
-            auto_login,
-        })
-        .insert_resource(SoundSettings {
-            enabled: enable_sound,
-            global_gain: 0.6,
-            gains: enum_map! {
-                SoundCategory::BackgroundMusic => 0.15,
-                SoundCategory::PlayerFootstep => 0.9,
-                SoundCategory::PlayerCombat => 1.0,
-                SoundCategory::OtherFootstep => 0.5,
-                SoundCategory::OtherCombat => 0.5,
-                SoundCategory::NpcSounds => 0.6,
-            },
-        });
+        .add_plugin(DebugInspectorPlugin);
 
     // Setup state
     app.add_state(app_state);
-    app.add_plugin(DebugInspectorPlugin);
 
     let mut load_zone_events = Events::<LoadZoneEvent>::default();
     if matches!(app_state, AppState::ZoneViewer) {
-        load_zone_events.send(LoadZoneEvent::new(view_zone_id));
+        load_zone_events.send(LoadZoneEvent::new(
+            zone_id.unwrap_or_else(|| ZoneId::new(1).unwrap()),
+        ));
     }
 
     app.insert_resource(load_zone_events)
-        .insert_resource(Events::<AnimationFrameEvent>::default())
-        .insert_resource(Events::<ChatboxEvent>::default())
-        .insert_resource(Events::<ClientEntityEvent>::default())
-        .insert_resource(Events::<ConversationDialogEvent>::default())
-        .insert_resource(Events::<GameConnectionEvent>::default())
-        .insert_resource(Events::<HitEvent>::default())
-        .insert_resource(Events::<NpcStoreEvent>::default())
-        .insert_resource(Events::<PartyEvent>::default())
-        .insert_resource(Events::<PlayerCommandEvent>::default())
-        .insert_resource(Events::<QuestTriggerEvent>::default())
-        .insert_resource(Events::<SystemFuncEvent>::default())
-        .insert_resource(Events::<SpawnEffectEvent>::default())
-        .insert_resource(Events::<SpawnProjectileEvent>::default())
-        .insert_resource(Events::<WorldConnectionEvent>::default())
-        .insert_resource(Events::<ZoneEvent>::default());
-
-    app.add_asset::<ZmsMaterialNumFaces>();
+        .init_resource::<Events<AnimationFrameEvent>>()
+        .init_resource::<Events<ChatboxEvent>>()
+        .init_resource::<Events<ClientEntityEvent>>()
+        .init_resource::<Events<ConversationDialogEvent>>()
+        .init_resource::<Events<GameConnectionEvent>>()
+        .init_resource::<Events<HitEvent>>()
+        .init_resource::<Events<NpcStoreEvent>>()
+        .init_resource::<Events<PartyEvent>>()
+        .init_resource::<Events<PlayerCommandEvent>>()
+        .init_resource::<Events<QuestTriggerEvent>>()
+        .init_resource::<Events<SystemFuncEvent>>()
+        .init_resource::<Events<SpawnEffectEvent>>()
+        .init_resource::<Events<SpawnProjectileEvent>>()
+        .init_resource::<Events<WorldConnectionEvent>>()
+        .init_resource::<Events<ZoneEvent>>();
 
     app.add_system(background_music_system)
         .add_system(character_model_system)
@@ -705,6 +986,10 @@ fn main() {
     app.add_system_to_stage(CoreStage::PostUpdate, ui_drag_and_drop_system);
 
     // Setup network
+    let protocol_type = match config.game.network_version.as_str() {
+        "irose" => ProtocolType::Irose,
+        unknown => panic!("Unknown game network version {}", unknown),
+    };
     let (network_thread_tx, network_thread_rx) =
         tokio::sync::mpsc::unbounded_channel::<NetworkThreadMessage>();
     let network_thread = std::thread::spawn(move || run_network_thread(network_thread_rx));
@@ -720,10 +1005,17 @@ fn main() {
             .with_system(game_connection_system),
     );
 
-    app.add_startup_system(load_ui_resources);
-    match protocol_type {
-        ProtocolType::Irose => app.add_startup_system(load_game_data_irose),
+    // Add startup systems
+    match config.game.ui_version.as_str() {
+        "irose" => app.add_startup_system(load_ui_resources),
+        unknown => panic!("Unknown game ui version {}", unknown),
     };
+
+    match config.game.data_version.as_str() {
+        "irose" => app.add_startup_system(load_game_data_irose),
+        unknown => panic!("Unknown game data version {}", unknown),
+    };
+
     app.add_startup_system_to_stage(StartupStage::PostStartup, load_common_game_data);
     app.run();
 
