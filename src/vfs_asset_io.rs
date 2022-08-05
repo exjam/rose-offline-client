@@ -1,16 +1,16 @@
 use bevy::asset::{AssetIo, AssetIoError, BoxedFuture, Metadata};
-use rose_file_readers::{VfsFile, VfsIndex};
+use rose_file_readers::{VfsFile, VirtualFilesystem};
 use std::{
     path::{Path, PathBuf},
     sync::Arc,
 };
 
 pub struct VfsAssetIo {
-    vfs: Arc<VfsIndex>,
+    vfs: Arc<VirtualFilesystem>,
 }
 
 impl VfsAssetIo {
-    pub fn new(vfs: Arc<VfsIndex>) -> Self {
+    pub fn new(vfs: Arc<VirtualFilesystem>) -> Self {
         Self { vfs }
     }
 }
@@ -29,7 +29,7 @@ impl AssetIo for VfsAssetIo {
             if path.ends_with(".zone_loader") {
                 let zone_id = path.trim_end_matches(".zone_loader").parse::<u8>().unwrap();
                 Ok(vec![zone_id])
-            } else if let Some(file) = self.vfs.open_file(path) {
+            } else if let Ok(file) = self.vfs.open_file(path) {
                 match file {
                     VfsFile::Buffer(buffer) => Ok(buffer),
                     VfsFile::View(view) => Ok(view.into()),

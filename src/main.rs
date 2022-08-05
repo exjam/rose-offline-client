@@ -18,10 +18,16 @@ use bevy::{
 };
 use bevy_rapier3d::plugin::PhysicsStages;
 use enum_map::enum_map;
-use std::{path::Path, sync::Arc};
+use std::{
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 
 use rose_data::{CharacterMotionDatabaseOptions, NpcDatabaseOptions, ZoneId};
-use rose_file_readers::{LtbFile, StbFile, StlFile, StlReadOptions, VfsIndex, ZscFile};
+use rose_file_readers::{
+    AruaVfsIndex, HostFilesystemDevice, LtbFile, StbFile, StlFile, StlReadOptions, TitanVfsIndex,
+    VfsIndex, VirtualFilesystem, VirtualFilesystemDevice, ZscFile,
+};
 
 mod audio;
 mod bundles;
@@ -58,7 +64,7 @@ use render::{DamageDigitMaterial, RoseRenderPlugin};
 use resources::{
     load_ui_resources, run_network_thread, update_ui_resources, AppState, ClientEntityList,
     DamageDigitsSpawner, DebugRenderConfig, GameData, NetworkThread, NetworkThreadMessage,
-    RenderConfiguration, ServerConfiguration, SoundSettings, WorldTime, ZoneTime,
+    RenderConfiguration, ServerConfiguration, SoundSettings, VfsResource, WorldTime, ZoneTime,
 };
 use scripting::RoseScriptingPlugin;
 use systems::{
@@ -73,8 +79,8 @@ use systems::{
     game_connection_system, game_mouse_input_system, game_state_enter_system,
     game_zone_change_system, hit_event_system, item_drop_model_add_collider_system,
     item_drop_model_system, login_connection_system, login_state_enter_system,
-    login_state_exit_system, login_system, model_viewer_enter_system, model_viewer_system,
-    npc_idle_sound_system, npc_model_add_collider_system, npc_model_system,
+    login_state_exit_system, login_system, model_viewer_enter_system, model_viewer_exit_system,
+    model_viewer_system, npc_idle_sound_system, npc_model_add_collider_system, npc_model_system,
     particle_sequence_system, passive_recovery_system, pending_damage_system,
     pending_skill_effect_system, player_command_system, projectile_system, quest_trigger_system,
     spawn_effect_system, spawn_projectile_system, system_func_event_system, update_position_system,
@@ -101,10 +107,6 @@ use zone_loader::{zone_loader_system, ZoneLoader, ZoneLoaderAsset};
 
 use crate::components::SoundCategory;
 
-pub struct VfsResource {
-    vfs: Arc<VfsIndex>,
-}
-
 #[derive(Debug, Clone, PartialEq, Eq, Hash, StageLabel)]
 enum GameStages {
     Network,
@@ -123,6 +125,18 @@ fn main() {
             clap::Arg::new("data-idx")
                 .long("data-idx")
                 .help("Path to data.idx")
+                .takes_value(true),
+        )
+        .arg(
+            clap::Arg::new("data-aruavfs-idx")
+                .long("data-aruavfs-idx")
+                .help("Path to aruarose data.idx")
+                .takes_value(true),
+        )
+        .arg(
+            clap::Arg::new("data-titanvfs-idx")
+                .long("data-titanvfs-idx")
+                .help("Path to titanrose data.idx")
                 .takes_value(true),
         )
         .arg(
@@ -267,18 +281,100 @@ fn main() {
 
     let mut data_idx_path = matches.value_of("data-idx").map(Path::new);
     let data_extracted_path = matches.value_of("data-path").map(Path::new);
+    let data_aruavfs_idx_path = matches.value_of("data-aruavfs-idx").map(Path::new);
+    let data_titanvfs_idx_path = matches.value_of("data-titanvfs-idx").map(Path::new);
 
-    if data_idx_path.is_none() && data_extracted_path.is_none() {
-        if Path::new("data.idx").exists() {
-            data_idx_path = Some(Path::new("data.idx"));
-        } else {
-            data_path_error.exit();
-        }
+    let mut vfs_devices: Vec<Box<dyn VirtualFilesystemDevice + Send + Sync>> = Vec::new();
+
+    if let Some(data_extracted_path) = data_extracted_path {
+        log::info!(
+            "Loading game data from path {}",
+            data_extracted_path.to_string_lossy()
+        );
+        vfs_devices.push(Box::new(HostFilesystemDevice::new(
+            data_extracted_path.to_path_buf(),
+        )));
     }
 
-    let vfs = Arc::new(
-        VfsIndex::with_paths(data_idx_path, data_extracted_path).expect("Failed to initialise VFS"),
-    );
+    if let Some(data_aruavfs_idx_path) = data_aruavfs_idx_path {
+        let index_root_path = data_aruavfs_idx_path
+            .parent()
+            .map(|path| path.into())
+            .unwrap_or_else(PathBuf::new);
+
+        log::info!(
+            "Loading game data from AruaVFS {}",
+            data_aruavfs_idx_path.to_string_lossy()
+        );
+        vfs_devices.push(Box::new(
+            AruaVfsIndex::load(
+                Path::new(data_aruavfs_idx_path),
+                &index_root_path.join("data.rose"),
+            )
+            .expect("Failed to load AruaVFS"),
+        ));
+
+        log::info!(
+            "Loading game data from AruaVFS root path {}",
+            index_root_path.to_string_lossy()
+        );
+        vfs_devices.push(Box::new(HostFilesystemDevice::new(index_root_path)));
+    }
+
+    if let Some(data_titanvfs_idx_path) = data_titanvfs_idx_path {
+        let index_root_path = data_titanvfs_idx_path
+            .parent()
+            .map(|path| path.into())
+            .unwrap_or_else(PathBuf::new);
+
+        log::info!(
+            "Loading game data from TitanVfs {}",
+            data_titanvfs_idx_path.to_string_lossy()
+        );
+        vfs_devices.push(Box::new(
+            TitanVfsIndex::load(
+                Path::new(data_titanvfs_idx_path),
+                &index_root_path.join("data.trf"),
+            )
+            .expect("Failed to load TitanVFS"),
+        ));
+
+        log::info!(
+            "Loading game data from TitanVfs root path {}",
+            index_root_path.to_string_lossy()
+        );
+        vfs_devices.push(Box::new(HostFilesystemDevice::new(index_root_path)));
+    }
+
+    if vfs_devices.is_empty() && data_idx_path.is_none() && Path::new("data.idx").exists() {
+        data_idx_path = Some(Path::new("data.idx"));
+    }
+
+    if let Some(data_idx_path) = data_idx_path {
+        log::info!(
+            "Loading game data from vfs {}",
+            data_idx_path.to_string_lossy()
+        );
+        vfs_devices.push(Box::new(VfsIndex::load(data_idx_path).unwrap_or_else(
+            |_| panic!("Failed to load {}", data_idx_path.to_string_lossy()),
+        )));
+
+        let index_root_path = data_idx_path
+            .parent()
+            .map(|path| path.into())
+            .unwrap_or_else(PathBuf::new);
+        log::info!(
+            "Loading game data from vfs root path {}",
+            index_root_path.to_string_lossy()
+        );
+        vfs_devices.push(Box::new(HostFilesystemDevice::new(index_root_path)));
+    }
+
+    if vfs_devices.is_empty() {
+        data_path_error.exit();
+    }
+
+    let virtual_filesystem = Arc::new(VirtualFilesystem::new(vfs_devices));
 
     let mut app = App::new();
 
@@ -321,9 +417,11 @@ fn main() {
         .add_plugin(bevy::input::InputPlugin::default())
         .add_plugin(bevy::window::WindowPlugin::default());
 
-    app.insert_resource(VfsResource { vfs: vfs.clone() })
-        .insert_resource(AssetServer::new(VfsAssetIo::new(vfs)))
-        .add_plugin(bevy::asset::AssetPlugin::default());
+    app.insert_resource(VfsResource {
+        vfs: virtual_filesystem.clone(),
+    })
+    .insert_resource(AssetServer::new(VfsAssetIo::new(virtual_filesystem)))
+    .add_plugin(bevy::asset::AssetPlugin::default());
 
     app.add_plugin(bevy::scene::ScenePlugin::default())
         .add_plugin(bevy::winit::WinitPlugin::default())

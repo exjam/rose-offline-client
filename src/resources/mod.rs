@@ -15,6 +15,7 @@ mod server_configuration;
 mod server_list;
 mod sound_settings;
 mod ui_resources;
+mod virtual_filesystem;
 mod world_connection;
 mod world_rates;
 mod world_time;
@@ -41,6 +42,7 @@ pub use sound_settings::SoundSettings;
 pub use ui_resources::{
     load_ui_resources, update_ui_resources, UiResources, UiSprite, UiSpriteSheet, UiSpriteSheetType,
 };
+pub use virtual_filesystem::VfsResource;
 pub use world_connection::WorldConnection;
 pub use world_rates::WorldRates;
 pub use world_time::WorldTime;

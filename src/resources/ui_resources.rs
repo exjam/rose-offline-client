@@ -7,7 +7,7 @@ use bevy::{
 use bevy_egui::{egui, EguiContext};
 use enum_map::{enum_map, Enum, EnumMap};
 
-use rose_file_readers::{IdFile, TsiFile, TsiSprite, VfsIndex};
+use rose_file_readers::{IdFile, TsiFile, TsiSprite, VirtualFilesystem};
 
 use crate::{ui::widgets::Dialog, VfsResource};
 
@@ -142,7 +142,7 @@ impl UiResources {
 }
 
 fn load_ui_spritesheet(
-    vfs: &VfsIndex,
+    vfs: &VirtualFilesystem,
     asset_server: &AssetServer,
     egui_context: &mut EguiContext,
     tsi_path: &str,

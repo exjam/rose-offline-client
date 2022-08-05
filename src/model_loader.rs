@@ -12,7 +12,7 @@ use enum_map::{enum_map, EnumMap};
 
 use rose_data::{CharacterMotionAction, CharacterMotionDatabase, ItemDatabase, NpcId};
 use rose_data::{EquipmentIndex, ItemType, NpcDatabase};
-use rose_file_readers::{ChrFile, VfsIndex, ZmdFile, ZscFile};
+use rose_file_readers::{ChrFile, VirtualFilesystem, ZmdFile, ZscFile};
 use rose_game_common::components::{
     CharacterGender, CharacterInfo, DroppedItem, Equipment, EquipmentItemDatabase,
 };
@@ -29,7 +29,7 @@ use crate::{
 };
 
 pub struct ModelLoader {
-    vfs: Arc<VfsIndex>,
+    vfs: Arc<VirtualFilesystem>,
     character_motion_database: Arc<CharacterMotionDatabase>,
     item_database: Arc<ItemDatabase>,
     npc_database: Arc<NpcDatabase>,
@@ -69,7 +69,7 @@ pub struct ModelLoader {
 
 impl ModelLoader {
     pub fn new(
-        vfs: Arc<VfsIndex>,
+        vfs: Arc<VirtualFilesystem>,
         character_motion_database: Arc<CharacterMotionDatabase>,
         item_database: Arc<ItemDatabase>,
         npc_database: Arc<NpcDatabase>,

@@ -1013,7 +1013,7 @@ fn spawn_object(
     let mut material_cache: Vec<Option<Handle<ObjectMaterial>>> = vec![None; zsc.materials.len()];
     let mut mesh_cache: Vec<Option<Handle<Mesh>>> = vec![None; zsc.meshes.len()];
 
-    let mut part_entities: ArrayVec<Entity, 32> = ArrayVec::new();
+    let mut part_entities: ArrayVec<Entity, 256> = ArrayVec::new();
     let mut object_entity_commands = commands.spawn_bundle((
         object_type(ZoneObjectId {
             ifo_object_id,

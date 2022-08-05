@@ -11,7 +11,7 @@ use bevy::{
         view::NoFrustumCulling,
     },
 };
-use rose_file_readers::{EftFile, EftMesh, EftParticle, PtlFile, VfsIndex, VfsPath};
+use rose_file_readers::{EftFile, EftMesh, EftParticle, PtlFile, VfsPath, VirtualFilesystem};
 
 use crate::{
     components::{Effect, EffectMesh, EffectParticle, ParticleSequence},
@@ -22,7 +22,7 @@ use crate::{
 };
 
 pub fn spawn_effect(
-    vfs: &VfsIndex,
+    vfs: &VirtualFilesystem,
     commands: &mut Commands,
     asset_server: &AssetServer,
     particle_materials: &mut Assets<ParticleMaterial>,
@@ -182,7 +182,7 @@ fn spawn_mesh(
 }
 
 fn spawn_particle(
-    vfs: &VfsIndex,
+    vfs: &VirtualFilesystem,
     commands: &mut Commands,
     asset_server: &AssetServer,
     particle_materials: &mut Assets<ParticleMaterial>,
