@@ -77,7 +77,9 @@ pub use hit_event_system::hit_event_system;
 pub use item_drop_model_system::{item_drop_model_add_collider_system, item_drop_model_system};
 pub use login_connection_system::login_connection_system;
 pub use login_system::{login_state_enter_system, login_state_exit_system, login_system};
-pub use model_viewer_system::{model_viewer_enter_system, model_viewer_system};
+pub use model_viewer_system::{
+    model_viewer_enter_system, model_viewer_exit_system, model_viewer_system,
+};
 pub use npc_idle_sound_system::npc_idle_sound_system;
 pub use npc_model_system::{npc_model_add_collider_system, npc_model_system};
 pub use particle_sequence_system::particle_sequence_system;

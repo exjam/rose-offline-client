@@ -1,7 +1,9 @@
 use bevy::{
     input::Input,
     math::{EulerRot, Vec3},
-    prelude::{Camera3d, Commands, Entity, KeyCode, Local, Query, Res, ResMut, Transform, With},
+    prelude::{
+        Camera3d, Commands, Entity, KeyCode, Local, Query, Res, ResMut, State, Transform, With,
+    },
 };
 use bevy_egui::{egui, EguiContext};
 use rose_game_common::messages::client::ClientMessage;
@@ -10,7 +12,7 @@ use crate::{
     components::PlayerCharacter,
     free_camera::FreeCamera,
     orbit_camera::OrbitCamera,
-    resources::{DebugInspector, GameConnection},
+    resources::{AppState, DebugInspector, GameConnection, WorldConnection},
 };
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -58,8 +60,10 @@ pub fn ui_debug_menu_system(
     query_cameras: Query<(Entity, &Transform), With<Camera3d>>,
     query_player: Query<Entity, With<PlayerCharacter>>,
     game_connection: Option<Res<GameConnection>>,
+    world_connection: Option<Res<WorldConnection>>,
     keyboard: Res<Input<KeyCode>>,
     mut debug_inspector: ResMut<DebugInspector>,
+    mut app_state: ResMut<State<AppState>>,
 ) {
     if keyboard.pressed(KeyCode::LControl) && keyboard.just_pressed(KeyCode::D) {
         ui_state_debug_windows.debug_ui_open = !ui_state_debug_windows.debug_ui_open;
@@ -73,6 +77,44 @@ pub fn ui_debug_menu_system(
     egui::TopBottomPanel::top("ui_debug_menu").show(ctx, |ui| {
         egui::menu::bar(ui, |ui| {
             let player_entity = query_player.get_single().ok();
+
+            ui.menu_button("App", |ui| {
+                if ui.button("Model Viewer").clicked() {
+                    app_state.set(AppState::ModelViewer).ok();
+                }
+
+                if ui.button("Zone Viewer").clicked() {
+                    app_state.set(AppState::ZoneViewer).ok();
+                }
+
+                ui.separator();
+
+                ui.add_enabled_ui(
+                    world_connection.is_none() && game_connection.is_none(),
+                    |ui| {
+                        if ui.button("Game Login").clicked() {
+                            app_state.set(AppState::GameLogin).ok();
+                        }
+                    },
+                );
+
+                ui.add_enabled_ui(
+                    world_connection.is_some() && game_connection.is_none(),
+                    |ui| {
+                        if ui.button("Game Character Select").clicked() {
+                            app_state.set(AppState::GameCharacterSelect).ok();
+                        }
+                    },
+                );
+
+                ui.add_enabled_ui(game_connection.is_some(), |ui| {
+                    if ui.button("Game").clicked() {
+                        app_state.set(AppState::Game).ok();
+                    }
+                });
+
+                ui.set_enabled(true);
+            });
 
             ui.menu_button("Camera", |ui| {
                 let previous_camera_type = ui_state_debug_menu.selected_camera_type;

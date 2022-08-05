@@ -617,6 +617,9 @@ fn main() {
     app.add_system_set(
         SystemSet::on_enter(AppState::ModelViewer).with_system(model_viewer_enter_system),
     );
+    app.add_system_set(
+        SystemSet::on_exit(AppState::ModelViewer).with_system(model_viewer_exit_system),
+    );
     app.add_stage_after(
         CoreStage::Update,
         ModelViewerStages::Input,

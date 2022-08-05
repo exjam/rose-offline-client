@@ -41,7 +41,6 @@ pub struct ModelViewerState {
     last_effect_entity: Option<Entity>,
 }
 
-#[allow(clippy::too_many_arguments)]
 pub fn model_viewer_enter_system(
     mut commands: Commands,
     query_cameras: Query<Entity, With<Camera3d>>,
@@ -103,7 +102,19 @@ pub fn model_viewer_enter_system(
     ui_state_debug_windows.item_list_open = true;
 }
 
-#[allow(clippy::too_many_arguments)]
+pub fn model_viewer_exit_system(
+    mut commands: Commands,
+    model_viewer_state: ResMut<ModelViewerState>,
+) {
+    for entity in model_viewer_state.characters.iter() {
+        commands.entity(*entity).despawn_recursive();
+    }
+
+    for entity in model_viewer_state.npcs.iter() {
+        commands.entity(*entity).despawn_recursive();
+    }
+}
+
 pub fn model_viewer_system(
     mut commands: Commands,
     mut ui_state: ResMut<ModelViewerState>,
@@ -143,6 +154,8 @@ pub fn model_viewer_system(
                     let entity = commands
                         .spawn_bundle((
                             Npc::new(npc.id, 0),
+                            Visibility::default(),
+                            ComputedVisibility::default(),
                             GlobalTransform::default(),
                             Transform::default().with_translation(Vec3::new(
                                 2.5 + (count / 30) as f32 * 5.0,
@@ -217,6 +230,8 @@ pub fn model_viewer_system(
                         .spawn_bundle((
                             character_info,
                             equipment,
+                            Visibility::default(),
+                            ComputedVisibility::default(),
                             GlobalTransform::default(),
                             Transform::default().with_translation(Vec3::new(
                                 -2.5 + (count / 25) as f32 * -5.0,
