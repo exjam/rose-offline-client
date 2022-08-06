@@ -55,6 +55,12 @@ impl TextureArrayBuilder {
     }
 }
 
+impl Default for TextureArrayBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 pub struct GpuTextureArray {
     pub texture: Texture,
     pub texture_view: TextureView,

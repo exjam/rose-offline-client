@@ -30,25 +30,25 @@ use rose_file_readers::{
     VfsIndex, VirtualFilesystem, VirtualFilesystemDevice, ZscFile,
 };
 
-mod audio;
-mod bundles;
-mod components;
-mod effect_loader;
-mod events;
-mod free_camera;
-mod model_loader;
-mod orbit_camera;
-mod protocol;
-mod ray_from_screenspace;
-mod render;
-mod resources;
-mod scripting;
-mod systems;
-mod ui;
-mod vfs_asset_io;
-mod zmo_asset_loader;
-mod zms_asset_loader;
-mod zone_loader;
+pub mod audio;
+pub mod bundles;
+pub mod components;
+pub mod effect_loader;
+pub mod events;
+pub mod free_camera;
+pub mod model_loader;
+pub mod orbit_camera;
+pub mod protocol;
+pub mod ray_from_screenspace;
+pub mod render;
+pub mod resources;
+pub mod scripting;
+pub mod systems;
+pub mod ui;
+pub mod vfs_asset_io;
+pub mod zmo_asset_loader;
+pub mod zms_asset_loader;
+pub mod zone_loader;
 
 use audio::OddioPlugin;
 use events::{

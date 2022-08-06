@@ -56,6 +56,12 @@ impl CharacterBlinkTimer {
     }
 }
 
+impl Default for CharacterBlinkTimer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 pub fn character_model_add_collider_system(
     mut commands: Commands,
     query_models: Query<

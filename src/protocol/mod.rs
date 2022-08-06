@@ -12,6 +12,7 @@ pub trait ProtocolClient {
     async fn run_connection(&mut self) -> Result<(), anyhow::Error>;
 }
 
+#[macro_export]
 macro_rules! implement_protocol_client {
     ( $x:ident ) => {
         #[async_trait]
