@@ -1,21 +1,23 @@
-use bevy::prelude::{Commands, Res, ResMut};
+use bevy::prelude::{Commands, EventWriter, Res, ResMut};
 use rose_game_common::messages::{
     client::{ClientMessage, GetChannelList, LoginRequest},
     server::{ChannelList, JoinServerResponse, LoginResponse, ServerMessage},
 };
 use rose_network_common::ConnectionError;
 
-use crate::resources::{
-    Account, LoginConnection, NetworkThread, ServerList, ServerListGameServer,
-    ServerListWorldServer,
+use crate::{
+    events::NetworkEvent,
+    resources::{
+        Account, LoginConnection, ServerList, ServerListGameServer, ServerListWorldServer,
+    },
 };
 
 pub fn login_connection_system(
     mut commands: Commands,
     account: Option<Res<Account>>,
     login_connection: Option<Res<LoginConnection>>,
-    network_thread: Res<NetworkThread>,
     mut server_list: Option<ResMut<ServerList>>,
+    mut network_events: EventWriter<NetworkEvent>,
 ) {
     if login_connection.is_none() {
         return;
@@ -96,13 +98,13 @@ pub fn login_connection_system(
                     port,
                 }) => {
                     if let Some(account) = account.as_ref() {
-                        commands.insert_resource(network_thread.connect_world(
-                            &ip,
+                        network_events.send(NetworkEvent::ConnectWorld {
+                            ip,
                             port,
                             packet_codec_seed,
                             login_token,
-                            account.password_md5.clone(),
-                        ));
+                            password: account.password_md5.clone(),
+                        });
                     } else {
                         break Err(ConnectionError::ConnectionLost.into());
                     }

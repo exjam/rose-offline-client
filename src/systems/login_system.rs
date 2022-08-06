@@ -14,12 +14,10 @@ use rose_game_common::messages::client::{ClientMessage, JoinServer};
 
 use crate::{
     components::ActiveMotion,
-    events::LoadZoneEvent,
+    events::{LoadZoneEvent, NetworkEvent},
     free_camera::FreeCamera,
     orbit_camera::OrbitCamera,
-    resources::{
-        Account, LoginConnection, NetworkThread, ServerConfiguration, ServerList, UiResources,
-    },
+    resources::{Account, LoginConnection, ServerConfiguration, ServerList, UiResources},
     ui::widgets::{DataBindings, Dialog, Widget},
 };
 
@@ -120,10 +118,10 @@ pub fn login_system(
     mut egui_context: ResMut<EguiContext>,
     login_connection: Option<Res<LoginConnection>>,
     server_list: Option<Res<ServerList>>,
-    network_thread: Res<NetworkThread>,
     ui_resources: Res<UiResources>,
     dialog_assets: Res<Assets<Dialog>>,
     mut exit_events: EventWriter<AppExit>,
+    mut network_events: EventWriter<NetworkEvent>,
 ) {
     let mut ui_state = &mut *ui_state;
     if login_connection.is_none() {
@@ -218,10 +216,11 @@ pub fn login_system(
                         username: ui_state.username.clone(),
                         password_md5: format!("{:x}", md5::compute(&ui_state.password)),
                     });
-                    commands.insert_resource(network_thread.connect_login(
-                        &ui_state.ip,
-                        ui_state.port.parse::<u16>().unwrap_or(29000),
-                    ));
+
+                    network_events.send(NetworkEvent::ConnectLogin {
+                        ip: ui_state.ip.clone(),
+                        port: ui_state.port.parse::<u16>().unwrap_or(29000),
+                    });
                 }
             }
 

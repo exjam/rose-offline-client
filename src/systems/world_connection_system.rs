@@ -1,25 +1,35 @@
 use bevy::prelude::{Commands, EventWriter, Res, ResMut, State};
-use rose_game_common::messages::{client::ClientMessage, server::ServerMessage};
+use rose_game_common::messages::{
+    client::ClientMessage,
+    server::{JoinServerResponse, ServerMessage},
+};
 use rose_network_common::ConnectionError;
 
 use crate::{
-    events::WorldConnectionEvent,
-    resources::{Account, AppState, CharacterList, NetworkThread, WorldConnection},
+    events::{NetworkEvent, WorldConnectionEvent},
+    resources::{Account, AppState, CharacterList, WorldConnection},
 };
 
 pub fn world_connection_system(
     mut commands: Commands,
     world_connection: Option<Res<WorldConnection>>,
     account: Option<Res<Account>>,
-    network_thread: Res<NetworkThread>,
     mut app_state: ResMut<State<AppState>>,
+    mut network_events: EventWriter<NetworkEvent>,
     mut world_connection_events: EventWriter<WorldConnectionEvent>,
 ) {
-    if world_connection.is_none() {
+    let world_connection = if let Some(world_connection) = world_connection {
+        world_connection
+    } else {
         return;
-    }
+    };
 
-    let world_connection = world_connection.unwrap();
+    let account = if let Some(account) = account {
+        account
+    } else {
+        return;
+    };
+
     let result: Result<(), anyhow::Error> = loop {
         match world_connection.server_message_rx.try_recv() {
             Ok(ServerMessage::ConnectionResponse(response)) => match response {
@@ -41,14 +51,19 @@ pub fn world_connection_system(
                 commands.insert_resource(CharacterList { characters });
             }
             Ok(ServerMessage::SelectCharacter(response)) => match response {
-                Ok(server_info) => {
-                    commands.insert_resource(network_thread.connect_game(
-                        &server_info.ip,
-                        server_info.port,
-                        server_info.packet_codec_seed,
-                        server_info.login_token,
-                        account.as_ref().unwrap().password_md5.clone(),
-                    ));
+                Ok(JoinServerResponse {
+                    login_token,
+                    packet_codec_seed,
+                    ip,
+                    port,
+                }) => {
+                    network_events.send(NetworkEvent::ConnectGame {
+                        ip,
+                        port,
+                        packet_codec_seed,
+                        login_token,
+                        password: account.password_md5.clone(),
+                    });
                 }
                 Err(_) => {
                     break Err(ConnectionError::ConnectionLost.into());

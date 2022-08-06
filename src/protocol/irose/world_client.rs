@@ -29,6 +29,7 @@ use rose_network_irose::{
 };
 
 use crate::protocol::{ProtocolClient, ProtocolClientError};
+
 pub struct WorldClient {
     server_address: SocketAddr,
     client_message_rx: tokio::sync::mpsc::UnboundedReceiver<ClientMessage>,

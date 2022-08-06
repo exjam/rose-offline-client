@@ -53,14 +53,13 @@ mod zone_loader;
 use audio::OddioPlugin;
 use events::{
     AnimationFrameEvent, ChatboxEvent, ClientEntityEvent, ConversationDialogEvent,
-    GameConnectionEvent, HitEvent, LoadZoneEvent, NpcStoreEvent, PartyEvent, PlayerCommandEvent,
-    QuestTriggerEvent, SpawnEffectEvent, SpawnProjectileEvent, SystemFuncEvent,
+    GameConnectionEvent, HitEvent, LoadZoneEvent, NetworkEvent, NpcStoreEvent, PartyEvent,
+    PlayerCommandEvent, QuestTriggerEvent, SpawnEffectEvent, SpawnProjectileEvent, SystemFuncEvent,
     WorldConnectionEvent, ZoneEvent,
 };
 use free_camera::FreeCameraPlugin;
 use model_loader::ModelLoader;
 use orbit_camera::OrbitCameraPlugin;
-use protocol::ProtocolType;
 use render::{DamageDigitMaterial, RoseRenderPlugin};
 use resources::{
     load_ui_resources, run_network_thread, update_ui_resources, AppState, ClientEntityList,
@@ -81,10 +80,11 @@ use systems::{
     game_zone_change_system, hit_event_system, item_drop_model_add_collider_system,
     item_drop_model_system, login_connection_system, login_state_enter_system,
     login_state_exit_system, login_system, model_viewer_enter_system, model_viewer_exit_system,
-    model_viewer_system, npc_idle_sound_system, npc_model_add_collider_system, npc_model_system,
-    particle_sequence_system, passive_recovery_system, pending_damage_system,
-    pending_skill_effect_system, player_command_system, projectile_system, quest_trigger_system,
-    spawn_effect_system, spawn_projectile_system, system_func_event_system, update_position_system,
+    model_viewer_system, network_thread_system, npc_idle_sound_system,
+    npc_model_add_collider_system, npc_model_system, particle_sequence_system,
+    passive_recovery_system, pending_damage_system, pending_skill_effect_system,
+    player_command_system, projectile_system, quest_trigger_system, spawn_effect_system,
+    spawn_projectile_system, system_func_event_system, update_position_system,
     visible_status_effects_system, world_connection_system, world_time_system, zone_time_system,
     zone_viewer_enter_system, DebugInspectorPlugin,
 };
@@ -522,6 +522,7 @@ fn run_client(config: &Config, app_state: AppState, zone_id: Option<ZoneId>) {
         .init_resource::<Events<ConversationDialogEvent>>()
         .init_resource::<Events<GameConnectionEvent>>()
         .init_resource::<Events<HitEvent>>()
+        .init_resource::<Events<NetworkEvent>>()
         .init_resource::<Events<NpcStoreEvent>>()
         .init_resource::<Events<PartyEvent>>()
         .init_resource::<Events<PlayerCommandEvent>>()
@@ -730,14 +731,10 @@ fn run_client(config: &Config, app_state: AppState, zone_id: Option<ZoneId>) {
     app.add_system_to_stage(CoreStage::PostUpdate, ui_drag_and_drop_system);
 
     // Setup network
-    let protocol_type = match config.game.network_version.as_str() {
-        "irose" => ProtocolType::Irose,
-        unknown => panic!("Unknown game network version {}", unknown),
-    };
     let (network_thread_tx, network_thread_rx) =
         tokio::sync::mpsc::unbounded_channel::<NetworkThreadMessage>();
     let network_thread = std::thread::spawn(move || run_network_thread(network_thread_rx));
-    app.insert_resource(NetworkThread::new(protocol_type, network_thread_tx.clone()));
+    app.insert_resource(NetworkThread::new(network_thread_tx.clone()));
 
     // Run network systems before Update, so we can add/remove entities
     app.add_stage_before(
@@ -749,7 +746,11 @@ fn run_client(config: &Config, app_state: AppState, zone_id: Option<ZoneId>) {
             .with_system(game_connection_system),
     );
 
-    // Add startup systems
+    match config.game.network_version.as_str() {
+        "irose" => app.add_system_to_stage(CoreStage::PostUpdate, network_thread_system),
+        unknown => panic!("Unknown game network version {}", unknown),
+    };
+
     match config.game.ui_version.as_str() {
         "irose" => app.add_startup_system(load_ui_resources),
         unknown => panic!("Unknown game ui version {}", unknown),

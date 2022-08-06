@@ -55,14 +55,3 @@ macro_rules! implement_protocol_client {
 }
 
 pub mod irose;
-
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub enum ProtocolType {
-    Irose,
-}
-
-impl Default for ProtocolType {
-    fn default() -> Self {
-        Self::Irose
-    }
-}
