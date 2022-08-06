@@ -49,17 +49,17 @@ pub fn game_mouse_input_system(
     query_player: Query<PlayerQuery, With<PlayerCharacter>>,
     mut player_command_events: EventWriter<PlayerCommandEvent>,
 ) {
-    let cursor_position = windows.primary().cursor_position();
-    if cursor_position.is_none() {
-        // Mouse not in window
-        return;
-    }
-    let cursor_position = cursor_position.unwrap();
-
     if egui_ctx.ctx_mut().wants_pointer_input() {
         // Mouse is over UI
         return;
     }
+
+    let cursor_position =
+        if let Some(cursor_position) = windows.get_primary().and_then(|w| w.cursor_position()) {
+            cursor_position
+        } else {
+            return;
+        };
 
     let player = if let Ok(player) = query_player.get_single() {
         player
