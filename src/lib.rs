@@ -175,7 +175,6 @@ impl Default for ServerConfig {
 #[serde(default)]
 pub struct GameConfig {
     pub data_version: String,
-    pub game_version: String,
     pub network_version: String,
     pub ui_version: String,
 }
@@ -184,7 +183,6 @@ impl Default for GameConfig {
     fn default() -> Self {
         Self {
             data_version: "irose".into(),
-            game_version: "irose".into(),
             network_version: "irose".into(),
             ui_version: "irose".into(),
         }
@@ -304,16 +302,28 @@ pub fn load_config(path: &Path) -> Config {
     }
 }
 
-pub fn run_game(config: &Config) {
-    run_client(config, AppState::GameLogin, None);
+pub fn run_game(config: &Config, app_builder: impl FnOnce(&mut App)) {
+    run_client(config, AppState::GameLogin, app_builder);
 }
 
-pub fn run_model_viewer(config: &Config) {
-    run_client(config, AppState::ModelViewer, None);
+pub fn run_model_viewer(config: &Config, app_builder: impl FnOnce(&mut App)) {
+    run_client(config, AppState::ModelViewer, app_builder);
 }
 
-pub fn run_zone_viewer(config: &Config, zone_id: Option<ZoneId>) {
-    run_client(config, AppState::ZoneViewer, zone_id);
+pub fn run_zone_viewer(
+    config: &Config,
+    zone_id: Option<ZoneId>,
+    app_builder: impl FnOnce(&mut App),
+) {
+    run_client(config, AppState::ZoneViewer, |app| {
+        app.world
+            .resource_mut::<Events<LoadZoneEvent>>()
+            .send(LoadZoneEvent::new(
+                zone_id.unwrap_or_else(|| ZoneId::new(1).unwrap()),
+            ));
+
+        app_builder(app);
+    });
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, StageLabel)]
@@ -328,7 +338,7 @@ enum ModelViewerStages {
     Input,
 }
 
-fn run_client(config: &Config, app_state: AppState, zone_id: Option<ZoneId>) {
+fn run_client(config: &Config, app_state: AppState, app_builder: impl FnOnce(&mut App)) {
     let mut vfs_devices: Vec<Box<dyn VirtualFilesystemDevice + Send + Sync>> = Vec::new();
     for device_config in config.filesystem.devices.iter() {
         match device_config {
@@ -508,20 +518,13 @@ fn run_client(config: &Config, app_state: AppState, zone_id: Option<ZoneId>) {
     // Setup state
     app.add_state(app_state);
 
-    let mut load_zone_events = Events::<LoadZoneEvent>::default();
-    if matches!(app_state, AppState::ZoneViewer) {
-        load_zone_events.send(LoadZoneEvent::new(
-            zone_id.unwrap_or_else(|| ZoneId::new(1).unwrap()),
-        ));
-    }
-
-    app.insert_resource(load_zone_events)
-        .init_resource::<Events<AnimationFrameEvent>>()
+    app.init_resource::<Events<AnimationFrameEvent>>()
         .init_resource::<Events<ChatboxEvent>>()
         .init_resource::<Events<ClientEntityEvent>>()
         .init_resource::<Events<ConversationDialogEvent>>()
         .init_resource::<Events<GameConnectionEvent>>()
         .init_resource::<Events<HitEvent>>()
+        .init_resource::<Events<LoadZoneEvent>>()
         .init_resource::<Events<NetworkEvent>>()
         .init_resource::<Events<NpcStoreEvent>>()
         .init_resource::<Events<PartyEvent>>()
@@ -746,22 +749,34 @@ fn run_client(config: &Config, app_state: AppState, zone_id: Option<ZoneId>) {
             .with_system(game_connection_system),
     );
 
+    app.add_startup_system_to_stage(StartupStage::PostStartup, load_common_game_data);
+
+    app_builder(&mut app);
+
     match config.game.network_version.as_str() {
-        "irose" => app.add_system_to_stage(CoreStage::PostUpdate, network_thread_system),
+        "irose" => {
+            app.add_system_to_stage(CoreStage::PostUpdate, network_thread_system);
+        }
+        "custom" => {}
         unknown => panic!("Unknown game network version {}", unknown),
     };
 
     match config.game.ui_version.as_str() {
-        "irose" => app.add_startup_system(load_ui_resources),
+        "irose" => {
+            app.add_startup_system(load_ui_resources);
+        }
+        "custom" => {}
         unknown => panic!("Unknown game ui version {}", unknown),
     };
 
     match config.game.data_version.as_str() {
-        "irose" => app.add_startup_system(load_game_data_irose),
+        "irose" => {
+            app.add_startup_system(load_game_data_irose);
+        }
+        "custom" => {}
         unknown => panic!("Unknown game data version {}", unknown),
     };
 
-    app.add_startup_system_to_stage(StartupStage::PostStartup, load_common_game_data);
     app.run();
 
     network_thread_tx.send(NetworkThreadMessage::Exit).ok();

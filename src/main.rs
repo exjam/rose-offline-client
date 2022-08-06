@@ -124,13 +124,6 @@ fn main() {
                 .help("Select which game version to use for game data."),
         )
         .arg(
-            clap::Arg::new("game-version")
-            .long("game-version")
-            .takes_value(true)
-                .value_parser(["irose"])
-                .help("Select which game version to use for gameplay."),
-        )
-        .arg(
             clap::Arg::new("network-version")
             .long("network-version")
             .takes_value(true)
@@ -205,10 +198,6 @@ fn main() {
         config.game.data_version = version.to_string();
     }
 
-    if let Some(version) = matches.value_of("game-version") {
-        config.game.game_version = version.to_string();
-    }
-
     if let Some(version) = matches.value_of("network-version") {
         config.game.network_version = version.to_string();
     }
@@ -246,7 +235,7 @@ fn main() {
     }
 
     if matches.is_present("model-viewer") {
-        run_model_viewer(&config);
+        run_model_viewer(&config, |_| {});
     } else if matches.is_present("zone-viewer") {
         run_zone_viewer(
             &config,
@@ -254,8 +243,9 @@ fn main() {
                 .value_of("zone")
                 .and_then(|str| str.parse::<u16>().ok())
                 .and_then(ZoneId::new),
+            |_| {},
         );
     } else {
-        run_game(&config);
+        run_game(&config, |_| {});
     }
 }
