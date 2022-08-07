@@ -129,14 +129,11 @@ impl LoginClient {
                     .write_packet(Packet::from(&PacketClientConnect {}))
                     .await?
             }
-            ClientMessage::LoginRequest(LoginRequest {
-                username,
-                password_md5,
-            }) => {
+            ClientMessage::LoginRequest(LoginRequest { username, password }) => {
                 connection
                     .write_packet(Packet::from(&PacketClientLoginRequest {
                         username: &username,
-                        password_md5: &password_md5,
+                        password_md5: &password.to_md5(),
                     }))
                     .await?
             }

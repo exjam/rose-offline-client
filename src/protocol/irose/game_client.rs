@@ -802,12 +802,12 @@ impl GameClient {
         match message {
             ClientMessage::ConnectionRequest(ConnectionRequest {
                 login_token,
-                ref password_md5,
+                ref password,
             }) => {
                 connection
                     .write_packet(Packet::from(&PacketClientConnectRequest {
                         login_token,
-                        password_md5,
+                        password_md5: &password.to_md5(),
                     }))
                     .await?
             }

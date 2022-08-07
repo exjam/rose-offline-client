@@ -111,7 +111,7 @@ pub fn login_event_system(
 
                     commands.insert_resource(Account {
                         username: username.clone(),
-                        password_md5: format!("{:x}", md5::compute(&password)),
+                        password: password.clone(),
                     });
 
                     network_events.send(NetworkEvent::ConnectLogin {

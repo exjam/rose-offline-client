@@ -1,5 +1,8 @@
 use bevy::prelude::{Commands, EventReader, Res};
-use rose_game_common::messages::{client::ClientMessage, server::ServerMessage};
+use rose_game_common::{
+    data::Password,
+    messages::{client::ClientMessage, server::ServerMessage},
+};
 
 use crate::{
     events::NetworkEvent,
@@ -66,7 +69,7 @@ pub fn network_thread_system(
                     client_message_tx,
                     server_message_rx,
                     login_token,
-                    password.clone(),
+                    Password::Plaintext(password.clone()),
                 ));
             }
             NetworkEvent::ConnectGame {
@@ -98,7 +101,7 @@ pub fn network_thread_system(
                     client_message_tx,
                     server_message_rx,
                     login_token,
-                    password.clone(),
+                    Password::Plaintext(password.clone()),
                 ));
             }
         }

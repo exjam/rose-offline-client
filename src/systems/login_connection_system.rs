@@ -1,7 +1,10 @@
 use bevy::prelude::{Commands, EventWriter, Res, ResMut};
-use rose_game_common::messages::{
-    client::{ClientMessage, GetChannelList, LoginRequest},
-    server::{ChannelList, JoinServerResponse, LoginResponse, ServerMessage},
+use rose_game_common::{
+    data::Password,
+    messages::{
+        client::{ClientMessage, GetChannelList, LoginRequest},
+        server::{ChannelList, JoinServerResponse, LoginResponse, ServerMessage},
+    },
 };
 use rose_network_common::ConnectionError;
 
@@ -33,7 +36,7 @@ pub fn login_connection_system(
                             .client_message_tx
                             .send(ClientMessage::LoginRequest(LoginRequest {
                                 username: account.username.clone(),
-                                password_md5: account.password_md5.clone(),
+                                password: Password::Plaintext(account.password.clone()),
                             }))
                             .ok();
                     } else {
@@ -103,7 +106,7 @@ pub fn login_connection_system(
                             port,
                             packet_codec_seed,
                             login_token,
-                            password: account.password_md5.clone(),
+                            password: account.password.clone(),
                         });
                     } else {
                         break Err(ConnectionError::ConnectionLost.into());

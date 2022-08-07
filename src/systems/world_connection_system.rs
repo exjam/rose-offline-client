@@ -62,7 +62,7 @@ pub fn world_connection_system(
                         port,
                         packet_codec_seed,
                         login_token,
-                        password: account.password_md5.clone(),
+                        password: account.password.clone(),
                     });
                 }
                 Err(_) => {

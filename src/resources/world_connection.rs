@@ -1,6 +1,9 @@
-use rose_game_common::messages::{
-    client::{ClientMessage, ConnectionRequest},
-    server::ServerMessage,
+use rose_game_common::{
+    data::Password,
+    messages::{
+        client::{ClientMessage, ConnectionRequest},
+        server::ServerMessage,
+    },
 };
 
 pub struct WorldConnection {
@@ -13,12 +16,12 @@ impl WorldConnection {
         client_message_tx: tokio::sync::mpsc::UnboundedSender<ClientMessage>,
         server_message_rx: crossbeam_channel::Receiver<ServerMessage>,
         login_token: u32,
-        password_md5: String,
+        password: Password,
     ) -> Self {
         client_message_tx
             .send(ClientMessage::ConnectionRequest(ConnectionRequest {
                 login_token,
-                password_md5,
+                password,
             }))
             .ok();
 
