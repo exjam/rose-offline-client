@@ -1542,6 +1542,33 @@ pub fn game_connection_system(
                     });
                 }
             }
+            Ok(ServerMessage::PartyMemberRewardItem {
+                client_entity_id,
+                item,
+            }) => {
+                let member_entity = client_entity_list.get(client_entity_id);
+                let item_name = game_data
+                    .items
+                    .get_base_item(item.get_item_reference())
+                    .map(|item_data| item_data.name.clone());
+
+                if let (Some(member_entity), Some(item_name)) = (member_entity, item_name) {
+                    commands.add(move |world: &mut World| {
+                        if let Some(member) = world.get_entity(member_entity) {
+                            if let Some(member_entity_name) = member.get::<ClientEntityName>() {
+                                let chat_message = format!(
+                                    "{} has earned {}.",
+                                    member_entity_name.as_str(),
+                                    &item_name
+                                );
+                                world
+                                    .resource_mut::<Events<ChatboxEvent>>()
+                                    .send(ChatboxEvent::System(chat_message));
+                            }
+                        }
+                    });
+                }
+            }
             Ok(ServerMessage::PartyUpdateRules(item_sharing, xp_sharing)) => {
                 if let Some(player_entity) = client_entity_list.player_entity {
                     commands.add(move |world: &mut World| {

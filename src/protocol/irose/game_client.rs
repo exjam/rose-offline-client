@@ -45,18 +45,18 @@ use rose_network_irose::{
         PacketServerDamageEntity, PacketServerFinishCastingSkill, PacketServerJoinZone,
         PacketServerLearnSkillResult, PacketServerLevelUpSkillResult, PacketServerLocalChat,
         PacketServerMoveEntity, PacketServerMoveToggle, PacketServerMoveToggleType,
-        PacketServerNpcStoreTransactionError, PacketServerPartyMemberUpdateInfo,
-        PacketServerPartyMembers, PacketServerPartyReply, PacketServerPartyRequest,
-        PacketServerPartyUpdateRules, PacketServerPickupItemDropResult, PacketServerQuestResult,
-        PacketServerQuestResultType, PacketServerRemoveEntities, PacketServerRewardItems,
-        PacketServerRewardMoney, PacketServerRunNpcDeathTrigger, PacketServerSelectCharacter,
-        PacketServerSetHotbarSlot, PacketServerShoutChat, PacketServerSpawnEntityCharacter,
-        PacketServerSpawnEntityItemDrop, PacketServerSpawnEntityMonster,
-        PacketServerSpawnEntityNpc, PacketServerStartCastingSkill, PacketServerStopMoveEntity,
-        PacketServerTeleport, PacketServerUpdateAbilityValue, PacketServerUpdateAmmo,
-        PacketServerUpdateBasicStat, PacketServerUpdateEquipment, PacketServerUpdateInventory,
-        PacketServerUpdateLevel, PacketServerUpdateMoney, PacketServerUpdateSpeed,
-        PacketServerUpdateStatusEffects, PacketServerUpdateVehiclePart,
+        PacketServerNpcStoreTransactionError, PacketServerPartyMemberRewardItem,
+        PacketServerPartyMemberUpdateInfo, PacketServerPartyMembers, PacketServerPartyReply,
+        PacketServerPartyRequest, PacketServerPartyUpdateRules, PacketServerPickupItemDropResult,
+        PacketServerQuestResult, PacketServerQuestResultType, PacketServerRemoveEntities,
+        PacketServerRewardItems, PacketServerRewardMoney, PacketServerRunNpcDeathTrigger,
+        PacketServerSelectCharacter, PacketServerSetHotbarSlot, PacketServerShoutChat,
+        PacketServerSpawnEntityCharacter, PacketServerSpawnEntityItemDrop,
+        PacketServerSpawnEntityMonster, PacketServerSpawnEntityNpc, PacketServerStartCastingSkill,
+        PacketServerStopMoveEntity, PacketServerTeleport, PacketServerUpdateAbilityValue,
+        PacketServerUpdateAmmo, PacketServerUpdateBasicStat, PacketServerUpdateEquipment,
+        PacketServerUpdateInventory, PacketServerUpdateLevel, PacketServerUpdateMoney,
+        PacketServerUpdateSpeed, PacketServerUpdateStatusEffects, PacketServerUpdateVehiclePart,
         PacketServerUpdateXpStamina, PacketServerUseEmote, PacketServerUseItem,
         PacketServerWhisper, ServerPackets,
     },
@@ -768,6 +768,15 @@ impl GameClient {
                 let message = PacketServerPartyMemberUpdateInfo::try_from(packet)?;
                 self.server_message_tx
                     .send(ServerMessage::PartyMemberUpdateInfo(message.member_info))
+                    .ok();
+            }
+            Some(ServerPackets::PartyMemberRewardItem) => {
+                let message = PacketServerPartyMemberRewardItem::try_from(packet)?;
+                self.server_message_tx
+                    .send(ServerMessage::PartyMemberRewardItem {
+                        client_entity_id: message.entity_id,
+                        item: message.item,
+                    })
                     .ok();
             }
             Some(ServerPackets::PartyUpdateRules) => {
