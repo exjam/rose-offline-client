@@ -53,14 +53,5 @@ bevy-inspector-egui = { git = "https://github.com/exjam/bevy-inspector-egui", re
 bevy_rapier3d = { git = "https://github.com/exjam/bevy_rapier", rev = "f0809f556fb2e97eba3fd1a07d50ab522e2f57df" }
 oddio = { git = "https://github.com/exjam/oddio", rev = "4f4eb4076c3a4068225a7c442a25e40422261c93" }
 
-[patch."https://github.com/exjam/rose-offline"]
-rose-data = { path = "../rose-offline/rose-data" }
-rose-data-irose = { path = "../rose-offline/rose-data-irose" }
-rose-file-readers = { path = "../rose-offline/rose-file-readers" }
-rose-game-common = { path = "../rose-offline/rose-game-common" }
-rose-game-irose = { path = "../rose-offline/rose-game-irose" }
-rose-network-common = { path = "../rose-offline/rose-network-common" }
-rose-network-irose = { path = "../rose-offline/rose-network-irose" }
-
 [profile.dev.package."*"]
 opt-level = 3
