@@ -52,10 +52,10 @@ pub mod zone_loader;
 
 use audio::OddioPlugin;
 use events::{
-    AnimationFrameEvent, ChatboxEvent, ClientEntityEvent, ConversationDialogEvent,
-    GameConnectionEvent, HitEvent, LoadZoneEvent, NetworkEvent, NpcStoreEvent, PartyEvent,
-    PlayerCommandEvent, QuestTriggerEvent, SpawnEffectEvent, SpawnProjectileEvent, SystemFuncEvent,
-    WorldConnectionEvent, ZoneEvent,
+    AnimationFrameEvent, CharacterSelectEvent, ChatboxEvent, ClientEntityEvent,
+    ConversationDialogEvent, GameConnectionEvent, HitEvent, LoadZoneEvent, LoginEvent,
+    NetworkEvent, NpcStoreEvent, PartyEvent, PlayerCommandEvent, QuestTriggerEvent,
+    SpawnEffectEvent, SpawnProjectileEvent, SystemFuncEvent, WorldConnectionEvent, ZoneEvent,
 };
 use free_camera::FreeCameraPlugin;
 use model_loader::ModelLoader;
@@ -69,16 +69,17 @@ use resources::{
 use scripting::RoseScriptingPlugin;
 use systems::{
     ability_values_system, animation_effect_system, animation_sound_system, animation_system,
-    background_music_system, character_model_add_collider_system, character_model_blink_system,
-    character_model_system, character_select_enter_system, character_select_exit_system,
-    character_select_input_system, character_select_models_system, character_select_system,
-    client_entity_event_system, collision_height_only_system, collision_player_system,
-    collision_player_system_join_zoin, command_system, conversation_dialog_system, cooldown_system,
-    damage_digit_render_system, debug_render_collider_system, debug_render_polylines_setup_system,
+    auto_login_system, background_music_system, character_model_add_collider_system,
+    character_model_blink_system, character_model_system, character_select_enter_system,
+    character_select_event_system, character_select_exit_system, character_select_input_system,
+    character_select_models_system, character_select_system, client_entity_event_system,
+    collision_height_only_system, collision_player_system, collision_player_system_join_zoin,
+    command_system, conversation_dialog_system, cooldown_system, damage_digit_render_system,
+    debug_render_collider_system, debug_render_polylines_setup_system,
     debug_render_polylines_update_system, debug_render_skeleton_system, effect_system,
     game_connection_system, game_mouse_input_system, game_state_enter_system,
     game_zone_change_system, hit_event_system, item_drop_model_add_collider_system,
-    item_drop_model_system, login_connection_system, login_state_enter_system,
+    item_drop_model_system, login_connection_system, login_event_system, login_state_enter_system,
     login_state_exit_system, login_system, model_viewer_enter_system, model_viewer_exit_system,
     model_viewer_system, network_thread_system, npc_idle_sound_system,
     npc_model_add_collider_system, npc_model_system, particle_sequence_system,
@@ -89,17 +90,18 @@ use systems::{
     zone_viewer_enter_system, DebugInspectorPlugin,
 };
 use ui::{
-    load_dialog_sprites_system, ui_character_info_system, ui_chatbox_system,
+    load_dialog_sprites_system, ui_character_create_system, ui_character_info_system,
+    ui_character_select_name_tag_system, ui_character_select_system, ui_chatbox_system,
     ui_debug_camera_info_system, ui_debug_client_entity_list_system,
     ui_debug_command_viewer_system, ui_debug_diagnostics_system, ui_debug_dialog_list_system,
     ui_debug_entity_inspector_system, ui_debug_item_list_system, ui_debug_menu_system,
     ui_debug_npc_list_system, ui_debug_physics_system, ui_debug_render_system,
     ui_debug_skill_list_system, ui_debug_zone_lighting_system, ui_debug_zone_list_system,
     ui_debug_zone_time_system, ui_drag_and_drop_system, ui_game_menu_system, ui_hotbar_system,
-    ui_inventory_system, ui_minimap_system, ui_npc_store_system, ui_party_system,
-    ui_player_info_system, ui_quest_list_system, ui_selected_target_system, ui_settings_system,
-    ui_skill_list_system, widgets::Dialog, DialogLoader, UiStateDebugWindows, UiStateDragAndDrop,
-    UiStateWindows,
+    ui_inventory_system, ui_login_system, ui_minimap_system, ui_npc_store_system, ui_party_system,
+    ui_player_info_system, ui_quest_list_system, ui_selected_target_system,
+    ui_server_select_system, ui_settings_system, ui_skill_list_system, widgets::Dialog,
+    DialogLoader, UiStateDebugWindows, UiStateDragAndDrop, UiStateWindows,
 };
 use vfs_asset_io::VfsAssetIo;
 use zmo_asset_loader::{ZmoAsset, ZmoAssetLoader};
@@ -520,10 +522,12 @@ fn run_client(config: &Config, app_state: AppState, app_builder: impl FnOnce(&mu
 
     app.init_resource::<Events<AnimationFrameEvent>>()
         .init_resource::<Events<ChatboxEvent>>()
+        .init_resource::<Events<CharacterSelectEvent>>()
         .init_resource::<Events<ClientEntityEvent>>()
         .init_resource::<Events<ConversationDialogEvent>>()
         .init_resource::<Events<GameConnectionEvent>>()
         .init_resource::<Events<HitEvent>>()
+        .init_resource::<Events<LoginEvent>>()
         .init_resource::<Events<LoadZoneEvent>>()
         .init_resource::<Events<NetworkEvent>>()
         .init_resource::<Events<NpcStoreEvent>>()
@@ -536,7 +540,8 @@ fn run_client(config: &Config, app_state: AppState, app_builder: impl FnOnce(&mu
         .init_resource::<Events<WorldConnectionEvent>>()
         .init_resource::<Events<ZoneEvent>>();
 
-    app.add_system(background_music_system)
+    app.add_system(auto_login_system)
+        .add_system(background_music_system)
         .add_system(character_model_system)
         .add_system(character_model_add_collider_system.after(character_model_system))
         .add_system(npc_model_system)
@@ -668,7 +673,23 @@ fn run_client(config: &Config, app_state: AppState, app_builder: impl FnOnce(&mu
         SystemSet::on_enter(AppState::GameLogin).with_system(login_state_enter_system),
     )
     .add_system_set(SystemSet::on_exit(AppState::GameLogin).with_system(login_state_exit_system))
-    .add_system_set(SystemSet::on_update(AppState::GameLogin).with_system(login_system));
+    .add_system_set(
+        SystemSet::on_update(AppState::GameLogin)
+            .with_system(login_system)
+            .with_system(
+                ui_login_system
+                    .label("ui_system")
+                    .after(login_system)
+                    .before(login_event_system),
+            )
+            .with_system(
+                ui_server_select_system
+                    .label("ui_system")
+                    .after(login_system)
+                    .before(login_event_system),
+            )
+            .with_system(login_event_system),
+    );
 
     // Game Character Select
     app.add_system_set(
@@ -679,7 +700,27 @@ fn run_client(config: &Config, app_state: AppState, app_builder: impl FnOnce(&mu
         SystemSet::on_update(AppState::GameCharacterSelect)
             .with_system(character_select_system)
             .with_system(character_select_input_system)
-            .with_system(character_select_models_system),
+            .with_system(character_select_models_system)
+            .with_system(
+                ui_character_create_system
+                    .label("ui_system")
+                    .after(character_select_system)
+                    .after(character_select_input_system)
+                    .before(character_select_event_system),
+            )
+            .with_system(
+                ui_character_select_system
+                    .label("ui_system")
+                    .after(character_select_system)
+                    .after(character_select_input_system)
+                    .before(character_select_event_system),
+            )
+            .with_system(character_select_event_system)
+            .with_system(
+                ui_character_select_name_tag_system
+                    .label("ui_system")
+                    .after(character_select_event_system),
+            ),
     )
     .add_system_set(
         SystemSet::on_exit(AppState::GameCharacterSelect).with_system(character_select_exit_system),
