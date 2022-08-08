@@ -64,20 +64,25 @@ impl DrawWidget for RadioButton {
         }
 
         let mut unbound_selected = 0;
+        let enabled = bindings.get_enabled(self.id);
         let selected = bindings
             .get_radio(self.radio_box_id)
             .unwrap_or(&mut unbound_selected);
 
         let rect = self.widget_rect(ui.min_rect().min);
-        let mut response = ui.allocate_rect(rect, egui::Sense::click());
+        let mut response = ui.allocate_rect(
+            rect,
+            if enabled {
+                egui::Sense::click()
+            } else {
+                egui::Sense::hover()
+            },
+        );
 
         if ui.is_rect_visible(rect) {
-            if response.clicked() {
-                *selected = self.id;
-                response.mark_changed();
-            }
-
-            let sprite = if *selected == self.id || response.is_pointer_button_down_on() {
+            let sprite = if !response.sense.interactive() {
+                self.normal_sprite.as_ref()
+            } else if *selected == self.id || response.is_pointer_button_down_on() {
                 self.down_sprite.as_ref()
             } else if response.hovered() || response.has_focus() {
                 self.over_sprite.as_ref()
@@ -88,6 +93,13 @@ impl DrawWidget for RadioButton {
 
             if let Some(sprite) = sprite {
                 sprite.draw(ui, rect.min);
+            }
+
+            // Update selected after drawing to avoid two boxes being
+            // rendered as selected in same frame
+            if response.clicked() {
+                *selected = self.id;
+                response.mark_changed();
             }
         }
 

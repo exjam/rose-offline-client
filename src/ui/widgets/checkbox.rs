@@ -55,6 +55,7 @@ impl DrawWidget for Checkbox {
         }
 
         let mut unbound_checked = false;
+        let enabled = bindings.get_enabled(self.id);
         let checked = bindings
             .checked
             .iter_mut()
@@ -63,7 +64,14 @@ impl DrawWidget for Checkbox {
             .unwrap_or(&mut unbound_checked);
 
         let rect = self.widget_rect(ui.min_rect().min);
-        let mut response = ui.allocate_rect(rect, egui::Sense::click());
+        let mut response = ui.allocate_rect(
+            rect,
+            if enabled {
+                egui::Sense::click()
+            } else {
+                egui::Sense::hover()
+            },
+        );
 
         if ui.is_rect_visible(rect) {
             if response.clicked() {

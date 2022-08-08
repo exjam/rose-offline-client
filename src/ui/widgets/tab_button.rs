@@ -65,14 +65,24 @@ impl DrawWidget for TabButton {
             return;
         }
 
+        let enabled = bindings.get_enabled(self.id);
         let mut current_tab = bindings.get_tab(self.tabbed_pane_id);
         let selected = current_tab.as_mut().map_or(0, |x| **x) == self.tab_id;
 
         let rect = self.widget_rect(ui.min_rect().min);
-        let response = ui.allocate_rect(rect, egui::Sense::click());
+        let response = ui.allocate_rect(
+            rect,
+            if enabled {
+                egui::Sense::click()
+            } else {
+                egui::Sense::hover()
+            },
+        );
 
         if ui.is_rect_visible(rect) {
-            let sprite = if selected || response.is_pointer_button_down_on() {
+            let sprite = if !response.sense.interactive() {
+                self.normal_sprite.as_ref()
+            } else if selected || response.is_pointer_button_down_on() {
                 self.down_sprite.as_ref()
             } else if response.hovered() || response.has_focus() {
                 self.over_sprite.as_ref()

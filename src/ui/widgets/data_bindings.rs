@@ -6,6 +6,7 @@ use bevy_egui::egui;
 pub struct DataBindings<'a> {
     pub visible: &'a mut [(i32, bool)],
     pub checked: &'a mut [(i32, &'a mut bool)],
+    pub enabled: &'a mut [(i32, bool)],
     pub text: &'a mut [(i32, &'a mut String)],
     pub gauge: &'a mut [(i32, &'a f32, &'a str)],
     pub tabs: &'a mut [(i32, &'a mut i32)],
@@ -54,6 +55,13 @@ impl<'a> DataBindings<'a> {
             .iter_mut()
             .find(|(x, _)| *x == id)
             .map(|(_, buffer)| &mut **buffer)
+    }
+
+    pub fn get_enabled(&self, id: i32) -> bool {
+        self.enabled
+            .iter()
+            .find(|(x, _)| *x == id)
+            .map_or(true, |(_, visible)| *visible)
     }
 
     pub fn get_visible(&self, id: i32) -> bool {

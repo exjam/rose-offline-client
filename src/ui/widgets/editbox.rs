@@ -58,16 +58,24 @@ impl DrawWidget for Editbox {
         }
 
         let mut unbound_buffer = format!("<{} unbound>", self.id);
+        let enabled = bindings.get_enabled(self.id);
         let buffer = bindings.get_text(self.id).unwrap_or(&mut unbound_buffer);
 
         let rect = self.widget_rect(ui.min_rect().min);
-        let response = ui.put(
-            rect,
-            egui::TextEdit::singleline(buffer)
-                .frame(false)
-                .margin(egui::vec2(0.0, 0.0))
-                .password(self.password != 0),
-        );
+        let response = ui
+            .allocate_ui_at_rect(rect, |ui| {
+                ui.centered_and_justified(|ui| {
+                    ui.add_enabled(
+                        enabled,
+                        egui::TextEdit::singleline(buffer)
+                            .frame(false)
+                            .margin(egui::vec2(0.0, 0.0))
+                            .password(self.password != 0),
+                    )
+                })
+                .inner
+            })
+            .inner;
 
         bindings.set_response(self.id, response);
     }
