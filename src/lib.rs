@@ -98,10 +98,10 @@ use ui::{
     ui_debug_npc_list_system, ui_debug_physics_system, ui_debug_render_system,
     ui_debug_skill_list_system, ui_debug_zone_lighting_system, ui_debug_zone_list_system,
     ui_debug_zone_time_system, ui_drag_and_drop_system, ui_game_menu_system, ui_hotbar_system,
-    ui_inventory_system, ui_login_system, ui_minimap_system, ui_npc_store_system, ui_party_system,
-    ui_player_info_system, ui_quest_list_system, ui_selected_target_system,
-    ui_server_select_system, ui_settings_system, ui_skill_list_system, widgets::Dialog,
-    DialogLoader, UiStateDebugWindows, UiStateDragAndDrop, UiStateWindows,
+    ui_inventory_system, ui_login_system, ui_minimap_system, ui_npc_store_system,
+    ui_party_option_system, ui_party_system, ui_player_info_system, ui_quest_list_system,
+    ui_selected_target_system, ui_server_select_system, ui_settings_system, ui_skill_list_system,
+    widgets::Dialog, DialogLoader, UiStateDebugWindows, UiStateDragAndDrop, UiStateWindows,
 };
 use vfs_asset_io::VfsAssetIo;
 use zmo_asset_loader::{ZmoAsset, ZmoAssetLoader};
@@ -765,6 +765,7 @@ fn run_client(config: &Config, app_state: AppState, app_builder: impl FnOnce(&mu
                 .with_system(ui_hotbar_system.label("ui_system"))
                 .with_system(ui_minimap_system.label("ui_system"))
                 .with_system(ui_party_system.label("ui_system"))
+                .with_system(ui_party_option_system.label("ui_system"))
                 .with_system(ui_player_info_system.label("ui_system"))
                 .with_system(ui_quest_list_system.label("ui_system"))
                 .with_system(ui_selected_target_system.label("ui_system"))

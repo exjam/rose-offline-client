@@ -1,26 +1,41 @@
 use bevy::{
     ecs::query::WorldQuery,
-    prelude::{EventReader, Local, Query, Res, ResMut, With},
+    prelude::{Assets, Commands, Entity, EventReader, Local, Query, Res, ResMut, With},
 };
 use bevy_egui::{egui, EguiContext};
 
 use rose_game_common::{
     components::{AbilityValues, CharacterInfo, HealthPoints, Level},
     messages::{
-        client::ClientMessage, server::PartyMemberInfo, ClientEntityId, PartyItemSharing,
-        PartyRejectInviteReason, PartyXpSharing,
+        client::ClientMessage, server::PartyMemberInfo, ClientEntityId, PartyRejectInviteReason,
     },
 };
 
 use crate::{
-    components::{ClientEntity, ClientEntityName, PartyInfo, PartyOwner, PlayerCharacter},
+    components::{
+        ClientEntity, ClientEntityName, PartyInfo, PartyOwner, PlayerCharacter, SelectedTarget,
+    },
     events::PartyEvent,
-    resources::{ClientEntityList, GameConnection},
+    resources::{ClientEntityList, GameConnection, UiResources},
+    ui::widgets::{Dialog, Gauge},
 };
+
+use super::{
+    widgets::{DrawText, DrawWidget, LoadWidget},
+    DataBindings, UiStateWindows,
+};
+
+const IID_BTN_ENTRUST: i32 = 11;
+const IID_BTN_BAN: i32 = 12;
+const IID_BTN_LEAVE: i32 = 13;
+const IID_BTN_OPTION: i32 = 14;
+const IID_PARTY_XP_GAUGE: i32 = 1001;
+const IID_PARTY_MEMBER_HP_GAUGE: i32 = 1002;
 
 #[derive(WorldQuery)]
 pub struct PlayerQuery<'w> {
     _player_character: With<PlayerCharacter>,
+    entity: Entity,
     ability_values: &'w AbilityValues,
     character_info: &'w CharacterInfo,
     health_points: &'w HealthPoints,
@@ -42,13 +57,46 @@ pub struct PendingPartyInvite {
     name: String,
 }
 
-#[derive(Default)]
 pub struct UiStatePartySystem {
     pending_invites: Vec<PendingPartyInvite>,
+    party_xp_gauge: Gauge,
+    party_member_health_gauge: Gauge,
+    selected_party_member_index: Option<usize>,
+}
+
+impl Default for UiStatePartySystem {
+    fn default() -> Self {
+        Self {
+            pending_invites: Default::default(),
+            party_xp_gauge: Gauge {
+                id: IID_PARTY_XP_GAUGE,
+                x: 96.0,
+                y: 34.0,
+                width: 111.0,
+                height: 9.0,
+                module_id: 0,
+                foreground_sprite_name: "UI18_GUAGE_PARTYLEVEL".into(),
+                background_sprite_name: "UI18_GUAGE_PARTYLEVEL_BASE".into(),
+                ..Default::default()
+            },
+            party_member_health_gauge: Gauge {
+                id: IID_PARTY_MEMBER_HP_GAUGE,
+                width: 119.0,
+                height: 9.0,
+                module_id: 0,
+                foreground_sprite_name: "UI18_GUAGE_HP".into(),
+                background_sprite_name: "UI18_GUAGE_HP_BASE".into(),
+                ..Default::default()
+            },
+            selected_party_member_index: None,
+        }
+    }
 }
 
 pub fn ui_party_system(
+    mut commands: Commands,
     mut ui_state: Local<UiStatePartySystem>,
+    mut ui_state_windows: ResMut<UiStateWindows>,
     mut egui_context: ResMut<EguiContext>,
     query_player: Query<PlayerQuery>,
     query_party_member: Query<PartyMemberQuery>,
@@ -56,6 +104,8 @@ pub fn ui_party_system(
     mut party_events: EventReader<PartyEvent>,
     game_connection: Option<Res<GameConnection>>,
     client_entity_list: Res<ClientEntityList>,
+    ui_resources: Res<UiResources>,
+    dialog_assets: Res<Assets<Dialog>>,
 ) {
     let player = if let Ok(player) = query_player.get_single() {
         player
@@ -168,206 +218,219 @@ pub fn ui_party_system(
         i += 1;
     }
 
+    let dialog = if let Some(dialog) = dialog_assets.get(&ui_resources.dialog_party) {
+        if ui_state.party_xp_gauge.foreground_sprite.is_none() {
+            ui_state.party_xp_gauge.load_widget(&ui_resources);
+        }
+
+        if ui_state
+            .party_member_health_gauge
+            .foreground_sprite
+            .is_none()
+        {
+            ui_state
+                .party_member_health_gauge
+                .load_widget(&ui_resources);
+        }
+
+        dialog
+    } else {
+        return;
+    };
+
+    let mut response_entrust_button = None;
+    let mut response_kick_button = None;
+    let mut response_leave_button = None;
+    let mut response_option_button = None;
+
     if let Some(party_info) = player.party_info {
-        let style = egui_context.ctx_mut().style();
-        let window_frame = egui::Frame::window(&style).fill(egui::Color32::from_rgba_unmultiplied(
-            style.visuals.widgets.noninteractive.bg_fill.r(),
-            style.visuals.widgets.noninteractive.bg_fill.g(),
-            style.visuals.widgets.noninteractive.bg_fill.b(),
-            180,
-        ));
         let player_is_owner = matches!(party_info.owner, PartyOwner::Player);
 
-        egui::Window::new("Party")
-            .anchor(egui::Align2::LEFT_CENTER, [10.0, -100.0])
-            .collapsible(false)
+        egui::Window::new("Party2")
+            .anchor(egui::Align2::RIGHT_CENTER, [0.0, 0.0])
+            .frame(egui::Frame::none())
             .title_bar(false)
-            .frame(window_frame)
+            .resizable(false)
+            .default_width(dialog.width)
+            .default_height(dialog.height)
             .show(egui_context.ctx_mut(), |ui| {
-                ui.group(|ui| {
-                    ui.add_enabled_ui(player_is_owner, |ui| {
-                        egui::Grid::new("party_info").num_columns(2).show(ui, |ui| {
-                            let mut item_sharing = party_info.item_sharing;
-                            let mut xp_sharing = party_info.xp_sharing;
+                dialog.draw(
+                    ui,
+                    DataBindings {
+                        gauge: &mut [(IID_PARTY_XP_GAUGE, &0.5, "50%")],
+                        response: &mut [
+                            (IID_BTN_ENTRUST, &mut response_entrust_button),
+                            (IID_BTN_BAN, &mut response_kick_button),
+                            (IID_BTN_LEAVE, &mut response_leave_button),
+                            (IID_BTN_OPTION, &mut response_option_button),
+                        ],
+                        visible: &mut [
+                            (IID_BTN_BAN, player_is_owner),
+                            (IID_BTN_ENTRUST, player_is_owner),
+                        ],
+                        ..Default::default()
+                    },
+                    |ui, bindings| {
+                        ui.add_label_at(
+                            egui::pos2(35.0, 7.0),
+                            egui::RichText::new("Party").color(egui::Color32::BLACK),
+                        );
 
-                            ui.colored_label(egui::Color32::WHITE, "Item Sharing:");
-                            egui::ComboBox::from_id_source("Item Sharing")
-                                .selected_text(format!("{:?}", party_info.item_sharing))
-                                .show_ui(ui, |ui| {
-                                    ui.selectable_value(
-                                        &mut item_sharing,
-                                        PartyItemSharing::EqualLootDistribution,
-                                        "Equal Loot Distribution",
-                                    );
-                                    ui.selectable_value(
-                                        &mut item_sharing,
-                                        PartyItemSharing::AcquisitionOrder,
-                                        "Acquisition Order",
-                                    );
-                                });
-                            ui.end_row();
+                        ui.add_label_at(egui::pos2(17.0, 34.0), format!("Party Level: {}", 1));
 
-                            ui.colored_label(egui::Color32::WHITE, "XP Sharing:");
-                            egui::ComboBox::from_id_source("XP Sharing")
-                                .selected_text(format!("{:?}", party_info.xp_sharing))
-                                .show_ui(ui, |ui| {
-                                    ui.selectable_value(
-                                        &mut xp_sharing,
-                                        PartyXpSharing::EqualShare,
-                                        "Equal Share",
-                                    );
-                                    ui.selectable_value(
-                                        &mut xp_sharing,
-                                        PartyXpSharing::DistributedByLevel,
-                                        "Distributed By Level",
-                                    );
-                                });
-                            ui.end_row();
+                        ui_state.party_xp_gauge.draw_widget(ui, bindings);
 
-                            let party_level = 1;
-                            let party_xp = 50;
-                            let party_need_xp = 100;
-
-                            ui.colored_label(
-                                egui::Color32::WHITE,
-                                format!("Party Level: {}", party_level),
-                            );
-                            ui.scope(|ui| {
-                                ui.style_mut().visuals.selection.bg_fill =
-                                    egui::Color32::from_rgb(145, 133, 0);
-                                ui.add(
-                                    egui::ProgressBar::new(party_xp as f32 / party_need_xp as f32)
-                                        .show_percentage(),
-                                )
-                                .on_hover_text(format!("{} / {}", party_xp, party_need_xp));
-                            });
-                            ui.end_row();
-
-                            if item_sharing != party_info.item_sharing
-                                || xp_sharing != party_info.xp_sharing
-                            {
-                                if let Some(game_connection) = &game_connection {
-                                    game_connection
-                                        .client_message_tx
-                                        .send(ClientMessage::PartyUpdateRules(
-                                            item_sharing,
-                                            xp_sharing,
-                                        ))
-                                        .ok();
-                                }
-                            }
-                        });
-                    });
-                });
-
-                ui.group(|ui| {
-                    ui.horizontal(|ui| {
-                        ui.colored_label(egui::Color32::WHITE, &player.character_info.name);
-
-                        ui.with_layout(egui::Layout::right_to_left(), |ui| {
-                            if ui.button("Leave").clicked() {
-                                if let Some(game_connection) = &game_connection {
-                                    game_connection
-                                        .client_message_tx
-                                        .send(ClientMessage::PartyLeave)
-                                        .ok();
-                                }
-                            }
-                        });
-                    });
-
-                    ui.colored_label(
-                        egui::Color32::WHITE,
-                        format!("Level {} Visitor", player.level.level), // TODO: Use character_info.job
-                    );
-                    ui.scope(|ui| {
-                        ui.style_mut().visuals.selection.bg_fill = egui::Color32::DARK_RED;
-                        ui.add(
-                            egui::ProgressBar::new(
-                                player.health_points.hp as f32
-                                    / player.ability_values.get_max_health() as f32,
-                            )
-                            .text(format!(
-                                "{} / {}",
-                                player.health_points.hp,
-                                player.ability_values.get_max_health()
-                            )),
-                        )
-                    });
-                });
-
-                for member in party_info.members.iter() {
-                    ui.group(|ui| {
-                        match member {
-                            PartyMemberInfo::Online(member_info) => {
-                                ui.horizontal(|ui| {
-                                    ui.colored_label(egui::Color32::WHITE, &member_info.name);
-
-                                    ui.with_layout(egui::Layout::right_to_left(), |ui| {
-                                        if player_is_owner && ui.button("Kick").clicked() {
-                                            if let Some(game_connection) = &game_connection {
-                                                game_connection
-                                                    .client_message_tx
-                                                    .send(ClientMessage::PartyKick(
-                                                        member_info.character_id,
-                                                    ))
-                                                    .ok();
-                                            }
-                                        }
-                                    });
-                                });
-
-                                if let Some(party_member) = client_entity_list
-                                    .get(member_info.entity_id)
-                                    .and_then(|entity| query_party_member.get(entity).ok())
+                        ui.vertical(|ui| {
+                            for (index, member) in party_info.members.iter().enumerate() {
+                                let (rect, response) = ui.allocate_exact_size(
+                                    egui::vec2(220.0, 45.0),
+                                    egui::Sense::click(),
+                                );
                                 {
-                                    ui.colored_label(
-                                        egui::Color32::WHITE,
-                                        format!("Level {} Visitor", party_member.level.level),
-                                    ); // TODO: Use character_info.job
-                                    ui.scope(|ui| {
-                                        ui.style_mut().visuals.selection.bg_fill =
-                                            egui::Color32::DARK_RED;
-                                        ui.add(
-                                            egui::ProgressBar::new(
-                                                party_member.health_points.hp as f32
+                                    let ui = &mut ui.child_ui(rect, egui::Layout::default());
+                                    let selected =
+                                        ui_state.selected_party_member_index == Some(index);
+                                    let (online, name) = match member {
+                                        PartyMemberInfo::Online(member_info) => {
+                                            if let Some(party_member) = client_entity_list
+                                                .get(member_info.entity_id)
+                                                .and_then(|entity| {
+                                                    query_party_member.get(entity).ok()
+                                                })
+                                            {
+                                                let hp_percent = party_member.health_points.hp
+                                                    as f32
                                                     / party_member.ability_values.get_max_health()
-                                                        as f32,
-                                            )
-                                            .text(
-                                                format!(
-                                                    "{} / {}",
-                                                    party_member.health_points.hp,
-                                                    party_member.ability_values.get_max_health()
-                                                ),
-                                            ),
-                                        )
-                                    });
+                                                        as f32;
+
+                                                ui_state.party_member_health_gauge.x = 220.0
+                                                    - ui_state.party_member_health_gauge.width;
+                                                ui_state.party_member_health_gauge.y = 25.0;
+                                                ui_state.party_member_health_gauge.draw_widget(
+                                                    ui,
+                                                    &mut DataBindings {
+                                                        gauge: &mut [(
+                                                            IID_PARTY_MEMBER_HP_GAUGE,
+                                                            &hp_percent,
+                                                            &format!("{:.2}%", 100.0 * hp_percent),
+                                                        )],
+                                                        ..Default::default()
+                                                    },
+                                                );
+                                            }
+
+                                            (true, &member_info.name)
+                                        }
+                                        PartyMemberInfo::Offline(member_info) => {
+                                            (false, &member_info.name)
+                                        }
+                                    };
+
+                                    ui.add_label_at(
+                                        egui::pos2(4.0, 26.0),
+                                        egui::RichText::new(name).color(egui::Color32::BLACK),
+                                    );
+                                    ui.add_label_at(
+                                        egui::pos2(3.0, 25.0),
+                                        egui::RichText::new(name).color(if selected {
+                                            egui::Color32::RED
+                                        } else if online {
+                                            egui::Color32::WHITE
+                                        } else {
+                                            egui::Color32::GRAY
+                                        }),
+                                    );
+                                }
+
+                                if response.clicked() {
+                                    if let Some(entity) = member
+                                        .get_client_entity_id()
+                                        .and_then(|entity_id| client_entity_list.get(entity_id))
+                                    {
+                                        commands
+                                            .entity(player.entity)
+                                            .insert(SelectedTarget::new(entity));
+                                    }
+
+                                    ui_state.selected_party_member_index = Some(index);
                                 }
                             }
-                            PartyMemberInfo::Offline(member_info) => {
-                                ui.horizontal(|ui| {
-                                    ui.colored_label(egui::Color32::WHITE, &member_info.name);
+                        });
+                    },
+                );
+            });
 
-                                    ui.with_layout(egui::Layout::right_to_left(), |ui| {
-                                        if player_is_owner && ui.button("Kick").clicked() {
-                                            if let Some(game_connection) = &game_connection {
-                                                game_connection
-                                                    .client_message_tx
-                                                    .send(ClientMessage::PartyKick(
-                                                        member_info.character_id,
-                                                    ))
-                                                    .ok();
-                                            }
-                                        }
-                                    });
-                                });
+        if player_is_owner {
+            if let Some(selected_party_member) = ui_state
+                .selected_party_member_index
+                .and_then(|index| party_info.members.get(index))
+            {
+                if player.character_info.unique_id != selected_party_member.get_character_id() {
+                    if response_kick_button.as_ref().map_or(false, |x| x.clicked()) {
+                        if let Some(game_connection) = &game_connection {
+                            game_connection
+                                .client_message_tx
+                                .send(ClientMessage::PartyKick(
+                                    selected_party_member.get_character_id(),
+                                ))
+                                .ok();
+                        }
+                    }
 
-                                ui.colored_label(egui::Color32::WHITE, "Offline");
+                    if let Some(selected_client_entity_id) =
+                        selected_party_member.get_client_entity_id()
+                    {
+                        if response_entrust_button
+                            .as_ref()
+                            .map_or(false, |x| x.clicked())
+                        {
+                            if let Some(game_connection) = &game_connection {
+                                game_connection
+                                    .client_message_tx
+                                    .send(ClientMessage::PartyChangeOwner(
+                                        selected_client_entity_id,
+                                    ))
+                                    .ok();
                             }
                         }
-                    });
+                    }
                 }
-            });
+            }
+        }
+
+        if response_leave_button
+            .as_ref()
+            .map_or(false, |x| x.clicked())
+        {
+            if let Some(game_connection) = &game_connection {
+                game_connection
+                    .client_message_tx
+                    .send(ClientMessage::PartyLeave)
+                    .ok();
+            }
+        }
+
+        if response_option_button
+            .as_ref()
+            .map_or(false, |x| x.clicked())
+        {
+            ui_state_windows.party_options_open = !ui_state_windows.party_options_open;
+        }
+
+        if let Some(button) = response_entrust_button {
+            button.on_hover_text("Entrust as Leader");
+        }
+
+        if let Some(button) = response_kick_button {
+            button.on_hover_text("Kick Member");
+        }
+
+        if let Some(button) = response_leave_button {
+            button.on_hover_text("Leave Party");
+        }
+
+        if let Some(button) = response_option_button {
+            button.on_hover_text("Party Options");
+        }
     }
 }

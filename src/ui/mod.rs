@@ -28,6 +28,7 @@ mod ui_inventory_system;
 mod ui_login_system;
 mod ui_minimap_system;
 mod ui_npc_store_system;
+mod ui_party_option_system;
 mod ui_party_system;
 mod ui_player_info_system;
 mod ui_quest_list_system;
@@ -45,6 +46,7 @@ pub struct UiStateWindows {
     pub quest_list_open: bool,
     pub settings_open: bool,
     pub menu_open: bool,
+    pub party_options_open: bool,
 }
 
 pub use dialog_loader::{load_dialog_sprites_system, DialogInstance, DialogLoader};
@@ -77,6 +79,7 @@ pub use ui_inventory_system::ui_inventory_system;
 pub use ui_login_system::ui_login_system;
 pub use ui_minimap_system::ui_minimap_system;
 pub use ui_npc_store_system::ui_npc_store_system;
+pub use ui_party_option_system::ui_party_option_system;
 pub use ui_party_system::ui_party_system;
 pub use ui_player_info_system::ui_player_info_system;
 pub use ui_quest_list_system::ui_quest_list_system;

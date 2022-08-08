@@ -1,3 +1,4 @@
+use arrayvec::ArrayVec;
 use bevy::{
     ecs::event::Events,
     math::{Quat, Vec3},
@@ -14,10 +15,14 @@ use rose_game_common::{
         ExperiencePoints, HealthPoints, Hotbar, Inventory, ItemDrop, ItemSlot, Level, ManaPoints,
         MoveMode, MoveSpeed, QuestState, SkillList, Stamina, StatPoints, StatusEffects,
     },
-    messages::server::{
-        CommandState, LearnSkillError, LevelUpSkillError, PartyMemberInfo, PartyMemberInfoOffline,
-        PartyMemberLeave, PartyMemberList, PickupItemDropContent, PickupItemDropError,
-        QuestDeleteResult, QuestTriggerResult, ServerMessage, UpdateAbilityValue,
+    messages::{
+        server::{
+            CommandState, LearnSkillError, LevelUpSkillError, PartyMemberInfo,
+            PartyMemberInfoOffline, PartyMemberLeave, PartyMemberList, PickupItemDropContent,
+            PickupItemDropError, QuestDeleteResult, QuestTriggerResult, ServerMessage,
+            UpdateAbilityValue,
+        },
+        PartyItemSharing, PartyXpSharing,
     },
 };
 use rose_network_common::ConnectionError;
@@ -1346,7 +1351,23 @@ pub fn game_connection_system(
                     party_events.send(PartyEvent::InvitedJoin(inviter_entity));
                 }
             }
-            Ok(ServerMessage::PartyAcceptCreate(_)) => {
+            Ok(ServerMessage::PartyAcceptCreate(with_entity_id)) => {
+                if let Some(invited_entity) = client_entity_list.get(with_entity_id) {
+                    commands.add(move |world: &mut World| {
+                        if let Some(invited_entity_name) =
+                            world.entity(invited_entity).get::<ClientEntityName>()
+                        {
+                            let message = format!(
+                                "{} accepted your party invite.",
+                                invited_entity_name.as_str()
+                            );
+                            world
+                                .resource_mut::<Events<ChatboxEvent>>()
+                                .send(ChatboxEvent::System(message));
+                        }
+                    });
+                }
+
                 if let Some(player_entity) = client_entity_list.player_entity {
                     commands.entity(player_entity).insert(PartyInfo {
                         owner: PartyOwner::Player,
@@ -1359,6 +1380,18 @@ pub fn game_connection_system(
                     commands.entity(player_entity).insert(PartyInfo {
                         owner: PartyOwner::Unknown,
                         ..Default::default()
+                    });
+
+                    commands.add(move |world: &mut World| {
+                        if let Some(player_entity_name) =
+                            world.entity(player_entity).get::<ClientEntityName>()
+                        {
+                            let message =
+                                format!("{} has joined the party.", player_entity_name.as_str());
+                            world
+                                .resource_mut::<Events<ChatboxEvent>>()
+                                .send(ChatboxEvent::System(message));
+                        }
                     });
                 }
             }
@@ -1390,15 +1423,36 @@ pub fn game_connection_system(
                         {
                             if is_player_owner {
                                 party_info.owner = PartyOwner::Player;
+
+                                if let Some(character_info) =
+                                    world.entity(player_entity).get::<CharacterInfo>()
+                                {
+                                    let message = format!(
+                                        "{} is now leader of the party.",
+                                        &character_info.name
+                                    );
+                                    world
+                                        .resource_mut::<Events<ChatboxEvent>>()
+                                        .send(ChatboxEvent::System(message));
+                                }
                             } else {
                                 party_info.owner = PartyOwner::Unknown;
 
                                 for member in party_info.members.iter() {
                                     if let PartyMemberInfo::Online(member_info_online) = member {
                                         if member_info_online.entity_id == client_entity_id {
+                                            let message = format!(
+                                                "{} is now leader of the party.",
+                                                &member_info_online.name
+                                            );
+
                                             party_info.owner = PartyOwner::Character(
                                                 member_info_online.character_id,
                                             );
+
+                                            world
+                                                .resource_mut::<Events<ChatboxEvent>>()
+                                                .send(ChatboxEvent::System(message));
                                             break;
                                         }
                                     }
@@ -1411,6 +1465,7 @@ pub fn game_connection_system(
             Ok(ServerMessage::PartyDelete) => {
                 if let Some(player_entity) = client_entity_list.player_entity {
                     commands.entity(player_entity).remove::<PartyInfo>();
+                    chatbox_events.send(ChatboxEvent::System("You have left the party.".into()));
                 }
             }
             Ok(ServerMessage::PartyMemberList(PartyMemberList {
@@ -1436,7 +1491,17 @@ pub fn game_connection_system(
                             party_info.owner = PartyOwner::Character(members[0].get_character_id());
                         }
 
+                        let mut messages: ArrayVec<String, 10> = ArrayVec::new();
+                        for member in members.iter() {
+                            messages.push(format!("{} has joined the party.", member.get_name()));
+                        }
+
                         party_info.members.append(&mut members);
+
+                        let mut chatbox_events = world.resource_mut::<Events<ChatboxEvent>>();
+                        for message in messages {
+                            chatbox_events.send(ChatboxEvent::System(message));
+                        }
                     });
                 }
             }
@@ -1462,7 +1527,16 @@ pub fn game_connection_system(
                                 .iter()
                                 .position(|x| x.get_character_id() == leaver_character_id)
                             {
+                                let message = format!(
+                                    "{} has left the party.",
+                                    party_info.members[index].get_name()
+                                );
+
                                 party_info.members.remove(index);
+
+                                world
+                                    .resource_mut::<Events<ChatboxEvent>>()
+                                    .send(ChatboxEvent::System(message));
                             }
                         }
                     });
@@ -1480,11 +1554,18 @@ pub fn game_connection_system(
                                 .find(|x| x.get_character_id() == character_unique_id)
                             {
                                 if let PartyMemberInfo::Online(party_member_online) = party_member {
+                                    let message =
+                                        format!("{} has disconnected.", &party_member_online.name);
+
                                     *party_member =
                                         PartyMemberInfo::Offline(PartyMemberInfoOffline {
                                             character_id: party_member_online.character_id,
                                             name: party_member_online.name.clone(),
                                         });
+
+                                    world
+                                        .resource_mut::<Events<ChatboxEvent>>()
+                                        .send(ChatboxEvent::System(message));
                                 }
                             }
                         }
@@ -1502,7 +1583,15 @@ pub fn game_connection_system(
                                 .iter()
                                 .position(|x| x.get_character_id() == character_unique_id)
                             {
+                                let message = format!(
+                                    "{} has been kicked from the party.",
+                                    party_info.members[index].get_name()
+                                );
                                 party_info.members.remove(index);
+
+                                world
+                                    .resource_mut::<Events<ChatboxEvent>>()
+                                    .send(ChatboxEvent::System(message));
                             }
                         }
                     });
@@ -1577,6 +1666,25 @@ pub fn game_connection_system(
                         {
                             party_info.item_sharing = item_sharing;
                             party_info.xp_sharing = xp_sharing;
+
+                            let mut chatbox_events = world.resource_mut::<Events<ChatboxEvent>>();
+                            chatbox_events
+                                .send(ChatboxEvent::System("Party rules have changed.".into()));
+                            chatbox_events.send(ChatboxEvent::System(format!(
+                                "Experience points sharing: {}.",
+                                match xp_sharing {
+                                    PartyXpSharing::EqualShare => "Equal Share",
+                                    PartyXpSharing::DistributedByLevel => "Distributed by Level",
+                                }
+                            )));
+                            chatbox_events.send(ChatboxEvent::System(format!(
+                                "Item sharing: {}.",
+                                match item_sharing {
+                                    PartyItemSharing::EqualLootDistribution =>
+                                        "Equal Loot Distribution",
+                                    PartyItemSharing::AcquisitionOrder => "Acquisition Order",
+                                }
+                            )));
                         }
                     });
                 }
