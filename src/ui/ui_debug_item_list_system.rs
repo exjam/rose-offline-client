@@ -13,6 +13,7 @@ use crate::{
 pub struct UiStateDebugItemList {
     item_list_type: ItemType,
     item_name_filter: String,
+    spawn_as_drop: bool,
     spawn_quantity: usize,
 }
 
@@ -21,6 +22,7 @@ impl Default for UiStateDebugItemList {
         Self {
             item_list_type: ItemType::Face,
             item_name_filter: String::new(),
+            spawn_as_drop: false,
             spawn_quantity: 1,
         }
     }
@@ -56,10 +58,19 @@ pub fn ui_debug_item_list_system(
                     );
                     ui.end_row();
 
+                    ui.label("Spawn as item drop:");
+                    ui.add(egui::Checkbox::new(
+                        &mut ui_state_debug_item_list.spawn_as_drop,
+                        "As item drop",
+                    ));
+                    ui.end_row();
+
                     ui.label("Item Name Filter:");
                     ui.text_edit_singleline(&mut ui_state_debug_item_list.item_name_filter);
                     ui.end_row();
                 });
+
+            ui.separator();
 
             ui.horizontal(|ui| {
                 ui.selectable_value(
@@ -245,7 +256,12 @@ pub fn ui_debug_item_list_system(
                                                 game_connection
                                                     .client_message_tx
                                                     .send(ClientMessage::Chat(format!(
-                                                        "/item {} {} {}",
+                                                        "{} {} {} {}",
+                                                        if ui_state_debug_item_list.spawn_as_drop {
+                                                            "/drop"
+                                                        } else {
+                                                            "/item"
+                                                        },
                                                         item_type,
                                                         item_reference.item_number,
                                                         ui_state_debug_item_list.spawn_quantity,
