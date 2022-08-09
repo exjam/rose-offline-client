@@ -209,6 +209,7 @@ pub fn ui_debug_client_entity_list_system(
                                             Command::Move(_) => ui.label("Moving"),
                                             Command::Attack(_) => ui.label("Attacking"),
                                             Command::Die => ui.label("Dead"),
+                                            Command::PersonalStore => ui.label("Personal Store"),
                                             Command::PickupItem(_) => ui.label("Pickup Item"),
                                             Command::Emote(_) => ui.label("Emote"),
                                             Command::Sit(_) => ui.label("Sitting"),

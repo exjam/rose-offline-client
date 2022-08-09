@@ -804,6 +804,14 @@ pub fn command_system(
                 // The transition from Sitting to Sit happens above
                 *next_command = NextCommand::default();
             }
+            Command::PersonalStore => {
+                *command = Command::with_personal_store();
+                *next_command = NextCommand::default();
+                commands
+                    .entity(entity)
+                    .remove::<Destination>()
+                    .remove::<Target>();
+            }
             &mut Command::CastSkill(CommandCastSkill {
                 skill_id,
                 skill_target,
@@ -888,20 +896,15 @@ pub fn command_system(
                                     });
                             }
                             SkillActionMode::Restore => match *command {
-                                Command::Stop
-                                | Command::Move(_)
-                                | Command::Attack(_) => {
-                                    *next_command =
-                                        NextCommand::new(Some(command.clone()));
+                                Command::Stop | Command::Move(_) | Command::Attack(_) => {
+                                    *next_command = NextCommand::new(Some(command.clone()));
                                 }
                                 Command::Die
                                 | Command::Emote(_)
                                 | Command::PickupItem(_)
-                                // TODO: | Command::PersonalStore
+                                | Command::PersonalStore
                                 | Command::Sit(_)
-                                | Command::CastSkill(_) => {
-                                    *next_command = NextCommand::default()
-                                }
+                                | Command::CastSkill(_) => *next_command = NextCommand::default(),
                             },
                         }
 

@@ -49,6 +49,9 @@ pub fn format_command(ui: &mut egui::Ui, command: &Command) {
         Command::Emote(command_emote) => {
             ui.label(format!("Emote {}", command_emote.motion_id.get()));
         }
+        Command::PersonalStore => {
+            ui.label("Personal Store");
+        }
         Command::Sit(CommandSit::Sit) => {
             ui.label("Sit");
         }

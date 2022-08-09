@@ -203,6 +203,7 @@ pub fn game_connection_system(
                             NextCommand::default()
                         }
                     }
+                    CommandState::PersonalStore => NextCommand::with_personal_store(),
                     _ => NextCommand::default(),
                 };
                 let mut ability_values = game_data.ability_value_calculator.calculate(

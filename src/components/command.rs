@@ -63,6 +63,7 @@ pub enum Command {
     Move(CommandMove),
     Attack(CommandAttack),
     Die,
+    PersonalStore,
     PickupItem(Entity),
     Emote(CommandEmote),
     Sit(CommandSit),
@@ -117,6 +118,10 @@ impl Command {
         })
     }
 
+    pub fn with_personal_store() -> Self {
+        Self::PersonalStore
+    }
+
     pub fn with_pickup_item(target: Entity) -> Self {
         Self::PickupItem(target)
     }
@@ -154,7 +159,10 @@ impl Command {
     }
 
     pub fn is_manual_complete(&self) -> bool {
-        matches!(self, Command::Sit(_) | Command::CastSkill(_)) // | Command::PersonalStore
+        matches!(
+            self,
+            Command::Sit(_) | Command::CastSkill(_) | Command::PersonalStore
+        )
     }
 
     pub fn requires_animation_complete(&self) -> bool {
@@ -172,6 +180,7 @@ impl Command {
                 cast_skill.cast_skill_state,
                 CommandCastSkillState::CastingRepeat
             ),
+            Command::PersonalStore => false,
         }
     }
 }
@@ -232,6 +241,10 @@ impl NextCommand {
             target,
             move_mode,
         })))
+    }
+
+    pub fn with_personal_store() -> Self {
+        Self(Some(Command::PersonalStore))
     }
 
     pub fn with_pickup_item(target: Entity) -> Self {
