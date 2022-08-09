@@ -136,14 +136,18 @@ pub fn game_mouse_input_system(
                                 .selected_target
                                 .map_or(false, |target| target.entity == hit_entity)
                             {
-                                if hit_team.id == Team::DEFAULT_NPC_TEAM_ID {
+                                if hit_team.id == Team::DEFAULT_NPC_TEAM_ID
+                                    || hit_team.id == player.team.id
+                                {
+                                    // Move towards friendly
                                     if let Some(hit_entity_position) = hit_entity_position {
                                         player_command_events.send(PlayerCommandEvent::Move(
                                             hit_entity_position.clone(),
                                             Some(hit_entity),
                                         ));
                                     }
-                                } else if hit_team.id != player.team.id {
+                                } else {
+                                    // Attack enemy
                                     player_command_events
                                         .send(PlayerCommandEvent::Attack(hit_entity));
                                 }
