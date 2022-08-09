@@ -76,6 +76,8 @@ pub trait LoadWidget {
 #[derive(Clone, Deserialize)]
 pub enum Widget {
     #[serde(rename = "BUTTON")]
+    #[serde(alias = "BUTTONOK")]
+    #[serde(alias = "BUTTONCANCEL")]
     Button(Button),
     #[serde(rename = "CAPTION")]
     Caption(Caption),
@@ -98,6 +100,9 @@ pub enum Widget {
     #[serde(rename = "SKILL")]
     Skill(Skill),
     #[serde(rename = "IMAGE")]
+    #[serde(alias = "IMAGETOP")]
+    #[serde(alias = "IMAGEMIDDLE")]
+    #[serde(alias = "IMAGEBOTTOM")]
     Image(Image),
     #[serde(rename = "TABBUTTON")]
     TabButton(TabButton),
