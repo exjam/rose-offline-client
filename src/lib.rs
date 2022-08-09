@@ -70,7 +70,8 @@ use scripting::RoseScriptingPlugin;
 use systems::{
     ability_values_system, animation_effect_system, animation_sound_system, animation_system,
     auto_login_system, background_music_system, character_model_add_collider_system,
-    character_model_blink_system, character_model_system, character_select_enter_system,
+    character_model_blink_system, character_model_changed_collider_system, character_model_system,
+    character_personal_store_model_add_collider_system, character_select_enter_system,
     character_select_event_system, character_select_exit_system, character_select_input_system,
     character_select_models_system, character_select_system, client_entity_event_system,
     collision_height_only_system, collision_player_system, collision_player_system_join_zoin,
@@ -544,6 +545,10 @@ fn run_client(config: &Config, app_state: AppState, app_builder: impl FnOnce(&mu
         .add_system(background_music_system)
         .add_system(character_model_system)
         .add_system(character_model_add_collider_system.after(character_model_system))
+        .add_system(character_model_changed_collider_system.after(character_model_system))
+        .add_system(
+            character_personal_store_model_add_collider_system.after(character_model_system),
+        )
         .add_system(npc_model_system)
         .add_system(npc_model_add_collider_system.after(npc_model_system))
         .add_system(item_drop_model_system)

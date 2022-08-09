@@ -303,7 +303,7 @@ impl ModelLoader {
             .id();
         commands.entity(model_entity).add_child(root_bone);
 
-        spawn_model(
+        let model_parts = spawn_model(
             commands,
             asset_server,
             object_materials,
@@ -314,11 +314,13 @@ impl ModelLoader {
             None,
             0,
             false,
-        );
+        )
+        .1;
 
         PersonalStoreModel {
             skin,
             model: root_bone,
+            model_parts,
         }
     }
 

@@ -52,7 +52,9 @@ pub use animation_system::animation_system;
 pub use auto_login_system::auto_login_system;
 pub use background_music_system::background_music_system;
 pub use character_model_system::{
-    character_model_add_collider_system, character_model_blink_system, character_model_system,
+    character_model_add_collider_system, character_model_blink_system,
+    character_model_changed_collider_system, character_model_system,
+    character_personal_store_model_add_collider_system,
 };
 pub use character_select_system::{
     character_select_enter_system, character_select_event_system, character_select_exit_system,

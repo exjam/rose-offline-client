@@ -16,4 +16,5 @@ impl PersonalStore {
 pub struct PersonalStoreModel {
     pub skin: usize,
     pub model: Entity,
+    pub model_parts: Vec<Entity>,
 }

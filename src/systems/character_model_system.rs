@@ -1,6 +1,7 @@
 use std::ops::Range;
 
 use bevy::{
+    ecs::query::QueryEntityError,
     hierarchy::DespawnRecursiveExt,
     math::{Quat, Vec3, Vec3A},
     prelude::{
@@ -28,11 +29,6 @@ use crate::{
     render::{ObjectMaterial, ObjectMaterialClipFace},
     zms_asset_loader::ZmsMaterialNumFaces,
 };
-
-#[derive(Component)]
-pub struct CharacterColliderRootBoneOffset {
-    pub offset: Vec3,
-}
 
 const BLINK_CLOSED_DURATION: Range<f32> = 0.010..0.110;
 const BLINK_OPEN_DURATION: Range<f32> = 0.100..3.000;
@@ -97,14 +93,16 @@ pub fn character_model_add_collider_system(
                     .iter(),
             )
         {
-            if let Ok(aabb) = query_aabb.get(*part_entity) {
-                if let Some(aabb) = aabb {
+            match query_aabb.get(*part_entity) {
+                Ok(Some(aabb)) => {
                     min = Some(min.map_or_else(|| aabb.min(), |min| min.min(aabb.min())));
                     max = Some(max.map_or_else(|| aabb.max(), |max| max.max(aabb.max())));
-                } else {
+                }
+                Ok(None) | Err(QueryEntityError::NoSuchEntity(_)) => {
                     all_parts_loaded = false;
                     break;
                 }
+                _ => {}
             }
         }
 
@@ -142,6 +140,143 @@ pub fn character_model_add_collider_system(
             .id();
 
         commands.entity(root_bone_entity).add_child(collider_entity);
+
+        commands.entity(entity).insert_bundle((
+            ColliderEntity::new(collider_entity),
+            ModelHeight::new(half_extents.y * 2.0),
+        ));
+    }
+}
+
+#[derive(Component)]
+pub struct ColliderDirty;
+
+pub fn character_model_changed_collider_system(
+    mut commands: Commands,
+    query_models: Query<
+        (Entity, &ColliderEntity, &CharacterModel, &SkinnedMesh),
+        Or<(Changed<CharacterModel>, With<ColliderDirty>)>,
+    >,
+    query_aabb: Query<Option<&Aabb>, With<Handle<Mesh>>>,
+    inverse_bindposes: Res<Assets<SkinnedMeshInverseBindposes>>,
+) {
+    // Add colliders to character models without one
+    for (entity, collider_entity, character_model, skinned_mesh) in query_models.iter() {
+        let mut min: Option<Vec3A> = None;
+        let mut max: Option<Vec3A> = None;
+        let mut all_parts_loaded = true;
+
+        // Collect the AABB of Body, Hands, Feet
+        for part_entity in character_model.model_parts[CharacterModelPart::Body]
+            .1
+            .iter()
+            .chain(
+                character_model.model_parts[CharacterModelPart::Hands]
+                    .1
+                    .iter(),
+            )
+            .chain(
+                character_model.model_parts[CharacterModelPart::Feet]
+                    .1
+                    .iter(),
+            )
+        {
+            match query_aabb.get(*part_entity) {
+                Ok(Some(aabb)) => {
+                    min = Some(min.map_or_else(|| aabb.min(), |min| min.min(aabb.min())));
+                    max = Some(max.map_or_else(|| aabb.max(), |max| max.max(aabb.max())));
+                }
+                Ok(None) | Err(QueryEntityError::NoSuchEntity(_)) => {
+                    all_parts_loaded = false;
+                    break;
+                }
+                _ => {}
+            }
+        }
+
+        let inverse_bindpose = inverse_bindposes.get(&skinned_mesh.inverse_bindposes);
+        if min.is_none() || max.is_none() || !all_parts_loaded || inverse_bindpose.is_none() {
+            commands.entity(entity).insert(ColliderDirty);
+            continue;
+        }
+        let min = Vec3::from(min.unwrap());
+        let max = Vec3::from(max.unwrap());
+        let root_bone_inverse_bindpose = Transform::from_matrix(inverse_bindpose.unwrap()[0]);
+
+        let local_bound_center = 0.5 * (min + max);
+        let half_extents = 0.5 * (max - min);
+        let root_bone_offset = root_bone_inverse_bindpose.mul_vec3(local_bound_center);
+
+        commands.entity(collider_entity.entity).insert_bundle((
+            Collider::cuboid(half_extents.x, half_extents.y, half_extents.z),
+            Transform::from_translation(root_bone_offset)
+                .with_rotation(Quat::from_axis_angle(Vec3::Z, std::f32::consts::PI / 2.0)),
+        ));
+
+        commands
+            .entity(entity)
+            .insert(ModelHeight::new(half_extents.y * 2.0));
+    }
+}
+
+pub fn character_personal_store_model_add_collider_system(
+    mut commands: Commands,
+    query_models: Query<
+        (Entity, &PersonalStoreModel, Option<&PlayerCharacter>),
+        Without<ColliderEntity>,
+    >,
+    query_aabb: Query<Option<&Aabb>, With<Handle<Mesh>>>,
+) {
+    // Add colliders to character models without one
+    for (entity, personal_store_model, player_character) in query_models.iter() {
+        let mut min: Option<Vec3A> = None;
+        let mut max: Option<Vec3A> = None;
+        let mut all_parts_loaded = true;
+
+        // Collect the AABB of Body, Hands, Feet
+        for part_entity in personal_store_model.model_parts.iter() {
+            match query_aabb.get(*part_entity) {
+                Ok(Some(aabb)) => {
+                    min = Some(min.map_or_else(|| aabb.min(), |min| min.min(aabb.min())));
+                    max = Some(max.map_or_else(|| aabb.max(), |max| max.max(aabb.max())));
+                }
+                Ok(None) | Err(QueryEntityError::NoSuchEntity(_)) => {
+                    all_parts_loaded = false;
+                    break;
+                }
+                _ => {}
+            }
+        }
+
+        if min.is_none() || max.is_none() || !all_parts_loaded {
+            continue;
+        }
+        let min = Vec3::from(min.unwrap());
+        let max = Vec3::from(max.unwrap());
+        let half_extents = 0.5 * (max - min);
+
+        let collider_entity = commands
+            .spawn_bundle((
+                ColliderParent::new(entity),
+                Collider::cuboid(half_extents.x, half_extents.y, half_extents.z),
+                CollisionGroups::new(
+                    if player_character.is_some() {
+                        COLLISION_GROUP_PLAYER
+                    } else {
+                        COLLISION_GROUP_CHARACTER
+                    },
+                    COLLISION_FILTER_INSPECTABLE
+                        | COLLISION_FILTER_CLICKABLE
+                        | COLLISION_GROUP_PHYSICS_TOY,
+                ),
+                Transform::from_translation(Vec3::new(0.0, half_extents.y, 0.0)),
+                GlobalTransform::default(),
+            ))
+            .id();
+
+        commands
+            .entity(personal_store_model.model)
+            .add_child(collider_entity);
 
         commands.entity(entity).insert_bundle((
             ColliderEntity::new(collider_entity),
@@ -203,17 +338,13 @@ pub fn character_model_system(
             }
 
             // Destroy the previous model
-            for (_, (_, part_entities)) in character_model.model_parts.iter() {
-                for part_entity in part_entities.iter() {
-                    commands.entity(*part_entity).despawn();
+            if let Some(skinned_mesh) = skinned_mesh {
+                if let Some(root_bone) = skinned_mesh.joints.first() {
+                    commands.entity(*root_bone).despawn_recursive();
                 }
             }
 
-            if let Some(skinned_mesh) = skinned_mesh {
-                for joint in skinned_mesh.joints.iter() {
-                    commands.entity(*joint).despawn();
-                }
-            }
+            commands.entity(entity).remove::<ColliderEntity>();
 
             if personal_store.is_some() {
                 commands
@@ -233,6 +364,8 @@ pub fn character_model_system(
                 commands
                     .entity(personal_store_model.model)
                     .despawn_recursive();
+
+                commands.entity(entity).remove::<ColliderEntity>();
             }
 
             // Spawn new personal store model
@@ -250,7 +383,10 @@ pub fn character_model_system(
                 commands
                     .entity(personal_store_model.model)
                     .despawn_recursive();
-                commands.entity(entity).remove::<PersonalStoreModel>();
+                commands
+                    .entity(entity)
+                    .remove::<PersonalStoreModel>()
+                    .remove::<ColliderEntity>();
             }
 
             // Spawn new character model

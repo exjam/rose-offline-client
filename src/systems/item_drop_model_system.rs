@@ -1,4 +1,5 @@
 use bevy::{
+    ecs::query::QueryEntityError,
     math::{Vec3, Vec3A},
     prelude::{
         AssetServer, Assets, BuildChildren, Changed, Commands, Entity, GlobalTransform, Handle,
@@ -69,14 +70,16 @@ pub fn item_drop_model_add_collider_system(
 
         // Collect the AABB of mesh parts
         for part_entity in item_drop_model.model_parts.iter() {
-            if let Ok(aabb) = query_aabb.get(*part_entity) {
-                if let Some(aabb) = aabb {
+            match query_aabb.get(*part_entity) {
+                Ok(Some(aabb)) => {
                     min = Some(min.map_or_else(|| aabb.min(), |min| min.min(aabb.min())));
                     max = Some(max.map_or_else(|| aabb.max(), |max| max.max(aabb.max())));
-                } else {
+                }
+                Ok(None) | Err(QueryEntityError::NoSuchEntity(_)) => {
                     all_parts_loaded = false;
                     break;
                 }
+                _ => {}
             }
         }
 
