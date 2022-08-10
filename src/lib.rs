@@ -54,8 +54,8 @@ use audio::OddioPlugin;
 use events::{
     AnimationFrameEvent, CharacterSelectEvent, ChatboxEvent, ClientEntityEvent,
     ConversationDialogEvent, GameConnectionEvent, HitEvent, LoadZoneEvent, LoginEvent,
-    NetworkEvent, NpcStoreEvent, PartyEvent, PersonalStoreEvent, PlayerCommandEvent,
-    QuestTriggerEvent, SpawnEffectEvent, SpawnProjectileEvent, SystemFuncEvent,
+    MessageBoxEvent, NetworkEvent, NpcStoreEvent, PartyEvent, PersonalStoreEvent,
+    PlayerCommandEvent, QuestTriggerEvent, SpawnEffectEvent, SpawnProjectileEvent, SystemFuncEvent,
     WorldConnectionEvent, ZoneEvent,
 };
 use free_camera::FreeCameraPlugin;
@@ -100,11 +100,11 @@ use ui::{
     ui_debug_npc_list_system, ui_debug_physics_system, ui_debug_render_system,
     ui_debug_skill_list_system, ui_debug_zone_lighting_system, ui_debug_zone_list_system,
     ui_debug_zone_time_system, ui_drag_and_drop_system, ui_game_menu_system, ui_hotbar_system,
-    ui_inventory_system, ui_login_system, ui_minimap_system, ui_npc_store_system,
-    ui_party_option_system, ui_party_system, ui_personal_store_system, ui_player_info_system,
-    ui_quest_list_system, ui_selected_target_system, ui_server_select_system, ui_settings_system,
-    ui_skill_list_system, widgets::Dialog, DialogLoader, UiStateDebugWindows, UiStateDragAndDrop,
-    UiStateWindows,
+    ui_inventory_system, ui_login_system, ui_message_box_system, ui_minimap_system,
+    ui_npc_store_system, ui_party_option_system, ui_party_system, ui_personal_store_system,
+    ui_player_info_system, ui_quest_list_system, ui_selected_target_system,
+    ui_server_select_system, ui_settings_system, ui_skill_list_system, widgets::Dialog,
+    DialogLoader, UiStateDebugWindows, UiStateDragAndDrop, UiStateWindows,
 };
 use vfs_asset_io::VfsAssetIo;
 use zmo_asset_loader::{ZmoAsset, ZmoAssetLoader};
@@ -532,6 +532,7 @@ fn run_client(config: &Config, app_state: AppState, app_builder: impl FnOnce(&mu
         .init_resource::<Events<HitEvent>>()
         .init_resource::<Events<LoginEvent>>()
         .init_resource::<Events<LoadZoneEvent>>()
+        .init_resource::<Events<MessageBoxEvent>>()
         .init_resource::<Events<NetworkEvent>>()
         .init_resource::<Events<NpcStoreEvent>>()
         .init_resource::<Events<PartyEvent>>()
@@ -604,7 +605,7 @@ fn run_client(config: &Config, app_state: AppState, app_builder: impl FnOnce(&mu
         .add_system(system_func_event_system)
         .add_system(load_dialog_sprites_system)
         .add_system(zone_time_system.after(world_time_system))
-        .add_system(ui_npc_store_system.label("ui_system"))
+        .add_system(ui_message_box_system.after("ui_system"))
         .add_system(ui_debug_camera_info_system.label("ui_system"))
         .add_system(ui_debug_client_entity_list_system.label("ui_system"))
         .add_system(ui_debug_command_viewer_system.label("ui_system"))
@@ -760,7 +761,11 @@ fn run_client(config: &Config, app_state: AppState, app_builder: impl FnOnce(&mu
                 .with_system(passive_recovery_system)
                 .with_system(quest_trigger_system)
                 .with_system(cooldown_system.before("ui_system"))
-                .with_system(game_mouse_input_system.after("ui_system"))
+                .with_system(
+                    game_mouse_input_system
+                        .after("ui_system")
+                        .after(ui_message_box_system),
+                )
                 .with_system(
                     player_command_system
                         .after(cooldown_system)
@@ -776,6 +781,7 @@ fn run_client(config: &Config, app_state: AppState, app_builder: impl FnOnce(&mu
                 )
                 .with_system(ui_hotbar_system.label("ui_system"))
                 .with_system(ui_minimap_system.label("ui_system"))
+                .with_system(ui_npc_store_system.label("ui_system"))
                 .with_system(ui_party_system.label("ui_system"))
                 .with_system(ui_party_option_system.label("ui_system"))
                 .with_system(ui_personal_store_system.label("ui_system"))
