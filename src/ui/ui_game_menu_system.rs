@@ -54,7 +54,7 @@ pub fn ui_game_menu_system(
         .open(&mut ui_state_windows.menu_open)
         .title_bar(false)
         .resizable(false)
-        .anchor(egui::Align2::LEFT_TOP, [dialog.adjust_x, dialog.adjust_y])
+        .fixed_pos([dialog.adjust_x, dialog.adjust_y])
         .default_width(dialog.width)
         .default_height(dialog.height)
         .show(egui_context.ctx_mut(), |ui| {
