@@ -54,8 +54,9 @@ use audio::OddioPlugin;
 use events::{
     AnimationFrameEvent, CharacterSelectEvent, ChatboxEvent, ClientEntityEvent,
     ConversationDialogEvent, GameConnectionEvent, HitEvent, LoadZoneEvent, LoginEvent,
-    NetworkEvent, NpcStoreEvent, PartyEvent, PlayerCommandEvent, QuestTriggerEvent,
-    SpawnEffectEvent, SpawnProjectileEvent, SystemFuncEvent, WorldConnectionEvent, ZoneEvent,
+    NetworkEvent, NpcStoreEvent, PartyEvent, PersonalStoreEvent, PlayerCommandEvent,
+    QuestTriggerEvent, SpawnEffectEvent, SpawnProjectileEvent, SystemFuncEvent,
+    WorldConnectionEvent, ZoneEvent,
 };
 use free_camera::FreeCameraPlugin;
 use model_loader::ModelLoader;
@@ -100,9 +101,10 @@ use ui::{
     ui_debug_skill_list_system, ui_debug_zone_lighting_system, ui_debug_zone_list_system,
     ui_debug_zone_time_system, ui_drag_and_drop_system, ui_game_menu_system, ui_hotbar_system,
     ui_inventory_system, ui_login_system, ui_minimap_system, ui_npc_store_system,
-    ui_party_option_system, ui_party_system, ui_player_info_system, ui_quest_list_system,
-    ui_selected_target_system, ui_server_select_system, ui_settings_system, ui_skill_list_system,
-    widgets::Dialog, DialogLoader, UiStateDebugWindows, UiStateDragAndDrop, UiStateWindows,
+    ui_party_option_system, ui_party_system, ui_personal_store_system, ui_player_info_system,
+    ui_quest_list_system, ui_selected_target_system, ui_server_select_system, ui_settings_system,
+    ui_skill_list_system, widgets::Dialog, DialogLoader, UiStateDebugWindows, UiStateDragAndDrop,
+    UiStateWindows,
 };
 use vfs_asset_io::VfsAssetIo;
 use zmo_asset_loader::{ZmoAsset, ZmoAssetLoader};
@@ -533,6 +535,7 @@ fn run_client(config: &Config, app_state: AppState, app_builder: impl FnOnce(&mu
         .init_resource::<Events<NetworkEvent>>()
         .init_resource::<Events<NpcStoreEvent>>()
         .init_resource::<Events<PartyEvent>>()
+        .init_resource::<Events<PersonalStoreEvent>>()
         .init_resource::<Events<PlayerCommandEvent>>()
         .init_resource::<Events<QuestTriggerEvent>>()
         .init_resource::<Events<SystemFuncEvent>>()
@@ -771,6 +774,7 @@ fn run_client(config: &Config, app_state: AppState, app_builder: impl FnOnce(&mu
                 .with_system(ui_minimap_system.label("ui_system"))
                 .with_system(ui_party_system.label("ui_system"))
                 .with_system(ui_party_option_system.label("ui_system"))
+                .with_system(ui_personal_store_system.label("ui_system"))
                 .with_system(ui_player_info_system.label("ui_system"))
                 .with_system(ui_quest_list_system.label("ui_system"))
                 .with_system(ui_selected_target_system.label("ui_system"))

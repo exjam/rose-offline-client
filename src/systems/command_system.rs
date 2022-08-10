@@ -20,9 +20,9 @@ use crate::{
     components::{
         ActiveMotion, CharacterModel, ClientEntity, ClientEntityType, Command, CommandAttack,
         CommandCastSkill, CommandCastSkillState, CommandCastSkillTarget, CommandEmote, CommandMove,
-        CommandSit, NextCommand, NpcModel, PlayerCharacter, Position,
+        CommandSit, NextCommand, NpcModel, PersonalStore, PlayerCharacter, Position,
     },
-    events::{ClientEntityEvent, ConversationDialogEvent},
+    events::{ClientEntityEvent, ConversationDialogEvent, PersonalStoreEvent},
     resources::{GameConnection, GameData},
     zmo_asset_loader::ZmoAsset,
 };
@@ -252,11 +252,13 @@ pub fn command_system(
     query_move_target: Query<(&Position, &ClientEntity)>,
     query_attack_target: Query<(&Position, &HealthPoints)>,
     query_npc: Query<&Npc>,
+    query_personal_store: Query<&PersonalStore>,
     asset_server: Res<AssetServer>,
     game_connection: Option<Res<GameConnection>>,
     game_data: Res<GameData>,
     mut conversation_dialog_events: EventWriter<ConversationDialogEvent>,
     mut client_entity_events: EventWriter<ClientEntityEvent>,
+    mut personal_store_events: EventWriter<PersonalStoreEvent>,
 ) {
     let mut rng = rand::thread_rng();
 
@@ -487,13 +489,18 @@ pub fn command_system(
                 let mut entity_commands = commands.entity(entity);
                 let mut pickup_item_entity = None;
                 let mut talk_to_npc_entity = None;
+                let mut move_to_character_entity = None;
 
                 if let Some(target_entity) = target {
                     if let Ok((target_position, target_client_entity)) =
                         query_move_target.get(*target_entity)
                     {
                         let required_distance = match target_client_entity.entity_type {
-                            ClientEntityType::Character => Some(CHARACTER_MOVE_TO_DISTANCE),
+                            ClientEntityType::Character => {
+                                move_to_character_entity =
+                                    Some((*target_entity, target_position.position));
+                                Some(CHARACTER_MOVE_TO_DISTANCE)
+                            }
                             ClientEntityType::Npc => {
                                 talk_to_npc_entity =
                                     Some((*target_entity, target_position.position));
@@ -561,8 +568,8 @@ pub fn command_system(
                     // Reached destination, stop moving
                     *next_command = NextCommand::with_stop();
 
-                    // If the player has moved to an item, pick it up
                     if player_character.is_some() {
+                        // If the player has moved to an item, pick it up
                         if let Some((
                             pickup_item_entity,
                             pickup_item_entity_id,
@@ -587,6 +594,7 @@ pub fn command_system(
                             }
                         }
 
+                        // If the player has moved to an NPC, open dialog
                         if let Some((talk_to_npc_entity, talk_to_npc_position)) = talk_to_npc_entity
                         {
                             // Update rotation to face NPC
@@ -611,6 +619,25 @@ pub fn command_system(
                                         );
                                     }
                                 }
+                            }
+                        }
+
+                        if let Some((move_to_character_entity, move_to_character_position)) =
+                            move_to_character_entity
+                        {
+                            // Update rotation to face character
+                            let dx = move_to_character_position.x - position.x;
+                            let dy = move_to_character_position.y - position.y;
+                            transform.rotation = Quat::from_axis_angle(
+                                Vec3::Y,
+                                dy.atan2(dx) + std::f32::consts::PI / 2.0,
+                            );
+
+                            // If character is running a personal store, open it
+                            if query_personal_store.contains(move_to_character_entity) {
+                                personal_store_events.send(PersonalStoreEvent::OpenEntityStore(
+                                    move_to_character_entity,
+                                ));
                             }
                         }
                     }

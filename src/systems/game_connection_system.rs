@@ -17,7 +17,7 @@ use rose_game_common::{
     },
     messages::{
         server::{
-            CommandState, LearnSkillError, LevelUpSkillError, PartyMemberInfo,
+            CommandState, LearnSkillError, LevelUpSkillError, OpenPersonalStore, PartyMemberInfo,
             PartyMemberInfoOffline, PartyMemberLeave, PartyMemberList, PickupItemDropContent,
             PickupItemDropError, QuestDeleteResult, QuestTriggerResult, ServerMessage,
             UpdateAbilityValue,
@@ -38,7 +38,7 @@ use crate::{
     },
     events::{
         ChatboxEvent, ClientEntityEvent, GameConnectionEvent, LoadZoneEvent, PartyEvent,
-        QuestTriggerEvent,
+        PersonalStoreEvent, QuestTriggerEvent,
     },
     resources::{AppState, ClientEntityList, GameConnection, GameData, WorldRates, WorldTime},
 };
@@ -54,6 +54,7 @@ pub fn game_connection_system(
     mut load_zone_events: EventWriter<LoadZoneEvent>,
     mut client_entity_events: EventWriter<ClientEntityEvent>,
     mut party_events: EventWriter<PartyEvent>,
+    mut personal_store_events: EventWriter<PersonalStoreEvent>,
     mut quest_trigger_events: EventWriter<QuestTriggerEvent>,
 ) {
     if game_connection.is_none() {
@@ -1705,6 +1706,26 @@ pub fn game_connection_system(
                         }
                     });
                 }
+            }
+            Ok(ServerMessage::OpenPersonalStore(OpenPersonalStore {
+                entity_id,
+                skin,
+                title,
+            })) => {
+                if let Some(entity) = client_entity_list.get(entity_id) {
+                    commands.entity(entity).insert(PersonalStore {
+                        title,
+                        skin: skin as usize,
+                    });
+                }
+            }
+            Ok(ServerMessage::ClosePersonalStore(entity_id)) => {
+                if let Some(entity) = client_entity_list.get(entity_id) {
+                    commands.entity(entity).remove::<PersonalStore>();
+                }
+            }
+            Ok(ServerMessage::PersonalStoreItemList(item_list)) => {
+                personal_store_events.send(PersonalStoreEvent::SetItemList(item_list));
             }
             Ok(message) => {
                 log::warn!("Received unimplemented game server message: {:#?}", message);

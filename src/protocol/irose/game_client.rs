@@ -12,12 +12,12 @@ use rose_game_common::{
             self, AnnounceChat, ApplySkillEffect, AttackEntity, CastSkillSelf,
             CastSkillTargetEntity, CastSkillTargetPosition, CharacterData, CharacterDataItems,
             CharacterDataQuest, ConnectionRequestError, ConnectionResponse, DamageEntity,
-            JoinZoneResponse, LevelUpSkillResult, LocalChat, MoveEntity, PickupItemDropResult,
-            QuestDeleteResult, QuestTriggerResult, RemoveEntities, ServerMessage, ShoutChat,
-            SpawnEntityCharacter, SpawnEntityItemDrop, SpawnEntityMonster, SpawnEntityNpc,
-            StopMoveEntity, Teleport, UpdateAbilityValue, UpdateBasicStat, UpdateEquipment,
-            UpdateLevel, UpdateSpeed, UpdateStatusEffects, UpdateVehiclePart, UpdateXpStamina,
-            UseEmote, UseInventoryItem, UseItem, Whisper,
+            JoinZoneResponse, LevelUpSkillResult, LocalChat, MoveEntity, PersonalStoreItemList,
+            PickupItemDropResult, QuestDeleteResult, QuestTriggerResult, RemoveEntities,
+            ServerMessage, ShoutChat, SpawnEntityCharacter, SpawnEntityItemDrop,
+            SpawnEntityMonster, SpawnEntityNpc, StopMoveEntity, Teleport, UpdateAbilityValue,
+            UpdateBasicStat, UpdateEquipment, UpdateLevel, UpdateSpeed, UpdateStatusEffects,
+            UpdateVehiclePart, UpdateXpStamina, UseEmote, UseInventoryItem, UseItem, Whisper,
         },
     },
 };
@@ -47,11 +47,11 @@ use rose_network_irose::{
         PacketServerMoveEntity, PacketServerMoveToggle, PacketServerMoveToggleType,
         PacketServerNpcStoreTransactionError, PacketServerPartyMemberRewardItem,
         PacketServerPartyMemberUpdateInfo, PacketServerPartyMembers, PacketServerPartyReply,
-        PacketServerPartyRequest, PacketServerPartyUpdateRules, PacketServerPickupItemDropResult,
-        PacketServerQuestResult, PacketServerQuestResultType, PacketServerRemoveEntities,
-        PacketServerRewardItems, PacketServerRewardMoney, PacketServerRunNpcDeathTrigger,
-        PacketServerSelectCharacter, PacketServerSetHotbarSlot, PacketServerShoutChat,
-        PacketServerSpawnEntityCharacter, PacketServerSpawnEntityItemDrop,
+        PacketServerPartyRequest, PacketServerPartyUpdateRules, PacketServerPersonalStoreItemList,
+        PacketServerPickupItemDropResult, PacketServerQuestResult, PacketServerQuestResultType,
+        PacketServerRemoveEntities, PacketServerRewardItems, PacketServerRewardMoney,
+        PacketServerRunNpcDeathTrigger, PacketServerSelectCharacter, PacketServerSetHotbarSlot,
+        PacketServerShoutChat, PacketServerSpawnEntityCharacter, PacketServerSpawnEntityItemDrop,
         PacketServerSpawnEntityMonster, PacketServerSpawnEntityNpc, PacketServerStartCastingSkill,
         PacketServerStopMoveEntity, PacketServerTeleport, PacketServerUpdateAbilityValue,
         PacketServerUpdateAmmo, PacketServerUpdateBasicStat, PacketServerUpdateEquipment,
@@ -794,6 +794,17 @@ impl GameClient {
                     .send(ServerMessage::AdjustPosition(
                         message.client_entity_id,
                         message.position,
+                    ))
+                    .ok();
+            }
+            Some(ServerPackets::PersonalStoreItemList) => {
+                let message = PacketServerPersonalStoreItemList::try_from(packet)?;
+                self.server_message_tx
+                    .send(ServerMessage::PersonalStoreItemList(
+                        PersonalStoreItemList {
+                            sell_items: message.sell_items,
+                            buy_items: message.buy_items,
+                        },
                     ))
                     .ok();
             }
