@@ -281,7 +281,7 @@ impl<'w> egui::Widget for DragAndDropSlot<'w> {
         if response.dragged_by(egui::PointerButton::Primary) {
             *dragged_item = Some(dnd_id);
         } else if dropped {
-            *dropped_item = Some(dragged_item.unwrap());
+            *dropped_item = dragged_item.take();
             response.mark_changed();
         }
 

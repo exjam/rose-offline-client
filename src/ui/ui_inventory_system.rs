@@ -8,15 +8,14 @@ use enum_map::{enum_map, EnumMap};
 use rose_data::{
     AmmoIndex, EquipmentIndex, Item, ItemClass, ItemType, StatusEffectType, VehiclePartIndex,
 };
-use rose_game_common::{
-    components::{Equipment, Inventory, InventoryPageType, ItemSlot, INVENTORY_PAGE_SIZE},
-    messages::client::{ChangeEquipment, ClientMessage},
+use rose_game_common::components::{
+    Equipment, Inventory, InventoryPageType, ItemSlot, INVENTORY_PAGE_SIZE,
 };
 
 use crate::{
     components::{ConsumableCooldownGroup, Cooldowns, PlayerCharacter},
-    events::{ChatboxEvent, PlayerCommandEvent},
-    resources::{GameConnection, GameData, UiResources, UiSpriteSheetType},
+    events::PlayerCommandEvent,
+    resources::{GameData, UiResources, UiSpriteSheetType},
     ui::{
         ui_add_item_tooltip,
         widgets::{DataBindings, Dialog, Widget},
@@ -204,12 +203,10 @@ fn ui_add_inventory_slot(
     inventory_slot: ItemSlot,
     pos: egui::Pos2,
     player: &PlayerQueryItem,
-    game_connection: Option<&Res<GameConnection>>,
     game_data: &GameData,
     ui_resources: &UiResources,
     item_slot_map: &mut EnumMap<InventoryPageType, Vec<ItemSlot>>,
     ui_state_dnd: &mut UiStateDragAndDrop,
-    chatbox_events: &mut EventWriter<ChatboxEvent>,
     player_command_events: &mut EventWriter<PlayerCommandEvent>,
 ) {
     let drag_accepts = match inventory_slot {
@@ -430,141 +427,28 @@ fn ui_add_inventory_slot(
         }
     }
 
-    if let Some(equip_inventory_slot) = equip_equipment_inventory_slot {
-        if let Some(item) = player.inventory.get_item(equip_inventory_slot) {
-            let equipment_index = match item.get_item_type() {
-                ItemType::Face => Some(EquipmentIndex::Face),
-                ItemType::Head => Some(EquipmentIndex::Head),
-                ItemType::Body => Some(EquipmentIndex::Body),
-                ItemType::Hands => Some(EquipmentIndex::Hands),
-                ItemType::Feet => Some(EquipmentIndex::Feet),
-                ItemType::Back => Some(EquipmentIndex::Back),
-                ItemType::Jewellery => {
-                    if let Some(item_data) =
-                        game_data.items.get_base_item(item.get_item_reference())
-                    {
-                        match item_data.class {
-                            ItemClass::Ring => Some(EquipmentIndex::Ring),
-                            ItemClass::Necklace => Some(EquipmentIndex::Necklace),
-                            ItemClass::Earring => Some(EquipmentIndex::Earring),
-                            _ => None,
-                        }
-                    } else {
-                        None
-                    }
-                }
-                ItemType::Weapon => Some(EquipmentIndex::Weapon),
-                ItemType::SubWeapon => Some(EquipmentIndex::SubWeapon),
-                _ => None,
-            };
-
-            if let Some(equipment_index) = equipment_index {
-                if let Some(game_connection) = game_connection {
-                    game_connection
-                        .client_message_tx
-                        .send(ClientMessage::ChangeEquipment(ChangeEquipment {
-                            equipment_index,
-                            item_slot: Some(equip_inventory_slot),
-                        }))
-                        .ok();
-                }
-            }
-        }
+    if let Some(item_slot) = equip_equipment_inventory_slot {
+        player_command_events.send(PlayerCommandEvent::EquipEquipment(item_slot));
     }
 
-    if let Some(equip_inventory_slot) = equip_ammo_inventory_slot {
-        if let Some(item) = player.inventory.get_item(equip_inventory_slot) {
-            let ammo_index =
-                if let Some(item_data) = game_data.items.get_base_item(item.get_item_reference()) {
-                    match item_data.class {
-                        ItemClass::Arrow => Some(AmmoIndex::Arrow),
-                        ItemClass::Bullet => Some(AmmoIndex::Bullet),
-                        ItemClass::Shell => Some(AmmoIndex::Throw),
-                        _ => None,
-                    }
-                } else {
-                    None
-                };
-
-            if let Some(ammo_index) = ammo_index {
-                if let Some(game_connection) = game_connection {
-                    game_connection
-                        .client_message_tx
-                        .send(ClientMessage::ChangeAmmo(
-                            ammo_index,
-                            Some(equip_inventory_slot),
-                        ))
-                        .ok();
-                }
-            }
-        }
+    if let Some(item_slot) = equip_ammo_inventory_slot {
+        player_command_events.send(PlayerCommandEvent::EquipAmmo(item_slot));
     }
 
-    if let Some(equip_inventory_slot) = equip_vehicle_inventory_slot {
-        if let Some(item) = player.inventory.get_item(equip_inventory_slot) {
-            let vehicle_part_index = if let Some(item_data) =
-                game_data.items.get_base_item(item.get_item_reference())
-            {
-                match item_data.class {
-                    ItemClass::CartBody | ItemClass::CastleGearBody => Some(VehiclePartIndex::Body),
-                    ItemClass::CartEngine | ItemClass::CastleGearEngine => {
-                        Some(VehiclePartIndex::Engine)
-                    }
-                    ItemClass::CartWheels | ItemClass::CastleGearLeg => Some(VehiclePartIndex::Leg),
-                    ItemClass::CartAccessory | ItemClass::CastleGearWeapon => {
-                        Some(VehiclePartIndex::Arms)
-                    }
-                    _ => None,
-                }
-            } else {
-                None
-            };
-
-            if let Some(vehicle_part_index) = vehicle_part_index {
-                if let Some(game_connection) = game_connection {
-                    game_connection
-                        .client_message_tx
-                        .send(ClientMessage::ChangeVehiclePart(
-                            vehicle_part_index,
-                            Some(equip_inventory_slot),
-                        ))
-                        .ok();
-                }
-            }
-        }
+    if let Some(item_slot) = equip_vehicle_inventory_slot {
+        player_command_events.send(PlayerCommandEvent::EquipVehicle(item_slot));
     }
 
-    if let Some(unequip_ammo_index) = unequip_ammo_index {
-        if let Some(game_connection) = game_connection {
-            game_connection
-                .client_message_tx
-                .send(ClientMessage::ChangeAmmo(unequip_ammo_index, None))
-                .ok();
-        }
+    if let Some(ammo_index) = unequip_ammo_index {
+        player_command_events.send(PlayerCommandEvent::UnequipAmmo(ammo_index));
     }
 
-    if let Some(unequip_equipment_index) = unequip_equipment_index {
-        if let Some(game_connection) = game_connection {
-            game_connection
-                .client_message_tx
-                .send(ClientMessage::ChangeEquipment(ChangeEquipment {
-                    equipment_index: unequip_equipment_index,
-                    item_slot: None,
-                }))
-                .ok();
-        }
+    if let Some(equipment_index) = unequip_equipment_index {
+        player_command_events.send(PlayerCommandEvent::UnequipEquipment(equipment_index));
     }
 
-    if let Some(unequip_vehicle_part_index) = unequip_vehicle_part_index {
-        if let Some(game_connection) = game_connection {
-            game_connection
-                .client_message_tx
-                .send(ClientMessage::ChangeVehiclePart(
-                    unequip_vehicle_part_index,
-                    None,
-                ))
-                .ok();
-        }
+    if let Some(vehicle_part_index) = unequip_vehicle_part_index {
+        player_command_events.send(PlayerCommandEvent::UnequipVehicle(vehicle_part_index));
     }
 
     if let Some(use_inventory_slot) = use_inventory_slot {
@@ -572,10 +456,7 @@ fn ui_add_inventory_slot(
     }
 
     if let Some(drop_inventory_slot) = drop_inventory_slot {
-        chatbox_events.send(ChatboxEvent::System(format!(
-            "TODO: Drop item {:?}",
-            drop_inventory_slot
-        )));
+        player_command_events.send(PlayerCommandEvent::DropItem(drop_inventory_slot));
     }
 
     if let Some((ItemSlot::Inventory(page_a, slot_a), ItemSlot::Inventory(page_b, slot_b))) =
@@ -611,10 +492,8 @@ pub fn ui_inventory_system(
     mut ui_state_windows: ResMut<UiStateWindows>,
     query_player: Query<PlayerQuery, With<PlayerCharacter>>,
     dialog_assets: Res<Assets<Dialog>>,
-    game_connection: Option<Res<GameConnection>>,
     game_data: Res<GameData>,
     ui_resources: Res<UiResources>,
-    mut chatbox_events: EventWriter<ChatboxEvent>,
     mut player_command_events: EventWriter<PlayerCommandEvent>,
 ) {
     let ui_state_inventory = &mut *ui_state_inventory;
@@ -688,12 +567,10 @@ pub fn ui_inventory_system(
                                         *item_slot,
                                         *pos + egui::vec2(-1.0, -1.0),
                                         &player,
-                                        game_connection.as_ref(),
                                         &game_data,
                                         &ui_resources,
                                         &mut ui_state_inventory.item_slot_map,
                                         &mut ui_state_dnd,
-                                        &mut chatbox_events,
                                         &mut player_command_events,
                                     );
                                 }
@@ -720,12 +597,10 @@ pub fn ui_inventory_system(
                                         *item_slot,
                                         *pos - egui::vec2(-1.0, -1.0),
                                         &player,
-                                        game_connection.as_ref(),
                                         &game_data,
                                         &ui_resources,
                                         &mut ui_state_inventory.item_slot_map,
                                         &mut ui_state_dnd,
-                                        &mut chatbox_events,
                                         &mut player_command_events,
                                     );
                                 }
@@ -755,12 +630,10 @@ pub fn ui_inventory_system(
                                     y_start + row as f32 * 41.0,
                                 ),
                                 &player,
-                                game_connection.as_ref(),
                                 &game_data,
                                 &ui_resources,
                                 &mut ui_state_inventory.item_slot_map,
                                 &mut ui_state_dnd,
-                                &mut chatbox_events,
                                 &mut player_command_events,
                             );
                         }

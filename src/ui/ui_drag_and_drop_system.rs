@@ -1,7 +1,8 @@
-use bevy::prelude::ResMut;
+use bevy::prelude::{EventWriter, Local, ResMut};
 use bevy_egui::{egui, EguiContext};
+use rose_game_common::components::ItemSlot;
 
-use crate::ui::DragAndDropId;
+use crate::{events::PlayerCommandEvent, ui::DragAndDropId};
 
 #[derive(Default)]
 pub struct UiStateDragAndDrop {
@@ -11,11 +12,45 @@ pub struct UiStateDragAndDrop {
 pub fn ui_drag_and_drop_system(
     mut egui_context: ResMut<EguiContext>,
     mut ui_state_dnd: ResMut<UiStateDragAndDrop>,
+    mut last_dropped_item: Local<Option<DragAndDropId>>,
+    mut player_command_events: EventWriter<PlayerCommandEvent>,
 ) {
-    let input = egui_context.ctx_mut().input();
+    let ctx = egui_context.ctx_mut();
 
-    // When mouse is released, clear dragged item state
-    if input.pointer.any_released() && !input.pointer.button_down(egui::PointerButton::Primary) {
-        ui_state_dnd.dragged_item = None;
+    if let Some(last_dropped_item) = last_dropped_item.take() {
+        if !ctx.is_pointer_over_area() {
+            match last_dropped_item {
+                DragAndDropId::Inventory(item_slot) => match item_slot {
+                    ItemSlot::Inventory(_, _) => {
+                        player_command_events.send(PlayerCommandEvent::DropItem(item_slot));
+                    }
+                    ItemSlot::Ammo(ammo_index) => {
+                        player_command_events.send(PlayerCommandEvent::UnequipAmmo(ammo_index));
+                    }
+                    ItemSlot::Equipment(equipment_index) => {
+                        player_command_events
+                            .send(PlayerCommandEvent::UnequipEquipment(equipment_index));
+                    }
+                    ItemSlot::Vehicle(vehicle_part_index) => {
+                        player_command_events
+                            .send(PlayerCommandEvent::UnequipVehicle(vehicle_part_index));
+                    }
+                },
+                DragAndDropId::Hotbar(page, slot) => {
+                    player_command_events.send(PlayerCommandEvent::SetHotbar(page, slot, None));
+                }
+                // TODO: DragAndDropId::NpcStoreBuyList(_) => todo!(),
+                // TODO: DragAndDropId::NpcStoreSellList(_) => todo!(),
+                _ => {}
+            }
+        }
+    }
+
+    let input = ctx.input();
+    if ui_state_dnd.dragged_item.is_some()
+        && input.pointer.any_released()
+        && !input.pointer.button_down(egui::PointerButton::Primary)
+    {
+        *last_dropped_item = ui_state_dnd.dragged_item.take();
     }
 }

@@ -6,10 +6,12 @@ use bevy::{
     prelude::{Entity, EventReader, EventWriter, Query, Res, With},
 };
 
-use rose_data::{ItemClass, ItemType, SkillBasicCommand, SkillType};
+use rose_data::{
+    AmmoIndex, EquipmentIndex, ItemClass, ItemType, SkillBasicCommand, SkillType, VehiclePartIndex,
+};
 use rose_game_common::{
     components::{Hotbar, HotbarSlot, Inventory, ItemDrop, SkillList, Team},
-    messages::client::{Attack, ClientMessage, Move, SetHotbarSlot},
+    messages::client::{Attack, ChangeEquipment, ClientMessage, Move, SetHotbarSlot},
 };
 
 use crate::{
@@ -385,6 +387,150 @@ pub fn player_command_system(
                         }
                     } else if item.get_item_type().is_equipment_item() {
                         // TODO: Equip item
+                    }
+                }
+            }
+            PlayerCommandEvent::EquipAmmo(item_slot) => {
+                if let Some(item) = player.inventory.get_item(item_slot) {
+                    let ammo_index = if let Some(item_data) =
+                        game_data.items.get_base_item(item.get_item_reference())
+                    {
+                        match item_data.class {
+                            ItemClass::Arrow => Some(AmmoIndex::Arrow),
+                            ItemClass::Bullet => Some(AmmoIndex::Bullet),
+                            ItemClass::Shell => Some(AmmoIndex::Throw),
+                            _ => None,
+                        }
+                    } else {
+                        None
+                    };
+
+                    if let Some(ammo_index) = ammo_index {
+                        if let Some(game_connection) = game_connection.as_ref() {
+                            game_connection
+                                .client_message_tx
+                                .send(ClientMessage::ChangeAmmo(ammo_index, Some(item_slot)))
+                                .ok();
+                        }
+                    }
+                }
+            }
+            PlayerCommandEvent::EquipEquipment(item_slot) => {
+                if let Some(item) = player.inventory.get_item(item_slot) {
+                    let equipment_index = match item.get_item_type() {
+                        ItemType::Face => Some(EquipmentIndex::Face),
+                        ItemType::Head => Some(EquipmentIndex::Head),
+                        ItemType::Body => Some(EquipmentIndex::Body),
+                        ItemType::Hands => Some(EquipmentIndex::Hands),
+                        ItemType::Feet => Some(EquipmentIndex::Feet),
+                        ItemType::Back => Some(EquipmentIndex::Back),
+                        ItemType::Jewellery => {
+                            if let Some(jewellery_item) =
+                                game_data.items.get_jewellery_item(item.get_item_number())
+                            {
+                                match jewellery_item.item_data.class {
+                                    ItemClass::Ring => Some(EquipmentIndex::Ring),
+                                    ItemClass::Necklace => Some(EquipmentIndex::Necklace),
+                                    ItemClass::Earring => Some(EquipmentIndex::Earring),
+                                    _ => None,
+                                }
+                            } else {
+                                None
+                            }
+                        }
+                        ItemType::Weapon => Some(EquipmentIndex::Weapon),
+                        ItemType::SubWeapon => Some(EquipmentIndex::SubWeapon),
+                        _ => None,
+                    };
+
+                    if let Some(equipment_index) = equipment_index {
+                        if let Some(game_connection) = game_connection.as_ref() {
+                            game_connection
+                                .client_message_tx
+                                .send(ClientMessage::ChangeEquipment(ChangeEquipment {
+                                    equipment_index,
+                                    item_slot: Some(item_slot),
+                                }))
+                                .ok();
+                        }
+                    }
+                }
+            }
+            PlayerCommandEvent::EquipVehicle(item_slot) => {
+                if let Some(item) = player.inventory.get_item(item_slot) {
+                    let vehicle_part_index = if let Some(item_data) =
+                        game_data.items.get_base_item(item.get_item_reference())
+                    {
+                        match item_data.class {
+                            ItemClass::CartBody | ItemClass::CastleGearBody => {
+                                Some(VehiclePartIndex::Body)
+                            }
+                            ItemClass::CartEngine | ItemClass::CastleGearEngine => {
+                                Some(VehiclePartIndex::Engine)
+                            }
+                            ItemClass::CartWheels | ItemClass::CastleGearLeg => {
+                                Some(VehiclePartIndex::Leg)
+                            }
+                            ItemClass::CartAccessory | ItemClass::CastleGearWeapon => {
+                                Some(VehiclePartIndex::Arms)
+                            }
+                            _ => None,
+                        }
+                    } else {
+                        None
+                    };
+
+                    if let Some(vehicle_part_index) = vehicle_part_index {
+                        if let Some(game_connection) = game_connection.as_ref() {
+                            game_connection
+                                .client_message_tx
+                                .send(ClientMessage::ChangeVehiclePart(
+                                    vehicle_part_index,
+                                    Some(item_slot),
+                                ))
+                                .ok();
+                        }
+                    }
+                }
+            }
+            PlayerCommandEvent::UnequipAmmo(ammo_index) => {
+                if let Some(game_connection) = game_connection.as_ref() {
+                    game_connection
+                        .client_message_tx
+                        .send(ClientMessage::ChangeAmmo(ammo_index, None))
+                        .ok();
+                }
+            }
+            PlayerCommandEvent::UnequipEquipment(equipment_index) => {
+                if let Some(game_connection) = game_connection.as_ref() {
+                    game_connection
+                        .client_message_tx
+                        .send(ClientMessage::ChangeEquipment(ChangeEquipment {
+                            equipment_index,
+                            item_slot: None,
+                        }))
+                        .ok();
+                }
+            }
+            PlayerCommandEvent::UnequipVehicle(vehicle_part_index) => {
+                if let Some(game_connection) = game_connection.as_ref() {
+                    game_connection
+                        .client_message_tx
+                        .send(ClientMessage::ChangeVehiclePart(vehicle_part_index, None))
+                        .ok();
+                }
+            }
+            PlayerCommandEvent::DropItem(item_slot) => {
+                if let Some(item) = player.inventory.get_item(item_slot) {
+                    // TODO: if item.get_quantity() > 1, show dialog to pick how many to drop
+                    if let Some(game_connection) = game_connection.as_ref() {
+                        game_connection
+                            .client_message_tx
+                            .send(ClientMessage::DropItem(
+                                item_slot,
+                                item.get_quantity() as usize,
+                            ))
+                            .ok();
                     }
                 }
             }
