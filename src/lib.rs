@@ -769,7 +769,11 @@ fn run_client(config: &Config, app_state: AppState, app_builder: impl FnOnce(&mu
                 .with_system(ui_chatbox_system.label("ui_system"))
                 .with_system(ui_character_info_system.label("ui_system"))
                 .with_system(ui_inventory_system.label("ui_system"))
-                .with_system(ui_game_menu_system.label("ui_system"))
+                .with_system(
+                    ui_game_menu_system
+                        .label("ui_system")
+                        .after(ui_character_info_system),
+                )
                 .with_system(ui_hotbar_system.label("ui_system"))
                 .with_system(ui_minimap_system.label("ui_system"))
                 .with_system(ui_party_system.label("ui_system"))
