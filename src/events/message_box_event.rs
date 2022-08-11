@@ -1,4 +1,4 @@
-use bevy::{ecs::system::Command, prelude::Commands};
+use bevy::prelude::Commands;
 
 pub enum MessageBoxEvent {
     Show {
