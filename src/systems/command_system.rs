@@ -369,7 +369,7 @@ pub fn command_system(
                         update_active_motion(
                             &mut commands.entity(entity),
                             &mut active_motion,
-                            asset_server.load(&motion_data.path),
+                            asset_server.load(motion_data.path.path()),
                             1.0,
                             false,
                         );
@@ -399,7 +399,7 @@ pub fn command_system(
                         update_active_motion(
                             &mut commands.entity(entity),
                             &mut active_motion,
-                            asset_server.load(&motion_data.path),
+                            asset_server.load(motion_data.path.path()),
                             1.0,
                             true,
                         );
@@ -792,7 +792,7 @@ pub fn command_system(
                     update_active_motion(
                         &mut commands.entity(entity),
                         &mut active_motion,
-                        asset_server.load(&motion_data.path),
+                        asset_server.load(motion_data.path.path()),
                         1.0,
                         false,
                     );
@@ -907,7 +907,7 @@ pub fn command_system(
                             update_active_motion(
                                 &mut commands.entity(entity),
                                 &mut active_motion,
-                                asset_server.load(&motion_data.path),
+                                asset_server.load(motion_data.path.path()),
                                 skill_data.casting_motion_speed,
                                 false,
                             );

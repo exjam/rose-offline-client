@@ -267,7 +267,7 @@ impl ModelLoader {
         let action_motions = enum_map! {
             action => {
                 if let Some(motion_data) = self.npc_database.get_npc_action_motion(npc_id, action) {
-                    asset_server.load(&motion_data.path)
+                    asset_server.load(motion_data.path.path())
                 } else {
                     Handle::default()
                 }
@@ -395,7 +395,7 @@ impl ModelLoader {
                 weapon_motion_type,
                 gender_index,
             ) {
-                return asset_server.load(&motion_data.path);
+                return asset_server.load(motion_data.path.path());
             }
 
             if gender_index == 1 {
@@ -403,7 +403,7 @@ impl ModelLoader {
                     .character_motion_database
                     .get_character_action_motion(action, weapon_motion_type, 0)
                 {
-                    return asset_server.load(&motion_data.path);
+                    return asset_server.load(motion_data.path.path());
                 }
             }
 
@@ -411,7 +411,7 @@ impl ModelLoader {
                 self.character_motion_database
                     .get_character_action_motion(action, 0, gender_index)
             {
-                return asset_server.load(&motion_data.path);
+                return asset_server.load(motion_data.path.path());
             }
 
             if gender_index == 1 {
@@ -419,7 +419,7 @@ impl ModelLoader {
                     .character_motion_database
                     .get_character_action_motion(action, 0, 0)
                 {
-                    return asset_server.load(&motion_data.path);
+                    return asset_server.load(motion_data.path.path());
                 }
             }
 
