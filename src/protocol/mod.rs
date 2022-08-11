@@ -29,7 +29,7 @@ macro_rules! implement_protocol_client {
                                     match self.handle_packet(&packet).await {
                                         Ok(_) => {},
                                         Err(error) => {
-                                            log::warn!("RECV [{:03X}] {:02x?}", packet.command, &packet.data[..]);
+                                            log::warn!("Error {} handling packet [{:03X}] {:02x?}", error, packet.command, &packet.data[..]);
                                             return Err(error);
                                         },
                                     }
