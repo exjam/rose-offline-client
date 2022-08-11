@@ -1,19 +1,22 @@
-use bevy::prelude::{Local, Res, ResMut, State};
+use bevy::prelude::{Commands, Entity, Local, Query, Res, ResMut, State, With};
 use bevy_egui::{egui, EguiContext};
 
 use rose_game_common::messages::client::ClientMessage;
 
 use crate::{
+    components::{Command, CommandCastSkillTarget, NextCommand, PlayerCharacter, SelectedTarget},
     resources::{AppState, GameConnection, GameData, UiResources, UiSpriteSheetType},
     ui::{ui_add_skill_tooltip, UiStateDebugWindows},
 };
 
 #[derive(Default)]
 pub struct UiStateDebugSkillList {
-    name_filter: String,
+    filter_name: String,
+    filter_castable: bool,
 }
 
 pub fn ui_debug_skill_list_system(
+    mut commands: Commands,
     mut egui_context: ResMut<EguiContext>,
     mut ui_state_debug_skill_list: Local<UiStateDebugSkillList>,
     mut ui_state_debug_windows: ResMut<UiStateDebugWindows>,
@@ -21,6 +24,7 @@ pub fn ui_debug_skill_list_system(
     game_connection: Option<Res<GameConnection>>,
     game_data: Res<GameData>,
     ui_resources: Res<UiResources>,
+    mut query_player: Query<(Entity, &mut Command, Option<&SelectedTarget>), With<PlayerCharacter>>,
 ) {
     if !ui_state_debug_windows.debug_ui_open {
         return;
@@ -35,7 +39,11 @@ pub fn ui_debug_skill_list_system(
                 .num_columns(2)
                 .show(ui, |ui| {
                     ui.label("Skill Name Filter:");
-                    ui.text_edit_singleline(&mut ui_state_debug_skill_list.name_filter);
+                    ui.text_edit_singleline(&mut ui_state_debug_skill_list.filter_name);
+                    ui.end_row();
+
+                    ui.label("Only Castable:");
+                    ui.checkbox(&mut ui_state_debug_skill_list.filter_castable, "Castable");
                     ui.end_row();
                 });
 
@@ -46,6 +54,7 @@ pub fn ui_debug_skill_list_system(
                 .column(egui_extras::Size::initial(50.0).at_least(50.0))
                 .column(egui_extras::Size::remainder().at_least(80.0))
                 .column(egui_extras::Size::initial(100.0).at_least(100.0))
+                .column(egui_extras::Size::initial(60.0).at_least(60.0))
                 .column(egui_extras::Size::initial(60.0).at_least(60.0))
                 .header(20.0, |mut header| {
                     header.col(|ui| {
@@ -63,15 +72,22 @@ pub fn ui_debug_skill_list_system(
                     header.col(|ui| {
                         ui.heading("Action");
                     });
+                    header.col(|ui| {
+                        ui.heading("Action");
+                    });
                 })
                 .body(|mut body| {
                     for skill_data in game_data.skills.iter().filter(|skill_data| {
-                        if ui_state_debug_skill_list.name_filter.is_empty() {
+                        if ui_state_debug_skill_list.filter_castable
+                            && skill_data.casting_motion_id.is_none()
+                        {
+                            false
+                        } else if ui_state_debug_skill_list.filter_name.is_empty() {
                             true
                         } else {
                             skill_data
                                 .name
-                                .contains(&ui_state_debug_skill_list.name_filter)
+                                .contains(&ui_state_debug_skill_list.filter_name)
                         }
                     }) {
                         body.row(45.0, |mut row| {
@@ -114,6 +130,38 @@ pub fn ui_debug_skill_list_system(
                                                 skill_data.id.get()
                                             )))
                                             .ok();
+                                    }
+                                }
+                            });
+
+                            row.col(|ui| {
+                                if let Ok((player_entity, mut player_command, selected_target)) =
+                                    query_player.get_single_mut()
+                                {
+                                    if skill_data.casting_motion_id.is_some()
+                                        && ui.button("Cast").clicked()
+                                    {
+                                        if let Command::CastSkill(command_cast_skill) =
+                                            player_command.as_mut()
+                                        {
+                                            if command_cast_skill.skill_id == skill_data.id {
+                                                command_cast_skill.ready_action = true;
+                                            } else {
+                                                *player_command = Command::with_stop();
+                                            }
+                                        } else {
+                                            commands.entity(player_entity).insert(
+                                                NextCommand::with_cast_skill(
+                                                    skill_data.id,
+                                                    selected_target.map(|x| {
+                                                        CommandCastSkillTarget::Entity(x.entity)
+                                                    }),
+                                                    None,
+                                                    None,
+                                                    None,
+                                                ),
+                                            );
+                                        }
                                     }
                                 }
                             });
