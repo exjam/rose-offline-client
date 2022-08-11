@@ -843,8 +843,10 @@ pub fn game_connection_system(
             }
             Ok(ServerMessage::UpdateLevel(message)) => {
                 if let Some(entity) = client_entity_list.get(message.entity_id) {
-                    client_entity_events
-                        .send(ClientEntityEvent::LevelUp(entity, message.level.level));
+                    client_entity_events.send(ClientEntityEvent::LevelUp(
+                        entity,
+                        Some(message.level.level),
+                    ));
 
                     commands.entity(entity).insert_bundle((
                         message.level,
@@ -874,6 +876,59 @@ pub fn game_connection_system(
                                 let ability_values = game_data.ability_value_calculator.calculate(
                                     character_info,
                                     &message.level,
+                                    equipment,
+                                    basic_stats,
+                                    skill_list,
+                                    status_effects,
+                                );
+
+                                if let Some(mut health_points) = character.get_mut::<HealthPoints>()
+                                {
+                                    health_points.hp = ability_values.get_max_health();
+                                }
+
+                                if let Some(mut mana_points) = character.get_mut::<ManaPoints>() {
+                                    mana_points.mp = ability_values.get_max_health();
+                                }
+                            }
+                        });
+                    });
+                }
+            }
+            Ok(ServerMessage::LevelUpEntity(client_entity_id)) => {
+                if client_entity_list.player_entity_id == Some(client_entity_id) {
+                    // Ignore, the server erroneously sends this message in addition to ServerMessage::UpdateLevel
+                } else if let Some(entity) = client_entity_list.get(client_entity_id) {
+                    client_entity_events.send(ClientEntityEvent::LevelUp(entity, None));
+
+                    commands.add(move |world: &mut World| {
+                        world.resource_scope(|world, game_data: Mut<GameData>| {
+                            let mut character = world.entity_mut(entity);
+
+                            // Update level
+                            if let Some(mut level) = character.get_mut::<Level>() {
+                                level.level += 1;
+                            }
+
+                            // Update HP / MP to max for new level
+                            if let (
+                                Some(basic_stats),
+                                Some(character_info),
+                                Some(equipment),
+                                Some(level),
+                                Some(skill_list),
+                                Some(status_effects),
+                            ) = (
+                                character.get::<BasicStats>(),
+                                character.get::<CharacterInfo>(),
+                                character.get::<Equipment>(),
+                                character.get::<Level>(),
+                                character.get::<SkillList>(),
+                                character.get::<StatusEffects>(),
+                            ) {
+                                let ability_values = game_data.ability_value_calculator.calculate(
+                                    character_info,
+                                    level,
                                     equipment,
                                     basic_stats,
                                     skill_list,

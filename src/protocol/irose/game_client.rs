@@ -422,15 +422,23 @@ impl GameClient {
             }
             Some(ServerPackets::UpdateLevel) => {
                 let message = PacketServerUpdateLevel::try_from(packet)?;
-                self.server_message_tx
-                    .send(ServerMessage::UpdateLevel(UpdateLevel {
-                        entity_id: message.entity_id,
-                        level: message.level,
-                        experience_points: message.experience_points,
-                        stat_points: message.stat_points,
-                        skill_points: message.skill_points,
-                    }))
-                    .ok();
+                if let Some((level, experience_points, stat_points, skill_points)) =
+                    message.update_values
+                {
+                    self.server_message_tx
+                        .send(ServerMessage::UpdateLevel(UpdateLevel {
+                            entity_id: message.entity_id,
+                            level,
+                            experience_points,
+                            stat_points,
+                            skill_points,
+                        }))
+                        .ok();
+                } else {
+                    self.server_message_tx
+                        .send(ServerMessage::LevelUpEntity(message.entity_id))
+                        .ok();
+                }
             }
             Some(ServerPackets::UpdateSpeed) => {
                 let message = PacketServerUpdateSpeed::try_from(packet)?;

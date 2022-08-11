@@ -57,10 +57,12 @@ pub fn client_entity_event_system(
             }
             ClientEntityEvent::LevelUp(entity, level) => {
                 let sound_category = if is_player(entity) {
-                    chatbox_events.send(ChatboxEvent::System(format!(
-                        "Congratulations! You are now level {}!",
-                        level
-                    )));
+                    if let Some(level) = level {
+                        chatbox_events.send(ChatboxEvent::System(format!(
+                            "Congratulations! You are now level {}!",
+                            level
+                        )));
+                    }
 
                     SoundCategory::PlayerCombat
                 } else {
