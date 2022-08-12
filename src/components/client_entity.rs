@@ -2,7 +2,7 @@ use bevy::prelude::Component;
 
 pub use rose_game_common::messages::ClientEntityId;
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum ClientEntityType {
     Character,
     Monster,

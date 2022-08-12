@@ -11,7 +11,7 @@ use crate::{
     ui::UiStateDebugWindows,
 };
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum UiStateSpawnNpcTeam {
     Character,
     Monster,

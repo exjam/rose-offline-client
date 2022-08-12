@@ -34,7 +34,7 @@ impl UiSprite {
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Enum)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Enum)]
 pub enum UiSpriteSheetType {
     Ui,
     ExUi,

@@ -341,7 +341,9 @@ pub fn ui_add_item_tooltip(ui: &mut egui::Ui, game_data: &GameData, item: &Item)
                         }
                         _ => {
                             if let Some(use_item_data) = use_item_data {
-                                for &(ability_type, value) in use_item_data.add_ability.iter() {
+                                if let Some((ability_type, value)) =
+                                    use_item_data.add_ability.as_ref()
+                                {
                                     ui.label(format!("[{:?} {}]", ability_type, value));
                                 }
                             }

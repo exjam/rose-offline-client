@@ -14,18 +14,18 @@ pub struct CommandMove {
     pub move_mode: Option<MoveMode>,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CommandAttack {
     pub target: Entity,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CommandEmote {
     pub motion_id: MotionId,
     pub is_stop: bool,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum CommandSit {
     Sitting,
     Sit,
@@ -38,7 +38,7 @@ pub enum CommandCastSkillTarget {
     Position(Vec2),
 }
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum CommandCastSkillState {
     Starting,
     Casting,
