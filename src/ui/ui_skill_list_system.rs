@@ -4,8 +4,8 @@ use bevy::{
 };
 use bevy_egui::{egui, EguiContext};
 
-use rose_data::SkillPageType;
-use rose_game_common::components::{SkillList, SkillPoints, SkillSlot, SKILL_PAGE_SIZE};
+use rose_data_irose::{IroseSkillPageType, SKILL_PAGE_SIZE};
+use rose_game_common::components::{SkillList, SkillPoints, SkillSlot};
 
 use crate::{
     components::PlayerCharacter,
@@ -146,7 +146,7 @@ pub fn ui_skill_list_system(
 
     let mut response_close_button = None;
 
-    egui::Window::new("Skill List")
+    egui::Window::new("Skills")
         .frame(egui::Frame::none())
         .open(&mut ui_state_windows.skill_list_open)
         .title_bar(false)
@@ -190,25 +190,25 @@ pub fn ui_skill_list_system(
                 |ui, bindings| {
                     let (page, index) = match bindings.get_tab(IID_TABBEDPANE) {
                         Some(&mut IID_TAB_BASIC) => (
-                            SkillPageType::Basic,
+                            IroseSkillPageType::Basic,
                             bindings.get_scroll(IID_ZLISTBOX_BASIC).map_or(0, |s| *s.0),
                         ),
                         Some(&mut IID_TAB_ACTIVE) => (
-                            SkillPageType::Active,
+                            IroseSkillPageType::Active,
                             bindings.get_scroll(IID_ZLISTBOX_ACTIVE).map_or(0, |s| *s.0),
                         ),
                         Some(&mut IID_TAB_PASSIVE) => (
-                            SkillPageType::Passive,
+                            IroseSkillPageType::Passive,
                             bindings
                                 .get_scroll(IID_ZLISTBOX_PASSIVE)
                                 .map_or(0, |s| *s.0),
                         ),
-                        _ => (SkillPageType::Basic, 0),
+                        _ => (IroseSkillPageType::Basic, 0),
                     };
 
                     let listbox_pos = egui::vec2(0.0, 65.0);
                     for i in 0..listbox_extent {
-                        let skill_slot = SkillSlot(page, (index + i) as usize);
+                        let skill_slot = SkillSlot(page as usize, (index + i) as usize);
                         let start_x = listbox_pos.x + 16.0;
                         let start_y = listbox_pos.y + 44.0 * i as f32;
 
