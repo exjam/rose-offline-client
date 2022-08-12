@@ -96,7 +96,7 @@ fn get_move_animation(
         let action = match move_mode {
             MoveMode::Walk => CharacterMotionAction::Walk,
             MoveMode::Run => CharacterMotionAction::Run,
-            MoveMode::Drive => todo!("Character drive animation"),
+            MoveMode::Drive => CharacterMotionAction::Walk, // TODO: Use drive animation
         };
 
         if character_model.action_motions[action].is_strong() {
