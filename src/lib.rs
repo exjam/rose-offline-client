@@ -307,28 +307,35 @@ pub fn load_config(path: &Path) -> Config {
     }
 }
 
-pub fn run_game(config: &Config, app_builder: impl FnOnce(&mut App)) {
-    run_client(config, AppState::GameLogin, app_builder);
+#[derive(Default)]
+pub struct SystemsConfig {
+    pub disable_player_command_system: bool,
+    pub add_custom_systems: Option<Box<dyn FnOnce(&mut App)>>,
 }
 
-pub fn run_model_viewer(config: &Config, app_builder: impl FnOnce(&mut App)) {
-    run_client(config, AppState::ModelViewer, app_builder);
+pub fn run_game(config: &Config, systems_config: SystemsConfig) {
+    run_client(config, AppState::GameLogin, systems_config);
 }
 
-pub fn run_zone_viewer(
-    config: &Config,
-    zone_id: Option<ZoneId>,
-    app_builder: impl FnOnce(&mut App),
-) {
-    run_client(config, AppState::ZoneViewer, |app| {
-        app.world
-            .resource_mut::<Events<LoadZoneEvent>>()
-            .send(LoadZoneEvent::new(
-                zone_id.unwrap_or_else(|| ZoneId::new(1).unwrap()),
-            ));
+pub fn run_model_viewer(config: &Config) {
+    run_client(config, AppState::ModelViewer, SystemsConfig::default());
+}
 
-        app_builder(app);
-    });
+pub fn run_zone_viewer(config: &Config, zone_id: Option<ZoneId>) {
+    run_client(
+        config,
+        AppState::ZoneViewer,
+        SystemsConfig {
+            add_custom_systems: Some(Box::new(move |app| {
+                app.world
+                    .resource_mut::<Events<LoadZoneEvent>>()
+                    .send(LoadZoneEvent::new(
+                        zone_id.unwrap_or_else(|| ZoneId::new(1).unwrap()),
+                    ));
+            })),
+            ..Default::default()
+        },
+    );
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, StageLabel)]
@@ -343,7 +350,7 @@ enum ModelViewerStages {
     Input,
 }
 
-fn run_client(config: &Config, app_state: AppState, app_builder: impl FnOnce(&mut App)) {
+fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsConfig) {
     let mut vfs_devices: Vec<Box<dyn VirtualFilesystemDevice + Send + Sync>> = Vec::new();
     for device_config in config.filesystem.devices.iter() {
         match device_config {
@@ -766,11 +773,6 @@ fn run_client(config: &Config, app_state: AppState, app_builder: impl FnOnce(&mu
                         .after("ui_system")
                         .after(ui_message_box_system),
                 )
-                .with_system(
-                    player_command_system
-                        .after(cooldown_system)
-                        .after(game_mouse_input_system),
-                )
                 .with_system(ui_chatbox_system.label("ui_system"))
                 .with_system(ui_character_info_system.label("ui_system"))
                 .with_system(ui_inventory_system.label("ui_system"))
@@ -792,6 +794,16 @@ fn run_client(config: &Config, app_state: AppState, app_builder: impl FnOnce(&mu
                 .with_system(ui_settings_system.label("ui_system"))
                 .with_system(conversation_dialog_system.label("ui_system")),
         );
+
+    if !systems_config.disable_player_command_system {
+        app.add_system_set(
+            SystemSet::on_update(AppState::Game)
+                .with_system(player_command_system)
+                .after(cooldown_system)
+                .after(game_mouse_input_system),
+        );
+    }
+
     app.add_system_to_stage(CoreStage::PostUpdate, ui_drag_and_drop_system);
 
     // Setup network
@@ -812,7 +824,9 @@ fn run_client(config: &Config, app_state: AppState, app_builder: impl FnOnce(&mu
 
     app.add_startup_system_to_stage(StartupStage::PostStartup, load_common_game_data);
 
-    app_builder(&mut app);
+    if let Some(app_builder) = systems_config.add_custom_systems.take() {
+        app_builder(&mut app);
+    }
 
     match config.game.network_version.as_str() {
         "irose" => {
