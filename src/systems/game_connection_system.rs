@@ -1320,7 +1320,23 @@ pub fn game_connection_system(
                             if let Command::CastSkill(command_cast_skill) = command.as_mut() {
                                 if command_cast_skill.skill_id == skill_id {
                                     command_cast_skill.ready_action = true;
+                                    return;
                                 }
+                             }
+                        }
+
+                        if let Some(mut next_command) = character.get_mut::<NextCommand>() {
+                            if let Some(Command::CastSkill(command_cast_skill)) = (*next_command).as_mut() {
+                                if command_cast_skill.skill_id == skill_id {
+                                    command_cast_skill.ready_action = true;
+                                    return;
+                                }
+                            }
+                        }
+
+                        if let Some(command) = character.get::<Command>() {
+                            if let Some(next_command) = character.get::<NextCommand>() {
+                                log::error!("FinishCastingSkill entity was not in expected state, command: {:?}, next command: {:?}, expected CastSkill({:?})", *command, *next_command, skill_id);
                             }
                         }
                     });

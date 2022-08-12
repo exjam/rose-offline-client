@@ -90,6 +90,7 @@ impl Command {
         cast_repeat_motion_id: Option<MotionId>,
         action_motion_id: Option<MotionId>,
         cast_skill_state: CommandCastSkillState,
+        ready_action: bool,
     ) -> Self {
         Self::CastSkill(CommandCastSkill {
             skill_id,
@@ -98,7 +99,7 @@ impl Command {
             cast_repeat_motion_id,
             action_motion_id,
             cast_skill_state,
-            ready_action: false,
+            ready_action,
         })
     }
 
@@ -185,7 +186,7 @@ impl Command {
     }
 }
 
-#[derive(Component)]
+#[derive(Component, Debug)]
 pub struct NextCommand(Option<Command>);
 
 impl NextCommand {

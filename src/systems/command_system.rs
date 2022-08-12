@@ -844,6 +844,7 @@ pub fn command_system(
                 skill_target,
                 cast_motion_id,
                 action_motion_id,
+                ready_action,
                 ..
             }) => {
                 if let Some(skill_data) = game_data.skills.get_skill(skill_id) {
@@ -943,6 +944,7 @@ pub fn command_system(
                             skill_data.casting_repeat_motion_id,
                             action_motion_id.or(skill_data.action_motion_id),
                             CommandCastSkillState::Casting,
+                            ready_action,
                         );
 
                         // Remove our destination component, as we have reached it!
