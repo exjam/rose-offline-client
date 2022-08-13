@@ -3,24 +3,24 @@ use bevy::{
     ecs::event::Events,
     math::{Quat, Vec3},
     prelude::{
-        Commands, ComputedVisibility, DespawnRecursiveExt, EventWriter, GlobalTransform, Mut, Res,
-        ResMut, State, Transform, Visibility, World,
+        Commands, ComputedVisibility, DespawnRecursiveExt, Entity, EventWriter, GlobalTransform,
+        Mut, Res, ResMut, State, Transform, Visibility, World,
     },
 };
 
-use rose_data::{AbilityType, EquipmentItem, ItemReference, ItemSlotBehaviour, ItemType};
+use rose_data::{AbilityType, EquipmentItem, Item, ItemReference, ItemSlotBehaviour, ItemType};
 use rose_game_common::{
     components::{
         AbilityValues, BasicStatType, BasicStats, CharacterInfo, DroppedItem, Equipment,
         ExperiencePoints, HealthPoints, Hotbar, Inventory, ItemDrop, ItemSlot, Level, ManaPoints,
-        MoveMode, MoveSpeed, QuestState, SkillList, Stamina, StatPoints, StatusEffects,
+        Money, MoveMode, MoveSpeed, QuestState, SkillList, Stamina, StatPoints, StatusEffects,
     },
     messages::{
         server::{
             CommandState, LearnSkillError, LevelUpSkillError, OpenPersonalStore, PartyMemberInfo,
-            PartyMemberInfoOffline, PartyMemberLeave, PartyMemberList, PickupItemDropContent,
-            PickupItemDropError, QuestDeleteResult, QuestTriggerResult, ServerMessage,
-            UpdateAbilityValue,
+            PartyMemberInfoOffline, PartyMemberLeave, PartyMemberList,
+            PersonalStoreTransactionStatus, PickupItemDropContent, PickupItemDropError,
+            QuestDeleteResult, QuestTriggerResult, ServerMessage, UpdateAbilityValue,
         },
         PartyItemSharing, PartyXpSharing,
     },
@@ -42,6 +42,49 @@ use crate::{
     },
     resources::{AppState, ClientEntityList, GameConnection, GameData, WorldRates, WorldTime},
 };
+
+fn update_inventory_and_money(
+    world: &mut World,
+    player_entity: Entity,
+    update_items: Vec<(ItemSlot, Option<Item>)>,
+    update_money: Option<Money>,
+) {
+    let mut player = world.entity_mut(player_entity);
+
+    if let Some(mut inventory) = player.get_mut::<Inventory>() {
+        for (item_slot, item) in update_items.iter() {
+            if let ItemSlot::Inventory(_, _) = item_slot {
+                if let Some(item_slot) = inventory.get_item_slot_mut(*item_slot) {
+                    *item_slot = item.clone();
+                }
+            }
+        }
+
+        if let Some(money) = update_money {
+            inventory.money = money;
+        }
+    }
+
+    if let Some(mut equipment) = player.get_mut::<Equipment>() {
+        for (item_slot, item) in update_items.iter() {
+            match *item_slot {
+                ItemSlot::Ammo(ammo_index) => {
+                    *equipment.get_ammo_slot_mut(ammo_index) =
+                        item.as_ref().and_then(|x| x.as_stackable().cloned())
+                }
+                ItemSlot::Equipment(equipment_index) => {
+                    *equipment.get_equipment_slot_mut(equipment_index) =
+                        item.as_ref().and_then(|x| x.as_equipment().cloned())
+                }
+                ItemSlot::Vehicle(vehicle_part_index) => {
+                    *equipment.get_vehicle_slot_mut(vehicle_part_index) =
+                        item.as_ref().and_then(|x| x.as_equipment().cloned())
+                }
+                _ => {}
+            }
+        }
+    }
+}
 
 pub fn game_connection_system(
     mut commands: Commands,
@@ -725,42 +768,12 @@ pub fn game_connection_system(
             Ok(ServerMessage::UpdateInventory(update_items, update_money)) => {
                 if let Some(player_entity) = client_entity_list.player_entity {
                     commands.add(move |world: &mut World| {
-                        let mut player = world.entity_mut(player_entity);
-
-                        if let Some(mut inventory) = player.get_mut::<Inventory>() {
-                            for (item_slot, item) in update_items.iter() {
-                                if let ItemSlot::Inventory(_, _) = item_slot {
-                                    if let Some(item_slot) = inventory.get_item_slot_mut(*item_slot)
-                                    {
-                                        *item_slot = item.clone();
-                                    }
-                                }
-                            }
-
-                            if let Some(money) = update_money {
-                                inventory.money = money;
-                            }
-                        }
-
-                        if let Some(mut equipment) = player.get_mut::<Equipment>() {
-                            for (item_slot, item) in update_items.iter() {
-                                match *item_slot {
-                                    ItemSlot::Ammo(ammo_index) => {
-                                        *equipment.get_ammo_slot_mut(ammo_index) =
-                                            item.as_ref().and_then(|x| x.as_stackable().cloned())
-                                    }
-                                    ItemSlot::Equipment(equipment_index) => {
-                                        *equipment.get_equipment_slot_mut(equipment_index) =
-                                            item.as_ref().and_then(|x| x.as_equipment().cloned())
-                                    }
-                                    ItemSlot::Vehicle(vehicle_part_index) => {
-                                        *equipment.get_vehicle_slot_mut(vehicle_part_index) =
-                                            item.as_ref().and_then(|x| x.as_equipment().cloned())
-                                    }
-                                    _ => {}
-                                }
-                            }
-                        }
+                        update_inventory_and_money(
+                            world,
+                            player_entity,
+                            update_items,
+                            update_money,
+                        );
                     });
                 }
             }
@@ -1797,6 +1810,119 @@ pub fn game_connection_system(
             }
             Ok(ServerMessage::PersonalStoreItemList(item_list)) => {
                 personal_store_events.send(PersonalStoreEvent::SetItemList(item_list));
+            }
+            Ok(ServerMessage::PersonalStoreTransaction {
+                status,
+                store_entity_id,
+                update_store,
+            }) => {
+                if !update_store.is_empty() {
+                    if let Some(entity) = client_entity_list.get(store_entity_id) {
+                        match status {
+                            PersonalStoreTransactionStatus::Cancelled => {}
+                            PersonalStoreTransactionStatus::SoldOut
+                            | PersonalStoreTransactionStatus::BoughtFromStore => {
+                                personal_store_events.send(PersonalStoreEvent::UpdateSellList {
+                                    entity,
+                                    item_list: update_store,
+                                });
+                            }
+                            PersonalStoreTransactionStatus::NoMoreNeed
+                            | PersonalStoreTransactionStatus::SoldToStore => {
+                                personal_store_events.send(PersonalStoreEvent::UpdateBuyList {
+                                    entity,
+                                    item_list: update_store,
+                                });
+                            }
+                        }
+                    }
+                }
+
+                match status {
+                    PersonalStoreTransactionStatus::Cancelled => {
+                        chatbox_events
+                            .send(ChatboxEvent::System("Transaction failed.".to_string()));
+                    }
+                    PersonalStoreTransactionStatus::SoldOut => {
+                        chatbox_events.send(ChatboxEvent::System(
+                            "Transaction failed. Item has sold out.".to_string(),
+                        ));
+                    }
+                    PersonalStoreTransactionStatus::NoMoreNeed => {
+                        chatbox_events.send(ChatboxEvent::System(
+                            "Transaction failed. Item is no longer wanted.".to_string(),
+                        ));
+                    }
+                    _ => {}
+                }
+            }
+            Ok(ServerMessage::PersonalStoreTransactionUpdateInventory { money, items }) => {
+                if let Some(player_entity) = client_entity_list.player_entity {
+                    commands.add(move |world: &mut World| {
+                        let player = world.entity(player_entity);
+
+                        if let Some(inventory) = player.get::<Inventory>() {
+                            let transaction_price = money.0 - inventory.money.0;
+
+                            if let Some((item_slot, transaction_item)) = items.first() {
+                                let transaction_item = transaction_item.as_ref();
+                                let inventory_item = inventory.get_item(*item_slot);
+                                let (transaction_quantity, transaction_item) =
+                                    match (transaction_item, inventory_item) {
+                                        (Some(transaction_item), Some(inventory_item)) => (
+                                            transaction_item.get_quantity() as i32
+                                                - inventory_item.get_quantity() as i32,
+                                            Some(inventory_item.get_item_reference()),
+                                        ),
+                                        (None, Some(inventory_item)) => (
+                                            inventory_item.get_quantity() as i32,
+                                            Some(inventory_item.get_item_reference()),
+                                        ),
+                                        (Some(transaction_item), None) => (
+                                            transaction_item.get_quantity() as i32,
+                                            Some(transaction_item.get_item_reference()),
+                                        ),
+                                        (None, None) => (0, None),
+                                    };
+
+                                let game_data = world.resource::<GameData>();
+                                if let Some(item_data) = transaction_item
+                                    .and_then(|item| game_data.items.get_base_item(item))
+                                {
+                                    let message = if transaction_quantity > 1 {
+                                        format!(
+                                            "You have {} {}x {} for {} Zuly.",
+                                            if transaction_price < 0 {
+                                                "purchased"
+                                            } else {
+                                                "sold"
+                                            },
+                                            transaction_quantity,
+                                            item_data.name,
+                                            transaction_price.abs()
+                                        )
+                                    } else {
+                                        format!(
+                                            "You have {} {} for {} Zuly.",
+                                            if transaction_price < 0 {
+                                                "purchased"
+                                            } else {
+                                                "sold"
+                                            },
+                                            item_data.name,
+                                            transaction_price.abs()
+                                        )
+                                    };
+                                    let mut chatbox_events =
+                                        world.resource_mut::<Events<ChatboxEvent>>();
+                                    chatbox_events.send(ChatboxEvent::System(message));
+                                }
+                            }
+                        }
+
+                        update_inventory_and_money(world, player_entity, items, Some(money));
+                    });
+                }
             }
             Ok(message) => {
                 log::warn!("Received unimplemented game server message: {:#?}", message);

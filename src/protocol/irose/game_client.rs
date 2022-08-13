@@ -7,7 +7,9 @@ use rose_data::{QuestTriggerHash, SkillId};
 use rose_game_common::{
     components::MoveMode,
     messages::{
-        client::{ChangeEquipment, ClientMessage, ConnectionRequest, QuestDelete},
+        client::{
+            ChangeEquipment, ClientMessage, ConnectionRequest, PersonalStoreBuyItem, QuestDelete,
+        },
         server::{
             self, AnnounceChat, ApplySkillEffect, AttackEntity, CastSkillSelf,
             CastSkillTargetEntity, CastSkillTargetPosition, CharacterData, CharacterDataItems,
@@ -31,10 +33,10 @@ use rose_network_irose::{
         PacketClientJoinZone, PacketClientLevelUpSkill, PacketClientMove,
         PacketClientMoveCollision, PacketClientMoveToggle, PacketClientMoveToggleType,
         PacketClientNpcStoreTransaction, PacketClientPartyReply, PacketClientPartyRequest,
-        PacketClientPartyUpdateRules, PacketClientPersonalStoreListItems,
-        PacketClientPickupItemDrop, PacketClientQuestRequest, PacketClientQuestRequestType,
-        PacketClientReviveRequest, PacketClientSetHotbarSlot, PacketClientUseItem,
-        PacketClientWarpGateRequest,
+        PacketClientPartyUpdateRules, PacketClientPersonalStoreBuyItem,
+        PacketClientPersonalStoreListItems, PacketClientPickupItemDrop, PacketClientQuestRequest,
+        PacketClientQuestRequestType, PacketClientReviveRequest, PacketClientSetHotbarSlot,
+        PacketClientUseItem, PacketClientWarpGateRequest,
     },
     game_server_packets::{
         ConnectResult, PacketConnectionReply, PacketServerAdjustPosition, PacketServerAnnounceChat,
@@ -48,6 +50,8 @@ use rose_network_irose::{
         PacketServerNpcStoreTransactionError, PacketServerPartyMemberRewardItem,
         PacketServerPartyMemberUpdateInfo, PacketServerPartyMembers, PacketServerPartyReply,
         PacketServerPartyRequest, PacketServerPartyUpdateRules, PacketServerPersonalStoreItemList,
+        PacketServerPersonalStoreTransactionResult,
+        PacketServerPersonalStoreTransactionUpdateMoneyAndInventory,
         PacketServerPickupItemDropResult, PacketServerQuestResult, PacketServerQuestResultType,
         PacketServerRemoveEntities, PacketServerRewardItems, PacketServerRewardMoney,
         PacketServerRunNpcDeathTrigger, PacketServerSelectCharacter, PacketServerSetHotbarSlot,
@@ -816,6 +820,26 @@ impl GameClient {
                     ))
                     .ok();
             }
+            Some(ServerPackets::PersonalStoreTransactionResult) => {
+                let message = PacketServerPersonalStoreTransactionResult::try_from(packet)?;
+                self.server_message_tx
+                    .send(ServerMessage::PersonalStoreTransaction {
+                        status: message.status,
+                        store_entity_id: message.store_entity_id,
+                        update_store: message.update_store_items,
+                    })
+                    .ok();
+            }
+            Some(ServerPackets::PersonalStoreTransactionUpdateMoneyAndInventory) => {
+                let message =
+                    PacketServerPersonalStoreTransactionUpdateMoneyAndInventory::try_from(packet)?;
+                self.server_message_tx
+                    .send(ServerMessage::PersonalStoreTransactionUpdateInventory {
+                        items: message.items,
+                        money: message.money,
+                    })
+                    .ok();
+            }
             _ => log::info!("Unhandled GameClient packet {:?}", packet),
         }
 
@@ -1108,6 +1132,19 @@ impl GameClient {
             ClientMessage::MoveCollision(position) => {
                 connection
                     .write_packet(Packet::from(&PacketClientMoveCollision { position }))
+                    .await?
+            }
+            ClientMessage::PersonalStoreBuyItem(PersonalStoreBuyItem {
+                store_entity_id,
+                store_slot_index,
+                buy_item,
+            }) => {
+                connection
+                    .write_packet(Packet::from(&PacketClientPersonalStoreBuyItem {
+                        store_entity_id,
+                        store_slot_index,
+                        buy_item,
+                    }))
                     .await?
             }
             unimplemented => {

@@ -1,14 +1,19 @@
 use bevy::{
     math::Vec3Swizzles,
-    prelude::{Assets, Entity, EventReader, Local, Query, Res, ResMut, With},
+    prelude::{
+        Assets, Entity, EventReader, EventWriter, Events, Local, Query, Res, ResMut, With, World,
+    },
 };
 use bevy_egui::{egui, EguiContext};
 use rose_data::Item;
-use rose_game_common::{components::Money, messages::client::ClientMessage};
+use rose_game_common::{
+    components::Money,
+    messages::client::{ClientMessage, PersonalStoreBuyItem},
+};
 
 use crate::{
     components::{ClientEntity, PersonalStore, PlayerCharacter, Position},
-    events::PersonalStoreEvent,
+    events::{MessageBoxEvent, PersonalStoreEvent},
     resources::{GameConnection, GameData, UiResources, UiSpriteSheetType},
     ui::{
         ui_add_item_tooltip,
@@ -49,8 +54,11 @@ fn ui_add_store_item_slot(
     pos: egui::Pos2,
     item: &Item,
     price: &Money,
+    is_sell_item: bool,
+    slot_index: usize,
     game_data: &GameData,
     ui_resources: &UiResources,
+    message_box_events: &mut EventWriter<MessageBoxEvent>,
 ) {
     let item_data = game_data.items.get_base_item(item.get_item_reference());
     let sprite = item_data.and_then(|item_data| {
@@ -84,10 +92,38 @@ fn ui_add_store_item_slot(
         )
         .inner;
 
+    if is_sell_item && response.double_clicked() {
+        let item = item.clone();
+
+        message_box_events.send(MessageBoxEvent::Show {
+            message: format!(
+                "Are you sure you want to buy {} for {} Zuly?",
+                item_data.as_ref().map(|x| x.name.as_str()).unwrap_or(""),
+                price.0
+            ),
+            modal: false,
+            ok: Some(Box::new(move |commands| {
+                commands.add(move |world: &mut World| {
+                    if let Some(mut personal_store_events) =
+                        world.get_resource_mut::<Events<PersonalStoreEvent>>()
+                    {
+                        personal_store_events
+                            .send(PersonalStoreEvent::BuyItem { slot_index, item });
+                    }
+                });
+            })),
+            cancel: Some(Box::new(|_| {})),
+        });
+    }
+
     response.on_hover_ui(|ui| {
         ui_add_item_tooltip(ui, game_data, item);
 
-        ui.colored_label(egui::Color32::YELLOW, format!("Buy Price: {}", price.0));
+        if is_sell_item {
+            ui.colored_label(egui::Color32::YELLOW, format!("Price: {}", price.0));
+        } else {
+            ui.colored_label(egui::Color32::GREEN, format!("Price: {}", price.0));
+        }
     });
 }
 
@@ -102,6 +138,7 @@ pub fn ui_personal_store_system(
     dialog_assets: Res<Assets<Dialog>>,
     game_connection: Option<Res<GameConnection>>,
     game_data: Res<GameData>,
+    mut message_box_events: EventWriter<MessageBoxEvent>,
 ) {
     let ui_state = &mut *ui_state;
 
@@ -139,6 +176,53 @@ pub fn ui_personal_store_system(
                         ui_state.store_sell_items.get_mut(*slot_index as usize)
                     {
                         *store_slot = Some((item.clone(), *price));
+                    }
+                }
+            }
+            PersonalStoreEvent::BuyItem { slot_index, item } => {
+                if let Some((store_client_entity, _, _)) = ui_state
+                    .store_owner
+                    .and_then(|entity| query_personal_store.get(entity).ok())
+                {
+                    if let Some(game_connection) = &game_connection {
+                        game_connection
+                            .client_message_tx
+                            .send(ClientMessage::PersonalStoreBuyItem(PersonalStoreBuyItem {
+                                store_entity_id: store_client_entity.id,
+                                store_slot_index: *slot_index,
+                                buy_item: item.clone(),
+                            }))
+                            .ok();
+                    }
+                }
+            }
+            PersonalStoreEvent::UpdateBuyList { entity, item_list } => {
+                if ui_state.store_owner == Some(*entity) {
+                    for (slot_index, item) in item_list.iter() {
+                        if let Some(store_slot) =
+                            ui_state.store_buy_items.get_mut(*slot_index as usize)
+                        {
+                            if item.is_none() {
+                                *store_slot = None;
+                            } else if let Some((store_slot_item, _)) = store_slot.as_mut() {
+                                *store_slot_item = item.as_ref().unwrap().clone();
+                            }
+                        }
+                    }
+                }
+            }
+            PersonalStoreEvent::UpdateSellList { entity, item_list } => {
+                if ui_state.store_owner == Some(*entity) {
+                    for (slot_index, item) in item_list.iter() {
+                        if let Some(store_slot) =
+                            ui_state.store_sell_items.get_mut(*slot_index as usize)
+                        {
+                            if item.is_none() {
+                                *store_slot = None;
+                            } else if let Some((store_slot_item, _)) = store_slot.as_mut() {
+                                *store_slot_item = item.as_ref().unwrap().clone();
+                            }
+                        }
                     }
                 }
             }
@@ -205,21 +289,25 @@ pub fn ui_personal_store_system(
                         Some(&mut IID_BTN_SELL) => {
                             for y in 0..6 {
                                 for x in 0..5 {
+                                    let slot_index = (y * 5 + x) as usize;
                                     if let Some((item, price)) =
                                         ui_state.store_sell_items[(y * 5 + x) as usize].as_ref()
                                     {
                                         ui_add_store_item_slot(
                                             ui,
                                             &mut ui_state_dnd,
-                                            DragAndDropId::PersonalStoreSell((y * 5 + x) as usize),
+                                            DragAndDropId::PersonalStoreSell(slot_index),
                                             egui::pos2(
                                                 10.0 + x as f32 * 41.0,
                                                 54.0 + y as f32 * 41.0,
                                             ),
                                             item,
                                             price,
+                                            true,
+                                            slot_index,
                                             &game_data,
                                             &ui_resources,
+                                            &mut message_box_events,
                                         );
                                     }
                                 }
@@ -228,8 +316,9 @@ pub fn ui_personal_store_system(
                         Some(&mut IID_BTN_BUY) => {
                             for y in 0..6 {
                                 for x in 0..5 {
+                                    let slot_index = (y * 5 + x) as usize;
                                     if let Some((item, price)) =
-                                        ui_state.store_buy_items[(y * 5 + x) as usize].as_ref()
+                                        ui_state.store_buy_items[slot_index].as_ref()
                                     {
                                         ui_add_store_item_slot(
                                             ui,
@@ -241,8 +330,11 @@ pub fn ui_personal_store_system(
                                             ),
                                             item,
                                             price,
+                                            false,
+                                            slot_index,
                                             &game_data,
                                             &ui_resources,
+                                            &mut message_box_events,
                                         );
                                     }
                                 }
