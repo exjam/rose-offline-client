@@ -10,7 +10,7 @@ pub enum ClientEntityType {
     ItemDrop,
 }
 
-#[derive(Component)]
+#[derive(Copy, Clone, Component)]
 pub struct ClientEntity {
     pub id: ClientEntityId,
     pub entity_type: ClientEntityType,
