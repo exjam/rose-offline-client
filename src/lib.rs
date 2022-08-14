@@ -160,6 +160,73 @@ impl Default for FilesystemConfig {
     }
 }
 
+impl FilesystemConfig {
+    pub fn create_virtual_filesystem(&self) -> Option<Arc<VirtualFilesystem>> {
+        let mut vfs_devices: Vec<Box<dyn VirtualFilesystemDevice + Send + Sync>> = Vec::new();
+        for device_config in self.devices.iter() {
+            match device_config {
+                FilesystemDeviceConfig::Directory(path) => {
+                    log::info!("Loading game data from host directory {}", path);
+                    vfs_devices.push(Box::new(HostFilesystemDevice::new(path.into())));
+                }
+                FilesystemDeviceConfig::AruaVfs(path) => {
+                    let index_root_path = Path::new(path)
+                        .parent()
+                        .map(|path| path.into())
+                        .unwrap_or_else(PathBuf::new);
+
+                    log::info!("Loading game data from AruaVfs {}", path);
+                    vfs_devices.push(Box::new(
+                        AruaVfsIndex::load(Path::new(path), &index_root_path.join("data.rose"))
+                            .unwrap_or_else(|_| panic!("Failed to load AruaVfs at {}", path)),
+                    ));
+
+                    log::info!(
+                        "Loading game data from AruaVfs root path {}",
+                        index_root_path.to_string_lossy()
+                    );
+                    vfs_devices.push(Box::new(HostFilesystemDevice::new(index_root_path)));
+                }
+                FilesystemDeviceConfig::TitanVfs(path) => {
+                    let index_root_path = Path::new(path)
+                        .parent()
+                        .map(|path| path.into())
+                        .unwrap_or_else(PathBuf::new);
+
+                    log::info!("Loading game data from TitanVfs {}", path);
+                    vfs_devices.push(Box::new(
+                        TitanVfsIndex::load(Path::new(path), &index_root_path.join("data.trf"))
+                            .unwrap_or_else(|_| panic!("Failed to load TitanVfs at {}", path)),
+                    ));
+
+                    log::info!("Loading game data from TitanVfs root path {}", path);
+                    vfs_devices.push(Box::new(HostFilesystemDevice::new(index_root_path)));
+                }
+                FilesystemDeviceConfig::Vfs(path) => {
+                    log::info!("Loading game data from Vfs {}", path);
+                    vfs_devices.push(Box::new(
+                        VfsIndex::load(Path::new(path))
+                            .unwrap_or_else(|_| panic!("Failed to load Vfs at {}", path)),
+                    ));
+
+                    let index_root_path = Path::new(path)
+                        .parent()
+                        .map(|path| path.into())
+                        .unwrap_or_else(PathBuf::new);
+                    log::info!("Loading game data from Vfs root path {}", path);
+                    vfs_devices.push(Box::new(HostFilesystemDevice::new(index_root_path)));
+                }
+            }
+        }
+
+        if vfs_devices.is_empty() {
+            None
+        } else {
+            Some(Arc::new(VirtualFilesystem::new(vfs_devices)))
+        }
+    }
+}
+
 #[derive(Deserialize)]
 #[serde(default)]
 pub struct ServerConfig {
@@ -351,69 +418,13 @@ enum ModelViewerStages {
 }
 
 fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsConfig) {
-    let mut vfs_devices: Vec<Box<dyn VirtualFilesystemDevice + Send + Sync>> = Vec::new();
-    for device_config in config.filesystem.devices.iter() {
-        match device_config {
-            FilesystemDeviceConfig::Directory(path) => {
-                log::info!("Loading game data from host directory {}", path);
-                vfs_devices.push(Box::new(HostFilesystemDevice::new(path.into())));
-            }
-            FilesystemDeviceConfig::AruaVfs(path) => {
-                let index_root_path = Path::new(path)
-                    .parent()
-                    .map(|path| path.into())
-                    .unwrap_or_else(PathBuf::new);
-
-                log::info!("Loading game data from AruaVfs {}", path);
-                vfs_devices.push(Box::new(
-                    AruaVfsIndex::load(Path::new(path), &index_root_path.join("data.rose"))
-                        .unwrap_or_else(|_| panic!("Failed to load AruaVfs at {}", path)),
-                ));
-
-                log::info!(
-                    "Loading game data from AruaVfs root path {}",
-                    index_root_path.to_string_lossy()
-                );
-                vfs_devices.push(Box::new(HostFilesystemDevice::new(index_root_path)));
-            }
-            FilesystemDeviceConfig::TitanVfs(path) => {
-                let index_root_path = Path::new(path)
-                    .parent()
-                    .map(|path| path.into())
-                    .unwrap_or_else(PathBuf::new);
-
-                log::info!("Loading game data from TitanVfs {}", path);
-                vfs_devices.push(Box::new(
-                    TitanVfsIndex::load(Path::new(path), &index_root_path.join("data.trf"))
-                        .unwrap_or_else(|_| panic!("Failed to load TitanVfs at {}", path)),
-                ));
-
-                log::info!("Loading game data from TitanVfs root path {}", path);
-                vfs_devices.push(Box::new(HostFilesystemDevice::new(index_root_path)));
-            }
-            FilesystemDeviceConfig::Vfs(path) => {
-                log::info!("Loading game data from Vfs {}", path);
-                vfs_devices.push(Box::new(
-                    VfsIndex::load(Path::new(path))
-                        .unwrap_or_else(|_| panic!("Failed to load Vfs at {}", path)),
-                ));
-
-                let index_root_path = Path::new(path)
-                    .parent()
-                    .map(|path| path.into())
-                    .unwrap_or_else(PathBuf::new);
-                log::info!("Loading game data from Vfs root path {}", path);
-                vfs_devices.push(Box::new(HostFilesystemDevice::new(index_root_path)));
-            }
-        }
-    }
-
-    if vfs_devices.is_empty() {
-        log::error!("No filesystem devices");
-        return;
-    }
-
-    let virtual_filesystem = Arc::new(VirtualFilesystem::new(vfs_devices));
+    let virtual_filesystem =
+        if let Some(virtual_filesystem) = config.filesystem.create_virtual_filesystem() {
+            virtual_filesystem
+        } else {
+            log::error!("No filesystem devices");
+            return;
+        };
 
     let (window_width, window_height) =
         if let GraphicsModeConfig::Window { width, height } = config.graphics.mode {
