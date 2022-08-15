@@ -58,8 +58,11 @@ impl StreamingAudioSource for WavAudioSource {
         let hound::WavSpec {
             bits_per_sample,
             sample_format,
-            ..
+            sample_rate,
+            channels,
         } = self.reader.spec();
+
+        let read_num_samples = (channels as usize * sample_rate as usize) / 20;
 
         let samples: Result<Vec<f32>, _> = match sample_format {
             hound::SampleFormat::Int => {
@@ -67,9 +70,14 @@ impl StreamingAudioSource for WavAudioSource {
                 self.reader
                     .samples::<i32>()
                     .map(|sample| sample.map(|sample| sample as f32 / max_value as f32))
+                    .take(read_num_samples)
                     .collect()
             }
-            hound::SampleFormat::Float => self.reader.samples::<f32>().collect(),
+            hound::SampleFormat::Float => self
+                .reader
+                .samples::<f32>()
+                .take(read_num_samples)
+                .collect(),
         };
 
         samples.unwrap_or_else(|_| Vec::default())
