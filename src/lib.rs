@@ -992,8 +992,10 @@ fn load_common_game_data(
         ModelLoader::new(
             vfs_resource.vfs.clone(),
             game_data.character_motion_database.clone(),
+            game_data.effect_database.clone(),
             game_data.items.clone(),
             game_data.npcs.clone(),
+            asset_server.load("3DDATA/EFFECT/TRAIL.DDS"),
         )
         .expect("Failed to create model loader"),
     );

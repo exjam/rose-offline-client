@@ -15,6 +15,7 @@ mod rgb_texture_loader;
 mod sky_material;
 mod terrain_material;
 mod texture_array;
+mod trail_effect;
 mod water_material;
 mod zone_lighting;
 
@@ -39,6 +40,7 @@ pub use rgb_texture_loader::RgbTextureLoader;
 pub use sky_material::SkyMaterial;
 pub use terrain_material::{TerrainMaterial, TERRAIN_MESH_ATTRIBUTE_TILE_INFO};
 pub use texture_array::{GpuTextureArray, TextureArray, TextureArrayBuilder};
+pub use trail_effect::TrailEffect;
 pub use water_material::WaterMaterial;
 pub use zone_lighting::ZoneLighting;
 
@@ -51,6 +53,7 @@ use particle_pipeline::ParticleRenderPlugin;
 use sky_material::SkyMaterialPlugin;
 use terrain_material::TerrainMaterialPlugin;
 use texture_array::TextureArrayPlugin;
+use trail_effect::TrailEffectRenderPlugin;
 use water_material::WaterMaterialPlugin;
 use zone_lighting::ZoneLightingPlugin;
 
@@ -71,6 +74,7 @@ impl Plugin for RoseRenderPlugin {
             .add_plugin(ParticleRenderPlugin)
             .add_plugin(DamageDigitMaterialPlugin)
             .add_plugin(DamageDigitRenderPlugin)
-            .add_plugin(SkyMaterialPlugin);
+            .add_plugin(SkyMaterialPlugin)
+            .add_plugin(TrailEffectRenderPlugin);
     }
 }

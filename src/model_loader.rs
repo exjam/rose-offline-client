@@ -1,16 +1,19 @@
 use std::sync::Arc;
 
+use arrayvec::ArrayVec;
 use bevy::{
     math::{Mat4, Quat, Vec3},
     prelude::{
-        AssetServer, Assets, BuildChildren, Commands, ComputedVisibility, Entity, GlobalTransform,
-        Handle, Mesh, Transform, Visibility,
+        AssetServer, Assets, BuildChildren, Color, Commands, ComputedVisibility, Entity,
+        GlobalTransform, Handle, Image, Mesh, Transform, Visibility,
     },
     render::mesh::skinning::{SkinnedMesh, SkinnedMeshInverseBindposes},
 };
 use enum_map::{enum_map, EnumMap};
 
-use rose_data::{CharacterMotionAction, CharacterMotionDatabase, ItemDatabase, NpcId};
+use rose_data::{
+    CharacterMotionAction, CharacterMotionDatabase, EffectDatabase, ItemClass, ItemDatabase, NpcId,
+};
 use rose_data::{EquipmentIndex, ItemType, NpcDatabase};
 use rose_file_readers::{ChrFile, VirtualFilesystem, ZmdFile, ZscFile};
 use rose_game_common::components::{
@@ -23,16 +26,30 @@ use crate::{
         PersonalStoreModel,
     },
     effect_loader::spawn_effect,
-    render::{EffectMeshMaterial, ObjectMaterial, ParticleMaterial, RgbTextureLoader},
+    render::{EffectMeshMaterial, ObjectMaterial, ParticleMaterial, RgbTextureLoader, TrailEffect},
     zmo_asset_loader::ZmoAsset,
     zms_asset_loader::ZmsMaterialNumFaces,
 };
 
+const TRAIL_COLOURS: [Color; 9] = [
+    Color::rgba(1.0, 0.0, 0.0, 1.0),
+    Color::rgba(0.0, 1.0, 0.0, 1.0),
+    Color::rgba(0.0, 0.0, 1.0, 1.0),
+    Color::rgba(0.0, 0.0, 0.0, 1.0),
+    Color::rgba(1.0, 1.0, 1.0, 1.0),
+    Color::rgba(1.0, 1.0, 0.0, 1.0),
+    Color::rgba(0.6, 0.6, 0.6, 1.0),
+    Color::rgba(1.0, 0.0, 1.0, 1.0),
+    Color::rgba(1.0, 0.5, 0.0, 1.0),
+];
+
 pub struct ModelLoader {
     vfs: Arc<VirtualFilesystem>,
     character_motion_database: Arc<CharacterMotionDatabase>,
+    effect_database: Arc<EffectDatabase>,
     item_database: Arc<ItemDatabase>,
     npc_database: Arc<NpcDatabase>,
+    trail_effect_image: Handle<Image>,
 
     // Male
     skeleton_male: ZmdFile,
@@ -71,8 +88,10 @@ impl ModelLoader {
     pub fn new(
         vfs: Arc<VirtualFilesystem>,
         character_motion_database: Arc<CharacterMotionDatabase>,
+        effect_database: Arc<EffectDatabase>,
         item_database: Arc<ItemDatabase>,
         npc_database: Arc<NpcDatabase>,
+        trail_effect_image: Handle<Image>,
     ) -> Result<ModelLoader, anyhow::Error> {
         Ok(ModelLoader {
             // Male
@@ -109,8 +128,10 @@ impl ModelLoader {
 
             vfs,
             character_motion_database,
+            effect_database,
             item_database,
             npc_database,
+            trail_effect_image,
         })
     }
 
@@ -430,6 +451,126 @@ impl ModelLoader {
         }
     }
 
+    pub fn spawn_weapon_trail(
+        &self,
+        commands: &mut Commands,
+        model_list: &ZscFile,
+        model_id: usize,
+        base_effect_index: usize,
+        colour: Color,
+        duration: f32,
+    ) -> Option<Entity> {
+        let object = model_list.objects.get(model_id)?;
+        let start_position = object.effects.get(base_effect_index)?.position;
+        let end_position = object.effects.get(base_effect_index + 1)?.position;
+        Some(
+            commands
+                .spawn_bundle((
+                    TrailEffect {
+                        colour,
+                        duration,
+                        start_offset: Vec3::new(
+                            start_position.x,
+                            start_position.z,
+                            -start_position.y,
+                        ) / 100.0,
+                        end_offset: Vec3::new(end_position.x, end_position.z, -end_position.y)
+                            / 100.0,
+                        trail_texture: self.trail_effect_image.clone_weak(),
+                        distance_per_point: 10.0 / 100.0,
+                    },
+                    Transform::default(),
+                    GlobalTransform::default(),
+                    Visibility::default(),
+                    ComputedVisibility::default(),
+                ))
+                .id(),
+        )
+    }
+
+    pub fn spawn_character_weapon_trail(
+        &self,
+        commands: &mut Commands,
+        equipment: &Equipment,
+        weapon_bone_entity: Entity,
+        subweapon_bone_entity: Entity,
+    ) -> ArrayVec<Entity, 2> {
+        let weapon_item_number = if let Some(weapon_item_number) = equipment.equipped_items
+            [EquipmentIndex::Weapon]
+            .as_ref()
+            .map(|equipment_item| equipment_item.item.item_number)
+        {
+            weapon_item_number
+        } else {
+            return ArrayVec::default();
+        };
+
+        let weapon_item_data = if let Some(weapon_item_data) =
+            self.item_database.get_weapon_item(weapon_item_number)
+        {
+            weapon_item_data
+        } else {
+            return ArrayVec::default();
+        };
+
+        let weapon_effect_data = if let Some(weapon_effect_data) = weapon_item_data
+            .effect_id
+            .and_then(|id| self.effect_database.get_effect(id))
+        {
+            weapon_effect_data
+        } else {
+            return ArrayVec::default();
+        };
+
+        let trail_colour_index =
+            if let Some(trail_colour_index) = weapon_effect_data.trail_colour_index {
+                trail_colour_index
+            } else {
+                return ArrayVec::default();
+            };
+
+        let colour = TRAIL_COLOURS
+            .get(trail_colour_index.get() - 1)
+            .cloned()
+            .unwrap_or(Color::WHITE);
+
+        let mut parts = ArrayVec::new();
+
+        if let Some(trail_entity) = self.spawn_weapon_trail(
+            commands,
+            &self.weapon,
+            weapon_item_number,
+            0,
+            colour,
+            weapon_effect_data.trail_duration.as_secs_f32(),
+        ) {
+            commands.entity(weapon_bone_entity).add_child(trail_entity);
+            parts.push(trail_entity);
+        }
+
+        // If the weapon is dual wield, add trail to the off hand weapon
+        if matches!(
+            weapon_item_data.item_data.class,
+            ItemClass::Katar | ItemClass::DualSwords
+        ) {
+            if let Some(trail_entity) = self.spawn_weapon_trail(
+                commands,
+                &self.weapon,
+                weapon_item_number,
+                2,
+                colour,
+                weapon_effect_data.trail_duration.as_secs_f32(),
+            ) {
+                commands
+                    .entity(subweapon_bone_entity)
+                    .add_child(trail_entity);
+                parts.push(trail_entity);
+            }
+        }
+
+        parts
+    }
+
     #[allow(clippy::too_many_arguments)]
     pub fn spawn_character_model(
         &self,
@@ -466,18 +607,31 @@ impl ModelLoader {
             if let Some(model_id) =
                 get_model_part_index(&self.item_database, character_info, equipment, model_part)
             {
+                let model_list = self.get_model_list(character_info.gender, model_part);
                 model_parts[model_part] = spawn_model(
                     commands,
                     asset_server,
                     object_materials,
                     model_entity,
-                    self.get_model_list(character_info.gender, model_part),
+                    model_list,
                     model_id,
                     Some(&skinned_mesh),
                     model_part.default_bone_id(dummy_bone_offset),
                     dummy_bone_offset,
                     matches!(model_part, CharacterModelPart::CharacterFace),
                 );
+
+                if matches!(model_part, CharacterModelPart::Weapon) {
+                    let weapon_trail_entities = self.spawn_character_weapon_trail(
+                        commands,
+                        equipment,
+                        skinned_mesh.joints[dummy_bone_offset],
+                        skinned_mesh.joints[dummy_bone_offset + 1],
+                    );
+                    model_parts[model_part]
+                        .1
+                        .extend(weapon_trail_entities.into_iter());
+                }
             }
         }
 
@@ -562,6 +716,18 @@ impl ModelLoader {
                         dummy_bone_offset.index,
                         matches!(model_part, CharacterModelPart::CharacterFace),
                     );
+
+                    if matches!(model_part, CharacterModelPart::Weapon) {
+                        let weapon_trail_entities = self.spawn_character_weapon_trail(
+                            commands,
+                            equipment,
+                            skinned_mesh.joints[dummy_bone_offset.index],
+                            skinned_mesh.joints[dummy_bone_offset.index + 1],
+                        );
+                        character_model.model_parts[model_part]
+                            .1
+                            .extend(weapon_trail_entities.into_iter());
+                    }
                 } else {
                     character_model.model_parts[model_part].0 = model_id;
                     character_model.model_parts[model_part].1.clear();

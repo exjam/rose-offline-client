@@ -83,7 +83,7 @@ pub fn model_viewer_enter_system(
         max_num_npcs: game_data.npcs.iter().count(),
 
         characters: Vec::new(),
-        num_characters: 0,
+        num_characters: 1,
         max_num_characters: 500,
 
         last_effect_entity: None,
