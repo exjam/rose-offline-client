@@ -209,7 +209,7 @@ async fn load_zone<'a, 'b>(
                 for block_x in 0..64 {
                     let load_context: &LoadContext = load_context;
 
-                    scope.spawn(async move {
+                    scope.spawn_local(async move {
                         load_block_files(load_context, zone_path, block_x, block_y).await
                     });
                 }

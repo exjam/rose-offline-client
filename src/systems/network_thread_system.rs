@@ -6,12 +6,15 @@ use rose_game_common::{
 
 use crate::{
     events::NetworkEvent,
-    protocol::irose,
     resources::{
         GameConnection, LoginConnection, NetworkThread, NetworkThreadMessage, WorldConnection,
     },
 };
 
+#[cfg(not(target_arch = "wasm32"))]
+use crate::protocol::irose;
+
+#[cfg(not(target_arch = "wasm32"))]
 pub fn network_thread_system(
     mut commands: Commands,
     network_thread: Res<NetworkThread>,
@@ -106,4 +109,13 @@ pub fn network_thread_system(
             }
         }
     }
+}
+
+#[cfg(target_arch = "wasm32")]
+pub fn network_thread_system(
+    mut commands: Commands,
+    network_thread: Res<NetworkThread>,
+    mut network_events: EventReader<NetworkEvent>,
+) {
+    for event in network_events.iter() {}
 }

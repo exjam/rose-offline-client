@@ -34,7 +34,6 @@ oddio = "0.5"
 rand = "0.8"
 serde = "1.0"
 thiserror = "1.0"
-tokio = { version = "1.17", features = ["rt", "net", "sync", "macros", "io-util"] }
 toml = "0.5.9"
 quick-xml = { version = "0.23", features = ["serialize"] }
 rose-data = { git = "https://github.com/exjam/rose-offline", rev = "a0045992e8b6d5e96cabcee19f9f7f3d840e572c" }
@@ -44,6 +43,9 @@ rose-game-common = { git = "https://github.com/exjam/rose-offline", rev = "a0045
 rose-game-irose = { git = "https://github.com/exjam/rose-offline", rev = "a0045992e8b6d5e96cabcee19f9f7f3d840e572c" }
 rose-network-common = { git = "https://github.com/exjam/rose-offline", rev = "a0045992e8b6d5e96cabcee19f9f7f3d840e572c" }
 rose-network-irose = { git = "https://github.com/exjam/rose-offline", rev = "a0045992e8b6d5e96cabcee19f9f7f3d840e572c" }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+tokio = { version = "1.17", features = ["rt", "net", "sync", "macros", "io-util"] }
 
 [patch.crates-io]
 bevy = { git = "https://github.com/exjam/bevy", rev = "88e688d68c9b31d14baa7582c67cb92877847c32" }
@@ -55,3 +57,7 @@ oddio = { git = "https://github.com/exjam/oddio", rev = "4f4eb4076c3a4068225a7c4
 
 [profile.dev.package."*"]
 opt-level = 3
+
+[profile.release]
+opt-level = 'z'
+lto = "thin"

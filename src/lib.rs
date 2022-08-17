@@ -38,7 +38,6 @@ pub mod events;
 pub mod free_camera;
 pub mod model_loader;
 pub mod orbit_camera;
-pub mod protocol;
 pub mod ray_from_screenspace;
 pub mod render;
 pub mod resources;
@@ -49,6 +48,9 @@ pub mod vfs_asset_io;
 pub mod zmo_asset_loader;
 pub mod zms_asset_loader;
 pub mod zone_loader;
+
+#[cfg(not(target_arch = "wasm32"))]
+pub mod protocol;
 
 use audio::OddioPlugin;
 use events::{
@@ -818,10 +820,15 @@ fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsC
     app.add_system_to_stage(CoreStage::PostUpdate, ui_drag_and_drop_system);
 
     // Setup network
+    #[cfg(not(target_arch = "wasm32"))]
     let (network_thread_tx, network_thread_rx) =
         tokio::sync::mpsc::unbounded_channel::<NetworkThreadMessage>();
+    #[cfg(not(target_arch = "wasm32"))]
     let network_thread = std::thread::spawn(move || run_network_thread(network_thread_rx));
+    #[cfg(not(target_arch = "wasm32"))]
     app.insert_resource(NetworkThread::new(network_thread_tx.clone()));
+    #[cfg(target_arch = "wasm32")]
+    app.insert_resource(NetworkThread {});
 
     // Run network systems before Update, so we can add/remove entities
     app.add_stage_before(
@@ -865,7 +872,9 @@ fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsC
 
     app.run();
 
+    #[cfg(not(target_arch = "wasm32"))]
     network_thread_tx.send(NetworkThreadMessage::Exit).ok();
+    #[cfg(not(target_arch = "wasm32"))]
     network_thread.join().ok();
 }
 

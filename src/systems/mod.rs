@@ -17,7 +17,6 @@ mod debug_render_collider_system;
 mod debug_render_polylines_system;
 mod debug_render_skeleton_system;
 mod effect_system;
-mod game_connection_system;
 mod game_mouse_input_system;
 mod game_system;
 mod hit_event_system;
@@ -75,7 +74,6 @@ pub use debug_render_polylines_system::{
 };
 pub use debug_render_skeleton_system::debug_render_skeleton_system;
 pub use effect_system::effect_system;
-pub use game_connection_system::game_connection_system;
 pub use game_mouse_input_system::game_mouse_input_system;
 pub use game_system::{game_state_enter_system, game_zone_change_system};
 pub use hit_event_system::hit_event_system;
@@ -106,3 +104,11 @@ pub use world_connection_system::world_connection_system;
 pub use world_time_system::world_time_system;
 pub use zone_time_system::zone_time_system;
 pub use zone_viewer_system::zone_viewer_enter_system;
+
+#[cfg(not(target_arch = "wasm32"))]
+mod game_connection_system;
+#[cfg(not(target_arch = "wasm32"))]
+pub use game_connection_system::game_connection_system;
+
+#[cfg(target_arch = "wasm32")]
+pub fn game_connection_system() {}

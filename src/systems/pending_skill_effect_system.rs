@@ -92,11 +92,13 @@ fn apply_skill_effect(
                 0
             };
 
+            /*
             target.status_effects.apply_status_effect(
                 status_effect_data,
                 time.last_update().unwrap() + skill_data.status_effect_duration,
                 adjust_value,
             );
+            */
         }
 
         let add_ability = skill_data

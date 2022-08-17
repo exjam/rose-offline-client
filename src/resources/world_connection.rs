@@ -6,11 +6,13 @@ use rose_game_common::{
     },
 };
 
+#[cfg(not(target_arch = "wasm32"))]
 pub struct WorldConnection {
     pub client_message_tx: tokio::sync::mpsc::UnboundedSender<ClientMessage>,
     pub server_message_rx: crossbeam_channel::Receiver<ServerMessage>,
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 impl WorldConnection {
     pub fn new(
         client_message_tx: tokio::sync::mpsc::UnboundedSender<ClientMessage>,
@@ -30,4 +32,10 @@ impl WorldConnection {
             server_message_rx,
         }
     }
+}
+
+#[cfg(target_arch = "wasm32")]
+pub struct WorldConnection {
+    pub client_message_tx: crossbeam_channel::Sender<ClientMessage>,
+    pub server_message_rx: crossbeam_channel::Receiver<ServerMessage>,
 }
