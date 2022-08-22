@@ -1,5 +1,12 @@
 use bevy::prelude::{Assets, Commands, Events, Local, Res, ResMut};
-use bevy_egui::{egui, EguiContext};
+use bevy_egui::{
+    egui,
+    egui::{
+        epaint::text::cursor::{CCursor, Cursor, PCursor, RCursor},
+        text_edit::CursorRange,
+    },
+    EguiContext,
+};
 
 use crate::{
     events::NumberInputDialogEvent,
@@ -170,49 +177,85 @@ pub fn ui_number_input_dialog_system(
     });
 
     if first_show || response.response.clicked() {
-        if let Some(response_editbox) = response_editbox {
+        if let Some(response_editbox) = response_editbox.as_ref() {
             response_editbox.request_focus();
         }
     }
 
+    let move_cursor_to_position = |response_editbox: Option<&egui::Response>,
+                                   text_length: usize| {
+        if let Some(response_editbox) = response_editbox.as_ref() {
+            if let Some(mut state) =
+                egui::text_edit::TextEditState::load(&response_editbox.ctx, response_editbox.id)
+            {
+                state.set_cursor_range(Some(CursorRange::one(Cursor {
+                    ccursor: CCursor {
+                        index: text_length,
+                        prefer_next_row: false,
+                    },
+                    rcursor: RCursor {
+                        row: 0,
+                        column: text_length,
+                    },
+                    pcursor: PCursor {
+                        paragraph: 0,
+                        offset: text_length,
+                        prefer_next_row: false,
+                    },
+                })));
+                state.store(&response_editbox.ctx, response_editbox.id);
+            }
+        }
+    };
+
     if response_button_0.map_or(false, |x| x.clicked()) {
         active_dialog.current_value.push('0');
+        move_cursor_to_position(response_editbox.as_ref(), active_dialog.current_value.len());
     }
 
     if response_button_1.map_or(false, |x| x.clicked()) {
         active_dialog.current_value.push('1');
+        move_cursor_to_position(response_editbox.as_ref(), active_dialog.current_value.len());
     }
 
     if response_button_2.map_or(false, |x| x.clicked()) {
         active_dialog.current_value.push('2');
+        move_cursor_to_position(response_editbox.as_ref(), active_dialog.current_value.len());
     }
 
     if response_button_3.map_or(false, |x| x.clicked()) {
         active_dialog.current_value.push('3');
+        move_cursor_to_position(response_editbox.as_ref(), active_dialog.current_value.len());
     }
 
     if response_button_4.map_or(false, |x| x.clicked()) {
         active_dialog.current_value.push('4');
+        move_cursor_to_position(response_editbox.as_ref(), active_dialog.current_value.len());
     }
 
     if response_button_5.map_or(false, |x| x.clicked()) {
         active_dialog.current_value.push('5');
+        move_cursor_to_position(response_editbox.as_ref(), active_dialog.current_value.len());
     }
 
     if response_button_6.map_or(false, |x| x.clicked()) {
         active_dialog.current_value.push('6');
+        move_cursor_to_position(response_editbox.as_ref(), active_dialog.current_value.len());
     }
 
     if response_button_7.map_or(false, |x| x.clicked()) {
         active_dialog.current_value.push('7');
+        move_cursor_to_position(response_editbox.as_ref(), active_dialog.current_value.len());
     }
 
     if response_button_8.map_or(false, |x| x.clicked()) {
         active_dialog.current_value.push('8');
+        move_cursor_to_position(response_editbox.as_ref(), active_dialog.current_value.len());
     }
 
     if response_button_9.map_or(false, |x| x.clicked()) {
         active_dialog.current_value.push('9');
+        move_cursor_to_position(response_editbox.as_ref(), active_dialog.current_value.len());
     }
 
     if response_button_del.map_or(false, |x| x.clicked()) && !active_dialog.current_value.is_empty()
@@ -220,11 +263,13 @@ pub fn ui_number_input_dialog_system(
         active_dialog
             .current_value
             .remove(active_dialog.current_value.len() - 1);
+        move_cursor_to_position(response_editbox.as_ref(), active_dialog.current_value.len());
     }
 
     if response_button_max.map_or(false, |x| x.clicked()) {
         if let Some(max_value) = active_dialog.max_value {
             active_dialog.current_value = format!("{}", max_value);
+            move_cursor_to_position(response_editbox.as_ref(), active_dialog.current_value.len());
         }
     }
 
