@@ -29,6 +29,8 @@ use bevy::{
 use bytemuck::{Pod, Zeroable};
 use std::{collections::HashMap, ops::Range};
 
+use crate::resources::RenderConfiguration;
+
 pub const TRAIL_EFFECT_SHADER_HANDLE: HandleUntyped =
     HandleUntyped::weak_from_u64(Shader::TYPE_UUID, 3042057527543835453);
 
@@ -133,6 +135,7 @@ pub fn update_trail_effects(
         &mut TrailEffectPositionHistory,
         &GlobalTransform,
     )>,
+    render_configuration: Res<RenderConfiguration>,
     time: Res<Time>,
 ) {
     let now = time.seconds_since_startup() as f32;
@@ -269,7 +272,8 @@ pub fn update_trail_effects(
         }
 
         // Pop old points
-        let last_time = now - trail_effect.duration;
+        let last_time =
+            now - trail_effect.duration * render_configuration.trail_effect_duration_multiplier;
         while history
             .history
             .back()

@@ -275,6 +275,7 @@ pub enum GraphicsModeConfig {
 pub struct GraphicsConfig {
     pub mode: GraphicsModeConfig,
     pub passthrough_terrain_textures: bool,
+    pub trail_effect_duration_multiplier: f32,
     pub disable_vsync: bool,
 }
 
@@ -286,6 +287,7 @@ impl Default for GraphicsConfig {
                 height: 1080.0,
             },
             passthrough_terrain_textures: false,
+            trail_effect_duration_multiplier: 1.0,
             disable_vsync: false,
         }
     }
@@ -511,6 +513,7 @@ fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsC
         .add_asset::<Dialog>()
         .insert_resource(RenderConfiguration {
             passthrough_terrain_textures: config.graphics.passthrough_terrain_textures,
+            trail_effect_duration_multiplier: config.graphics.trail_effect_duration_multiplier,
         })
         .insert_resource(ServerConfiguration {
             ip: config.server.ip.clone(),
