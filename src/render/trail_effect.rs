@@ -283,7 +283,6 @@ pub fn update_trail_effects(
 struct TrailEffectPipeline {
     view_layout: BindGroupLayout,
     material_layout: BindGroupLayout,
-    sampler: Sampler,
 }
 
 impl FromWorld for TrailEffectPipeline {
@@ -331,13 +330,6 @@ impl FromWorld for TrailEffectPipeline {
         Self {
             view_layout,
             material_layout,
-            sampler: render_device.create_sampler(&SamplerDescriptor {
-                address_mode_u: AddressMode::Repeat,
-                address_mode_v: AddressMode::Repeat,
-                mag_filter: FilterMode::Linear,
-                min_filter: FilterMode::Linear,
-                ..Default::default()
-            }),
         }
     }
 }
@@ -675,7 +667,7 @@ fn queue_trail_effects(
                             },
                             BindGroupEntry {
                                 binding: 1,
-                                resource: BindingResource::Sampler(&trail_effect_pipeline.sampler),
+                                resource: BindingResource::Sampler(&gpu_image.sampler),
                             },
                         ],
                         label: Some("trail_effect_material_bind_group"),
