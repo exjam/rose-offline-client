@@ -107,7 +107,7 @@ pub fn ui_message_box_system(
     }
 
     if ui_state.active.iter().any(|x| x.modal) {
-        egui::Area::new("modal")
+        egui::Area::new("modal_msgbox")
             .interactable(true)
             .fixed_pos(egui::Pos2::ZERO)
             .show(egui_context.ctx_mut(), |ui| {
