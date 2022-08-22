@@ -454,7 +454,7 @@ fn extract_trail_effects(
         )>,
     >,
 ) {
-    extracted_trail_effects.trail_effects.clear();
+    let mut trail_index = 0;
 
     for (visible, trail_effect, position_history) in query.iter() {
         if !visible.is_visible() {
@@ -469,8 +469,22 @@ fn extract_trail_effects(
             continue;
         }
 
-        // TODO: Any way to cache this allocation ?
-        let mut vertices = Vec::with_capacity(6 * position_history.history.len());
+        let required_capacity = 6 * position_history.history.len();
+        let mut vertices = if trail_index < extracted_trail_effects.trail_effects.len() {
+            // We try to reuse previous allocated vertices
+            let mut vertices =
+                std::mem::take(&mut extracted_trail_effects.trail_effects[trail_index].vertices);
+            vertices.clear();
+
+            if vertices.capacity() < required_capacity {
+                vertices.reserve(required_capacity - vertices.capacity());
+            }
+
+            vertices
+        } else {
+            Vec::with_capacity(6 * position_history.history.len())
+        };
+
         let num_points = (position_history.history.len() - 1) as f32;
         let colour = trail_effect.colour.as_rgba_u32();
 
@@ -507,13 +521,24 @@ fn extract_trail_effects(
             }
         }
 
-        extracted_trail_effects
-            .trail_effects
-            .push(ExtractedTrailEffect {
+        if trail_index < extracted_trail_effects.trail_effects.len() {
+            extracted_trail_effects.trail_effects[trail_index] = ExtractedTrailEffect {
                 texture: trail_effect.trail_texture.clone_weak(),
                 vertices,
-            });
+            };
+        } else {
+            extracted_trail_effects
+                .trail_effects
+                .push(ExtractedTrailEffect {
+                    texture: trail_effect.trail_texture.clone_weak(),
+                    vertices,
+                });
+        }
+
+        trail_index += 1;
     }
+
+    extracted_trail_effects.trail_effects.truncate(trail_index);
 }
 
 struct TrailEffectMeta {
