@@ -20,4 +20,5 @@ pub enum PlayerCommandEvent {
     EquipAmmo(ItemSlot),
     EquipEquipment(ItemSlot),
     EquipVehicle(ItemSlot),
+    DropMoney(usize),
 }

@@ -534,6 +534,14 @@ pub fn player_command_system(
                     }
                 }
             }
+            PlayerCommandEvent::DropMoney(amount) => {
+                if let Some(game_connection) = game_connection.as_ref() {
+                    game_connection
+                        .client_message_tx
+                        .send(ClientMessage::DropMoney(amount))
+                        .ok();
+                }
+            }
             PlayerCommandEvent::Attack(entity) => {
                 if let Ok((target_client_entity, target_team)) = query_team.get(entity) {
                     if target_team.id != Team::DEFAULT_NPC_TEAM_ID

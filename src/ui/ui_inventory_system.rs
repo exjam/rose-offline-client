@@ -1,6 +1,6 @@
 use bevy::{
     ecs::query::WorldQuery,
-    prelude::{Assets, EventWriter, Local, Query, Res, ResMut, With},
+    prelude::{Assets, EventWriter, Events, Local, Query, Res, ResMut, With, World},
 };
 use bevy_egui::{egui, EguiContext};
 use enum_map::{enum_map, EnumMap};
@@ -14,7 +14,7 @@ use rose_game_common::components::{
 
 use crate::{
     components::{ConsumableCooldownGroup, Cooldowns, PlayerCharacter},
-    events::PlayerCommandEvent,
+    events::{NumberInputDialogEvent, PlayerCommandEvent},
     resources::{GameData, UiResources, UiSpriteSheetType},
     ui::{
         ui_add_item_tooltip,
@@ -25,7 +25,7 @@ use crate::{
 
 const IID_BTN_CLOSE: i32 = 10;
 // const IID_BTN_ICONIZE: i32 = 11;
-// const IID_BTN_MONEY: i32 = 12;
+const IID_BTN_MONEY: i32 = 12;
 const IID_TABBEDPANE_EQUIP: i32 = 20;
 const IID_TAB_EQUIP_PAT: i32 = 21;
 // const IID_BTN_EQUIP_PAT: i32 = 23;
@@ -495,6 +495,7 @@ pub fn ui_inventory_system(
     game_data: Res<GameData>,
     ui_resources: Res<UiResources>,
     mut player_command_events: EventWriter<PlayerCommandEvent>,
+    mut number_input_dialog_events: EventWriter<NumberInputDialogEvent>,
 ) {
     let ui_state_inventory = &mut *ui_state_inventory;
     let dialog = if let Some(dialog) = ui_state_inventory
@@ -514,6 +515,7 @@ pub fn ui_inventory_system(
     let mut response_close_button = None;
     let mut response_minimise_button = None;
     let mut response_maximise_button = None;
+    let mut response_drop_money_button = None;
     let is_equipment_tab = ui_state_inventory.current_equipment_tab == IID_TAB_EQUIP_AVATAR;
     let is_minimised = ui_state_inventory.minimised;
 
@@ -552,6 +554,7 @@ pub fn ui_inventory_system(
                         (IID_BTN_CLOSE, &mut response_close_button),
                         (IID_BTN_MINIMIZE, &mut response_minimise_button),
                         (IID_BTN_MAXIMIZE, &mut response_maximise_button),
+                        (IID_BTN_MONEY, &mut response_drop_money_button),
                     ],
                     ..Default::default()
                 },
@@ -675,5 +678,22 @@ pub fn ui_inventory_system(
         if let Some(Widget::Pane(pane)) = dialog.get_widget_mut(IID_PANE_INVEN) {
             pane.y = 254.0;
         }
+    }
+
+    if response_drop_money_button.map_or(false, |r| r.clicked()) && player.inventory.money.0 > 0 {
+        number_input_dialog_events.send(NumberInputDialogEvent::Show {
+            max_value: Some(player.inventory.money.0 as usize),
+            modal: false,
+            ok: Some(Box::new(move |commands, amount| {
+                commands.add(move |world: &mut World| {
+                    if let Some(mut player_command_events) =
+                        world.get_resource_mut::<Events<PlayerCommandEvent>>()
+                    {
+                        player_command_events.send(PlayerCommandEvent::DropMoney(amount));
+                    }
+                });
+            })),
+            cancel: None,
+        });
     }
 }
