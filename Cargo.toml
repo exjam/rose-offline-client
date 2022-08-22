@@ -51,6 +51,7 @@ bevy_polyline = { git = "https://github.com/exjam/bevy_polyline", rev = "3c7bae5
 bevy_egui = { git = "https://github.com/exjam/bevy_egui", rev = "9e9c47b51f2cc18812070580cc9d0fa8feeebb13" }
 bevy-inspector-egui = { git = "https://github.com/exjam/bevy-inspector-egui", rev = "a1a4379b0fe787e4830ce7b919fa75cfc2b6390b" }
 bevy_rapier3d = { git = "https://github.com/exjam/bevy_rapier", rev = "f0809f556fb2e97eba3fd1a07d50ab522e2f57df" }
+egui = { git = "https://github.com/exjam/egui", rev = "b5ea40aaf5a527dbf0d5bc867cfa6e5dc6945770" }
 oddio = { git = "https://github.com/exjam/oddio", rev = "4f4eb4076c3a4068225a7c442a25e40422261c93" }
 
 [profile.dev.package."*"]

@@ -62,18 +62,27 @@ impl DrawWidget for Editbox {
         let buffer = bindings.get_text(self.id).unwrap_or(&mut unbound_buffer);
 
         let rect = self.widget_rect(ui.min_rect().min);
+        let text_edit = if self.multiline != 0 {
+            egui::TextEdit::multiline(buffer)
+        } else {
+            egui::TextEdit::singleline(buffer)
+        }
+        .frame(false)
+        .margin(egui::vec2(0.0, 0.0))
+        .password(self.password != 0);
+
+        let mut number_input_filter = |text: &str| text.chars().all(|c| c.is_ascii_digit());
+
+        let text_edit = if self.number != 0 {
+            text_edit.input_filter(&mut number_input_filter)
+        } else {
+            text_edit
+        };
+
         let response = ui
             .allocate_ui_at_rect(rect, |ui| {
-                ui.centered_and_justified(|ui| {
-                    ui.add_enabled(
-                        enabled,
-                        egui::TextEdit::singleline(buffer)
-                            .frame(false)
-                            .margin(egui::vec2(0.0, 0.0))
-                            .password(self.password != 0),
-                    )
-                })
-                .inner
+                ui.centered_and_justified(|ui| ui.add_enabled(enabled, text_edit))
+                    .inner
             })
             .inner;
 
