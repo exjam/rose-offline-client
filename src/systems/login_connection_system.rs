@@ -1,4 +1,5 @@
 use bevy::prelude::{Commands, EventWriter, Res, ResMut};
+
 use rose_game_common::{
     data::Password,
     messages::{
