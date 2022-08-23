@@ -33,7 +33,7 @@ pub fn ability_values_get_value(
         }),
         AbilityType::Race => character_info.map(|x| (x.race / 2) as i32),
         AbilityType::Birthstone => character_info.map(|x| x.birth_stone as i32),
-        AbilityType::Class => character_info.map(|x| x.job as i32),
+        AbilityType::Job => character_info.map(|x| x.job as i32),
         AbilityType::Rank => character_info.map(|x| x.rank as i32),
         AbilityType::Fame => character_info.map(|x| x.fame as i32),
         AbilityType::FameB => character_info.map(|x| x.fame_b as i32),
@@ -403,7 +403,7 @@ pub fn ability_values_set_value(
         AbilityType::Hair => {
             character_info.hair = value as u8;
         }
-        AbilityType::Class => {
+        AbilityType::Job => {
             character_info.job = value as u16;
         }
         AbilityType::Strength => {
@@ -511,7 +511,7 @@ pub fn ability_values_set_value_exclusive(
                 character_info.hair = value as u8;
             }
         }
-        AbilityType::Class => {
+        AbilityType::Job => {
             if let Some(mut character_info) = entity.get_mut::<CharacterInfo>() {
                 character_info.job = value as u16;
             }

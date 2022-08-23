@@ -110,11 +110,11 @@ fn add_equipment_item_add_appraisal(
 }
 
 fn add_item_equip_requirement(ui: &mut egui::Ui, item_data: &BaseItemData) {
-    if item_data.equip_class_requirement != 0 {
-        // TODO: Class requirement strings
+    if item_data.equip_job_requirement != 0 {
+        // TODO: Job requirement strings
         ui.colored_label(
             egui::Color32::GREEN,
-            format!("[Class Requirement {}]", item_data.equip_class_requirement),
+            format!("[Job Requirement {}]", item_data.equip_job_requirement),
         );
     }
 
