@@ -44,7 +44,8 @@ pub use server_configuration::ServerConfiguration;
 pub use server_list::{ServerList, ServerListGameServer, ServerListWorldServer};
 pub use sound_settings::SoundSettings;
 pub use ui_resources::{
-    load_ui_resources, update_ui_resources, UiResources, UiSprite, UiSpriteSheet, UiSpriteSheetType,
+    load_ui_resources, update_ui_resources, UiResources, UiSprite, UiSpriteSheet,
+    UiSpriteSheetType, UiTexture,
 };
 pub use virtual_filesystem::VfsResource;
 pub use world_connection::WorldConnection;

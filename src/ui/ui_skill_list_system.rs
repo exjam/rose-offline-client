@@ -5,7 +5,7 @@ use bevy::{
 use bevy_egui::{egui, EguiContext};
 
 use rose_data_irose::{IroseSkillPageType, SKILL_PAGE_SIZE};
-use rose_game_common::components::{SkillList, SkillPoints, SkillSlot};
+use rose_game_common::components::{CharacterInfo, SkillList, SkillPoints, SkillSlot};
 
 use crate::{
     components::PlayerCharacter,
@@ -20,7 +20,7 @@ use crate::{
 
 const IID_BTN_CLOSE: i32 = 10;
 // const IID_BTN_ICONIZE: i32 = 11;
-// const IID_BTN_OPEN_SKILLTREE: i32 = 12;
+const IID_BTN_OPEN_SKILLTREE: i32 = 12;
 const IID_TABBEDPANE: i32 = 20;
 
 const IID_TAB_BASIC: i32 = 21;
@@ -108,6 +108,7 @@ fn ui_add_skill_list_slot(
 
 #[derive(WorldQuery)]
 pub struct PlayerQuery<'w> {
+    character_info: &'w CharacterInfo,
     skill_list: &'w SkillList,
     skill_points: &'w SkillPoints,
 }
@@ -145,6 +146,7 @@ pub fn ui_skill_list_system(
     let scrollbar_range = 0..SKILL_PAGE_SIZE as i32;
 
     let mut response_close_button = None;
+    let mut response_skill_tree_button = None;
 
     egui::Window::new("Skills")
         .frame(egui::Frame::none())
@@ -184,7 +186,12 @@ pub fn ui_skill_list_system(
                             ),
                         ),
                     ],
-                    response: &mut [(IID_BTN_CLOSE, &mut response_close_button)],
+                    visible: &mut [(IID_BTN_OPEN_SKILLTREE, player.character_info.job != 0)],
+                    label: &mut [(IID_BTN_OPEN_SKILLTREE, "Skill Tree")],
+                    response: &mut [
+                        (IID_BTN_CLOSE, &mut response_close_button),
+                        (IID_BTN_OPEN_SKILLTREE, &mut response_skill_tree_button),
+                    ],
                     ..Default::default()
                 },
                 |ui, bindings| {
@@ -245,6 +252,10 @@ pub fn ui_skill_list_system(
                 },
             );
         });
+
+    if response_skill_tree_button.map_or(false, |r| r.clicked()) {
+        ui_state_windows.skill_tree_open = !ui_state_windows.skill_tree_open;
+    }
 
     if response_close_button.map_or(false, |r| r.clicked()) {
         ui_state_windows.skill_list_open = false;

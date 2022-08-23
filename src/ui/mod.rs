@@ -39,6 +39,7 @@ mod ui_selected_target_system;
 mod ui_server_select_system;
 mod ui_settings_system;
 mod ui_skill_list_system;
+mod ui_skill_tree_system;
 pub mod widgets;
 
 #[derive(Default)]
@@ -46,6 +47,7 @@ pub struct UiStateWindows {
     pub character_info_open: bool,
     pub inventory_open: bool,
     pub skill_list_open: bool,
+    pub skill_tree_open: bool,
     pub quest_list_open: bool,
     pub settings_open: bool,
     pub menu_open: bool,
@@ -93,4 +95,5 @@ pub use ui_selected_target_system::ui_selected_target_system;
 pub use ui_server_select_system::ui_server_select_system;
 pub use ui_settings_system::ui_settings_system;
 pub use ui_skill_list_system::ui_skill_list_system;
+pub use ui_skill_tree_system::ui_skill_tree_system;
 pub use widgets::DataBindings;

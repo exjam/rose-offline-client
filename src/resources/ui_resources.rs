@@ -9,7 +9,10 @@ use enum_map::{enum_map, Enum, EnumMap};
 
 use rose_file_readers::{IdFile, TsiFile, TsiSprite, VirtualFilesystem};
 
-use crate::{ui::widgets::Dialog, VfsResource};
+use crate::{
+    ui::widgets::{Dialog, Widget},
+    VfsResource,
+};
 
 #[derive(Clone)]
 pub struct UiSprite {
@@ -45,6 +48,7 @@ pub enum UiSpriteSheetType {
     MinimapArrow,
 }
 
+#[derive(Clone)]
 pub struct UiTexture {
     pub handle: Handle<Image>,
     pub texture_id: egui::TextureId,
@@ -78,6 +82,11 @@ pub struct UiResources {
     pub dialog_player_info: Handle<Dialog>,
     pub dialog_select_server: Handle<Dialog>,
     pub dialog_skill_list: Handle<Dialog>,
+    pub dialog_skill_tree: Handle<Dialog>,
+    pub skill_tree_dealer: Handle<Dialog>,
+    pub skill_tree_hawker: Handle<Dialog>,
+    pub skill_tree_muse: Handle<Dialog>,
+    pub skill_tree_soldier: Handle<Dialog>,
 }
 
 impl UiResources {
@@ -184,6 +193,8 @@ pub fn update_ui_resources(
     mut ui_resources: ResMut<UiResources>,
     images: Res<Assets<Image>>,
     asset_server: Res<AssetServer>,
+    mut dialog_assets: ResMut<Assets<Dialog>>,
+    mut egui_context: ResMut<EguiContext>,
 ) {
     if ui_resources.loaded_all_textures {
         return;
@@ -213,6 +224,44 @@ pub fn update_ui_resources(
             }
         }
     }
+
+    let mut load_skill_tree = |skill_tree: &Handle<Dialog>| {
+        if let Some(skill_tree) = dialog_assets.get_mut(skill_tree) {
+            for widget in skill_tree.widgets.iter_mut() {
+                if let Widget::Skill(skill_widget) = widget {
+                    if let Some(texture) = skill_widget.ui_texture.as_mut() {
+                        if let Some(image) = images.get(&texture.handle) {
+                            texture.size = Some(image.size());
+                        } else if matches!(
+                            asset_server.get_load_state(&texture.handle),
+                            LoadState::Failed
+                        ) {
+                            texture.size = Some(Vec2::ZERO);
+                        } else {
+                            loaded_all = false;
+                        }
+                    } else {
+                        let handle = asset_server
+                            .load(&format!("3DDATA/CONTROL/RES/{}", &skill_widget.image));
+                        let texture_id = egui_context.add_image(handle.clone_weak());
+                        skill_widget.ui_texture = Some(UiTexture {
+                            handle,
+                            texture_id,
+                            size: None,
+                        });
+                        loaded_all = false;
+                    }
+                }
+            }
+        } else if !matches!(asset_server.get_load_state(skill_tree), LoadState::Failed) {
+            loaded_all = false;
+        }
+    };
+
+    load_skill_tree(&ui_resources.skill_tree_soldier);
+    load_skill_tree(&ui_resources.skill_tree_muse);
+    load_skill_tree(&ui_resources.skill_tree_hawker);
+    load_skill_tree(&ui_resources.skill_tree_dealer);
 
     ui_resources.loaded_all_textures = loaded_all;
 }
@@ -331,6 +380,11 @@ pub fn load_ui_resources(
         dialog_player_info: dialog_files["DLGINFO.XML"].clone(),
         dialog_select_server: dialog_files["DLGSELSVR.XML"].clone(),
         dialog_skill_list: dialog_files["DLGSKILL.XML"].clone(),
+        dialog_skill_tree: dialog_files["DLGSKILLTREE.XML"].clone(),
+        skill_tree_dealer: dialog_files["SKILLTREE_DEALER.XML"].clone(),
+        skill_tree_hawker: dialog_files["SKILLTREE_HOWKER.XML"].clone(),
+        skill_tree_muse: dialog_files["SKILLTREE_MUSE.XML"].clone(),
+        skill_tree_soldier: dialog_files["SKILLTREE_SOLDIER.XML"].clone(),
         dialog_files,
     });
 }

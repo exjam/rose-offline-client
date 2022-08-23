@@ -83,9 +83,10 @@ pub fn load_dialog_sprites_system(
 
     if ui_resources.loaded_all_textures {
         for handle in load_state.pending_dialogs.drain(..) {
-            let dialog = assets.get_mut(&handle).unwrap();
-            dialog.widgets.load_widget(&ui_resources);
-            dialog.loaded = true;
+            if let Some(dialog) = assets.get_mut(&handle) {
+                dialog.widgets.load_widget(&ui_resources);
+                dialog.loaded = true;
+            }
         }
     }
 }
