@@ -110,6 +110,8 @@ pub enum Widget {
     TabbedPane(TabbedPane),
     #[serde(rename = "ZLISTBOX")]
     ZListbox(ZListbox),
+    #[serde(other)]
+    Unknown,
 }
 
 impl Widget {
@@ -130,6 +132,7 @@ impl Widget {
             Widget::TabButton(x) => x.id,
             Widget::TabbedPane(x) => x.id,
             Widget::ZListbox(x) => x.id,
+            Widget::Unknown => panic!("Use of unknown widget"),
         }
     }
 }
@@ -152,6 +155,7 @@ impl DrawWidget for Widget {
             Widget::TabButton(this) => this.draw_widget(ui, bindings),
             Widget::TabbedPane(this) => this.draw_widget(ui, bindings),
             Widget::ZListbox(this) => this.draw_widget(ui, bindings),
+            Widget::Unknown => {}
         }
     }
 }
@@ -174,6 +178,7 @@ impl LoadWidget for Widget {
             Widget::TabButton(this) => this.load_widget(ui_resources),
             Widget::TabbedPane(this) => this.load_widget(ui_resources),
             Widget::ZListbox(this) => this.load_widget(ui_resources),
+            Widget::Unknown => {}
         }
     }
 }
@@ -233,6 +238,7 @@ impl GetWidget for Vec<Widget> {
                 | Widget::Scrollbar(_) => {
                     continue;
                 }
+                Widget::Unknown => panic!("Use of unknown widget"),
             }
         }
 
@@ -277,6 +283,7 @@ impl GetWidget for Vec<Widget> {
                 | Widget::Scrollbar(_) => {
                     continue;
                 }
+                Widget::Unknown => panic!("Use of unknown widget"),
             }
         }
 
