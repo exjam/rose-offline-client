@@ -1,4 +1,4 @@
-use bevy_egui::egui;
+use bevy_egui::{egui, egui::Widget};
 use serde::Deserialize;
 
 use crate::resources::{UiResources, UiSprite};
@@ -76,7 +76,7 @@ impl DrawWidget for Button {
 
         let rect = self.widget_rect(ui.min_rect().min);
         let enabled = bindings.get_enabled(self.id);
-        let response = ui.allocate_rect(
+        let mut response = ui.allocate_rect(
             rect,
             if enabled {
                 egui::Sense::click()
@@ -99,6 +99,42 @@ impl DrawWidget for Button {
 
             if let Some(sprite) = sprite {
                 sprite.draw(ui, rect.min);
+            }
+
+            let label = bindings.get_label(self.id);
+            if let Some(label) = label {
+                let rect = rect.shrink(2.0);
+                let mut child_ui =
+                    ui.child_ui(rect, egui::Layout::top_down_justified(egui::Align::Center));
+                let style = ui.style();
+                let mut font_id = style.override_text_style.clone().map_or_else(
+                    || egui::FontSelection::Default.resolve(style),
+                    |text_style| text_style.resolve(style),
+                );
+                font_id.size = 12.0;
+
+                let mut layout_job = egui::epaint::text::LayoutJob::single_section(
+                    label.to_string(),
+                    egui::TextFormat::simple(font_id, egui::Color32::BLACK),
+                );
+                layout_job.wrap = egui::epaint::text::TextWrapping {
+                    max_width: rect.width(),
+                    max_rows: 1,
+                    break_anywhere: true,
+                    overflow_character: Some('…'),
+                };
+
+                let galley = ui.fonts().layout_job(layout_job);
+                let was_truncated = galley
+                    .rows
+                    .last()
+                    .and_then(|row| row.glyphs.last())
+                    .map_or(false, |glyph| glyph.chr == '…');
+                egui::Label::new(galley).wrap(true).ui(&mut child_ui);
+
+                if was_truncated {
+                    response = response.on_hover_text(label);
+                }
             }
         }
 

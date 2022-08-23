@@ -1,4 +1,4 @@
-use bevy_egui::egui;
+use bevy_egui::{egui, egui::Widget};
 use serde::Deserialize;
 
 use crate::resources::{UiResources, UiSprite};
@@ -80,9 +80,11 @@ impl DrawWidget for RadioButton {
         );
 
         if ui.is_rect_visible(rect) {
+            let mut label_colour = egui::Color32::WHITE;
             let sprite = if !response.sense.interactive() {
                 self.normal_sprite.as_ref()
             } else if *selected == self.id || response.is_pointer_button_down_on() {
+                label_colour = egui::Color32::YELLOW;
                 self.down_sprite.as_ref()
             } else if response.hovered() || response.has_focus() {
                 self.over_sprite.as_ref()
@@ -100,6 +102,41 @@ impl DrawWidget for RadioButton {
             if response.clicked() {
                 *selected = self.id;
                 response.mark_changed();
+            }
+
+            let label = bindings.get_label(self.id);
+            if let Some(label) = label {
+                let rect = rect.shrink2(egui::vec2(4.0, 0.0));
+                let mut child_ui = ui.child_ui(rect, egui::Layout::left_to_right());
+                let style = ui.style();
+                let mut font_id = style.override_text_style.clone().map_or_else(
+                    || egui::FontSelection::Default.resolve(style),
+                    |text_style| text_style.resolve(style),
+                );
+                font_id.size = 12.0;
+
+                let mut layout_job = egui::epaint::text::LayoutJob::single_section(
+                    label.to_string(),
+                    egui::TextFormat::simple(font_id, label_colour),
+                );
+                layout_job.wrap = egui::epaint::text::TextWrapping {
+                    max_width: rect.width(),
+                    max_rows: 1,
+                    break_anywhere: true,
+                    overflow_character: Some('…'),
+                };
+
+                let galley = ui.fonts().layout_job(layout_job);
+                let was_truncated = galley
+                    .rows
+                    .last()
+                    .and_then(|row| row.glyphs.last())
+                    .map_or(false, |glyph| glyph.chr == '…');
+                egui::Label::new(galley).wrap(true).ui(&mut child_ui);
+
+                if was_truncated {
+                    response = response.on_hover_text(label);
+                }
             }
         }
 

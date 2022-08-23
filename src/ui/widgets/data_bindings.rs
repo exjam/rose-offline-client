@@ -9,6 +9,7 @@ pub struct DataBindings<'a> {
     pub enabled: &'a mut [(i32, bool)],
     pub text: &'a mut [(i32, &'a mut String)],
     pub gauge: &'a mut [(i32, &'a f32, &'a str)],
+    pub label: &'a mut [(i32, &'a str)],
     pub tabs: &'a mut [(i32, &'a mut i32)],
     pub radio: &'a mut [(i32, &'a mut i32)],
     pub scroll: &'a mut [(i32, (&'a mut i32, Range<i32>, i32))], // (current_scroll, scroll_range, num_visible)
@@ -27,6 +28,13 @@ impl<'a> DataBindings<'a> {
         if let Some((_, out)) = self.response.iter_mut().find(|(x, _)| *x == id) {
             **out = Some(response);
         }
+    }
+
+    pub fn get_label(&mut self, id: i32) -> Option<&str> {
+        self.label
+            .iter()
+            .find(|(x, _)| *x == id)
+            .map(|(_, text)| *text)
     }
 
     pub fn get_radio(&mut self, id: i32) -> Option<&mut i32> {
