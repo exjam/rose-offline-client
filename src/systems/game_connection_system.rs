@@ -342,7 +342,7 @@ pub fn game_connection_system(
                 let name = game_data
                     .npcs
                     .get_npc(message.npc.id)
-                    .map(|npc_data| npc_data.name.clone())
+                    .map(|npc_data| npc_data.name.to_string())
                     .unwrap_or_else(|| format!("[NPC {}]", message.npc.id.get()));
 
                 let entity = commands
@@ -451,7 +451,7 @@ pub fn game_connection_system(
                             .ok();
                     }
 
-                    npc_data.name.clone()
+                    npc_data.name.to_string()
                 } else {
                     format!("[Monster {}]", message.npc.id.get())
                 };
@@ -497,7 +497,7 @@ pub fn game_connection_system(
                     DroppedItem::Item(item) => game_data
                         .items
                         .get_base_item(item.get_item_reference())
-                        .map(|item_data| item_data.name.clone())
+                        .map(|item_data| item_data.name.to_string())
                         .unwrap_or_else(|| {
                             format!("[{:?} {}]", item.get_item_type(), item.get_item_number())
                         }),
@@ -1725,7 +1725,7 @@ pub fn game_connection_system(
                 let item_name = game_data
                     .items
                     .get_base_item(item.get_item_reference())
-                    .map(|item_data| item_data.name.clone());
+                    .map(|item_data| item_data.name);
 
                 if let (Some(member_entity), Some(item_name)) = (member_entity, item_name) {
                     commands.add(move |world: &mut World| {
@@ -1734,7 +1734,7 @@ pub fn game_connection_system(
                                 let chat_message = format!(
                                     "{} has earned {}.",
                                     member_entity_name.as_str(),
-                                    &item_name
+                                    item_name
                                 );
                                 world
                                     .resource_mut::<Events<ChatboxEvent>>()

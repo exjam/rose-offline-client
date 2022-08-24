@@ -111,7 +111,7 @@ pub fn ui_debug_skill_list_system(
                             });
 
                             row.col(|ui| {
-                                ui.label(&skill_data.name);
+                                ui.label(skill_data.name);
                             });
 
                             row.col(|ui| {

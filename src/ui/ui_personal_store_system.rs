@@ -98,7 +98,7 @@ fn ui_add_store_item_slot(
         message_box_events.send(MessageBoxEvent::Show {
             message: format!(
                 "Are you sure you want to buy {} for {} Zuly?",
-                item_data.as_ref().map(|x| x.name.as_str()).unwrap_or(""),
+                item_data.as_ref().map(|x| x.name).unwrap_or(""),
                 price.0
             ),
             modal: false,

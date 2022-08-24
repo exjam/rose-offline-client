@@ -40,8 +40,16 @@ pub fn ui_character_select_name_tag_system(
                                         egui::Color32::RED
                                     }),
                             );
+
                             ui.label(format!("Level: {}", selected_character.level.level));
-                            ui.label(format!("Job: {}", selected_character.info.job));
+
+                            if let Some(job_name) = game_data
+                                .string_database
+                                .get_job_name(selected_character.info.job)
+                            {
+                                ui.label(format!("Job: {}", job_name));
+                            }
+
                             if let Some(delete_time) = selected_character.delete_time.as_ref() {
                                 let duration = delete_time.get_time_until_delete();
                                 let seconds = duration.as_secs() % 60;

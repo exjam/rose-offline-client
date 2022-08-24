@@ -119,9 +119,9 @@ pub fn ui_minimap_system(
                     egui_context.add_image(ui_state.minimap_image.clone_weak());
             }
 
-            zone_data.name.clone()
+            zone_data.name
         } else {
-            "???".to_string()
+            "???"
         };
 
         let ctx = egui_context.ctx_mut();
@@ -129,13 +129,13 @@ pub fn ui_minimap_system(
             ctx,
             ZONE_NAME_WIDTH,
             16.0,
-            zone_name.clone(),
+            zone_name.to_string(),
         ));
         ui_state.zone_name_text_expanded_galley = Some(generate_text_galley(
             ctx,
             ZONE_NAME_EXPANDED_WIDTH,
             16.0,
-            zone_name,
+            zone_name.to_string(),
         ));
         ui_state.zone_id = Some(current_zone.id);
         ui_state.last_player_position = Vec2::default();

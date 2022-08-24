@@ -154,18 +154,12 @@ fn quest_reward_remove_selected_quest(
                     .quests
                     .get_quest_data(active_quest.quest_id)
             }) {
-                if let Some(quest_name) = script_resources
-                    .game_data
-                    .stl_quest
-                    .get_text_string(1, &quest_data.string_id)
-                {
-                    script_context
-                        .chatbox_events
-                        .send(ChatboxEvent::Quest(format!(
-                            "Completed quest \"{}\".",
-                            quest_name
-                        )));
-                }
+                script_context
+                    .chatbox_events
+                    .send(ChatboxEvent::Quest(format!(
+                        "Completed quest \"{}\".",
+                        quest_data.name
+                    )));
             }
 
             *quest_slot = None;
@@ -193,26 +187,15 @@ fn quest_reward_add_quest(
         }
 
         if let Some(quest_data) = script_resources.game_data.quests.get_quest_data(quest_id) {
-            if let (Some(quest_name), Some(quest_description)) = (
-                script_resources
-                    .game_data
-                    .stl_quest
-                    .get_text_string(1, &quest_data.string_id),
-                script_resources
-                    .game_data
-                    .stl_quest
-                    .get_comment_string(1, &quest_data.string_id),
-            ) {
-                script_context
-                    .chatbox_events
-                    .send(ChatboxEvent::Quest(format!(
-                        "Started quest \"{}\".",
-                        quest_name
-                    )));
-                script_context
-                    .chatbox_events
-                    .send(ChatboxEvent::Quest(quest_description.to_string()));
-            }
+            script_context
+                .chatbox_events
+                .send(ChatboxEvent::Quest(format!(
+                    "Started quest \"{}\".",
+                    quest_data.name
+                )));
+            script_context
+                .chatbox_events
+                .send(ChatboxEvent::Quest(quest_data.description.to_string()));
         }
 
         return true;
@@ -240,26 +223,16 @@ fn quest_reward_change_selected_quest_id(
             }
 
             if let Some(quest_data) = script_resources.game_data.quests.get_quest_data(quest_id) {
-                if let (Some(quest_name), Some(quest_description)) = (
-                    script_resources
-                        .game_data
-                        .stl_quest
-                        .get_text_string(1, &quest_data.string_id),
-                    script_resources
-                        .game_data
-                        .stl_quest
-                        .get_comment_string(1, &quest_data.string_id),
-                ) {
-                    script_context
-                        .chatbox_events
-                        .send(ChatboxEvent::Quest(format!(
-                            "Started quest \"{}\"",
-                            quest_name
-                        )));
-                    script_context
-                        .chatbox_events
-                        .send(ChatboxEvent::Quest(quest_description.to_string()));
-                }
+                script_context
+                    .chatbox_events
+                    .send(ChatboxEvent::Quest(format!(
+                        "Started quest \"{}\"",
+                        quest_data.name
+                    )));
+
+                script_context
+                    .chatbox_events
+                    .send(ChatboxEvent::Quest(quest_data.description.to_string()));
             }
 
             return true;

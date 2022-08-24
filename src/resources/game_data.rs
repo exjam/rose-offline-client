@@ -4,9 +4,9 @@ use std::sync::Arc;
 use rose_data::{
     AnimationEventFlags, CharacterMotionDatabase, DataDecoder, EffectDatabase, ItemDatabase,
     NpcDatabase, QuestDatabase, SkillDatabase, SkyboxDatabase, SoundDatabase, StatusEffectDatabase,
-    ZoneList,
+    StringDatabase, ZoneList,
 };
-use rose_file_readers::{LtbFile, StbFile, StlFile, ZscFile};
+use rose_file_readers::{LtbFile, StbFile, ZscFile};
 use rose_game_common::data::AbilityValueCalculator;
 
 pub struct GameData {
@@ -22,9 +22,9 @@ pub struct GameData {
     pub skybox: Arc<SkyboxDatabase>,
     pub sounds: Arc<SoundDatabase>,
     pub status_effects: Arc<StatusEffectDatabase>,
+    pub string_database: Arc<StringDatabase>,
     pub zone_list: Arc<ZoneList>,
     pub ltb_event: LtbFile,
-    pub stl_quest: StlFile,
     pub zsc_event_object: ZscFile,
     pub zsc_special_object: ZscFile,
     pub stb_morph_object: StbFile,

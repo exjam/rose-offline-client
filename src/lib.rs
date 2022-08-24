@@ -26,8 +26,8 @@ use std::{
 
 use rose_data::{CharacterMotionDatabaseOptions, NpcDatabaseOptions, ZoneId};
 use rose_file_readers::{
-    AruaVfsIndex, HostFilesystemDevice, LtbFile, StbFile, StlFile, StlReadOptions, TitanVfsIndex,
-    VfsIndex, VirtualFilesystem, VirtualFilesystemDevice, ZscFile,
+    AruaVfsIndex, HostFilesystemDevice, LtbFile, StbFile, TitanVfsIndex, VfsIndex,
+    VirtualFilesystem, VirtualFilesystemDevice, ZscFile,
 };
 
 pub mod audio;
@@ -882,13 +882,17 @@ fn load_game_data_irose(
     vfs_resource: Res<VfsResource>,
     asset_server: Res<AssetServer>,
 ) {
+    let string_database = rose_data_irose::get_string_database(&vfs_resource.vfs, 1)
+        .expect("Failed to load string database");
+
     let items = Arc::new(
-        rose_data_irose::get_item_database(&vfs_resource.vfs)
+        rose_data_irose::get_item_database(&vfs_resource.vfs, string_database.clone())
             .expect("Failed to load item database"),
     );
     let npcs = Arc::new(
         rose_data_irose::get_npc_database(
             &vfs_resource.vfs,
+            string_database.clone(),
             &NpcDatabaseOptions {
                 load_frame_data: false,
             },
@@ -896,7 +900,7 @@ fn load_game_data_irose(
         .expect("Failed to load npc database"),
     );
     let skills = Arc::new(
-        rose_data_irose::get_skill_database(&vfs_resource.vfs)
+        rose_data_irose::get_skill_database(&vfs_resource.vfs, string_database.clone())
             .expect("Failed to load skill database"),
     );
     let character_motion_database = Arc::new(
@@ -909,7 +913,8 @@ fn load_game_data_irose(
         .expect("Failed to load character motion list"),
     );
     let zone_list = Arc::new(
-        rose_data_irose::get_zone_list(&vfs_resource.vfs).expect("Failed to load zone list"),
+        rose_data_irose::get_zone_list(&vfs_resource.vfs, string_database.clone())
+            .expect("Failed to load zone list"),
     );
 
     asset_server.add_loader(ZoneLoader {
@@ -930,7 +935,7 @@ fn load_game_data_irose(
         items,
         npcs,
         quests: Arc::new(
-            rose_data_irose::get_quest_database(&vfs_resource.vfs)
+            rose_data_irose::get_quest_database(&vfs_resource.vfs, string_database.clone())
                 .expect("Failed to load quest database"),
         ),
         skills,
@@ -939,24 +944,15 @@ fn load_game_data_irose(
         sounds: rose_data_irose::get_sound_database(&vfs_resource.vfs)
             .expect("Failed to load sound database"),
         status_effects: Arc::new(
-            rose_data_irose::get_status_effect_database(&vfs_resource.vfs)
+            rose_data_irose::get_status_effect_database(&vfs_resource.vfs, string_database.clone())
                 .expect("Failed to load status effect database"),
         ),
+        string_database,
         zone_list,
         ltb_event: vfs_resource
             .vfs
             .read_file::<LtbFile, _>("3DDATA/EVENT/ULNGTB_CON.LTB")
             .expect("Failed to load event language file"),
-        stl_quest: vfs_resource
-            .vfs
-            .read_file_with::<StlFile, _>(
-                "3DDATA/STB/LIST_QUEST_S.STL",
-                &StlReadOptions {
-                    language_filter: Some(vec![1]),
-                },
-            )
-            .expect("Failed to load quest string file"),
-
         zsc_event_object: vfs_resource
             .vfs
             .read_file::<ZscFile, _>("3DDATA/SPECIAL/EVENT_OBJECT.ZSC")

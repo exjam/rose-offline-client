@@ -181,7 +181,7 @@ pub fn ui_debug_client_entity_list_system(
                                         }
 
                                         if let Some(npc_data) = game_data.npcs.get_npc(npc.id) {
-                                            ui.label(&npc_data.name);
+                                            ui.label(npc_data.name);
                                         } else {
                                             ui.label(format!("? [{}]", npc.id.get()));
                                         }

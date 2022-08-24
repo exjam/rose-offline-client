@@ -72,7 +72,7 @@ pub fn ui_debug_zone_list_system(
                             });
 
                             row.col(|ui| {
-                                ui.label(&zone.name);
+                                ui.label(zone.name);
                             });
 
                             row.col(|ui| match app_state.current() {

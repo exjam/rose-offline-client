@@ -134,7 +134,7 @@ pub fn ui_debug_npc_list_system(
                                 });
 
                                 row.col(|ui| {
-                                    ui.label(&npc_data.name);
+                                    ui.label(npc_data.name);
                                 });
 
                                 row.col(|ui| match app_state.current() {

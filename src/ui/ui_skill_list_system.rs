@@ -226,7 +226,7 @@ pub fn ui_skill_list_system(
                         if let Some(skill_data) = skill_data {
                             ui.add_label_at(
                                 egui::pos2(start_x + 46.0, start_y + 5.0),
-                                &skill_data.name,
+                                skill_data.name,
                             );
                         }
 

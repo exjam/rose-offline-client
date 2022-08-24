@@ -132,7 +132,13 @@ pub fn ui_character_info_system(
                 |ui, bindings| match bindings.get_tab(IID_TABBEDPANE) {
                     Some(&mut IID_TAB_BASICINFO) => {
                         ui.add_label_at(egui::pos2(59.0, 67.0), &player.character_info.name);
-                        ui.add_label_at(egui::pos2(59.0, 88.0), "TODO: job name");
+                        ui.add_label_at(
+                            egui::pos2(59.0, 88.0),
+                            game_data
+                                .string_database
+                                .get_job_name(player.character_info.job)
+                                .unwrap_or("???"),
+                        );
                         ui.add_label_at(egui::pos2(59.0, 109.0), "TODO: clan name");
                         ui.add_label_at(
                             egui::pos2(59.0, 172.0),

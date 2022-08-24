@@ -439,7 +439,7 @@ pub fn ui_npc_store_system(
                                 if let Some(id) = id {
                                     if let Some(store_tab) = game_data.npcs.get_store_tab(*id) {
                                         ui_state.store_tabs[index] =
-                                            Some((*id, store_tab.name.clone()));
+                                            Some((*id, store_tab.name.to_string()));
                                     }
                                 }
                             }

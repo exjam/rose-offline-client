@@ -243,7 +243,7 @@ pub fn ui_debug_item_list_system(
                             });
 
                             row.col(|ui| {
-                                ui.label(&item_data.name);
+                                ui.label(item_data.name);
                             });
 
                             row.col(|ui| match app_state.current() {

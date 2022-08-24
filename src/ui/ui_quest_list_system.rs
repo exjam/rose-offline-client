@@ -171,23 +171,17 @@ pub fn ui_quest_list_system(
                                 .nth(index as usize)
                                 .and_then(|x| x.as_ref())
                             {
-                                let quest_data =
-                                    game_data.quests.get_quest_data(active_quest.quest_id);
-                                let quest_name = quest_data.and_then(|quest_data| {
-                                    game_data
-                                        .stl_quest
-                                        .get_text_string(1, &quest_data.string_id)
-                                });
-
-                                if let Some(quest_name) = quest_name {
+                                if let Some(quest_data) =
+                                    game_data.quests.get_quest_data(active_quest.quest_id)
+                                {
                                     if selected {
                                         ui.add_label_at(
                                             egui::pos2(28.0, 4.0),
-                                            egui::RichText::new(quest_name)
+                                            egui::RichText::new(quest_data.name)
                                                 .color(egui::Color32::YELLOW),
                                         );
                                     } else {
-                                        ui.add_label_at(egui::pos2(28.0, 4.0), quest_name);
+                                        ui.add_label_at(egui::pos2(28.0, 4.0), quest_data.name);
                                     }
                                 }
                             }
@@ -215,11 +209,6 @@ pub fn ui_quest_list_system(
                         .and_then(|x| x.as_ref())
                     {
                         let quest_data = game_data.quests.get_quest_data(selected_quest.quest_id);
-                        let quest_name = quest_data.and_then(|quest_data| {
-                            game_data
-                                .stl_quest
-                                .get_text_string(1, &quest_data.string_id)
-                        });
 
                         let rect_info = if let Some(Widget::Pane(pane)) =
                             dialog.get_widget(IID_PANE_QUESTINFO)
@@ -229,28 +218,21 @@ pub fn ui_quest_list_system(
                             ui.min_rect()
                         };
 
-                        if let Some(quest_name) = quest_name {
+                        if let Some(quest_data) = quest_data {
                             ui.allocate_ui_at_rect(
                                 rect_info.translate(egui::vec2(43.0, 38.0)),
                                 |ui| {
                                     ui.horizontal_top(|ui| {
                                         ui.add(egui::Label::new(
-                                            egui::RichText::new(quest_name)
+                                            egui::RichText::new(quest_data.name)
                                                 .color(egui::Color32::YELLOW),
                                         ));
                                     })
                                 },
                             );
-                        }
 
-                        // TODO: Add quest icon
-                        let quest_description = quest_data.and_then(|quest_data| {
-                            game_data
-                                .stl_quest
-                                .get_comment_string(1, &quest_data.string_id)
-                        });
+                            // TODO: Add quest icon
 
-                        if let Some(quest_description) = quest_description {
                             if let Some(Widget::Listbox(listbox)) =
                                 dialog.get_widget(IID_LIST_QUESTINFO)
                             {
@@ -260,7 +242,7 @@ pub fn ui_quest_list_system(
                                     egui::ScrollArea::vertical().auto_shrink([false; 2]).show(
                                         ui,
                                         |ui| {
-                                            ui.label(quest_description);
+                                            ui.label(quest_data.description);
                                         },
                                     );
                                 });

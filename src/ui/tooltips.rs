@@ -22,7 +22,7 @@ fn add_equipment_item_name(
     let text = if equipment_item.grade > 0 {
         format!("{} ({})", &item_data.name, equipment_item.grade)
     } else {
-        item_data.name.clone()
+        item_data.name.to_string()
     };
 
     ui.add(egui::Label::new(
@@ -38,7 +38,7 @@ fn add_stackable_item_name(
     item_data: &BaseItemData,
 ) {
     ui.add(egui::Label::new(
-        egui::RichText::new(&item_data.name)
+        egui::RichText::new(item_data.name)
             .color(get_item_name_color(item_data))
             .strong(),
     ));
@@ -93,7 +93,7 @@ fn add_equipment_item_add_appraisal(
         ui.colored_label(egui::Color32::RED, "[Requires Appraisal]");
     } else if let Some(gem_item_data) = game_data.items.get_gem_item(equipment_item.gem as usize) {
         if is_gem {
-            ui.colored_label(egui::Color32::YELLOW, &gem_item_data.item_data.name);
+            ui.colored_label(egui::Color32::YELLOW, gem_item_data.item_data.name);
         }
 
         for &(ability_type, value) in gem_item_data.gem_add_ability.iter() {
@@ -394,7 +394,7 @@ fn add_skill_name(ui: &mut egui::Ui, skill_data: &SkillData) {
     } else if skill_data.level > 1 {
         format!("{} (Level: {})", &skill_data.name, skill_data.level)
     } else {
-        skill_data.name.clone()
+        skill_data.name.to_string()
     };
 
     ui.add(egui::Label::new(
