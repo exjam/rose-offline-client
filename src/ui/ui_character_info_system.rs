@@ -136,10 +136,9 @@ pub fn ui_character_info_system(
                             egui::pos2(59.0, 88.0),
                             game_data
                                 .string_database
-                                .get_job_name(player.character_info.job)
-                                .unwrap_or("???"),
+                                .get_job_name(player.character_info.job),
                         );
-                        ui.add_label_at(egui::pos2(59.0, 109.0), "TODO: clan name");
+                        // ui.add_label_at(egui::pos2(59.0, 109.0), ""); // TODO: Clan name
                         ui.add_label_at(
                             egui::pos2(59.0, 172.0),
                             &format!("{}", player.level.level),

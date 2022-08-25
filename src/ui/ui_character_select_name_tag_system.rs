@@ -43,12 +43,12 @@ pub fn ui_character_select_name_tag_system(
 
                             ui.label(format!("Level: {}", selected_character.level.level));
 
-                            if let Some(job_name) = game_data
-                                .string_database
-                                .get_job_name(selected_character.info.job)
-                            {
-                                ui.label(format!("Job: {}", job_name));
-                            }
+                            ui.label(format!(
+                                "Job: {}",
+                                game_data
+                                    .string_database
+                                    .get_job_name(selected_character.info.job)
+                            ));
 
                             if let Some(delete_time) = selected_character.delete_time.as_ref() {
                                 let duration = delete_time.get_time_until_delete();

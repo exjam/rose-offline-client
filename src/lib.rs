@@ -929,6 +929,8 @@ fn load_game_data_irose(
         ),
         animation_event_flags: rose_data_irose::get_animation_event_flags(),
         character_motion_database,
+        client_strings: rose_data_irose::get_client_strings(string_database.clone())
+            .expect("Failed to load client strings"),
         data_decoder: rose_data_irose::get_data_decoder(),
         effect_database: rose_data_irose::get_effect_database(&vfs_resource.vfs)
             .expect("Failed to load effect database"),

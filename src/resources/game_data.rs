@@ -2,9 +2,9 @@ use bevy::prelude::Transform;
 use std::sync::Arc;
 
 use rose_data::{
-    AnimationEventFlags, CharacterMotionDatabase, DataDecoder, EffectDatabase, ItemDatabase,
-    JobClassDatabase, NpcDatabase, QuestDatabase, SkillDatabase, SkyboxDatabase, SoundDatabase,
-    StatusEffectDatabase, StringDatabase, ZoneList,
+    AnimationEventFlags, CharacterMotionDatabase, ClientStrings, DataDecoder, EffectDatabase,
+    ItemDatabase, JobClassDatabase, NpcDatabase, QuestDatabase, SkillDatabase, SkyboxDatabase,
+    SoundDatabase, StatusEffectDatabase, StringDatabase, ZoneList,
 };
 use rose_file_readers::{LtbFile, StbFile, ZscFile};
 use rose_game_common::data::AbilityValueCalculator;
@@ -13,6 +13,7 @@ pub struct GameData {
     pub ability_value_calculator: Box<dyn AbilityValueCalculator + Send + Sync>,
     pub animation_event_flags: Vec<AnimationEventFlags>,
     pub character_motion_database: Arc<CharacterMotionDatabase>,
+    pub client_strings: Arc<ClientStrings>,
     pub data_decoder: Box<dyn DataDecoder + Send + Sync>,
     pub effect_database: Arc<EffectDatabase>,
     pub items: Arc<ItemDatabase>,

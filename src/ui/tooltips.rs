@@ -1,26 +1,53 @@
 use std::cmp::Ordering;
+use std::fmt::Write;
 
 use bevy::ecs::query::WorldQuery;
 use bevy_egui::egui;
 
 use rose_data::{
-    BaseItemData, EquipmentItem, Item, ItemClass, ItemGradeData, ItemType, JobId, SkillData,
-    SkillId, SkillType, StackableItem,
+    AbilityType, BaseItemData, EquipmentItem, Item, ItemClass, ItemGradeData, ItemType, JobId,
+    SkillData, SkillId, SkillType, StackableItem,
 };
-use rose_game_common::components::CharacterInfo;
+use rose_game_common::components::{
+    AbilityValues, CharacterInfo, ExperiencePoints, HealthPoints, Inventory, Level, ManaPoints,
+    MoveSpeed, SkillPoints, Stamina, StatPoints, Team, UnionMembership,
+};
 
-use crate::resources::GameData;
+use crate::{bundles::ability_values_get_value, resources::GameData};
 
-const TOOLTIP_MAX_WIDTH: f32 = 200.0;
+const TOOLTIP_MAX_WIDTH: f32 = 300.0;
 
 #[derive(WorldQuery)]
 pub struct PlayerTooltipQuery<'w> {
+    ability_values: &'w AbilityValues,
     character_info: &'w CharacterInfo,
+    experience_points: &'w ExperiencePoints,
+    health_points: &'w HealthPoints,
+    inventory: &'w Inventory,
+    level: &'w Level,
+    mana_points: &'w ManaPoints,
+    move_speed: &'w MoveSpeed,
+    skill_points: &'w SkillPoints,
+    stamina: &'w Stamina,
+    stat_points: &'w StatPoints,
+    team: &'w Team,
+    union_membership: &'w UnionMembership,
 }
 
-fn get_item_name_color(_item_data: &BaseItemData) -> egui::Color32 {
-    // TODO: Get correct item color from stb
-    egui::Color32::YELLOW
+fn get_item_name_color(item_type: ItemType, item_data: &BaseItemData) -> egui::Color32 {
+    match item_type {
+        ItemType::Head
+        | ItemType::Body
+        | ItemType::Hands
+        | ItemType::Feet
+        | ItemType::Weapon
+        | ItemType::SubWeapon => match item_data.rare_type {
+            1..=20 => egui::Color32::from_rgb(0, 255, 255),
+            21 => egui::Color32::from_rgb(255, 128, 255),
+            _ => egui::Color32::YELLOW,
+        },
+        _ => egui::Color32::YELLOW,
+    }
 }
 
 fn add_equipment_item_name(
@@ -36,42 +63,61 @@ fn add_equipment_item_name(
 
     ui.add(egui::Label::new(
         egui::RichText::new(text)
-            .color(get_item_name_color(item_data))
-            .strong(),
+            .color(get_item_name_color(
+                equipment_item.item.item_type,
+                item_data,
+            ))
+            .size(20.0),
     ));
 }
 
 fn add_stackable_item_name(
     ui: &mut egui::Ui,
-    _stackable_item: &StackableItem,
+    stackable_item: &StackableItem,
     item_data: &BaseItemData,
 ) {
     ui.add(egui::Label::new(
         egui::RichText::new(item_data.name)
-            .color(get_item_name_color(item_data))
-            .strong(),
+            .color(get_item_name_color(
+                stackable_item.item.item_type,
+                item_data,
+            ))
+            .size(20.0),
     ));
 }
 
-fn add_equipment_item_life_durability(ui: &mut egui::Ui, equipment_item: &EquipmentItem) {
+fn add_equipment_item_life_durability(
+    ui: &mut egui::Ui,
+    game_data: &GameData,
+    equipment_item: &EquipmentItem,
+) {
     ui.label(format!(
-        "Life: {:?}% Durability: {}",
+        "{}:{: >3}% {}:{: >3}",
+        game_data.client_strings.item_life,
         (equipment_item.life + 9) / 10,
+        game_data.client_strings.item_durability,
         equipment_item.durability
     ));
 }
 
 fn add_item_defence(
     ui: &mut egui::Ui,
+    game_data: &GameData,
     item_data: &BaseItemData,
     grade_data: Option<&ItemGradeData>,
 ) {
     ui.label(format!(
-        "Defence: {} Magic Resistance: {}",
+        "{}:{} {}:{}",
+        game_data
+            .string_database
+            .get_ability_type(AbilityType::Defence),
         item_data.defence
             + grade_data
                 .map(|grade_data| grade_data.defence as u32)
                 .unwrap_or(0),
+        game_data
+            .string_database
+            .get_ability_type(AbilityType::Resistance),
         item_data.resistance
             + grade_data
                 .map(|grade_data| grade_data.resistance as u32)
@@ -79,11 +125,20 @@ fn add_item_defence(
     ));
 }
 
-fn add_item_add_ability(ui: &mut egui::Ui, item_data: &BaseItemData) {
+fn add_item_add_ability(ui: &mut egui::Ui, game_data: &GameData, item_data: &BaseItemData) {
     for &(ability_type, value) in item_data.add_ability.iter() {
         ui.colored_label(
             egui::Color32::from_rgb(100, 200, 255),
-            format!("[{:?} {}]", ability_type, value),
+            format!(
+                "[{} {}{}]",
+                game_data.string_database.get_ability_type(ability_type),
+                value,
+                if matches!(ability_type, AbilityType::SaveMana) {
+                    "%"
+                } else {
+                    ""
+                }
+            ),
         );
     }
 }
@@ -99,7 +154,10 @@ fn add_equipment_item_add_appraisal(
 
     let is_gem = equipment_item.gem > 300;
     if !is_gem && !equipment_item.is_appraised {
-        ui.colored_label(egui::Color32::RED, "[Requires Appraisal]");
+        ui.colored_label(
+            egui::Color32::RED,
+            game_data.client_strings.item_requires_appraisal,
+        );
     } else if let Some(gem_item_data) = game_data.items.get_gem_item(equipment_item.gem as usize) {
         if is_gem {
             ui.colored_label(egui::Color32::YELLOW, gem_item_data.item_data.name);
@@ -112,7 +170,16 @@ fn add_equipment_item_add_appraisal(
                 } else {
                     egui::Color32::from_rgb(100, 200, 255)
                 },
-                format!("[{:?} {}]", ability_type, value),
+                format!(
+                    "[{} {}{}]",
+                    game_data.string_database.get_ability_type(ability_type),
+                    value,
+                    if matches!(ability_type, AbilityType::SaveMana) {
+                        "%"
+                    } else {
+                        ""
+                    }
+                ),
             );
         }
     }
@@ -136,29 +203,81 @@ fn add_item_equip_requirement(
                 egui::Color32::RED
             };
 
-            ui.colored_label(color, format!("[Job Requirement {}]", job_class.name));
+            ui.colored_label(
+                color,
+                format!(
+                    "[{}: {}]",
+                    game_data.client_strings.equip_require_job, job_class.name
+                ),
+            );
         }
     }
 
-    for union_id in item_data.equip_union_requirement.iter() {
-        // TODO: Union names
-        ui.colored_label(
-            egui::Color32::GREEN,
-            format!("[Union Requirement {}]", union_id),
+    if !item_data.equip_union_requirement.is_empty() {
+        let mut union_text = format!(
+            "[{}:",
+            game_data
+                .string_database
+                .get_ability_type(AbilityType::Union)
         );
+        let mut union_color = egui::Color32::RED;
+        for union_id in item_data.equip_union_requirement.iter() {
+            if let Some(player) = player {
+                if let Some(current_union) = player.union_membership.current_union {
+                    if current_union.get() == *union_id as usize {
+                        union_color = egui::Color32::GREEN;
+                    }
+                }
+            }
+
+            write!(&mut union_text, " {}", union_id).ok();
+        }
+        union_text.push(']');
+        ui.colored_label(union_color, union_text);
     }
 
     for &(ability_type, value) in item_data.equip_ability_requirement.iter() {
-        // TODO: Check if ability requirements are met
+        let mut color = egui::Color32::RED;
+
+        if let Some(player) = player {
+            if let Some(current_value) = ability_values_get_value(
+                ability_type,
+                player.ability_values,
+                Some(player.character_info),
+                Some(player.experience_points),
+                Some(player.health_points),
+                Some(player.inventory),
+                Some(player.level),
+                Some(player.mana_points),
+                Some(player.move_speed),
+                Some(player.skill_points),
+                Some(player.stamina),
+                Some(player.stat_points),
+                Some(player.team),
+                Some(player.union_membership),
+            ) {
+                if current_value >= value as i32 {
+                    color = egui::Color32::GREEN;
+                }
+            }
+        }
+
         ui.colored_label(
-            egui::Color32::GREEN,
-            format!("[{:?} {}]", ability_type, value),
+            color,
+            format!(
+                "[{} {}]",
+                game_data.string_database.get_ability_type(ability_type),
+                value
+            ),
         );
     }
 }
 
-fn add_item_description(ui: &mut egui::Ui, item_data: &BaseItemData) {
-    ui.label(format!("Weight: {}", item_data.weight));
+fn add_item_description(ui: &mut egui::Ui, game_data: &GameData, item_data: &BaseItemData) {
+    ui.label(format!(
+        "{}:{}",
+        game_data.client_strings.item_weight, item_data.weight
+    ));
     ui.label(item_data.description);
 }
 
@@ -169,6 +288,8 @@ pub fn ui_add_item_tooltip(
     item: &Item,
 ) {
     ui.set_max_width(TOOLTIP_MAX_WIDTH);
+    ui.style_mut().visuals.widgets.noninteractive.fg_stroke =
+        egui::Stroke::new(1.0, egui::Color32::WHITE);
 
     let item_data = game_data.items.get_base_item(item.get_item_reference());
     if item_data.is_none() {
@@ -198,46 +319,71 @@ pub fn ui_add_item_tooltip(
                         + grade_data.map(|grade| grade.hit).unwrap_or(0) as f32;
 
                     ui.label(format!(
-                        "Item Class: {:?} Hit Rate: {}",
-                        item_data.class, hit_rate as i32
+                        "{}:{} {}:{}",
+                        game_data.client_strings.item_class,
+                        game_data.string_database.get_item_class(item_data.class),
+                        game_data.string_database.get_ability_type(AbilityType::Hit),
+                        hit_rate as i32
                     ));
 
-                    add_equipment_item_life_durability(ui, equipment_item);
+                    add_equipment_item_life_durability(ui, game_data, equipment_item);
 
                     let attack_power = weapon_item_data.attack_power
                         + grade_data.map(|grade| grade.attack).unwrap_or(0);
                     match weapon_item_data.attack_speed.cmp(&12) {
                         Ordering::Less => {
                             ui.label(format!(
-                                "Attack Power: {} Attack Speed: Fast +{}",
+                                "{}:{} {}:{} +{}",
+                                game_data
+                                    .string_database
+                                    .get_ability_type(AbilityType::Attack),
                                 attack_power,
+                                game_data
+                                    .string_database
+                                    .get_ability_type(AbilityType::AttackSpeed),
+                                game_data.client_strings.item_attack_speed_fast,
                                 12 - weapon_item_data.attack_speed
                             ));
                         }
                         Ordering::Equal => {
                             ui.label(format!(
-                                "Attack Power: {} Attack Speed: Normal",
-                                attack_power
+                                "{}:{} {}:{}",
+                                game_data
+                                    .string_database
+                                    .get_ability_type(AbilityType::Attack),
+                                attack_power,
+                                game_data
+                                    .string_database
+                                    .get_ability_type(AbilityType::AttackSpeed),
+                                game_data.client_strings.item_attack_speed_normal,
                             ));
                         }
                         Ordering::Greater => {
                             ui.label(format!(
-                                "Attack Power: {} Attack Speed: Slow -{}",
+                                "{}: {} {}:{} -{}",
+                                game_data
+                                    .string_database
+                                    .get_ability_type(AbilityType::Attack),
                                 attack_power,
+                                game_data
+                                    .string_database
+                                    .get_ability_type(AbilityType::AttackSpeed),
+                                game_data.client_strings.item_attack_speed_slow,
                                 weapon_item_data.attack_speed - 12
                             ));
                         }
                     }
 
                     ui.label(format!(
-                        "Attack Range: {}M",
+                        "{}{}M",
+                        game_data.client_strings.item_attack_range,
                         weapon_item_data.attack_range / 100
                     ));
 
-                    add_item_add_ability(ui, item_data);
+                    add_item_add_ability(ui, game_data, item_data);
                     add_equipment_item_add_appraisal(ui, game_data, equipment_item);
                     add_item_equip_requirement(ui, game_data, player, item_data);
-                    add_item_description(ui, item_data);
+                    add_item_description(ui, game_data, item_data);
                 }
                 ItemType::SubWeapon => {
                     let grade_data = game_data.items.get_item_grade(equipment_item.grade);
@@ -247,26 +393,34 @@ pub fn ui_add_item_tooltip(
                             + grade_data.map(|grade| grade.avoid).unwrap_or(0) as f32;
 
                         ui.label(format!(
-                            "Item Class: {:?} Avoid Rate: {}",
-                            item_data.class, avoid_rate as i32
+                            "{}:{} {}:{}",
+                            game_data.client_strings.item_class,
+                            game_data.string_database.get_item_class(item_data.class),
+                            game_data
+                                .string_database
+                                .get_ability_type(AbilityType::Avoid),
+                            avoid_rate as i32
                         ));
                     } else {
                         ui.label(format!(
-                            "Item Class: {:?} Quality: {}",
-                            item_data.class, item_data.quality
+                            "{}:{} {}:{}",
+                            game_data.client_strings.item_class,
+                            game_data.string_database.get_item_class(item_data.class),
+                            game_data.client_strings.item_quality,
+                            item_data.quality
                         ));
                     }
 
-                    add_equipment_item_life_durability(ui, equipment_item);
+                    add_equipment_item_life_durability(ui, game_data, equipment_item);
 
                     if matches!(item_data.class, ItemClass::Shield) {
-                        add_item_defence(ui, item_data, grade_data);
+                        add_item_defence(ui, game_data, item_data, grade_data);
                     }
 
-                    add_item_add_ability(ui, item_data);
+                    add_item_add_ability(ui, game_data, item_data);
                     add_equipment_item_add_appraisal(ui, game_data, equipment_item);
                     add_item_equip_requirement(ui, game_data, player, item_data);
-                    add_item_description(ui, item_data);
+                    add_item_description(ui, game_data, item_data);
                 }
                 ItemType::Face
                 | ItemType::Head
@@ -278,21 +432,29 @@ pub fn ui_add_item_tooltip(
 
                     if matches!(equipment_item.item.item_type, ItemType::Face) {
                         ui.label(format!(
-                            "Item Class: {:?} Quality: {}",
-                            item_data.class, item_data.quality
+                            "{}:{} {}:{}",
+                            game_data.client_strings.item_class,
+                            game_data.string_database.get_item_class(item_data.class),
+                            game_data.client_strings.item_quality,
+                            item_data.quality
                         ));
                     } else {
                         let avoid_rate = equipment_item.durability as f32 * 0.3
                             + grade_data.map(|grade| grade.avoid).unwrap_or(0) as f32;
 
                         ui.label(format!(
-                            "Item Class: {:?} Avoid Rate: {}",
-                            item_data.class, avoid_rate as i32
+                            "{}:{} {}:{}",
+                            game_data.client_strings.item_class,
+                            game_data.string_database.get_item_class(item_data.class),
+                            game_data
+                                .string_database
+                                .get_ability_type(AbilityType::Avoid),
+                            avoid_rate as i32
                         ));
                     }
 
-                    add_equipment_item_life_durability(ui, equipment_item);
-                    add_item_defence(ui, item_data, grade_data);
+                    add_equipment_item_life_durability(ui, game_data, equipment_item);
+                    add_item_defence(ui, game_data, item_data, grade_data);
 
                     if matches!(equipment_item.item.item_type, ItemType::Feet) {
                         if let Some(move_speed) = game_data
@@ -300,7 +462,10 @@ pub fn ui_add_item_tooltip(
                             .get_feet_item(equipment_item.item.item_number)
                             .map(|feet_item_data| feet_item_data.move_speed)
                         {
-                            ui.label(format!("[Movement Speed {}]", move_speed));
+                            ui.label(format!(
+                                "[{} {}]",
+                                game_data.client_strings.item_move_speed, move_speed
+                            ));
                         }
                     } else if matches!(equipment_item.item.item_type, ItemType::Back) {
                         if let Some(move_speed) = game_data
@@ -308,34 +473,43 @@ pub fn ui_add_item_tooltip(
                             .get_back_item(equipment_item.item.item_number)
                             .map(|back_item_data| back_item_data.move_speed)
                         {
-                            ui.label(format!("[Movement Speed {}]", move_speed));
+                            ui.label(format!(
+                                "[{} {}]",
+                                game_data.client_strings.item_move_speed, move_speed
+                            ));
                         }
                     }
 
-                    add_item_add_ability(ui, item_data);
+                    add_item_add_ability(ui, game_data, item_data);
                     add_equipment_item_add_appraisal(ui, game_data, equipment_item);
                     add_item_equip_requirement(ui, game_data, player, item_data);
-                    add_item_description(ui, item_data);
+                    add_item_description(ui, game_data, item_data);
                 }
                 ItemType::Jewellery => {
                     ui.label(format!(
-                        "Item Class: {:?} Quality: {}",
-                        item_data.class, item_data.quality
+                        "{}:{} {}:{}",
+                        game_data.client_strings.item_class,
+                        game_data.string_database.get_item_class(item_data.class),
+                        game_data.client_strings.item_quality,
+                        item_data.quality
                     ));
 
-                    add_item_add_ability(ui, item_data);
+                    add_item_add_ability(ui, game_data, item_data);
                     add_equipment_item_add_appraisal(ui, game_data, equipment_item);
                     add_item_equip_requirement(ui, game_data, player, item_data);
-                    add_item_description(ui, item_data);
+                    add_item_description(ui, game_data, item_data);
                 }
                 ItemType::Vehicle => {
                     ui.label(format!(
-                        "Item Class: {:?} Quality: {}",
-                        item_data.class, item_data.quality
+                        "{}:{} {}:{}",
+                        game_data.client_strings.item_class,
+                        game_data.string_database.get_item_class(item_data.class),
+                        game_data.client_strings.item_quality,
+                        item_data.quality
                     ));
 
                     // TODO: Vehicle tooltip
-                    add_item_description(ui, item_data);
+                    add_item_description(ui, game_data, item_data);
                 }
                 _ => panic!("Unexpected item type"),
             }
@@ -350,8 +524,11 @@ pub fn ui_add_item_tooltip(
                         .get_consumable_item(stackable_item.item.item_number as usize);
 
                     ui.label(format!(
-                        "Item Class: {:?} Quality: {}",
-                        item_data.class, item_data.quality
+                        "{}:{} {}:{}",
+                        game_data.client_strings.item_class,
+                        game_data.string_database.get_item_class(item_data.class),
+                        game_data.client_strings.item_quality,
+                        item_data.quality
                     ));
 
                     match item_data.class {
@@ -378,7 +555,7 @@ pub fn ui_add_item_tooltip(
                         }
                     }
 
-                    add_item_description(ui, item_data);
+                    add_item_description(ui, game_data, item_data);
                 }
                 ItemType::Gem => {
                     let gem_item_data = game_data
@@ -386,28 +563,43 @@ pub fn ui_add_item_tooltip(
                         .get_gem_item(stackable_item.item.item_number as usize);
 
                     ui.label(format!(
-                        "Item Class: {:?} Quality: {}",
-                        item_data.class, item_data.quality
+                        "{}:{} {}:{}",
+                        game_data.client_strings.item_class,
+                        game_data.string_database.get_item_class(item_data.class),
+                        game_data.client_strings.item_quality,
+                        item_data.quality
                     ));
 
                     if let Some(gem_item_data) = gem_item_data {
                         for &(ability_type, value) in gem_item_data.gem_add_ability.iter() {
                             ui.colored_label(
                                 egui::Color32::from_rgb(100, 200, 255),
-                                format!("[{:?} {}]", ability_type, value),
+                                format!(
+                                    "[{} {}{}]",
+                                    game_data.string_database.get_ability_type(ability_type),
+                                    value,
+                                    if matches!(ability_type, AbilityType::SaveMana) {
+                                        "%"
+                                    } else {
+                                        ""
+                                    }
+                                ),
                             );
                         }
                     }
 
-                    add_item_description(ui, item_data);
+                    add_item_description(ui, game_data, item_data);
                 }
                 ItemType::Material => {
                     ui.label(format!(
-                        "Item Class: {:?} Quality: {}",
-                        item_data.class, item_data.quality
+                        "{}:{} {}:{}",
+                        game_data.client_strings.item_class,
+                        game_data.string_database.get_item_class(item_data.class),
+                        game_data.client_strings.item_quality,
+                        item_data.quality
                     ));
 
-                    add_item_description(ui, item_data);
+                    add_item_description(ui, game_data, item_data);
                 }
                 ItemType::Quest => {}
                 _ => panic!("Unexpected item type"),
@@ -428,7 +620,7 @@ fn add_skill_name(ui: &mut egui::Ui, skill_data: &SkillData) {
     ui.add(egui::Label::new(
         egui::RichText::new(text)
             .color(egui::Color32::YELLOW)
-            .strong(),
+            .size(20.0),
     ));
 }
 
@@ -500,6 +692,8 @@ pub fn ui_add_skill_tooltip(
     skill_id: SkillId,
 ) {
     ui.set_max_width(TOOLTIP_MAX_WIDTH);
+    ui.style_mut().visuals.widgets.noninteractive.fg_stroke =
+        egui::Stroke::new(1.0, egui::Color32::WHITE);
 
     let skill_data = game_data.skills.get_skill(skill_id);
     if skill_data.is_none() {
