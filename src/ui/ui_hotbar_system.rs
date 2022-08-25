@@ -15,6 +15,7 @@ use crate::{
     events::PlayerCommandEvent,
     resources::{GameData, UiResources, UiSpriteSheetType},
     ui::{
+        tooltips::{PlayerTooltipQuery, PlayerTooltipQueryItem},
         ui_add_item_tooltip, ui_add_skill_tooltip,
         ui_inventory_system::GetItem,
         widgets::{DataBindings, Dialog, Widget},
@@ -69,6 +70,7 @@ fn ui_add_hotbar_slot(
     pos: egui::Pos2,
     hotbar_index: (usize, usize),
     player: &mut PlayerQueryItem,
+    player_tooltip_data: Option<&PlayerTooltipQueryItem>,
     game_data: &GameData,
     ui_resources: &UiResources,
     ui_state_dnd: &mut UiStateDragAndDrop,
@@ -157,7 +159,7 @@ fn ui_add_hotbar_slot(
         response.on_hover_ui(|ui| match hotbar_slot {
             Some(HotbarSlot::Inventory(item_slot)) => {
                 if let Some(item) = (player.equipment, player.inventory).get_item(*item_slot) {
-                    ui_add_item_tooltip(ui, game_data, &item);
+                    ui_add_item_tooltip(ui, game_data, player_tooltip_data, &item);
                 }
             }
             Some(HotbarSlot::Skill(skill_slot)) => {
@@ -206,6 +208,7 @@ pub fn ui_hotbar_system(
     mut ui_state_hot_bar: Local<UiStateHotBar>,
     mut ui_state_dnd: ResMut<UiStateDragAndDrop>,
     mut query_player: Query<PlayerQuery, With<PlayerCharacter>>,
+    query_player_tooltip: Query<PlayerTooltipQuery, With<PlayerCharacter>>,
     mut player_command_events: EventWriter<PlayerCommandEvent>,
     keyboard_input: Res<Input<KeyCode>>,
     game_data: Res<GameData>,
@@ -227,6 +230,7 @@ pub fn ui_hotbar_system(
     } else {
         return;
     };
+    let player_tooltip_data = query_player_tooltip.get_single().ok();
 
     let use_hotbar_index = if !egui_context.ctx_mut().wants_keyboard_input() {
         if keyboard_input.just_pressed(KeyCode::F1) {
@@ -308,6 +312,7 @@ pub fn ui_hotbar_system(
                             ui.min_rect().min + pos,
                             hotbar_index,
                             &mut player,
+                            player_tooltip_data.as_ref(),
                             &game_data,
                             &ui_resources,
                             &mut ui_state_dnd,

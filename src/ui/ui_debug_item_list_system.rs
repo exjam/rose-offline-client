@@ -1,4 +1,4 @@
-use bevy::prelude::{Local, Query, Res, ResMut, State};
+use bevy::prelude::{Local, Query, Res, ResMut, State, With};
 use bevy_egui::{egui, EguiContext};
 
 use rose_data::{EquipmentIndex, EquipmentItem, Item, ItemType};
@@ -6,8 +6,9 @@ use rose_data_irose::encode_item_type;
 use rose_game_common::{components::Equipment, messages::client::ClientMessage};
 
 use crate::{
+    components::PlayerCharacter,
     resources::{AppState, GameConnection, GameData, UiResources, UiSpriteSheetType},
-    ui::{ui_add_item_tooltip, UiStateDebugWindows},
+    ui::{tooltips::PlayerTooltipQuery, ui_add_item_tooltip, UiStateDebugWindows},
 };
 
 pub struct UiStateDebugItemList {
@@ -33,6 +34,7 @@ pub fn ui_debug_item_list_system(
     mut ui_state_debug_item_list: Local<UiStateDebugItemList>,
     mut ui_state_debug_windows: ResMut<UiStateDebugWindows>,
     mut query_equipment: Query<&mut Equipment>,
+    query_player_tooltip: Query<PlayerTooltipQuery, With<PlayerCharacter>>,
     app_state: Res<State<AppState>>,
     game_connection: Option<Res<GameConnection>>,
     game_data: Res<GameData>,
@@ -41,6 +43,7 @@ pub fn ui_debug_item_list_system(
     if !ui_state_debug_windows.debug_ui_open {
         return;
     }
+    let player_tooltip_data = query_player_tooltip.get_single().ok();
 
     egui::Window::new("Item List")
         .resizable(true)
@@ -232,7 +235,12 @@ pub fn ui_debug_item_list_system(
                                     )
                                     .on_hover_ui(|ui| {
                                         if let Some(item) = Item::from_item_data(item_data, 1) {
-                                            ui_add_item_tooltip(ui, &game_data, &item);
+                                            ui_add_item_tooltip(
+                                                ui,
+                                                &game_data,
+                                                player_tooltip_data.as_ref(),
+                                                &item,
+                                            );
                                         }
                                     });
                                 }

@@ -933,6 +933,10 @@ fn load_game_data_irose(
         effect_database: rose_data_irose::get_effect_database(&vfs_resource.vfs)
             .expect("Failed to load effect database"),
         items,
+        job_class: Arc::new(
+            rose_data_irose::get_job_class_database(&vfs_resource.vfs, string_database.clone())
+                .expect("Failed to load job class database"),
+        ),
         npcs,
         quests: Arc::new(
             rose_data_irose::get_quest_database(&vfs_resource.vfs, string_database.clone())

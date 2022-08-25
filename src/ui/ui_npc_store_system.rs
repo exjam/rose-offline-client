@@ -1,7 +1,9 @@
 use bevy::{
     ecs::query::WorldQuery,
     math::Vec3Swizzles,
-    prelude::{Assets, Entity, EventReader, EventWriter, Events, Local, Query, Res, ResMut, World},
+    prelude::{
+        Assets, Entity, EventReader, EventWriter, Events, Local, Query, Res, ResMut, With, World,
+    },
 };
 use bevy_egui::{egui, EguiContext};
 
@@ -21,6 +23,7 @@ use crate::{
         ClientEntityList, GameConnection, GameData, UiResources, UiSpriteSheetType, WorldRates,
     },
     ui::{
+        tooltips::{PlayerTooltipQuery, PlayerTooltipQueryItem},
         ui_add_item_tooltip,
         ui_drag_and_drop_system::UiStateDragAndDrop,
         widgets::{DataBindings, Dialog, DrawText},
@@ -84,6 +87,7 @@ fn ui_add_store_item_slot(
     store_tab_slot: usize,
     buy_list: &mut [Option<PendingBuyItem>; NUM_BUY_ITEMS],
     player: Option<&NpcStorePlayerWorldQueryItem>,
+    player_tooltip_data: Option<&PlayerTooltipQueryItem>,
     game_data: &GameData,
     ui_resources: &UiResources,
     world_rates: Option<&Res<WorldRates>>,
@@ -176,7 +180,7 @@ fn ui_add_store_item_slot(
         }
 
         response.on_hover_ui(|ui| {
-            ui_add_item_tooltip(ui, game_data, item);
+            ui_add_item_tooltip(ui, game_data, player_tooltip_data, item);
 
             ui.colored_label(egui::Color32::YELLOW, format!("Buy Price: {}", item_price));
         });
@@ -202,6 +206,7 @@ fn ui_add_buy_item_slot(
     buy_list: &mut [Option<PendingBuyItem>; NUM_BUY_ITEMS],
     buy_slot_index: usize,
     player: Option<&NpcStorePlayerWorldQueryItem>,
+    player_tooltip_data: Option<&PlayerTooltipQueryItem>,
     game_data: &GameData,
     ui_resources: &UiResources,
     world_rates: Option<&Res<WorldRates>>,
@@ -277,7 +282,7 @@ fn ui_add_buy_item_slot(
 
     if let Some(item) = item {
         response.on_hover_ui(|ui| {
-            ui_add_item_tooltip(ui, game_data, &item);
+            ui_add_item_tooltip(ui, game_data, player_tooltip_data, &item);
 
             ui.colored_label(egui::Color32::YELLOW, format!("Buy Price: {}", item_price));
         });
@@ -301,6 +306,7 @@ fn ui_add_sell_item_slot(
     sell_list: &mut [Option<PendingSellItem>; NUM_SELL_ITEMS],
     sell_slot_index: usize,
     player: Option<&NpcStorePlayerWorldQueryItem>,
+    player_tooltip_data: Option<&PlayerTooltipQueryItem>,
     game_data: &GameData,
     ui_resources: &UiResources,
     world_rates: Option<&Res<WorldRates>>,
@@ -368,7 +374,7 @@ fn ui_add_sell_item_slot(
 
     if let Some(item) = item {
         response.on_hover_ui(|ui| {
-            ui_add_item_tooltip(ui, game_data, item);
+            ui_add_item_tooltip(ui, game_data, player_tooltip_data, item);
 
             ui.colored_label(egui::Color32::YELLOW, format!("Sell Value: {}", item_price));
         });
@@ -404,6 +410,7 @@ pub fn ui_npc_store_system(
     mut ui_state_dnd: ResMut<UiStateDragAndDrop>,
     mut npc_store_events: EventReader<NpcStoreEvent>,
     query_player: Query<NpcStorePlayerWorldQuery>,
+    query_player_tooltip: Query<PlayerTooltipQuery, With<PlayerCharacter>>,
     query_npc: Query<NpcStoreNpcWorldQuery>,
     client_entity_list: Res<ClientEntityList>,
     game_connection: Option<Res<GameConnection>>,
@@ -479,6 +486,7 @@ pub fn ui_npc_store_system(
     }
 
     let player = query_player.get_single().ok();
+    let player_tooltip_data = query_player_tooltip.get_single().ok();
     let npc = ui_state
         .owner_entity
         .and_then(|(owner_entity, _)| query_npc.get(owner_entity).ok());
@@ -571,6 +579,7 @@ pub fn ui_npc_store_system(
                                     column + row * 8,
                                     &mut ui_state.buy_list,
                                     player.as_ref(),
+                                    player_tooltip_data.as_ref(),
                                     &game_data,
                                     &ui_resources,
                                     world_rates.as_ref(),
@@ -618,6 +627,7 @@ pub fn ui_npc_store_system(
                             &mut ui_state.buy_list,
                             i,
                             player.as_ref(),
+                            player_tooltip_data.as_ref(),
                             &game_data,
                             &ui_resources,
                             world_rates.as_ref(),
@@ -638,6 +648,7 @@ pub fn ui_npc_store_system(
                             &mut ui_state.sell_list,
                             i,
                             player.as_ref(),
+                            player_tooltip_data.as_ref(),
                             &game_data,
                             &ui_resources,
                             world_rates.as_ref(),

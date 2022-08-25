@@ -8,6 +8,7 @@ use crate::{
     components::PlayerCharacter,
     resources::{GameData, UiResources, UiSpriteSheetType},
     ui::{
+        tooltips::{PlayerTooltipQuery, PlayerTooltipQueryItem},
         ui_add_item_tooltip,
         widgets::{DataBindings, Dialog, DrawText, Widget},
         DragAndDropId, DragAndDropSlot, UiStateWindows,
@@ -31,6 +32,7 @@ const IID_PANE_QUESTINFO: i32 = 200;
 fn ui_add_quest_item_slot(
     ui: &mut egui::Ui,
     pos: egui::Pos2,
+    player_tooltip_data: Option<&PlayerTooltipQueryItem>,
     item: Option<&Item>,
     game_data: &GameData,
     ui_resources: &UiResources,
@@ -72,7 +74,7 @@ fn ui_add_quest_item_slot(
 
     if let Some(item) = item {
         response.on_hover_ui(|ui| {
-            ui_add_item_tooltip(ui, game_data, item);
+            ui_add_item_tooltip(ui, game_data, player_tooltip_data, item);
         });
     }
 }
@@ -100,6 +102,7 @@ pub fn ui_quest_list_system(
     mut egui_context: ResMut<EguiContext>,
     mut ui_state_windows: ResMut<UiStateWindows>,
     query_player: Query<&QuestState, With<PlayerCharacter>>,
+    query_player_tooltip: Query<PlayerTooltipQuery, With<PlayerCharacter>>,
     game_data: Res<GameData>,
     ui_resources: Res<UiResources>,
     dialog_assets: Res<Assets<Dialog>>,
@@ -118,6 +121,7 @@ pub fn ui_quest_list_system(
     } else {
         return;
     };
+    let player_tooltip_data = query_player_tooltip.get_single().ok();
 
     let listbox_extent = if let Some(Widget::ZListbox(listbox)) = dialog.get_widget(IID_ZLIST_QUEST)
     {
@@ -262,6 +266,7 @@ pub fn ui_quest_list_system(
                             ui_add_quest_item_slot(
                                 ui,
                                 rect_info.min + QUEST_ITEM_SLOT_POS[i],
+                                player_tooltip_data.as_ref(),
                                 item.as_ref(),
                                 &game_data,
                                 &ui_resources,

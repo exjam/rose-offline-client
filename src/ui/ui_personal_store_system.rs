@@ -16,6 +16,7 @@ use crate::{
     events::{MessageBoxEvent, PersonalStoreEvent},
     resources::{GameConnection, GameData, UiResources, UiSpriteSheetType},
     ui::{
+        tooltips::{PlayerTooltipQuery, PlayerTooltipQueryItem},
         ui_add_item_tooltip,
         widgets::{DataBindings, Dialog},
         DragAndDropId, DragAndDropSlot, UiStateDragAndDrop,
@@ -56,6 +57,7 @@ fn ui_add_store_item_slot(
     price: &Money,
     is_sell_item: bool,
     slot_index: usize,
+    player_tooltip_data: Option<&PlayerTooltipQueryItem>,
     game_data: &GameData,
     ui_resources: &UiResources,
     message_box_events: &mut EventWriter<MessageBoxEvent>,
@@ -117,7 +119,7 @@ fn ui_add_store_item_slot(
     }
 
     response.on_hover_ui(|ui| {
-        ui_add_item_tooltip(ui, game_data, item);
+        ui_add_item_tooltip(ui, game_data, player_tooltip_data, item);
 
         if is_sell_item {
             ui.colored_label(egui::Color32::YELLOW, format!("Price: {}", price.0));
@@ -134,6 +136,7 @@ pub fn ui_personal_store_system(
     mut personal_store_events: EventReader<PersonalStoreEvent>,
     query_personal_store: Query<(&ClientEntity, &PersonalStore, &Position), With<PersonalStore>>,
     query_player: Query<&Position, With<PlayerCharacter>>,
+    query_player_tooltip: Query<PlayerTooltipQuery, With<PlayerCharacter>>,
     ui_resources: Res<UiResources>,
     dialog_assets: Res<Assets<Dialog>>,
     game_connection: Option<Res<GameConnection>>,
@@ -265,6 +268,7 @@ pub fn ui_personal_store_system(
     } else {
         return;
     };
+    let player_tooltip_data = query_player_tooltip.get_single().ok();
 
     let mut response_close_button = None;
 
@@ -305,6 +309,7 @@ pub fn ui_personal_store_system(
                                             price,
                                             true,
                                             slot_index,
+                                            player_tooltip_data.as_ref(),
                                             &game_data,
                                             &ui_resources,
                                             &mut message_box_events,
@@ -332,6 +337,7 @@ pub fn ui_personal_store_system(
                                             price,
                                             false,
                                             slot_index,
+                                            player_tooltip_data.as_ref(),
                                             &game_data,
                                             &ui_resources,
                                             &mut message_box_events,

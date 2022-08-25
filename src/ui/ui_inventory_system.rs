@@ -17,6 +17,7 @@ use crate::{
     events::{NumberInputDialogEvent, PlayerCommandEvent},
     resources::{GameData, UiResources, UiSpriteSheetType},
     ui::{
+        tooltips::{PlayerTooltipQuery, PlayerTooltipQueryItem},
         ui_add_item_tooltip,
         widgets::{DataBindings, Dialog, Widget},
         DialogInstance, DragAndDropId, DragAndDropSlot, UiStateDragAndDrop, UiStateWindows,
@@ -203,6 +204,7 @@ fn ui_add_inventory_slot(
     inventory_slot: ItemSlot,
     pos: egui::Pos2,
     player: &PlayerQueryItem,
+    player_tooltip_data: Option<&PlayerTooltipQueryItem>,
     game_data: &GameData,
     ui_resources: &UiResources,
     item_slot_map: &mut EnumMap<InventoryPageType, Vec<ItemSlot>>,
@@ -380,7 +382,7 @@ fn ui_add_inventory_slot(
         });
 
         response.on_hover_ui(|ui| {
-            ui_add_item_tooltip(ui, game_data, &item);
+            ui_add_item_tooltip(ui, game_data, player_tooltip_data, &item);
         });
     }
 
@@ -491,6 +493,7 @@ pub fn ui_inventory_system(
     mut ui_state_dnd: ResMut<UiStateDragAndDrop>,
     mut ui_state_windows: ResMut<UiStateWindows>,
     query_player: Query<PlayerQuery, With<PlayerCharacter>>,
+    query_player_tooltip: Query<PlayerTooltipQuery, With<PlayerCharacter>>,
     dialog_assets: Res<Assets<Dialog>>,
     game_data: Res<GameData>,
     ui_resources: Res<UiResources>,
@@ -511,6 +514,7 @@ pub fn ui_inventory_system(
     } else {
         return;
     };
+    let player_tooltip_data = query_player_tooltip.get_single().ok();
 
     let mut response_close_button = None;
     let mut response_minimise_button = None;
@@ -570,6 +574,7 @@ pub fn ui_inventory_system(
                                         *item_slot,
                                         *pos + egui::vec2(-1.0, -1.0),
                                         &player,
+                                        player_tooltip_data.as_ref(),
                                         &game_data,
                                         &ui_resources,
                                         &mut ui_state_inventory.item_slot_map,
@@ -600,6 +605,7 @@ pub fn ui_inventory_system(
                                         *item_slot,
                                         *pos - egui::vec2(-1.0, -1.0),
                                         &player,
+                                        player_tooltip_data.as_ref(),
                                         &game_data,
                                         &ui_resources,
                                         &mut ui_state_inventory.item_slot_map,
@@ -633,6 +639,7 @@ pub fn ui_inventory_system(
                                     y_start + row as f32 * 41.0,
                                 ),
                                 &player,
+                                player_tooltip_data.as_ref(),
                                 &game_data,
                                 &ui_resources,
                                 &mut ui_state_inventory.item_slot_map,

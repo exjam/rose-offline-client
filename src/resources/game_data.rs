@@ -3,8 +3,8 @@ use std::sync::Arc;
 
 use rose_data::{
     AnimationEventFlags, CharacterMotionDatabase, DataDecoder, EffectDatabase, ItemDatabase,
-    NpcDatabase, QuestDatabase, SkillDatabase, SkyboxDatabase, SoundDatabase, StatusEffectDatabase,
-    StringDatabase, ZoneList,
+    JobClassDatabase, NpcDatabase, QuestDatabase, SkillDatabase, SkyboxDatabase, SoundDatabase,
+    StatusEffectDatabase, StringDatabase, ZoneList,
 };
 use rose_file_readers::{LtbFile, StbFile, ZscFile};
 use rose_game_common::data::AbilityValueCalculator;
@@ -16,6 +16,7 @@ pub struct GameData {
     pub data_decoder: Box<dyn DataDecoder + Send + Sync>,
     pub effect_database: Arc<EffectDatabase>,
     pub items: Arc<ItemDatabase>,
+    pub job_class: Arc<JobClassDatabase>,
     pub npcs: Arc<NpcDatabase>,
     pub quests: Arc<QuestDatabase>,
     pub skills: Arc<SkillDatabase>,

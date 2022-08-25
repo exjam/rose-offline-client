@@ -1,13 +1,22 @@
 use std::cmp::Ordering;
 
+use bevy::ecs::query::WorldQuery;
 use bevy_egui::egui;
 
 use rose_data::{
-    BaseItemData, EquipmentItem, Item, ItemClass, ItemGradeData, ItemType, SkillData, SkillId,
-    SkillType, StackableItem,
+    BaseItemData, EquipmentItem, Item, ItemClass, ItemGradeData, ItemType, JobId, SkillData,
+    SkillId, SkillType, StackableItem,
 };
+use rose_game_common::components::CharacterInfo;
 
 use crate::resources::GameData;
+
+const TOOLTIP_MAX_WIDTH: f32 = 200.0;
+
+#[derive(WorldQuery)]
+pub struct PlayerTooltipQuery<'w> {
+    character_info: &'w CharacterInfo,
+}
 
 fn get_item_name_color(_item_data: &BaseItemData) -> egui::Color32 {
     // TODO: Get correct item color from stb
@@ -109,13 +118,26 @@ fn add_equipment_item_add_appraisal(
     }
 }
 
-fn add_item_equip_requirement(ui: &mut egui::Ui, item_data: &BaseItemData) {
-    if item_data.equip_job_requirement != 0 {
-        // TODO: Job requirement strings
-        ui.colored_label(
-            egui::Color32::GREEN,
-            format!("[Job Requirement {}]", item_data.equip_job_requirement),
-        );
+fn add_item_equip_requirement(
+    ui: &mut egui::Ui,
+    game_data: &GameData,
+    player: Option<&PlayerTooltipQueryItem>,
+    item_data: &BaseItemData,
+) {
+    if let Some(job_class_id) = item_data.equip_job_class_requirement {
+        if let Some(job_class) = game_data.job_class.get(job_class_id) {
+            let color = if player.map_or(true, |player| {
+                job_class
+                    .jobs
+                    .contains(&JobId::new(player.character_info.job))
+            }) {
+                egui::Color32::GREEN
+            } else {
+                egui::Color32::RED
+            };
+
+            ui.colored_label(color, format!("[Job Requirement {}]", job_class.name));
+        }
     }
 
     for union_id in item_data.equip_union_requirement.iter() {
@@ -137,11 +159,17 @@ fn add_item_equip_requirement(ui: &mut egui::Ui, item_data: &BaseItemData) {
 
 fn add_item_description(ui: &mut egui::Ui, item_data: &BaseItemData) {
     ui.label(format!("Weight: {}", item_data.weight));
-
-    // TODO: add_item_description
+    ui.label(item_data.description);
 }
 
-pub fn ui_add_item_tooltip(ui: &mut egui::Ui, game_data: &GameData, item: &Item) {
+pub fn ui_add_item_tooltip(
+    ui: &mut egui::Ui,
+    game_data: &GameData,
+    player: Option<&PlayerTooltipQueryItem>,
+    item: &Item,
+) {
+    ui.set_max_width(TOOLTIP_MAX_WIDTH);
+
     let item_data = game_data.items.get_base_item(item.get_item_reference());
     if item_data.is_none() {
         ui.label(format!(
@@ -208,7 +236,7 @@ pub fn ui_add_item_tooltip(ui: &mut egui::Ui, game_data: &GameData, item: &Item)
 
                     add_item_add_ability(ui, item_data);
                     add_equipment_item_add_appraisal(ui, game_data, equipment_item);
-                    add_item_equip_requirement(ui, item_data);
+                    add_item_equip_requirement(ui, game_data, player, item_data);
                     add_item_description(ui, item_data);
                 }
                 ItemType::SubWeapon => {
@@ -237,7 +265,7 @@ pub fn ui_add_item_tooltip(ui: &mut egui::Ui, game_data: &GameData, item: &Item)
 
                     add_item_add_ability(ui, item_data);
                     add_equipment_item_add_appraisal(ui, game_data, equipment_item);
-                    add_item_equip_requirement(ui, item_data);
+                    add_item_equip_requirement(ui, game_data, player, item_data);
                     add_item_description(ui, item_data);
                 }
                 ItemType::Face
@@ -286,7 +314,7 @@ pub fn ui_add_item_tooltip(ui: &mut egui::Ui, game_data: &GameData, item: &Item)
 
                     add_item_add_ability(ui, item_data);
                     add_equipment_item_add_appraisal(ui, game_data, equipment_item);
-                    add_item_equip_requirement(ui, item_data);
+                    add_item_equip_requirement(ui, game_data, player, item_data);
                     add_item_description(ui, item_data);
                 }
                 ItemType::Jewellery => {
@@ -297,7 +325,7 @@ pub fn ui_add_item_tooltip(ui: &mut egui::Ui, game_data: &GameData, item: &Item)
 
                     add_item_add_ability(ui, item_data);
                     add_equipment_item_add_appraisal(ui, game_data, equipment_item);
-                    add_item_equip_requirement(ui, item_data);
+                    add_item_equip_requirement(ui, game_data, player, item_data);
                     add_item_description(ui, item_data);
                 }
                 ItemType::Vehicle => {
@@ -412,8 +440,8 @@ fn add_skill_cast_range(ui: &mut egui::Ui, skill_data: &SkillData) {
     ui.label(format!("Cast Range: {}m", skill_data.cast_range / 100));
 }
 
-fn add_skill_description(_ui: &mut egui::Ui, _skill_data: &SkillData) {
-    // TODO: add_skill_description
+fn add_skill_description(ui: &mut egui::Ui, skill_data: &SkillData) {
+    ui.label(skill_data.description);
 }
 
 fn add_skill_power(ui: &mut egui::Ui, skill_data: &SkillData) {
@@ -471,6 +499,8 @@ pub fn ui_add_skill_tooltip(
     game_data: &GameData,
     skill_id: SkillId,
 ) {
+    ui.set_max_width(TOOLTIP_MAX_WIDTH);
+
     let skill_data = game_data.skills.get_skill(skill_id);
     if skill_data.is_none() {
         ui.label(format!("Unknown Skill\nSkill ID: {}", skill_id.get()));
