@@ -16,6 +16,7 @@ use bevy::{
     render::{render_resource::WgpuFeatures, settings::WgpuSettings},
     window::{WindowDescriptor, WindowMode},
 };
+use bevy_egui::{egui, EguiContext};
 use bevy_rapier3d::plugin::PhysicsStages;
 use enum_map::enum_map;
 use serde::Deserialize;
@@ -997,6 +998,7 @@ fn load_common_game_data(
     game_data: Res<GameData>,
     asset_server: Res<AssetServer>,
     mut damage_digit_materials: ResMut<Assets<DamageDigitMaterial>>,
+    mut egui_context: ResMut<EguiContext>,
 ) {
     commands.insert_resource(
         ModelLoader::new(
@@ -1020,4 +1022,18 @@ fn load_common_game_data(
         &asset_server,
         &mut damage_digit_materials,
     ));
+
+    let mut fonts = egui::FontDefinitions::default();
+    fonts.font_data.insert(
+        "Ubuntu-M".to_owned(),
+        egui::FontData::from_static(include_bytes!("fonts/Ubuntu-M.ttf")),
+    );
+
+    fonts
+        .families
+        .entry(egui::FontFamily::Name("Ubuntu-M".into()))
+        .or_default()
+        .insert(0, "Ubuntu-M".to_owned());
+
+    egui_context.ctx_mut().set_fonts(fonts);
 }
