@@ -105,13 +105,21 @@ pub fn ui_player_info_system(
                     ui.add_label_in(
                         egui::Rect::from_min_max(egui::pos2(15.0, 8.0), egui::pos2(150.0, 25.0)),
                         egui::RichText::new(&player.character_info.name)
-                            .color(egui::Color32::from_rgb(0, 255, 42)),
+                            .color(egui::Color32::from_rgb(0, 255, 42))
+                            .font(egui::FontId::new(
+                                14.0,
+                                egui::FontFamily::Name("Ubuntu-M".into()),
+                            )),
                     );
 
                     ui.add_label_in(
                         egui::Rect::from_min_max(egui::pos2(180.0, 8.0), egui::pos2(230.0, 25.0)),
                         egui::RichText::new(&format!("{}", player.level.level))
-                            .color(egui::Color32::YELLOW),
+                            .color(egui::Color32::YELLOW)
+                            .font(egui::FontId::new(
+                                14.0,
+                                egui::FontFamily::Name("Ubuntu-M".into()),
+                            )),
                     );
                 },
             )
