@@ -12,6 +12,7 @@ use crate::{
     events::PlayerCommandEvent,
     resources::{GameData, UiResources, UiSpriteSheetType},
     ui::{
+        tooltips::{PlayerTooltipQuery, PlayerTooltipQueryItem, SkillTooltipType},
         ui_add_skill_tooltip,
         widgets::{DataBindings, Dialog, DrawText, Widget},
         DragAndDropId, DragAndDropSlot, UiStateDragAndDrop, UiStateWindows,
@@ -61,6 +62,7 @@ fn ui_add_skill_list_slot(
     pos: egui::Pos2,
     skill_slot: SkillSlot,
     player: &PlayerQueryItem,
+    player_tooltip_data: Option<&PlayerTooltipQueryItem>,
     game_data: &GameData,
     ui_resources: &UiResources,
     ui_state_dnd: &mut UiStateDragAndDrop,
@@ -101,7 +103,18 @@ fn ui_add_skill_list_slot(
 
     if let Some(skill_id) = skill {
         response.on_hover_ui(|ui| {
-            ui_add_skill_tooltip(ui, false, game_data, skill_id);
+            let extra = ui.input().pointer.secondary_down();
+            ui_add_skill_tooltip(
+                ui,
+                if extra {
+                    SkillTooltipType::Extra
+                } else {
+                    SkillTooltipType::Detailed
+                },
+                game_data,
+                player_tooltip_data,
+                skill_id,
+            );
         });
     }
 }
@@ -120,6 +133,7 @@ pub fn ui_skill_list_system(
     mut ui_state_windows: ResMut<UiStateWindows>,
     mut player_command_events: EventWriter<PlayerCommandEvent>,
     query_player: Query<PlayerQuery, With<PlayerCharacter>>,
+    query_player_tooltip: Query<PlayerTooltipQuery, With<PlayerCharacter>>,
     game_data: Res<GameData>,
     ui_resources: Res<UiResources>,
     dialog_assets: Res<Assets<Dialog>>,
@@ -136,6 +150,7 @@ pub fn ui_skill_list_system(
     } else {
         return;
     };
+    let player_tooltip_data = query_player_tooltip.get_single().ok();
 
     let listbox_extent =
         if let Some(Widget::ZListbox(listbox)) = dialog.get_widget(IID_ZLISTBOX_BASIC) {
@@ -238,6 +253,7 @@ pub fn ui_skill_list_system(
                             ui.min_rect().min + egui::vec2(start_x, start_y + 3.0),
                             skill_slot,
                             &player,
+                            player_tooltip_data.as_ref(),
                             &game_data,
                             &ui_resources,
                             &mut ui_state_dnd,

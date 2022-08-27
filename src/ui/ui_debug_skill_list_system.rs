@@ -6,7 +6,10 @@ use rose_game_common::messages::client::ClientMessage;
 use crate::{
     components::{Command, CommandCastSkillTarget, NextCommand, PlayerCharacter, SelectedTarget},
     resources::{AppState, GameConnection, GameData, UiResources, UiSpriteSheetType},
-    ui::{ui_add_skill_tooltip, UiStateDebugWindows},
+    ui::{
+        tooltips::{PlayerTooltipQuery, SkillTooltipType},
+        ui_add_skill_tooltip, UiStateDebugWindows,
+    },
 };
 
 #[derive(Default)]
@@ -25,10 +28,12 @@ pub fn ui_debug_skill_list_system(
     game_data: Res<GameData>,
     ui_resources: Res<UiResources>,
     mut query_player: Query<(Entity, &mut Command, Option<&SelectedTarget>), With<PlayerCharacter>>,
+    query_player_tooltip: Query<PlayerTooltipQuery, With<PlayerCharacter>>,
 ) {
     if !ui_state_debug_windows.debug_ui_open {
         return;
     }
+    let player_tooltip_data = query_player_tooltip.get_single().ok();
 
     egui::Window::new("Skill List")
         .resizable(true)
@@ -101,7 +106,13 @@ pub fn ui_debug_skill_list_system(
                                             .uv(sprite.uv),
                                     )
                                     .on_hover_ui(|ui| {
-                                        ui_add_skill_tooltip(ui, false, &game_data, skill_data.id);
+                                        ui_add_skill_tooltip(
+                                            ui,
+                                            SkillTooltipType::Extra,
+                                            &game_data,
+                                            player_tooltip_data.as_ref(),
+                                            skill_data.id,
+                                        );
                                     });
                                 }
                             });

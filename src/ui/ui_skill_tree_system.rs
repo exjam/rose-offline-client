@@ -11,8 +11,9 @@ use crate::{
     components::PlayerCharacter,
     resources::{GameData, UiResources, UiSpriteSheetType},
     ui::{
+        tooltips::{PlayerTooltipQuery, PlayerTooltipQueryItem, SkillTooltipType},
         ui_add_skill_tooltip,
-        widgets::{DataBindings, Dialog, DrawWidget, Widget},
+        widgets::{DataBindings, Dialog, DrawWidget, Skill, Widget},
         DragAndDropId, DragAndDropSlot, UiStateWindows,
     },
 };
@@ -33,11 +34,45 @@ pub struct UiStateSkillTree {
 fn ui_add_skill_tree_slot(
     ui: &mut egui::Ui,
     pos: egui::Pos2,
-    skill_id: SkillId,
+    skill: &Skill,
+    player: &PlayerQueryItem,
+    player_tooltip_data: Option<&PlayerTooltipQueryItem>,
     game_data: &GameData,
     ui_resources: &UiResources,
 ) -> egui::Response {
-    let skill_data = game_data.skills.get_skill(skill_id);
+    let base_skill_id = if let Some(base_skill_id) = SkillId::new(skill.id as u16) {
+        base_skill_id
+    } else {
+        return ui
+            .allocate_ui_at_rect(
+                egui::Rect::from_min_size(
+                    ui.min_rect().min + pos.to_vec2(),
+                    egui::vec2(40.0, 40.0),
+                ),
+                |_| {},
+            )
+            .response;
+    };
+
+    let learned_level = if let Some((_, _, level)) = player
+        .skill_list
+        .find_skill_level(&game_data.skills, base_skill_id)
+    {
+        if level < skill.level {
+            None
+        } else if skill.limit_level > 0 {
+            Some(level.min(skill.limit_level))
+        } else {
+            Some(level)
+        }
+    } else {
+        None
+    };
+
+    let skill_data = game_data.skills.get_skill(
+        SkillId::new((skill.id + learned_level.unwrap_or(skill.level).max(1) - 1) as u16).unwrap(),
+    );
+
     let sprite = skill_data.and_then(|skill_data| {
         ui_resources.get_sprite_by_index(UiSpriteSheetType::Skill, skill_data.icon_number as usize)
     });
@@ -52,7 +87,11 @@ fn ui_add_skill_tree_slot(
                         DragAndDropId::NotDraggable,
                         sprite,
                         None,
-                        None, // TODO: Show skill cooldown ?
+                        if learned_level.is_some() {
+                            None
+                        } else {
+                            Some(1.0)
+                        },
                         |_| false,
                         &mut dragged_item,
                         &mut dropped_item,
@@ -68,13 +107,25 @@ fn ui_add_skill_tree_slot(
         // player_command_events.send(PlayerCommandEvent::UseSkill(skill_slot));
     }
 
-    response.on_hover_ui(|ui| {
-        ui_add_skill_tooltip(ui, false, game_data, skill_id);
-    })
+    if let Some(skill_data) = skill_data {
+        response.on_hover_ui(|ui| {
+            ui_add_skill_tooltip(
+                ui,
+                SkillTooltipType::Extra,
+                game_data,
+                player_tooltip_data,
+                skill_data.id,
+            );
+        })
+    } else {
+        response
+    }
 }
 
 fn draw_skill_slots(
     ui: &mut egui::Ui,
+    player: &PlayerQueryItem,
+    player_tooltip_data: Option<&PlayerTooltipQueryItem>,
     game_data: &GameData,
     ui_resources: &UiResources,
     widgets: &[Widget],
@@ -83,17 +134,24 @@ fn draw_skill_slots(
         Widget::Skill(s) => Some(s),
         _ => None,
     }) {
-        if let Some(skill_id) = SkillId::new(skill.id as u16) {
-            ui_add_skill_tree_slot(
-                ui,
-                egui::pos2(skill.x + 3.0, skill.y + 3.0),
-                skill_id,
-                game_data,
-                ui_resources,
-            );
-        }
+        ui_add_skill_tree_slot(
+            ui,
+            egui::pos2(skill.x + 3.0, skill.y + 3.0),
+            skill,
+            player,
+            player_tooltip_data,
+            game_data,
+            ui_resources,
+        );
 
-        draw_skill_slots(ui, game_data, ui_resources, &skill.widgets);
+        draw_skill_slots(
+            ui,
+            player,
+            player_tooltip_data,
+            game_data,
+            ui_resources,
+            &skill.widgets,
+        );
     }
 }
 
@@ -109,6 +167,7 @@ pub fn ui_skill_tree_system(
     mut ui_state: Local<UiStateSkillTree>,
     mut ui_state_windows: ResMut<UiStateWindows>,
     query_player: Query<PlayerQuery, With<PlayerCharacter>>,
+    query_player_tooltip: Query<PlayerTooltipQuery, With<PlayerCharacter>>,
     game_data: Res<GameData>,
     ui_resources: Res<UiResources>,
     dialog_assets: Res<Assets<Dialog>>,
@@ -125,6 +184,7 @@ pub fn ui_skill_tree_system(
     } else {
         return;
     };
+    let player_tooltip_data = query_player_tooltip.get_single().ok();
 
     if !ui_state
         .skill_tree
@@ -177,19 +237,19 @@ pub fn ui_skill_tree_system(
                     // Draw all base skill icons
                     for (index, widget) in skill_tree.widgets.iter().enumerate() {
                         if let Widget::Skill(base_skill) = widget {
-                            if let Some(skill_id) = SkillId::new(base_skill.id as u16) {
-                                if ui_add_skill_tree_slot(
-                                    ui,
-                                    egui::pos2(base_skill.x + 3.0, base_skill.y + 3.0),
-                                    skill_id,
-                                    &game_data,
-                                    &ui_resources,
-                                )
-                                .clicked()
-                                    && index != 0
-                                {
-                                    select_base_skill_index = Some(index);
-                                }
+                            if ui_add_skill_tree_slot(
+                                ui,
+                                egui::pos2(base_skill.x + 3.0, base_skill.y + 3.0),
+                                base_skill,
+                                &player,
+                                player_tooltip_data.as_ref(),
+                                &game_data,
+                                &ui_resources,
+                            )
+                            .clicked()
+                                && index != 0
+                            {
+                                select_base_skill_index = Some(index);
                             }
                         }
                     }
@@ -197,7 +257,14 @@ pub fn ui_skill_tree_system(
                     // Draw only background & children of selected base skill
                     if let Some(Widget::Skill(base_skill)) = skill_tree.widgets.get(0) {
                         base_skill.draw_widget(ui, bindings);
-                        draw_skill_slots(ui, &game_data, &ui_resources, &base_skill.widgets);
+                        draw_skill_slots(
+                            ui,
+                            &player,
+                            player_tooltip_data.as_ref(),
+                            &game_data,
+                            &ui_resources,
+                            &base_skill.widgets,
+                        );
                     }
                 },
             );

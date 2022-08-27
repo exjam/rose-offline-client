@@ -1,4 +1,4 @@
-use bevy::prelude::{Local, Query, Res, ResMut, State, With};
+use bevy::prelude::{Local, ParamSet, Query, Res, ResMut, State, With};
 use bevy_egui::{egui, EguiContext};
 
 use rose_data::{EquipmentIndex, EquipmentItem, Item, ItemType};
@@ -33,8 +33,10 @@ pub fn ui_debug_item_list_system(
     mut egui_context: ResMut<EguiContext>,
     mut ui_state_debug_item_list: Local<UiStateDebugItemList>,
     mut ui_state_debug_windows: ResMut<UiStateDebugWindows>,
-    mut query_equipment: Query<&mut Equipment>,
-    query_player_tooltip: Query<PlayerTooltipQuery, With<PlayerCharacter>>,
+    mut query_set: ParamSet<(
+        Query<&mut Equipment>,
+        Query<PlayerTooltipQuery, With<PlayerCharacter>>,
+    )>,
     app_state: Res<State<AppState>>,
     game_connection: Option<Res<GameConnection>>,
     game_data: Res<GameData>,
@@ -43,7 +45,6 @@ pub fn ui_debug_item_list_system(
     if !ui_state_debug_windows.debug_ui_open {
         return;
     }
-    let player_tooltip_data = query_player_tooltip.get_single().ok();
 
     egui::Window::new("Item List")
         .resizable(true)
@@ -193,7 +194,7 @@ pub fn ui_debug_item_list_system(
                                     && ui.button("Equip").clicked()
                                 {
                                     if let Some(equipment_index) = equipment_index {
-                                        for mut equipment in query_equipment.iter_mut() {
+                                        for mut equipment in query_set.p0().iter_mut() {
                                             equipment.equipped_items[equipment_index] = None;
                                         }
                                     }
@@ -235,6 +236,8 @@ pub fn ui_debug_item_list_system(
                                     )
                                     .on_hover_ui(|ui| {
                                         if let Some(item) = Item::from_item_data(item_data, 1) {
+                                            let query = query_set.p1();
+                                            let player_tooltip_data = query.get_single().ok();
                                             ui_add_item_tooltip(
                                                 ui,
                                                 &game_data,
@@ -282,7 +285,7 @@ pub fn ui_debug_item_list_system(
                                 AppState::ModelViewer => {
                                     if let Some(equipment_index) = equipment_index {
                                         if ui.button("Equip").clicked() {
-                                            for mut equipment in query_equipment.iter_mut() {
+                                            for mut equipment in query_set.p0().iter_mut() {
                                                 equipment.equipped_items[equipment_index] = Some(
                                                     EquipmentItem::from_item_data(item_data)
                                                         .unwrap(),

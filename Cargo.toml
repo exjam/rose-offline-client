@@ -37,13 +37,13 @@ thiserror = "1.0"
 tokio = { version = "1.17", features = ["rt", "net", "sync", "macros", "io-util"] }
 toml = "0.5.9"
 quick-xml = { version = "0.23", features = ["serialize"] }
-rose-data = { git = "https://github.com/exjam/rose-offline", rev = "a9252dcc24587d531fc6891a79a5268b57eca632" }
-rose-data-irose = { git = "https://github.com/exjam/rose-offline", rev = "a9252dcc24587d531fc6891a79a5268b57eca632" }
-rose-file-readers = { git = "https://github.com/exjam/rose-offline", rev = "a9252dcc24587d531fc6891a79a5268b57eca632" }
-rose-game-common = { git = "https://github.com/exjam/rose-offline", rev = "a9252dcc24587d531fc6891a79a5268b57eca632" }
-rose-game-irose = { git = "https://github.com/exjam/rose-offline", rev = "a9252dcc24587d531fc6891a79a5268b57eca632" }
-rose-network-common = { git = "https://github.com/exjam/rose-offline", rev = "a9252dcc24587d531fc6891a79a5268b57eca632" }
-rose-network-irose = { git = "https://github.com/exjam/rose-offline", rev = "a9252dcc24587d531fc6891a79a5268b57eca632" }
+rose-data = { git = "https://github.com/exjam/rose-offline", rev = "512b49162bcc3478d081dc2e6ddbd3f853ffdbb5" }
+rose-data-irose = { git = "https://github.com/exjam/rose-offline", rev = "512b49162bcc3478d081dc2e6ddbd3f853ffdbb5" }
+rose-file-readers = { git = "https://github.com/exjam/rose-offline", rev = "512b49162bcc3478d081dc2e6ddbd3f853ffdbb5" }
+rose-game-common = { git = "https://github.com/exjam/rose-offline", rev = "512b49162bcc3478d081dc2e6ddbd3f853ffdbb5" }
+rose-game-irose = { git = "https://github.com/exjam/rose-offline", rev = "512b49162bcc3478d081dc2e6ddbd3f853ffdbb5" }
+rose-network-common = { git = "https://github.com/exjam/rose-offline", rev = "512b49162bcc3478d081dc2e6ddbd3f853ffdbb5" }
+rose-network-irose = { git = "https://github.com/exjam/rose-offline", rev = "512b49162bcc3478d081dc2e6ddbd3f853ffdbb5" }
 
 [patch.crates-io]
 bevy = { git = "https://github.com/exjam/bevy", rev = "88e688d68c9b31d14baa7582c67cb92877847c32" }

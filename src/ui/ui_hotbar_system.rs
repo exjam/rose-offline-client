@@ -15,7 +15,7 @@ use crate::{
     events::PlayerCommandEvent,
     resources::{GameData, UiResources, UiSpriteSheetType},
     ui::{
-        tooltips::{PlayerTooltipQuery, PlayerTooltipQueryItem},
+        tooltips::{PlayerTooltipQuery, PlayerTooltipQueryItem, SkillTooltipType},
         ui_add_item_tooltip, ui_add_skill_tooltip,
         ui_inventory_system::GetItem,
         widgets::{DataBindings, Dialog, Widget},
@@ -164,7 +164,18 @@ fn ui_add_hotbar_slot(
             }
             Some(HotbarSlot::Skill(skill_slot)) => {
                 if let Some(skill) = player.skill_list.get_skill(*skill_slot) {
-                    ui_add_skill_tooltip(ui, false, game_data, skill);
+                    let detailed = ui.input().pointer.secondary_down();
+                    ui_add_skill_tooltip(
+                        ui,
+                        if detailed {
+                            SkillTooltipType::Detailed
+                        } else {
+                            SkillTooltipType::Simple
+                        },
+                        game_data,
+                        player_tooltip_data,
+                        skill,
+                    );
                 }
             }
             _ => {}

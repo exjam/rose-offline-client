@@ -127,7 +127,7 @@ impl Widget {
             Widget::RadioBox(x) => x.id,
             Widget::RadioButton(x) => x.id,
             Widget::Scrollbar(x) => x.id,
-            Widget::Skill(x) => x.id,
+            Widget::Skill(x) => (x.id + x.level) as i32,
             Widget::Image(x) => x.id,
             Widget::TabButton(x) => x.id,
             Widget::TabbedPane(x) => x.id,

@@ -10,15 +10,15 @@ use super::{DataBindings, DrawWidget, LoadWidget, Widget};
 #[serde(default)]
 pub struct Skill {
     #[serde(rename = "INDEX")]
-    pub id: i32,
+    pub id: u32,
     #[serde(rename = "OFFSETX")]
     pub x: f32,
     #[serde(rename = "OFFSETY")]
     pub y: f32,
     #[serde(rename = "LEVEL")]
-    pub level: i32,
+    pub level: u32,
     #[serde(rename = "LIMITLEVEL")]
-    pub limit_level: i32,
+    pub limit_level: u32,
     #[serde(rename = "IMAGE")]
     pub image: String,
 
@@ -37,7 +37,7 @@ impl LoadWidget for Skill {
 
 impl DrawWidget for Skill {
     fn draw_widget(&self, ui: &mut egui::Ui, bindings: &mut DataBindings) {
-        if !bindings.get_visible(self.id) {
+        if !bindings.get_visible((self.id + self.level) as i32) {
             return;
         }
 
@@ -68,6 +68,6 @@ impl DrawWidget for Skill {
             ui.painter().add(egui::epaint::Shape::mesh(mesh));
         }
 
-        bindings.set_response(self.id, response);
+        bindings.set_response((self.id + self.level) as i32, response);
     }
 }

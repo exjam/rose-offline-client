@@ -66,7 +66,7 @@ fn generate_cooldown_mesh(cooldown: f32, content_rect: egui::Rect) -> egui::epai
         mesh.vertices.push(Vertex {
             pos: Pos2::new(x, y),
             uv: WHITE_UV,
-            color: Color32::from_rgba_unmultiplied(50, 50, 50, 150),
+            color: Color32::from_rgba_unmultiplied(40, 40, 40, 160),
         });
         pos as u32
     };
