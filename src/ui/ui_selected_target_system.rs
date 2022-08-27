@@ -1,4 +1,4 @@
-use bevy::prelude::{Entity, Local, Query, Res, ResMut};
+use bevy::prelude::{Local, Query, Res, ResMut};
 use bevy_egui::{egui, EguiContext};
 
 use rose_game_common::components::{AbilityValues, HealthPoints, Npc};
@@ -6,6 +6,7 @@ use rose_game_common::components::{AbilityValues, HealthPoints, Npc};
 use crate::{
     components::{ClientEntityName, Command},
     resources::{SelectedTarget, UiResources, UiSprite},
+    ui::UiStateWindows,
 };
 
 #[derive(Default)]
@@ -20,6 +21,7 @@ pub struct UiSelectedTargetState {
 pub fn ui_selected_target_system(
     mut egui_context: ResMut<EguiContext>,
     mut ui_state: Local<UiSelectedTargetState>,
+    ui_state_windows: Res<UiStateWindows>,
     query_target: Query<(
         &AbilityValues,
         &Command,
@@ -36,6 +38,10 @@ pub fn ui_selected_target_system(
         ui_state.sprite_bottom = ui_resources.get_sprite(0, "UI18_PARTYOPTION_BOTTOM");
         ui_state.hp_gauge_background = ui_resources.get_sprite(0, "UI00_GUAGE_BACKGROUND");
         ui_state.hp_gauge_foreground = ui_resources.get_sprite(0, "UI00_GUAGE_RED");
+    }
+
+    if !ui_state_windows.selected_target_ui_open {
+        return;
     }
 
     if let Some(selected_target_entity) = selected_target.selected {

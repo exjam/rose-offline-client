@@ -14,8 +14,38 @@ struct ZoneLighting {
     fog_alpha_range_end: f32,
 };
 
+#ifdef ZONE_LIGHTING_GROUP_2
+@group(2) @binding(0)
+var<uniform> zone_lighting: ZoneLighting;
+#else
 @group(3) @binding(0)
 var<uniform> zone_lighting: ZoneLighting;
+#endif
+
+fn apply_zone_lighting_fog(world_position: vec4<f32>, fragment_color: vec4<f32>) -> vec4<f32> {
+    let view_z = dot(vec4<f32>(
+        view.inverse_view[0].z,
+        view.inverse_view[1].z,
+        view.inverse_view[2].z,
+        view.inverse_view[3].z
+    ), world_position);
+
+    var fog_amount: f32 = clamp(1.0 - exp2(-zone_lighting.fog_density * zone_lighting.fog_density * view_z * view_z * 1.442695), 0.0, 1.0);
+
+    if (world_position.y >= zone_lighting.fog_height_offset) {
+        fog_amount = fog_amount * clamp(1.0 - (world_position.y - zone_lighting.fog_height_offset) / zone_lighting.fog_height_falloff, 0.0, 1.0);
+    }
+
+    var fog_color: vec4<f32> = vec4<f32>(mix(fragment_color.rgb, zone_lighting.fog_color.rgb, clamp(fog_amount, zone_lighting.fog_min_density, zone_lighting.fog_max_density)), fragment_color.a);
+
+    if (fog_amount >= zone_lighting.fog_alpha_range_end) {
+        discard;
+    } else if (fog_amount >= zone_lighting.fog_alpha_range_start) {
+        fog_color.a = fog_color.a *(1.0 - (fog_amount - zone_lighting.fog_alpha_range_start) / (zone_lighting.fog_alpha_range_end - zone_lighting.fog_alpha_range_start));
+    }
+
+    return fog_color;
+}
 
 fn apply_zone_lighting(world_position: vec4<f32>, fragment_color: vec4<f32>) -> vec4<f32> {
     let view_z = dot(vec4<f32>(
@@ -32,18 +62,10 @@ fn apply_zone_lighting(world_position: vec4<f32>, fragment_color: vec4<f32>) -> 
     }
 
 #ifdef ZONE_LIGHTING_CHARACTER
-    let lit_color = fragment_color.rgb * zone_lighting.character_ambient_color.rgb;
+    let lit_color = vec4<f32>(fragment_color.rgb * zone_lighting.character_ambient_color.rgb, fragment_color.a);
 #else
-    let lit_color = fragment_color.rgb * zone_lighting.map_ambient_color.rgb;
+    let lit_color = vec4<f32>(fragment_color.rgb * zone_lighting.map_ambient_color.rgb, fragment_color.a);
 #endif
 
-    var fog_color: vec4<f32> = vec4<f32>(mix(lit_color, zone_lighting.fog_color.rgb, clamp(fog_amount, zone_lighting.fog_min_density, zone_lighting.fog_max_density)), fragment_color.a);
-
-    if (fog_amount >= zone_lighting.fog_alpha_range_end) {
-        discard;
-    } else if (fog_amount >= zone_lighting.fog_alpha_range_start) {
-        fog_color.a = fog_color.a *(1.0 - (fog_amount - zone_lighting.fog_alpha_range_start) / (zone_lighting.fog_alpha_range_end - zone_lighting.fog_alpha_range_start));
-    }
-
-    return fog_color;
+    return apply_zone_lighting_fog(world_position, lit_color);
 }

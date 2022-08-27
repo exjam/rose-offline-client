@@ -11,6 +11,7 @@ mod effect;
 mod event_object;
 mod item_drop_model;
 mod model_height;
+mod name_tag_entity;
 mod night_time_effect;
 mod npc_model;
 mod particle_sequence;
@@ -51,6 +52,10 @@ pub use effect::{Effect, EffectMesh, EffectParticle};
 pub use event_object::EventObject;
 pub use item_drop_model::ItemDropModel;
 pub use model_height::ModelHeight;
+pub use name_tag_entity::{
+    NameTag, NameTagEntity, NameTagHealthbarBackground, NameTagHealthbarForeground,
+    NameTagTargetMark, NameTagType,
+};
 pub use night_time_effect::NightTimeEffect;
 pub use npc_model::NpcModel;
 pub use particle_sequence::{ActiveParticle, ParticleSequence};

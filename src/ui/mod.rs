@@ -52,6 +52,7 @@ pub struct UiStateWindows {
     pub settings_open: bool,
     pub menu_open: bool,
     pub party_options_open: bool,
+    pub selected_target_ui_open: bool,
 }
 
 pub use dialog_loader::{load_dialog_sprites_system, DialogInstance, DialogLoader};

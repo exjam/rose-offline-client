@@ -19,7 +19,7 @@ use rose_data::{
 use rose_game_common::components::{CharacterGender, CharacterInfo, Equipment, Npc};
 
 use crate::{
-    components::{ActiveMotion, CharacterModel, Effect, NpcModel},
+    components::{ActiveMotion, CharacterModel, ClientEntityName, Effect, NpcModel},
     events::{SpawnEffectData, SpawnEffectEvent},
     free_camera::FreeCamera,
     orbit_camera::OrbitCamera,
@@ -153,6 +153,9 @@ pub fn model_viewer_system(
                 {
                     let entity = commands
                         .spawn_bundle((
+                            ClientEntityName {
+                                name: npc.name.to_string(),
+                            },
                             Npc::new(npc.id, 0),
                             Visibility::default(),
                             ComputedVisibility::default(),
@@ -228,6 +231,9 @@ pub fn model_viewer_system(
 
                     let entity = commands
                         .spawn_bundle((
+                            ClientEntityName {
+                                name: character_info.name.clone(),
+                            },
                             character_info,
                             equipment,
                             Visibility::default(),

@@ -65,7 +65,7 @@ use orbit_camera::OrbitCameraPlugin;
 use render::{DamageDigitMaterial, RoseRenderPlugin};
 use resources::{
     load_ui_resources, run_network_thread, update_ui_resources, AppState, ClientEntityList,
-    DamageDigitsSpawner, DebugRenderConfig, GameData, NetworkThread,
+    DamageDigitsSpawner, DebugRenderConfig, GameData, NameTagCache, NameTagSettings, NetworkThread,
     NetworkThreadMessage, RenderConfiguration, SelectedTarget, ServerConfiguration, SoundSettings,
     VfsResource, WorldTime, ZoneTime,
 };
@@ -85,7 +85,8 @@ use systems::{
     game_zone_change_system, hit_event_system, item_drop_model_add_collider_system,
     item_drop_model_system, login_connection_system, login_event_system, login_state_enter_system,
     login_state_exit_system, login_system, model_viewer_enter_system, model_viewer_exit_system,
-    model_viewer_system, network_thread_system, npc_idle_sound_system,
+    model_viewer_system, name_tag_system, name_tag_update_healthbar_system,
+    name_tag_visibility_system, network_thread_system, npc_idle_sound_system,
     npc_model_add_collider_system, npc_model_system, particle_sequence_system,
     passive_recovery_system, pending_damage_system, pending_skill_effect_system,
     player_command_system, projectile_system, quest_trigger_system, spawn_effect_system,
@@ -623,9 +624,16 @@ fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsC
                 .after(pending_damage_system)
                 .after(hit_event_system),
         )
+        .add_system(
+            name_tag_update_healthbar_system
+                .after(pending_damage_system)
+                .after(hit_event_system),
+        )
         .add_system(update_ui_resources)
         .add_system(spawn_effect_system)
         .add_system(npc_idle_sound_system)
+        .add_system(name_tag_system)
+        .add_system(name_tag_visibility_system.after(game_mouse_input_system))
         .add_system(world_time_system)
         .add_system(system_func_event_system)
         .add_system(load_dialog_sprites_system)
@@ -769,7 +777,9 @@ fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsC
         .init_resource::<DebugRenderConfig>()
         .init_resource::<WorldTime>()
         .init_resource::<ZoneTime>()
-        .init_resource::<SelectedTarget>();
+        .init_resource::<NameTagCache>()
+        .init_resource::<SelectedTarget>()
+        .init_resource::<NameTagSettings>();
 
     app.add_system_set(SystemSet::on_enter(AppState::Game).with_system(game_state_enter_system))
         .add_system_set(

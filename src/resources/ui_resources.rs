@@ -46,6 +46,7 @@ pub enum UiSpriteSheetType {
     StateIcon,
     ItemSocket,
     MinimapArrow,
+    TargetMark,
 }
 
 #[derive(Clone)]
@@ -98,6 +99,7 @@ impl UiResources {
             4 => UiSpriteSheetType::Skill,
             5 => UiSpriteSheetType::StateIcon,
             6 => UiSpriteSheetType::ItemSocket,
+            9 => UiSpriteSheetType::TargetMark,
             _ => return None,
         };
         let sprite_sheet = self.sprite_sheets[sprite_sheet_type].as_ref()?;
@@ -137,6 +139,40 @@ impl UiResources {
             width: ((sprite.right + 1) - sprite.left) as f32,
             height: ((sprite.bottom + 1) - sprite.top) as f32,
         })
+    }
+
+    pub fn get_sprite_image(&self, module_id: i32, sprite_name: &str) -> Option<&Handle<Image>> {
+        let sprite_sheet_type = match module_id {
+            0 => UiSpriteSheetType::Ui,
+            1 => UiSpriteSheetType::Item,
+            3 => UiSpriteSheetType::ExUi,
+            4 => UiSpriteSheetType::Skill,
+            5 => UiSpriteSheetType::StateIcon,
+            6 => UiSpriteSheetType::ItemSocket,
+            9 => UiSpriteSheetType::TargetMark,
+            _ => return None,
+        };
+        let sprite_sheet = self.sprite_sheets[sprite_sheet_type].as_ref()?;
+        let sprite_index = sprite_sheet
+            .sprites_by_name
+            .as_ref()
+            .unwrap()
+            .get(sprite_name)?;
+
+        self.get_sprite_image_by_index(sprite_sheet_type, *sprite_index as usize)
+    }
+
+    pub fn get_sprite_image_by_index(
+        &self,
+        sprite_sheet_type: UiSpriteSheetType,
+        sprite_index: usize,
+    ) -> Option<&Handle<Image>> {
+        let sprite_sheet = self.sprite_sheets[sprite_sheet_type].as_ref()?;
+        let sprite = sprite_sheet.sprites.get(sprite_index)?;
+        let texture = sprite_sheet
+            .loaded_textures
+            .get(sprite.texture_id as usize)?;
+        Some(&texture.handle)
     }
 
     pub fn get_minimap_player_sprite(&self) -> Option<UiSprite> {
@@ -348,6 +384,7 @@ pub fn load_ui_resources(
             UiSpriteSheetType::Skill => load_ui_spritesheet(vfs, &asset_server, &mut egui_context,  "3DDATA/CONTROL/RES/SKILLICON.TSI", "").map_err(|e| { log::warn!("Error loading ui resource: {}", e); e }).ok(),
             UiSpriteSheetType::Item => load_ui_spritesheet(vfs, &asset_server, &mut egui_context,  "3DDATA/CONTROL/RES/ITEM1.TSI", "").map_err(|e| { log::warn!("Error loading ui resource: {}", e); e }).ok(),
             UiSpriteSheetType::ItemSocket => load_ui_spritesheet(vfs, &asset_server, &mut egui_context,  "3DDATA/CONTROL/RES/SOKETJAM.TSI", "").map_err(|e| { log::warn!("Error loading ui resource: {}", e); e }).ok(),
+            UiSpriteSheetType::TargetMark => load_ui_spritesheet(vfs, &asset_server, &mut egui_context,  "3DDATA/CONTROL/RES/TARGETMARK.TSI", "").map_err(|e| { log::warn!("Error loading ui resource: {}", e); e }).ok(),
             UiSpriteSheetType::MinimapArrow => {
                 let handle = asset_server.load("3DDATA/CONTROL/RES/MINIMAP_ARROW.TGA");
                 let texture_id = egui_context.add_image(handle.clone_weak());

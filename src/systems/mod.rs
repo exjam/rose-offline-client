@@ -25,6 +25,9 @@ mod item_drop_model_system;
 mod login_connection_system;
 mod login_system;
 mod model_viewer_system;
+mod name_tag_system;
+mod name_tag_update_healthbar_system;
+mod name_tag_visibility_system;
 mod network_thread_system;
 mod npc_idle_sound_system;
 mod npc_model_system;
@@ -87,6 +90,9 @@ pub use login_system::{
 pub use model_viewer_system::{
     model_viewer_enter_system, model_viewer_exit_system, model_viewer_system,
 };
+pub use name_tag_system::name_tag_system;
+pub use name_tag_update_healthbar_system::name_tag_update_healthbar_system;
+pub use name_tag_visibility_system::name_tag_visibility_system;
 pub use network_thread_system::network_thread_system;
 pub use npc_idle_sound_system::npc_idle_sound_system;
 pub use npc_model_system::{npc_model_add_collider_system, npc_model_system};

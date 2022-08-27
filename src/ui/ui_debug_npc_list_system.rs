@@ -141,7 +141,8 @@ pub fn ui_debug_npc_list_system(
                                     AppState::Game => {
                                         if ui
                                             .add_enabled(
-                                                npc_data.npc_type_index < 900,
+                                                npc_data.npc_type_index.map_or(0, |x| x.get())
+                                                    < 900,
                                                 egui::Button::new("Spawn"),
                                             )
                                             .clicked()

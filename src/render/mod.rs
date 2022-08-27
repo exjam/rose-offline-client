@@ -17,6 +17,7 @@ mod terrain_material;
 mod texture_array;
 mod trail_effect;
 mod water_material;
+mod world_ui;
 mod zone_lighting;
 
 pub const MESH_ATTRIBUTE_UV_1: MeshVertexAttribute =
@@ -42,6 +43,7 @@ pub use terrain_material::{TerrainMaterial, TERRAIN_MESH_ATTRIBUTE_TILE_INFO};
 pub use texture_array::{GpuTextureArray, TextureArray, TextureArrayBuilder};
 pub use trail_effect::TrailEffect;
 pub use water_material::WaterMaterial;
+pub use world_ui::WorldUiRect;
 pub use zone_lighting::ZoneLighting;
 
 use damage_digit_material::DamageDigitMaterialPlugin;
@@ -55,6 +57,7 @@ use terrain_material::TerrainMaterialPlugin;
 use texture_array::TextureArrayPlugin;
 use trail_effect::TrailEffectRenderPlugin;
 use water_material::WaterMaterialPlugin;
+use world_ui::WorldUiRenderPlugin;
 use zone_lighting::ZoneLightingPlugin;
 
 #[derive(Default)]
@@ -75,6 +78,7 @@ impl Plugin for RoseRenderPlugin {
             .add_plugin(DamageDigitMaterialPlugin)
             .add_plugin(DamageDigitRenderPlugin)
             .add_plugin(SkyMaterialPlugin)
-            .add_plugin(TrailEffectRenderPlugin);
+            .add_plugin(TrailEffectRenderPlugin)
+            .add_plugin(WorldUiRenderPlugin);
     }
 }
