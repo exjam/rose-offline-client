@@ -404,6 +404,29 @@ pub fn ui_minimap_system(
                         });
                     }
                 }
+
+                // Draw player x, y
+                let player_xy_rect = egui::Rect::from_min_size(
+                    ui.min_rect().min + egui::vec2(1.0, dialog_height - 17.0),
+                    egui::vec2(dialog_width - 2.0, 17.0),
+                );
+
+                let mut mesh = egui::epaint::Mesh::default();
+                mesh.add_colored_rect(
+                    player_xy_rect,
+                    egui::Color32::from_rgba_unmultiplied(0, 0, 0, 190),
+                );
+                ui.painter().add(egui::epaint::Shape::mesh(mesh));
+
+                ui.allocate_ui_at_rect(player_xy_rect.shrink(2.0), |ui| {
+                    if let Some(player_position) = player_position {
+                        ui.label(format!(
+                            "{:0>4}, {:0>4}",
+                            (player_position.position.x / 100.0) as i32,
+                            (player_position.position.y / 100.0) as i32
+                        ));
+                    }
+                });
             }
         });
 
