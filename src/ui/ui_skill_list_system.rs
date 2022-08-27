@@ -4,10 +4,12 @@ use bevy::{
 };
 use bevy_egui::{egui, EguiContext};
 
+use rose_data::AbilityType;
 use rose_data_irose::{IroseSkillPageType, SKILL_PAGE_SIZE};
 use rose_game_common::components::{CharacterInfo, SkillList, SkillPoints, SkillSlot};
 
 use crate::{
+    bundles::ability_values_get_value,
     components::PlayerCharacter,
     events::PlayerCommandEvent,
     resources::{GameData, UiResources, UiSpriteSheetType},
@@ -239,13 +241,97 @@ pub fn ui_skill_list_system(
                             .as_ref()
                             .and_then(|skill| game_data.skills.get_skill(*skill));
                         if let Some(skill_data) = skill_data {
-                            ui.add_label_at(
-                                egui::pos2(start_x + 46.0, start_y + 5.0),
-                                skill_data.name,
-                            );
+                            // Skill name
+                            if skill_data.level > 0 {
+                                ui.add_label_at(
+                                    egui::pos2(start_x + 46.0, start_y + 5.0),
+                                    format!("{} (Lv: {})", skill_data.name, skill_data.level),
+                                );
+                            } else {
+                                ui.add_label_at(
+                                    egui::pos2(start_x + 46.0, start_y + 5.0),
+                                    skill_data.name,
+                                );
+                            }
+
+                            // Skill use ability values
+                            if !skill_data.use_ability.is_empty() {
+                                ui.allocate_ui_at_rect(
+                                    egui::Rect::from_min_size(
+                                        ui.min_rect().min
+                                            + egui::vec2(start_x + 46.0, start_y + 25.0),
+                                        egui::vec2(100.0, 18.0),
+                                    ),
+                                    |ui| {
+                                        ui.horizontal(|ui| {
+                                            for &(ability_type, mut value) in
+                                                skill_data.use_ability.iter()
+                                            {
+                                                let mut color = egui::Color32::RED;
+
+                                                if let Some(player_tooltip_data) =
+                                                    player_tooltip_data.as_ref()
+                                                {
+                                                    if matches!(ability_type, AbilityType::Mana) {
+                                                        let use_mana_rate = (100
+                                                            - player_tooltip_data
+                                                                .ability_values
+                                                                .get_save_mana())
+                                                            as f32
+                                                            / 100.0;
+                                                        value =
+                                                            (value as f32 * use_mana_rate) as i32;
+                                                    }
+
+                                                    if let Some(current_value) =
+                                                        ability_values_get_value(
+                                                            ability_type,
+                                                            player_tooltip_data.ability_values,
+                                                            Some(
+                                                                player_tooltip_data.character_info,
+                                                            ),
+                                                            Some(
+                                                                player_tooltip_data
+                                                                    .experience_points,
+                                                            ),
+                                                            Some(player_tooltip_data.health_points),
+                                                            Some(player_tooltip_data.inventory),
+                                                            Some(player_tooltip_data.level),
+                                                            Some(player_tooltip_data.mana_points),
+                                                            Some(player_tooltip_data.move_speed),
+                                                            Some(player_tooltip_data.skill_points),
+                                                            Some(player_tooltip_data.stamina),
+                                                            Some(player_tooltip_data.stat_points),
+                                                            Some(player_tooltip_data.team),
+                                                            Some(
+                                                                player_tooltip_data
+                                                                    .union_membership,
+                                                            ),
+                                                        )
+                                                    {
+                                                        if current_value >= value as i32 {
+                                                            color = egui::Color32::GREEN;
+                                                        }
+                                                    }
+                                                }
+
+                                                ui.colored_label(
+                                                    color,
+                                                    format!(
+                                                        "{} {}",
+                                                        game_data
+                                                            .string_database
+                                                            .get_ability_type(ability_type),
+                                                        value
+                                                    ),
+                                                );
+                                            }
+                                        });
+                                    },
+                                );
+                            }
                         }
 
-                        // TODO: Skill usage requirements
                         // TODO: Skill level up button
 
                         ui_add_skill_list_slot(

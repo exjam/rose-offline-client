@@ -19,21 +19,21 @@ const TOOLTIP_MAX_WIDTH: f32 = 300.0;
 
 #[derive(WorldQuery)]
 pub struct PlayerTooltipQuery<'w> {
-    ability_values: &'w AbilityValues,
-    character_info: &'w CharacterInfo,
-    experience_points: &'w ExperiencePoints,
-    health_points: &'w HealthPoints,
-    equipment: &'w Equipment,
-    inventory: &'w Inventory,
-    level: &'w Level,
-    mana_points: &'w ManaPoints,
-    move_speed: &'w MoveSpeed,
-    skill_list: &'w SkillList,
-    skill_points: &'w SkillPoints,
-    stamina: &'w Stamina,
-    stat_points: &'w StatPoints,
-    team: &'w Team,
-    union_membership: &'w UnionMembership,
+    pub ability_values: &'w AbilityValues,
+    pub character_info: &'w CharacterInfo,
+    pub experience_points: &'w ExperiencePoints,
+    pub health_points: &'w HealthPoints,
+    pub equipment: &'w Equipment,
+    pub inventory: &'w Inventory,
+    pub level: &'w Level,
+    pub mana_points: &'w ManaPoints,
+    pub move_speed: &'w MoveSpeed,
+    pub skill_list: &'w SkillList,
+    pub skill_points: &'w SkillPoints,
+    pub stamina: &'w Stamina,
+    pub stat_points: &'w StatPoints,
+    pub team: &'w Team,
+    pub union_membership: &'w UnionMembership,
 }
 
 fn get_item_name_color(item_type: ItemType, item_data: &BaseItemData) -> egui::Color32 {
