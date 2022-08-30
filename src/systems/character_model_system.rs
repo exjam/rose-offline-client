@@ -143,7 +143,7 @@ pub fn character_model_add_collider_system(
 
         commands.entity(entity).insert_bundle((
             ColliderEntity::new(collider_entity),
-            ModelHeight::new(half_extents.y * 2.0),
+            ModelHeight::new(0.65 + half_extents.y * 2.0),
         ));
     }
 }
@@ -215,7 +215,7 @@ pub fn character_model_changed_collider_system(
 
         commands
             .entity(entity)
-            .insert(ModelHeight::new(half_extents.y * 2.0));
+            .insert(ModelHeight::new(0.65 + half_extents.y * 2.0));
     }
 }
 
@@ -280,7 +280,7 @@ pub fn character_personal_store_model_add_collider_system(
 
         commands.entity(entity).insert_bundle((
             ColliderEntity::new(collider_entity),
-            ModelHeight::new(half_extents.y * 2.0),
+            ModelHeight::new(0.65 + half_extents.y * 2.0),
         ));
     }
 }
