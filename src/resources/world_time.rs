@@ -8,11 +8,13 @@ pub struct WorldTime {
     pub time_since_last_tick: Duration,
 }
 
-impl WorldTime {
-    pub fn default() -> Self {
+impl Default for WorldTime {
+    fn default() -> Self {
         Self::new(WorldTicks(rand::thread_rng().gen_range(0..=9999)))
     }
+}
 
+impl WorldTime {
     pub fn new(ticks: WorldTicks) -> Self {
         Self {
             ticks,

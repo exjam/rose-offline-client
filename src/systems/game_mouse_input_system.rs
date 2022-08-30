@@ -3,36 +3,35 @@ use bevy::{
     input::Input,
     math::Vec3,
     prelude::{
-        Camera, Camera3d, Commands, Entity, EventWriter, GlobalTransform, MouseButton, Query, Res,
-        ResMut, With,
+        Camera, Camera3d, Entity, EventWriter, GlobalTransform, MouseButton, Query, Res, ResMut,
+        With,
     },
     render::camera::Projection,
     window::Windows,
 };
-use bevy_egui::{egui, EguiContext};
+use bevy_egui::EguiContext;
 use bevy_rapier3d::prelude::{InteractionGroups, QueryFilter, RapierContext};
 
 use rose_game_common::components::{ItemDrop, Team};
 
 use crate::{
     components::{
-        ClientEntityName, ColliderParent, PlayerCharacter, Position, SelectedTarget, ZoneObject,
-        COLLISION_FILTER_CLICKABLE, COLLISION_GROUP_PHYSICS_TOY, COLLISION_GROUP_PLAYER,
+        ColliderParent, PlayerCharacter, Position, ZoneObject, COLLISION_FILTER_CLICKABLE,
+        COLLISION_GROUP_PHYSICS_TOY, COLLISION_GROUP_PLAYER,
     },
     events::PlayerCommandEvent,
     ray_from_screenspace::ray_from_screenspace,
+    resources::SelectedTarget,
 };
 
 #[derive(WorldQuery)]
 pub struct PlayerQuery<'w> {
     entity: Entity,
     team: &'w Team,
-    selected_target: Option<&'w SelectedTarget>,
 }
 
 #[allow(clippy::too_many_arguments)]
 pub fn game_mouse_input_system(
-    mut commands: Commands,
     mouse_button_input: Res<Input<MouseButton>>,
     windows: Res<Windows>,
     query_camera: Query<(&Camera, &Projection, &GlobalTransform), With<Camera3d>>,
@@ -40,7 +39,6 @@ pub fn game_mouse_input_system(
     mut egui_ctx: ResMut<EguiContext>,
     query_collider_parent: Query<&ColliderParent>,
     query_hit_entity: Query<(
-        Option<&ClientEntityName>,
         Option<&Team>,
         Option<&Position>,
         Option<&ItemDrop>,
@@ -48,7 +46,10 @@ pub fn game_mouse_input_system(
     )>,
     query_player: Query<PlayerQuery, With<PlayerCharacter>>,
     mut player_command_events: EventWriter<PlayerCommandEvent>,
+    mut selected_target: ResMut<SelectedTarget>,
 ) {
+    selected_target.hover = None;
+
     if egui_ctx.ctx_mut().wants_pointer_input() {
         // Mouse is over UI
         return;
@@ -90,24 +91,9 @@ pub fn game_mouse_input_system(
                     .get(collider_entity)
                     .map_or(collider_entity, |collider_parent| collider_parent.entity);
 
-                if let Ok((
-                    hit_client_entity_name,
-                    hit_team,
-                    hit_entity_position,
-                    hit_item_drop,
-                    hit_zone_object,
-                )) = query_hit_entity.get(hit_entity)
+                if let Ok((hit_team, hit_entity_position, hit_item_drop, hit_zone_object)) =
+                    query_hit_entity.get(hit_entity)
                 {
-                    if let Some(hit_client_entity_name) = hit_client_entity_name {
-                        egui::show_tooltip(
-                            egui_ctx.ctx_mut(),
-                            egui::Id::new("entity_mouse_tooltip"),
-                            |ui| {
-                                ui.label(hit_client_entity_name.as_str());
-                            },
-                        );
-                    }
-
                     if hit_zone_object.is_some() {
                         if mouse_button_input.just_pressed(MouseButton::Left) {
                             player_command_events.send(PlayerCommandEvent::Move(
@@ -120,6 +106,8 @@ pub fn game_mouse_input_system(
                             ));
                         }
                     } else if hit_item_drop.is_some() {
+                        selected_target.hover = Some(hit_entity);
+
                         if mouse_button_input.just_pressed(MouseButton::Left) {
                             if let Some(hit_entity_position) = hit_entity_position {
                                 // Move to target item drop, once we are close enough the command_system
@@ -131,10 +119,12 @@ pub fn game_mouse_input_system(
                             }
                         }
                     } else if let Some(hit_team) = hit_team {
+                        selected_target.hover = Some(hit_entity);
+
                         if mouse_button_input.just_pressed(MouseButton::Left) {
-                            if player
-                                .selected_target
-                                .map_or(false, |target| target.entity == hit_entity)
+                            if selected_target
+                                .selected
+                                .map_or(false, |selected_entity| selected_entity == hit_entity)
                             {
                                 if hit_team.id == Team::DEFAULT_NPC_TEAM_ID
                                     || hit_team.id == player.team.id
@@ -152,9 +142,7 @@ pub fn game_mouse_input_system(
                                         .send(PlayerCommandEvent::Attack(hit_entity));
                                 }
                             } else {
-                                commands
-                                    .entity(player.entity)
-                                    .insert(SelectedTarget::new(hit_entity));
+                                selected_target.selected = Some(hit_entity);
                             }
                         }
                     }

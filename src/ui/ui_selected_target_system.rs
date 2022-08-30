@@ -1,11 +1,11 @@
-use bevy::prelude::{Commands, Entity, Local, Query, Res, ResMut, With};
+use bevy::prelude::{Entity, Local, Query, Res, ResMut};
 use bevy_egui::{egui, EguiContext};
 
 use rose_game_common::components::{AbilityValues, HealthPoints, Npc};
 
 use crate::{
-    components::{ClientEntityName, Command, PlayerCharacter, SelectedTarget},
-    resources::{UiResources, UiSprite},
+    components::{ClientEntityName, Command},
+    resources::{SelectedTarget, UiResources, UiSprite},
 };
 
 #[derive(Default)]
@@ -18,10 +18,8 @@ pub struct UiSelectedTargetState {
 }
 
 pub fn ui_selected_target_system(
-    mut commands: Commands,
     mut egui_context: ResMut<EguiContext>,
     mut ui_state: Local<UiSelectedTargetState>,
-    query_player: Query<(Entity, Option<&SelectedTarget>), With<PlayerCharacter>>,
     query_target: Query<(
         &AbilityValues,
         &Command,
@@ -30,9 +28,8 @@ pub fn ui_selected_target_system(
         Option<&Npc>,
     )>,
     ui_resources: Res<UiResources>,
+    mut selected_target: ResMut<SelectedTarget>,
 ) {
-    let (player_entity, player_target) = query_player.single();
-
     if ui_state.sprite_top.is_none() {
         ui_state.sprite_top = ui_resources.get_sprite(0, "UI18_PARTYOPTION_TOP");
         ui_state.sprite_middle = ui_resources.get_sprite(0, "UI18_PARTYOPTION_MIDDLE");
@@ -41,13 +38,13 @@ pub fn ui_selected_target_system(
         ui_state.hp_gauge_foreground = ui_resources.get_sprite(0, "UI00_GUAGE_RED");
     }
 
-    if let Some(player_target) = player_target {
+    if let Some(selected_target_entity) = selected_target.selected {
         if let Ok((ability_values, command, client_entity_name, health_points, npc)) =
-            query_target.get(player_target.entity)
+            query_target.get(selected_target_entity)
         {
             if command.is_die() && npc.is_some() {
                 // Cannot target dead NPC
-                commands.entity(player_entity).remove::<SelectedTarget>();
+                selected_target.selected = None;
             } else {
                 egui::Window::new("Selected Target")
                     .anchor(egui::Align2::CENTER_TOP, [0.0, 0.0])
@@ -154,7 +151,7 @@ pub fn ui_selected_target_system(
             }
         } else {
             // Selected target no longer valid, remove it
-            commands.entity(player_entity).remove::<SelectedTarget>();
+            selected_target.selected = None;
         }
     }
 }

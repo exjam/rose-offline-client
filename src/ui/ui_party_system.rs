@@ -1,6 +1,6 @@
 use bevy::{
     ecs::query::WorldQuery,
-    prelude::{Assets, Commands, Entity, EventReader, Local, Query, Res, ResMut, With},
+    prelude::{Assets, Entity, EventReader, Local, Query, Res, ResMut, With},
 };
 use bevy_egui::{egui, EguiContext};
 
@@ -12,11 +12,9 @@ use rose_game_common::{
 };
 
 use crate::{
-    components::{
-        ClientEntity, ClientEntityName, PartyInfo, PartyOwner, PlayerCharacter, SelectedTarget,
-    },
+    components::{ClientEntity, ClientEntityName, PartyInfo, PartyOwner, PlayerCharacter},
     events::PartyEvent,
-    resources::{ClientEntityList, GameConnection, UiResources},
+    resources::{ClientEntityList, GameConnection, SelectedTarget, UiResources},
     ui::widgets::{Dialog, Gauge},
 };
 
@@ -94,7 +92,6 @@ impl Default for UiStatePartySystem {
 }
 
 pub fn ui_party_system(
-    mut commands: Commands,
     mut ui_state: Local<UiStatePartySystem>,
     mut ui_state_windows: ResMut<UiStateWindows>,
     mut egui_context: ResMut<EguiContext>,
@@ -106,6 +103,7 @@ pub fn ui_party_system(
     client_entity_list: Res<ClientEntityList>,
     ui_resources: Res<UiResources>,
     dialog_assets: Res<Assets<Dialog>>,
+    mut selected_target: ResMut<SelectedTarget>,
 ) {
     let player = if let Ok(player) = query_player.get_single() {
         player
@@ -347,9 +345,7 @@ pub fn ui_party_system(
                                         .get_client_entity_id()
                                         .and_then(|entity_id| client_entity_list.get(entity_id))
                                     {
-                                        commands
-                                            .entity(player.entity)
-                                            .insert(SelectedTarget::new(entity));
+                                        selected_target.selected = Some(entity);
                                     }
 
                                     ui_state.selected_party_member_index = Some(index);

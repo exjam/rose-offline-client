@@ -17,10 +17,9 @@ use rose_game_common::{
 use crate::{
     components::{
         ClientEntity, ConsumableCooldownGroup, Cooldowns, PartyInfo, PlayerCharacter, Position,
-        SelectedTarget,
     },
     events::{ChatboxEvent, PlayerCommandEvent},
-    resources::{GameConnection, GameData},
+    resources::{GameConnection, GameData, SelectedTarget},
 };
 
 #[derive(WorldQuery)]
@@ -35,7 +34,6 @@ pub struct PlayerQuery<'w> {
     skill_list: &'w SkillList,
     team: &'w Team,
     party_info: Option<&'w PartyInfo>,
-    selected_target: Option<&'w SelectedTarget>,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -48,6 +46,7 @@ pub fn player_command_system(
     mut chatbox_events: EventWriter<ChatboxEvent>,
     game_connection: Option<Res<GameConnection>>,
     game_data: Res<GameData>,
+    selected_target: Res<SelectedTarget>,
 ) {
     let query_player_result = query_player.get_single_mut();
     if query_player_result.is_err() {
@@ -146,9 +145,9 @@ pub fn player_command_system(
                                 }
                             }
                             Some(SkillBasicCommand::Attack) => {
-                                if let Some(selected_target) = player.selected_target {
+                                if let Some(selected_target_entity) = selected_target.selected {
                                     if let Ok((target_client_entity, target_team)) =
-                                        query_team.get(selected_target.entity)
+                                        query_team.get(selected_target_entity)
                                     {
                                         if target_team.id != Team::DEFAULT_NPC_TEAM_ID
                                             && target_team.id != player.team.id
@@ -177,9 +176,9 @@ pub fn player_command_system(
                                 }
                             }
                             Some(SkillBasicCommand::PartyInvite) => {
-                                if let Some(selected_target) = player.selected_target {
+                                if let Some(selected_target_entity) = selected_target.selected {
                                     if let Ok((target_client_entity, target_team)) =
-                                        query_team.get(selected_target.entity)
+                                        query_team.get(selected_target_entity)
                                     {
                                         if target_team.id == player.team.id {
                                             if let Some(game_connection) = game_connection.as_ref()
@@ -266,9 +265,9 @@ pub fn player_command_system(
                         | SkillType::EnforceBullet
                         | SkillType::FireBullet => {
                             // TODO: Check target team
-                            if let Some((target_client_entity, _)) = player
-                                .selected_target
-                                .and_then(|target| query_team.get(target.entity).ok())
+                            if let Some((target_client_entity, _)) = selected_target
+                                .selected
+                                .and_then(|selected_entity| query_team.get(selected_entity).ok())
                             {
                                 if let Some(game_connection) = game_connection.as_ref() {
                                     game_connection
@@ -354,9 +353,10 @@ pub fn player_command_system(
                                             | SkillType::TargetBound
                                             | SkillType::TargetStateDuration
                                     ) {
-                                        if let Some((target_client_entity, _)) = player
-                                            .selected_target
-                                            .and_then(|target| query_team.get(target.entity).ok())
+                                        if let Some((target_client_entity, _)) =
+                                            selected_target.selected.and_then(|target_entity| {
+                                                query_team.get(target_entity).ok()
+                                            })
                                         {
                                             // TODO: Check target team
                                             use_item_target = Some(target_client_entity.id);

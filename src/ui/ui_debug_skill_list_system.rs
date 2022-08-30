@@ -4,8 +4,10 @@ use bevy_egui::{egui, EguiContext};
 use rose_game_common::messages::client::ClientMessage;
 
 use crate::{
-    components::{Command, CommandCastSkillTarget, NextCommand, PlayerCharacter, SelectedTarget},
-    resources::{AppState, GameConnection, GameData, UiResources, UiSpriteSheetType},
+    components::{Command, CommandCastSkillTarget, NextCommand, PlayerCharacter},
+    resources::{
+        AppState, GameConnection, GameData, SelectedTarget, UiResources, UiSpriteSheetType,
+    },
     ui::{
         tooltips::{PlayerTooltipQuery, SkillTooltipType},
         ui_add_skill_tooltip, UiStateDebugWindows,
@@ -27,8 +29,9 @@ pub fn ui_debug_skill_list_system(
     game_connection: Option<Res<GameConnection>>,
     game_data: Res<GameData>,
     ui_resources: Res<UiResources>,
-    mut query_player: Query<(Entity, &mut Command, Option<&SelectedTarget>), With<PlayerCharacter>>,
+    mut query_player: Query<(Entity, &mut Command), With<PlayerCharacter>>,
     query_player_tooltip: Query<PlayerTooltipQuery, With<PlayerCharacter>>,
+    selected_target: Res<SelectedTarget>,
 ) {
     if !ui_state_debug_windows.debug_ui_open {
         return;
@@ -146,7 +149,7 @@ pub fn ui_debug_skill_list_system(
                             });
 
                             row.col(|ui| {
-                                if let Ok((player_entity, mut player_command, selected_target)) =
+                                if let Ok((player_entity, mut player_command)) =
                                     query_player.get_single_mut()
                                 {
                                     if skill_data.casting_motion_id.is_some()
@@ -164,8 +167,10 @@ pub fn ui_debug_skill_list_system(
                                             commands.entity(player_entity).insert(
                                                 NextCommand::with_cast_skill(
                                                     skill_data.id,
-                                                    selected_target.map(|x| {
-                                                        CommandCastSkillTarget::Entity(x.entity)
+                                                    selected_target.selected.map(|target_entity| {
+                                                        CommandCastSkillTarget::Entity(
+                                                            target_entity,
+                                                        )
                                                     }),
                                                     None,
                                                     None,

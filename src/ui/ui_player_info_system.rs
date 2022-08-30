@@ -1,6 +1,6 @@
 use bevy::{
     ecs::query::WorldQuery,
-    prelude::{Assets, Commands, Entity, Query, Res, ResMut, With},
+    prelude::{Assets, Entity, Query, Res, ResMut, With},
 };
 use bevy_egui::{egui, EguiContext};
 use rose_game_common::components::{
@@ -8,8 +8,8 @@ use rose_game_common::components::{
 };
 
 use crate::{
-    components::{PlayerCharacter, SelectedTarget},
-    resources::{GameData, UiResources},
+    components::PlayerCharacter,
+    resources::{GameData, SelectedTarget, UiResources},
     ui::{
         widgets::{DataBindings, Dialog, DrawText},
         UiStateWindows,
@@ -37,13 +37,13 @@ pub struct PlayerQuery<'w> {
 }
 
 pub fn ui_player_info_system(
-    mut commands: Commands,
     mut egui_context: ResMut<EguiContext>,
     mut ui_state_windows: ResMut<UiStateWindows>,
     query_player: Query<PlayerQuery, With<PlayerCharacter>>,
     game_data: Res<GameData>,
     ui_resources: Res<UiResources>,
     dialog_assets: Res<Assets<Dialog>>,
+    mut selected_target: ResMut<SelectedTarget>,
 ) {
     let dialog = if let Some(dialog) = dialog_assets.get(&ui_resources.dialog_player_info) {
         dialog
@@ -127,9 +127,7 @@ pub fn ui_player_info_system(
 
     if let Some(response) = response {
         if response.response.clicked() {
-            commands
-                .entity(player.entity)
-                .insert(SelectedTarget::new(player.entity));
+            selected_target.selected = Some(player.entity);
         }
     }
 

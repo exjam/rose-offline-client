@@ -65,8 +65,9 @@ use orbit_camera::OrbitCameraPlugin;
 use render::{DamageDigitMaterial, RoseRenderPlugin};
 use resources::{
     load_ui_resources, run_network_thread, update_ui_resources, AppState, ClientEntityList,
-    DamageDigitsSpawner, DebugRenderConfig, GameData, NetworkThread, NetworkThreadMessage,
-    RenderConfiguration, ServerConfiguration, SoundSettings, VfsResource, WorldTime, ZoneTime,
+    DamageDigitsSpawner, DebugRenderConfig, GameData, NetworkThread,
+    NetworkThreadMessage, RenderConfiguration, SelectedTarget, ServerConfiguration, SoundSettings,
+    VfsResource, WorldTime, ZoneTime,
 };
 use scripting::RoseScriptingPlugin;
 use systems::{
@@ -761,13 +762,14 @@ fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsC
     );
 
     // Game
-    app.insert_resource(UiStateDragAndDrop::default())
-        .insert_resource(UiStateWindows::default())
-        .insert_resource(UiStateDebugWindows::default())
-        .insert_resource(ClientEntityList::default())
-        .insert_resource(DebugRenderConfig::default())
-        .insert_resource(WorldTime::default())
-        .insert_resource(ZoneTime::default());
+    app.init_resource::<UiStateDragAndDrop>()
+        .init_resource::<UiStateWindows>()
+        .init_resource::<UiStateDebugWindows>()
+        .init_resource::<ClientEntityList>()
+        .init_resource::<DebugRenderConfig>()
+        .init_resource::<WorldTime>()
+        .init_resource::<ZoneTime>()
+        .init_resource::<SelectedTarget>();
 
     app.add_system_set(SystemSet::on_enter(AppState::Game).with_system(game_state_enter_system))
         .add_system_set(
