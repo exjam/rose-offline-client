@@ -4,8 +4,9 @@ use arrayvec::ArrayVec;
 use bevy::{
     ecs::query::WorldQuery,
     prelude::{
-        Assets, BuildChildren, Color, Commands, ComputedVisibility, Entity, GlobalTransform, Image,
-        Query, Res, ResMut, Transform, Vec2, Vec3, Visibility, With, Without,
+        Assets, BuildChildren, Color, Commands, ComputedVisibility, DespawnRecursiveExt, Entity,
+        EventReader, GlobalTransform, Image, Query, Res, ResMut, Transform, Vec2, Vec3, Visibility,
+        With, Without,
     },
     render::{
         render_resource::{Extent3d, TextureDimension, TextureFormat},
@@ -23,6 +24,7 @@ use crate::{
         ClientEntityName, ModelHeight, NameTag, NameTagEntity, NameTagHealthbarBackground,
         NameTagHealthbarForeground, NameTagName, NameTagTargetMark, NameTagType, PlayerCharacter,
     },
+    events::LoadZoneEvent,
     render::WorldUiRect,
     resources::{
         GameData, NameTagCache, NameTagData, NameTagSettings, UiResources, UiSpriteSheetType,
@@ -86,15 +88,28 @@ pub fn name_tag_system(
         Without<NameTagEntity>,
     >,
     query_player: Query<PlayerQuery, With<PlayerCharacter>>,
+    query_nametags: Query<(Entity, &NameTagEntity)>,
     egui_managed_textures: Res<bevy_egui::EguiManagedTextures>,
     mut egui_context: ResMut<EguiContext>,
     mut images: ResMut<Assets<Image>>,
     game_data: Res<GameData>,
     ui_resources: Res<UiResources>,
     name_tag_settings: Res<NameTagSettings>,
+    mut load_zone_events: EventReader<LoadZoneEvent>,
 ) {
     let player = query_player.get_single().ok();
     let pixels_per_point = egui_context.ctx_mut().pixels_per_point();
+
+    if load_zone_events.iter().last().is_some() {
+        // When the zone changes, we flush all cached name tag textures
+        for (entity, name_tag_entity) in query_nametags.iter() {
+            commands.entity(entity).remove::<NameTagEntity>();
+            commands.entity(name_tag_entity.0).despawn_recursive();
+        }
+
+        name_tag_cache.cache.clear();
+        return;
+    }
 
     for (entity, name, npc, level, team, model_height) in query_add.iter() {
         let name_tag_data = name_tag_cache.cache.get(&name.name);
