@@ -53,7 +53,7 @@ pub use event_object::EventObject;
 pub use item_drop_model::ItemDropModel;
 pub use model_height::ModelHeight;
 pub use name_tag_entity::{
-    NameTag, NameTagEntity, NameTagHealthbarBackground, NameTagHealthbarForeground,
+    NameTag, NameTagEntity, NameTagHealthbarBackground, NameTagHealthbarForeground, NameTagName,
     NameTagTargetMark, NameTagType,
 };
 pub use night_time_effect::NightTimeEffect;

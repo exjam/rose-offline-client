@@ -26,6 +26,7 @@ mod login_connection_system;
 mod login_system;
 mod model_viewer_system;
 mod name_tag_system;
+mod name_tag_update_color_system;
 mod name_tag_update_healthbar_system;
 mod name_tag_visibility_system;
 mod network_thread_system;
@@ -91,6 +92,7 @@ pub use model_viewer_system::{
     model_viewer_enter_system, model_viewer_exit_system, model_viewer_system,
 };
 pub use name_tag_system::name_tag_system;
+pub use name_tag_update_color_system::name_tag_update_color_system;
 pub use name_tag_update_healthbar_system::name_tag_update_healthbar_system;
 pub use name_tag_visibility_system::name_tag_visibility_system;
 pub use network_thread_system::network_thread_system;

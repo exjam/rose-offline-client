@@ -14,6 +14,9 @@ pub struct NameTag {
 }
 
 #[derive(Component)]
+pub struct NameTagName;
+
+#[derive(Component)]
 pub struct NameTagTargetMark;
 
 #[derive(Component)]

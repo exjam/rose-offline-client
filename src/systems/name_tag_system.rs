@@ -21,7 +21,7 @@ use rose_game_common::components::{Level, Npc, Team};
 use crate::{
     components::{
         ClientEntityName, ModelHeight, NameTag, NameTagEntity, NameTagHealthbarBackground,
-        NameTagHealthbarForeground, NameTagTargetMark, NameTagType, PlayerCharacter,
+        NameTagHealthbarForeground, NameTagName, NameTagTargetMark, NameTagType, PlayerCharacter,
     },
     render::WorldUiRect,
     resources::{
@@ -38,6 +38,37 @@ const ORDER_TARGET_MARK: u8 = 2;
 pub struct PlayerQuery<'w> {
     level: &'w Level,
     team: &'w Team,
+}
+
+pub fn get_monster_name_tag_color(
+    player_level: Option<&Level>,
+    monster_level: Option<&Level>,
+    monster_team: Option<&Team>,
+) -> egui::Color32 {
+    let level_diff = player_level.map_or(1, |level| level.level) as i32
+        - monster_level.map_or(1, |level| level.level) as i32;
+
+    if monster_team.map_or(false, |team| team.id == Team::DEFAULT_NPC_TEAM_ID) {
+        egui::Color32::GREEN
+    } else if level_diff <= -23 {
+        egui::Color32::from_rgb(224, 149, 255)
+    } else if level_diff <= -16 {
+        egui::Color32::from_rgb(255, 136, 200)
+    } else if level_diff <= -10 {
+        egui::Color32::from_rgb(255, 113, 107)
+    } else if level_diff <= -4 {
+        egui::Color32::from_rgb(255, 166, 107)
+    } else if level_diff <= 3 {
+        egui::Color32::from_rgb(255, 228, 122)
+    } else if level_diff <= 8 {
+        egui::Color32::from_rgb(150, 255, 122)
+    } else if level_diff <= 14 {
+        egui::Color32::from_rgb(137, 243, 255)
+    } else if level_diff <= 21 {
+        egui::Color32::from_rgb(202, 243, 255)
+    } else {
+        egui::Color32::from_rgb(217, 217, 217)
+    }
 }
 
 pub fn name_tag_system(
@@ -108,31 +139,11 @@ pub fn name_tag_system(
                 layout_job
             } else {
                 let color = if npc.is_some() {
-                    let player_level = player.as_ref().map_or(1, |player| player.level.level);
-                    let npc_level = level.map_or(1, |level| level.level);
-                    let level_diff = player_level as i32 - npc_level as i32;
-
-                    if team.map_or(false, |team| team.id == Team::DEFAULT_NPC_TEAM_ID) {
-                        egui::Color32::GREEN
-                    } else if level_diff <= -23 {
-                        egui::Color32::from_rgb(224, 149, 255)
-                    } else if level_diff <= -16 {
-                        egui::Color32::from_rgb(255, 136, 200)
-                    } else if level_diff <= -10 {
-                        egui::Color32::from_rgb(255, 113, 107)
-                    } else if level_diff <= -4 {
-                        egui::Color32::from_rgb(255, 166, 107)
-                    } else if level_diff <= 3 {
-                        egui::Color32::from_rgb(255, 228, 122)
-                    } else if level_diff <= 8 {
-                        egui::Color32::from_rgb(150, 255, 122)
-                    } else if level_diff <= 14 {
-                        egui::Color32::from_rgb(137, 243, 255)
-                    } else if level_diff <= 21 {
-                        egui::Color32::from_rgb(202, 243, 255)
-                    } else {
-                        egui::Color32::from_rgb(217, 217, 217)
-                    }
+                    get_monster_name_tag_color(
+                        player.as_ref().map(|player| player.level),
+                        level,
+                        team,
+                    )
                 } else if team.map_or(false, |team| {
                     Some(team.id) != player.as_ref().map(|player| player.team.id)
                 }) {
@@ -493,6 +504,7 @@ pub fn name_tag_system(
             commands.entity(name_tag_entity).add_children(|builder| {
                 for rect in name_tag_data.rects.iter() {
                     builder.spawn_bundle((
+                        NameTagName,
                         rect.clone(),
                         Transform::default(),
                         GlobalTransform::default(),
