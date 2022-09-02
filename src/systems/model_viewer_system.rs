@@ -19,13 +19,16 @@ use rose_data::{
 use rose_game_common::components::{CharacterGender, CharacterInfo, Equipment, Npc};
 
 use crate::{
-    components::{ActiveMotion, CharacterModel, ClientEntityName, Effect, NpcModel},
+    components::{ActiveMotion, CharacterModel, ClientEntityName, Effect, NameTagType, NpcModel},
     events::{SpawnEffectData, SpawnEffectEvent},
     free_camera::FreeCamera,
     orbit_camera::OrbitCamera,
-    resources::GameData,
+    resources::{GameData, NameTagSettings},
     ui::UiStateDebugWindows,
 };
+
+const CHARACTER_SPACING: f32 = 7.5;
+const NPC_SPACING: f32 = 7.5;
 
 pub struct ModelViewerState {
     valid_items: EnumMap<EquipmentIndex, Vec<ItemReference>>,
@@ -46,6 +49,7 @@ pub fn model_viewer_enter_system(
     query_cameras: Query<Entity, With<Camera3d>>,
     game_data: Res<GameData>,
     mut ui_state_debug_windows: ResMut<UiStateDebugWindows>,
+    mut name_tag_settings: ResMut<NameTagSettings>,
 ) {
     // Reset camera
     for entity in query_cameras.iter() {
@@ -100,11 +104,17 @@ pub fn model_viewer_enter_system(
     ui_state_debug_windows.debug_render_open = true;
     ui_state_debug_windows.npc_list_open = true;
     ui_state_debug_windows.item_list_open = true;
+
+    // Show only Monster & NPC name tags
+    name_tag_settings.show_all[NameTagType::Character] = false;
+    name_tag_settings.show_all[NameTagType::Npc] = true;
+    name_tag_settings.show_all[NameTagType::Monster] = true;
 }
 
 pub fn model_viewer_exit_system(
     mut commands: Commands,
     model_viewer_state: ResMut<ModelViewerState>,
+    mut name_tag_settings: ResMut<NameTagSettings>,
 ) {
     for entity in model_viewer_state.characters.iter() {
         commands.entity(*entity).despawn_recursive();
@@ -113,6 +123,9 @@ pub fn model_viewer_exit_system(
     for entity in model_viewer_state.npcs.iter() {
         commands.entity(*entity).despawn_recursive();
     }
+
+    // Restore default NameTagSettings
+    *name_tag_settings = NameTagSettings::default();
 }
 
 pub fn model_viewer_system(
@@ -161,9 +174,9 @@ pub fn model_viewer_system(
                             ComputedVisibility::default(),
                             GlobalTransform::default(),
                             Transform::default().with_translation(Vec3::new(
-                                2.5 + (count / 30) as f32 * 5.0,
+                                2.5 + (count / 30) as f32 * NPC_SPACING,
                                 0.0,
-                                (count % 30) as f32 * -5.0,
+                                (count % 30) as f32 * -NPC_SPACING,
                             )),
                         ))
                         .id();
@@ -240,9 +253,9 @@ pub fn model_viewer_system(
                             ComputedVisibility::default(),
                             GlobalTransform::default(),
                             Transform::default().with_translation(Vec3::new(
-                                -2.5 + (count / 25) as f32 * -5.0,
+                                -2.5 + (count / 25) as f32 * -CHARACTER_SPACING,
                                 0.0,
-                                (count % 25) as f32 * -5.0,
+                                (count % 25) as f32 * -CHARACTER_SPACING,
                             )),
                         ))
                         .id();
