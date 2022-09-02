@@ -1,4 +1,5 @@
 use bevy::{
+    asset::LoadState,
     ecs::query::QueryEntityError,
     math::{Quat, Vec3, Vec3A},
     prelude::{
@@ -13,16 +14,18 @@ use bevy::{
 use bevy_rapier3d::prelude::{Collider, CollisionGroups};
 use enum_map::EnumMap;
 
+use rose_data::NpcMotionAction;
 use rose_game_common::components::Npc;
 
 use crate::{
     components::{
-        ColliderEntity, ColliderParent, NpcModel, COLLISION_FILTER_CLICKABLE,
+        ColliderEntity, ColliderParent, ModelHeight, NpcModel, COLLISION_FILTER_CLICKABLE,
         COLLISION_FILTER_INSPECTABLE, COLLISION_GROUP_NPC, COLLISION_GROUP_PHYSICS_TOY,
     },
     model_loader::ModelLoader,
     render::{EffectMeshMaterial, ObjectMaterial, ParticleMaterial},
     resources::GameData,
+    zmo_asset_loader::ZmoAsset,
 };
 
 pub fn npc_model_system(
@@ -102,6 +105,7 @@ pub fn npc_model_system(
                     npc_id: npc.id,
                     model_parts: Vec::new(),
                     action_motions: EnumMap::default(),
+                    root_bone_position: Vec3::ZERO,
                 })
                 .remove::<SkinnedMesh>();
         }
@@ -113,6 +117,8 @@ pub fn npc_model_add_collider_system(
     query_models: Query<(Entity, &NpcModel, &SkinnedMesh), Without<ColliderEntity>>,
     query_aabb: Query<Option<&Aabb>, With<SkinnedMesh>>,
     inverse_bindposes: Res<Assets<SkinnedMeshInverseBindposes>>,
+    zmo_assets: Res<Assets<ZmoAsset>>,
+    asset_server: Res<AssetServer>,
 ) {
     // Add colliders to NPC models without one
     for (entity, npc_model, skinned_mesh) in query_models.iter() {
@@ -134,6 +140,25 @@ pub fn npc_model_add_collider_system(
                 _ => {}
             }
         }
+
+        let root_bone_height = if let Some(motion_data) =
+            zmo_assets.get(&npc_model.action_motions[NpcMotionAction::Stop])
+        {
+            // For flying NPCs their t-pose is often on the floor, so we should adjust model
+            // height by the difference in the root bone position between the t-pose and the
+            // first frame of their idle animation. And for safety, do not allow below 0.0
+            (motion_data
+                .get_translation(0, 0)
+                .map_or(0.0, |translation| translation.y)
+                - npc_model.root_bone_position.y)
+                .max(0.0)
+        } else {
+            match asset_server.get_load_state(&npc_model.action_motions[NpcMotionAction::Stop]) {
+                LoadState::NotLoaded | LoadState::Loading => all_parts_loaded = false,
+                LoadState::Loaded | LoadState::Failed | LoadState::Unloaded => {}
+            }
+            0.0
+        };
 
         let inverse_bindpose = inverse_bindposes.get(&skinned_mesh.inverse_bindposes);
         let root_bone_entity = skinned_mesh.joints[0];
@@ -166,8 +191,9 @@ pub fn npc_model_add_collider_system(
 
         commands.entity(root_bone_entity).add_child(collider_entity);
 
-        commands
-            .entity(entity)
-            .insert_bundle((ColliderEntity::new(collider_entity),));
+        commands.entity(entity).insert_bundle((
+            ColliderEntity::new(collider_entity),
+            ModelHeight::new(root_bone_height + half_extents.y * 2.0),
+        ));
     }
 }

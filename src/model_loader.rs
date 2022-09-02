@@ -192,7 +192,7 @@ impl ModelLoader {
         npc_id: NpcId,
     ) -> Option<(NpcModel, SkinnedMesh, DummyBoneOffset)> {
         let npc_model_data = self.npc_chr.npcs.get(&npc_id.get())?;
-        let (skinned_mesh, dummy_bone_offset) = if let Some(skeleton) = self
+        let (skinned_mesh, root_bone_position, dummy_bone_offset) = if let Some(skeleton) = self
             .npc_chr
             .skeleton_files
             .get(npc_model_data.skeleton_index as usize)
@@ -205,10 +205,19 @@ impl ModelLoader {
                     &skeleton,
                     skinned_mesh_inverse_bindposes_assets,
                 ),
+                if let Some(root_bone) = skeleton.bones.first() {
+                    Vec3::new(
+                        root_bone.position.x,
+                        root_bone.position.z,
+                        -root_bone.position.y,
+                    ) / 100.0
+                } else {
+                    Vec3::ZERO
+                },
                 skeleton.bones.len(),
             )
         } else {
-            (SkinnedMesh::default(), 0)
+            (SkinnedMesh::default(), Vec3::ZERO, 0)
         };
 
         let mut model_parts = Vec::with_capacity(16);
@@ -300,6 +309,7 @@ impl ModelLoader {
                 npc_id,
                 model_parts,
                 action_motions,
+                root_bone_position,
             },
             skinned_mesh,
             DummyBoneOffset::new(dummy_bone_offset),
