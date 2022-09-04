@@ -11,7 +11,7 @@ use bevy::{
 };
 use bevy_egui::{egui, EguiContext};
 use enum_map::{enum_map, EnumMap};
-use rand::prelude::SliceRandom;
+use rand::{prelude::SliceRandom, Rng};
 
 use rose_data::{
     CharacterMotionAction, EquipmentIndex, EquipmentItem, ItemReference, NpcMotionAction, ZoneId,
@@ -19,11 +19,13 @@ use rose_data::{
 use rose_game_common::components::{CharacterGender, CharacterInfo, Equipment, Npc};
 
 use crate::{
-    components::{ActiveMotion, CharacterModel, ClientEntityName, Effect, NameTagType, NpcModel},
+    components::{
+        ActiveMotion, CharacterModel, ClientEntityName, Effect, ModelHeight, NameTagType, NpcModel,
+    },
     events::{SpawnEffectData, SpawnEffectEvent},
     free_camera::FreeCamera,
     orbit_camera::OrbitCamera,
-    resources::{GameData, NameTagSettings},
+    resources::{DamageDigitsSpawner, GameData, NameTagSettings},
     ui::UiStateDebugWindows,
 };
 
@@ -137,6 +139,9 @@ pub fn model_viewer_system(
     query_effects: Query<Entity, With<Effect>>,
     game_data: Res<GameData>,
     mut egui_context: ResMut<EguiContext>,
+    damage_digits_spawner: Res<DamageDigitsSpawner>,
+    query_damage_character_model: Query<(&GlobalTransform, &ModelHeight), With<CharacterModel>>,
+    query_damage_npc_model: Query<(&GlobalTransform, &ModelHeight), With<NpcModel>>,
 ) {
     egui::Window::new("Model Viewer").show(egui_context.ctx_mut(), |ui| {
         let max_num_npcs = ui_state.max_num_npcs;
@@ -146,6 +151,30 @@ pub fn model_viewer_system(
             egui::Slider::new(&mut ui_state.num_characters, 0..=(max_num_characters - 1))
                 .suffix(" Characters"),
         );
+
+        if ui.button("Spawn Damage").clicked() {
+            let mut rng = rand::thread_rng();
+
+            for (global_transform, model_height) in query_damage_character_model.iter() {
+                damage_digits_spawner.spawn(
+                    &mut commands,
+                    global_transform,
+                    model_height.height,
+                    rng.gen_range(0..2047),
+                    true,
+                );
+            }
+
+            for (global_transform, model_height) in query_damage_npc_model.iter() {
+                damage_digits_spawner.spawn(
+                    &mut commands,
+                    global_transform,
+                    model_height.height,
+                    rng.gen_range(0..2047),
+                    false,
+                );
+            }
+        }
 
         match ui_state.num_npcs.cmp(&ui_state.npcs.len()) {
             Ordering::Less => {

@@ -1,8 +1,7 @@
 use bevy::{
-    math::Vec3,
     prelude::{
-        AssetServer, Assets, Commands, ComputedVisibility, Entity, GlobalTransform, Handle,
-        Transform, Visibility,
+        AssetServer, Assets, BuildChildren, Commands, ComputedVisibility, GlobalTransform, Handle,
+        Transform, Vec3, Visibility,
     },
     render::primitives::Aabb,
 };
@@ -42,17 +41,26 @@ impl DamageDigitsSpawner {
     pub fn spawn(
         &self,
         commands: &mut Commands,
+        global_transform: &GlobalTransform,
+        model_height: f32,
         damage: u32,
         is_damage_player: bool,
-        model_height: f32,
-    ) -> Option<Entity> {
-        Some(
-            commands
-                .spawn_bundle((
-                    DamageDigits {
-                        damage,
-                        model_height,
-                    },
+    ) {
+        let (scale, _, translation) = global_transform.to_scale_rotation_translation();
+
+        // We need to spawn inside a parent entity for positioning because the ActiveMotion will set the translation absolutely
+        commands
+            .spawn_bundle((
+                Transform::from_translation(
+                    translation + Vec3::new(0.0, model_height * scale.y, 0.0),
+                ),
+                GlobalTransform::default(),
+                Visibility::default(),
+                ComputedVisibility::default(),
+            ))
+            .with_children(|child_builder| {
+                child_builder.spawn_bundle((
+                    DamageDigits { damage },
                     DamageDigitRenderData::new(4),
                     if damage == 0 {
                         self.texture_miss.clone_weak()
@@ -62,13 +70,12 @@ impl DamageDigitsSpawner {
                         self.texture_damage.clone_weak()
                     },
                     ActiveMotion::new_once(self.motion.clone_weak()),
-                    Transform::from_translation(Vec3::new(0.0, 0.0, 0.0)),
+                    Transform::default(),
                     GlobalTransform::default(),
                     Aabb::default(),
                     Visibility::default(),
                     ComputedVisibility::default(),
-                ))
-                .id(),
-        )
+                ));
+            });
     }
 }

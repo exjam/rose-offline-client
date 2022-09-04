@@ -1,7 +1,6 @@
 use bevy::{
     ecs::query::WorldQuery,
-    hierarchy::BuildChildren,
-    prelude::{Commands, Entity, EventReader, EventWriter, Query, Res, ResMut},
+    prelude::{Commands, Entity, EventReader, EventWriter, GlobalTransform, Query, Res, ResMut},
 };
 
 use rose_game_common::{
@@ -34,10 +33,11 @@ pub struct HitDefenderQuery<'w> {
     pending_skill_effect_list: &'w mut PendingSkillEffectList,
     ability_values: &'w AbilityValues,
     health_points: &'w mut HealthPoints,
+    global_transform: &'w GlobalTransform,
     mana_points: Option<&'w mut ManaPoints>,
+    model_height: Option<&'w ModelHeight>,
     move_speed: &'w MoveSpeed,
     status_effects: &'w mut StatusEffects,
-    model_height: Option<&'w ModelHeight>,
 }
 
 fn apply_damage(
@@ -54,20 +54,17 @@ fn apply_damage(
         defender.health_points.hp -= damage.amount as i32;
     }
 
-    if let Some(damage_digits_entity) = damage_digits_spawner.spawn(
+    damage_digits_spawner.spawn(
         commands,
+        defender.global_transform,
+        defender
+            .model_height
+            .map_or(1.8, |model_height| model_height.height),
         damage.amount,
         client_entity_list
             .player_entity
             .map_or(false, |player_entity| defender.entity == player_entity),
-        defender
-            .model_height
-            .map_or(2.0, |model_height| model_height.height),
-    ) {
-        commands
-            .entity(defender.entity)
-            .add_child(damage_digits_entity);
-    }
+    );
 
     if is_killed {
         commands

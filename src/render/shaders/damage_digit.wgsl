@@ -44,8 +44,9 @@ fn vs_main(model: VertexInput) -> VertexOutput {
   let digit_idx = model.vertex_idx / 6u;
 
   let camera_right =
-    normalize(vec3<f32>(view.view_proj.x.x, 0.0, view.view_proj.z.x));
-  let camera_up = vec3<f32>(0.0, 1.0, 0.0);
+    normalize(vec3<f32>(view.view_proj.x.x, view.view_proj.y.x, view.view_proj.z.x));
+  let camera_up =
+    normalize(vec3<f32>(view.view_proj.x.y, view.view_proj.y.y, view.view_proj.z.y));
 
   let particle_position = positions.data[digit_idx].xyz;
   let x_offset = positions.data[digit_idx].w;

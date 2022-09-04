@@ -1,7 +1,7 @@
 use bevy::{
     hierarchy::DespawnRecursiveExt,
-    math::{Vec3, Vec3Swizzles, Vec4},
-    prelude::{Commands, Entity, GlobalTransform, Query, Transform},
+    math::{Vec3Swizzles, Vec4},
+    prelude::{Commands, Entity, GlobalTransform, Query},
 };
 
 use crate::{
@@ -14,20 +14,13 @@ pub fn damage_digit_render_system(
     mut query: Query<(
         Entity,
         &GlobalTransform,
-        &Transform,
         Option<&ActiveMotion>,
         &DamageDigits,
         &mut DamageDigitRenderData,
     )>,
 ) {
-    for (
-        entity,
-        global_transform,
-        local_transform,
-        active_motion,
-        damage_digits,
-        mut damage_digit_render_data,
-    ) in query.iter_mut()
+    for (entity, global_transform, active_motion, damage_digits, mut damage_digit_render_data) in
+        query.iter_mut()
     {
         damage_digit_render_data.clear();
 
@@ -37,16 +30,14 @@ pub fn damage_digit_render_system(
             continue;
         }
 
-        let translation =
-            global_transform.translation() + Vec3::new(0.0, damage_digits.model_height, 0.0);
-
+        let (scale, _, translation) = global_transform.to_scale_rotation_translation();
         if damage_digits.damage == 0 {
             // Miss, split over 4 digits
             for digit in 0..4 {
                 damage_digit_render_data.add(
                     translation,
                     -1.5 + digit as f32,
-                    0.25 * local_transform.scale.xy(),
+                    0.4 * scale.xy(),
                     Vec4::new(digit as f32 / 4.0, 0.0, (digit + 1) as f32 / 4.0, 1.0),
                 );
             }
@@ -68,7 +59,7 @@ pub fn damage_digit_render_system(
                 damage_digit_render_data.add(
                     translation,
                     number_offset - digit_offset,
-                    0.25 * local_transform.scale.xy(),
+                    0.4 * scale.xy(),
                     Vec4::new(digit as f32 / 10.0, 0.0, (digit + 1) as f32 / 10.0, 1.0),
                 );
                 digit_offset += 1.0;
