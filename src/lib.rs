@@ -65,7 +65,7 @@ use orbit_camera::OrbitCameraPlugin;
 use render::{DamageDigitMaterial, RoseRenderPlugin};
 use resources::{
     load_ui_resources, run_network_thread, update_ui_resources, AppState, ClientEntityList,
-    DamageDigitsSpawner, DebugRenderConfig, GameData, NameTagCache, NameTagSettings, NetworkThread,
+    DamageDigitsSpawner, DebugRenderConfig, GameData, NameTagSettings, NetworkThread,
     NetworkThreadMessage, RenderConfiguration, SelectedTarget, ServerConfiguration, SoundSettings,
     VfsResource, WorldTime, ZoneTime,
 };
@@ -778,7 +778,6 @@ fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsC
         .init_resource::<DebugRenderConfig>()
         .init_resource::<WorldTime>()
         .init_resource::<ZoneTime>()
-        .init_resource::<NameTagCache>()
         .init_resource::<SelectedTarget>()
         .init_resource::<NameTagSettings>();
 

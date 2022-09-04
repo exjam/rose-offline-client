@@ -16,9 +16,9 @@ impl Default for NameTagSettings {
                 NameTagType::Monster => false,
             },
             font_size: enum_map! {
-                NameTagType::Character => 14.0,
-                NameTagType::Npc => 14.0,
-                NameTagType::Monster => 14.0,
+                NameTagType::Character => 16.0,
+                NameTagType::Npc => 16.0,
+                NameTagType::Monster => 16.0,
             },
         }
     }
