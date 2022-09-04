@@ -26,7 +26,7 @@ use crate::{
         COLLISION_GROUP_PHYSICS_TOY, COLLISION_GROUP_PLAYER,
     },
     model_loader::ModelLoader,
-    render::{ObjectMaterial, ObjectMaterialClipFace},
+    render::{EffectMeshMaterial, ObjectMaterial, ObjectMaterialClipFace, ParticleMaterial},
     zms_asset_loader::ZmsMaterialNumFaces,
 };
 
@@ -307,6 +307,8 @@ pub fn character_model_system(
     asset_server: Res<AssetServer>,
     model_loader: Res<ModelLoader>,
     mut object_materials: ResMut<Assets<ObjectMaterial>>,
+    mut particle_materials: ResMut<Assets<ParticleMaterial>>,
+    mut effect_mesh_materials: ResMut<Assets<EffectMeshMaterial>>,
     mut skinned_mesh_inverse_bindposes_assets: ResMut<Assets<SkinnedMeshInverseBindposes>>,
 ) {
     for (
@@ -327,6 +329,8 @@ pub fn character_model_system(
                     &mut commands,
                     &asset_server,
                     &mut object_materials,
+                    &mut particle_materials,
+                    &mut effect_mesh_materials,
                     entity,
                     character_info,
                     equipment,
@@ -395,6 +399,8 @@ pub fn character_model_system(
                     &mut commands,
                     &asset_server,
                     &mut object_materials,
+                    &mut particle_materials,
+                    &mut effect_mesh_materials,
                     &mut skinned_mesh_inverse_bindposes_assets,
                     entity,
                     character_info,

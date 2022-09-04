@@ -4,8 +4,8 @@ use arrayvec::ArrayVec;
 use bevy::{
     math::{Mat4, Quat, Vec3},
     prelude::{
-        AssetServer, Assets, BuildChildren, Color, Commands, ComputedVisibility, Entity,
-        GlobalTransform, Handle, Image, Mesh, Transform, Visibility,
+        AssetServer, Assets, BuildChildren, Color, Commands, ComputedVisibility,
+        DespawnRecursiveExt, Entity, GlobalTransform, Handle, Image, Mesh, Transform, Visibility,
     },
     render::mesh::skinning::{SkinnedMesh, SkinnedMeshInverseBindposes},
 };
@@ -222,7 +222,7 @@ impl ModelLoader {
 
         let mut model_parts = Vec::with_capacity(16);
         for model_id in npc_model_data.model_ids.iter() {
-            let (_model_id, mut parts) = spawn_model(
+            let mut parts = spawn_model(
                 commands,
                 asset_server,
                 object_materials,
@@ -262,7 +262,7 @@ impl ModelLoader {
 
         if let Some(npc_data) = self.npc_database.get_npc(npc_id) {
             if npc_data.right_hand_part_index != 0 {
-                let (_model_id, mut parts) = spawn_model(
+                let mut parts = spawn_model(
                     commands,
                     asset_server,
                     object_materials,
@@ -278,7 +278,7 @@ impl ModelLoader {
             }
 
             if npc_data.left_hand_part_index != 0 {
-                let (_model_id, mut parts) = spawn_model(
+                let mut parts = spawn_model(
                     commands,
                     asset_server,
                     object_materials,
@@ -345,8 +345,7 @@ impl ModelLoader {
             None,
             0,
             false,
-        )
-        .1;
+        );
 
         PersonalStoreModel {
             skin,
@@ -398,8 +397,7 @@ impl ModelLoader {
                     None,
                     0,
                     false,
-                )
-                .1,
+                ),
             },
             asset_server.load(&self.field_item_motion_path),
         )
@@ -461,7 +459,7 @@ impl ModelLoader {
         }
     }
 
-    pub fn spawn_weapon_trail(
+    fn spawn_weapon_trail(
         &self,
         commands: &mut Commands,
         model_list: &ZscFile,
@@ -496,6 +494,62 @@ impl ModelLoader {
                 ))
                 .id(),
         )
+    }
+
+    fn spawn_character_gem_effect(
+        &self,
+        commands: &mut Commands,
+        asset_server: &AssetServer,
+        particle_materials: &mut Assets<ParticleMaterial>,
+        effect_mesh_materials: &mut Assets<EffectMeshMaterial>,
+        model_list: &ZscFile,
+        model_parts: &[Entity],
+        item_model_id: usize,
+        gem_item_number: usize,
+        gem_position: usize,
+    ) -> Option<Entity> {
+        let gem_item = self.item_database.get_gem_item(gem_item_number)?;
+        let gem_effect_id = gem_item.gem_effect_id?;
+        let gem_effect = self.effect_database.get_effect(gem_effect_id)?;
+        let effect_file_id = gem_effect.point_effects.get(0)?;
+        let effect_file = self.effect_database.get_effect_file(*effect_file_id)?;
+
+        let zsc_object = model_list.objects.get(item_model_id)?;
+        let gem_effect_point = zsc_object.effects.get(gem_position as usize)?;
+        let parent_part_entity = model_parts.get(gem_effect_point.parent.unwrap_or(0) as usize)?;
+
+        let effect_entity = spawn_effect(
+            &self.vfs,
+            commands,
+            asset_server,
+            particle_materials,
+            effect_mesh_materials,
+            effect_file.into(),
+            false,
+            None,
+        )?;
+
+        commands
+            .entity(*parent_part_entity)
+            .add_child(effect_entity);
+
+        commands.entity(effect_entity).insert(
+            Transform::from_translation(
+                Vec3::new(
+                    gem_effect_point.position.x,
+                    gem_effect_point.position.z,
+                    -gem_effect_point.position.y,
+                ) / 100.0,
+            )
+            .with_rotation(Quat::from_xyzw(
+                gem_effect_point.rotation.x,
+                gem_effect_point.rotation.z,
+                -gem_effect_point.rotation.y,
+                gem_effect_point.rotation.w,
+            )),
+        );
+
+        Some(effect_entity)
     }
 
     pub fn spawn_character_weapon_trail(
@@ -587,6 +641,8 @@ impl ModelLoader {
         commands: &mut Commands,
         asset_server: &AssetServer,
         object_materials: &mut Assets<ObjectMaterial>,
+        particle_materials: &mut Assets<ParticleMaterial>,
+        effect_mesh_materials: &mut Assets<EffectMeshMaterial>,
         skinned_mesh_inverse_bindposes_assets: &mut Assets<SkinnedMeshInverseBindposes>,
         model_entity: Entity,
         character_info: &CharacterInfo,
@@ -617,31 +673,23 @@ impl ModelLoader {
             if let Some(model_id) =
                 get_model_part_index(&self.item_database, character_info, equipment, model_part)
             {
-                let model_list = self.get_model_list(character_info.gender, model_part);
-                model_parts[model_part] = spawn_model(
-                    commands,
-                    asset_server,
-                    object_materials,
-                    model_entity,
-                    model_list,
+                model_parts[model_part] = (
                     model_id,
-                    Some(&skinned_mesh),
-                    model_part.default_bone_id(dummy_bone_offset),
-                    dummy_bone_offset,
-                    matches!(model_part, CharacterModelPart::CharacterFace),
-                );
-
-                if matches!(model_part, CharacterModelPart::Weapon) {
-                    let weapon_trail_entities = self.spawn_character_weapon_trail(
+                    self.spawn_character_model_part(
+                        character_info,
+                        model_part,
                         commands,
+                        asset_server,
+                        object_materials,
+                        model_entity,
+                        model_id,
+                        &skinned_mesh,
+                        dummy_bone_offset,
                         equipment,
-                        skinned_mesh.joints[dummy_bone_offset],
-                        skinned_mesh.joints[dummy_bone_offset + 1],
-                    );
-                    model_parts[model_part]
-                        .1
-                        .extend(weapon_trail_entities.into_iter());
-                }
+                        particle_materials,
+                        effect_mesh_materials,
+                    ),
+                );
             }
         }
 
@@ -660,12 +708,105 @@ impl ModelLoader {
         )
     }
 
+    fn spawn_character_model_part(
+        &self,
+        character_info: &CharacterInfo,
+        model_part: CharacterModelPart,
+        commands: &mut Commands,
+        asset_server: &AssetServer,
+        object_materials: &mut Assets<ObjectMaterial>,
+        model_entity: Entity,
+        model_id: usize,
+        skinned_mesh: &SkinnedMesh,
+        dummy_bone_offset: usize,
+        equipment: &Equipment,
+        particle_materials: &mut Assets<ParticleMaterial>,
+        effect_mesh_materials: &mut Assets<EffectMeshMaterial>,
+    ) -> Vec<Entity> {
+        let model_list = self.get_model_list(character_info.gender, model_part);
+
+        let mut model_parts = spawn_model(
+            commands,
+            asset_server,
+            object_materials,
+            model_entity,
+            model_list,
+            model_id,
+            Some(skinned_mesh),
+            model_part.default_bone_id(dummy_bone_offset),
+            dummy_bone_offset,
+            matches!(model_part, CharacterModelPart::CharacterFace),
+        );
+
+        if matches!(model_part, CharacterModelPart::Weapon) {
+            let weapon_trail_entities = self.spawn_character_weapon_trail(
+                commands,
+                equipment,
+                skinned_mesh.joints[dummy_bone_offset],
+                skinned_mesh.joints[dummy_bone_offset + 1],
+            );
+            model_parts.extend(weapon_trail_entities.into_iter());
+        }
+
+        if matches!(model_part, CharacterModelPart::Weapon) {
+            if let Some(item) = equipment.get_equipment_item(EquipmentIndex::Weapon) {
+                if item.has_socket && item.gem > 300 {
+                    if let Some(item_data) =
+                        self.item_database.get_weapon_item(item.item.item_number)
+                    {
+                        if let Some(gem_effect_entity) = self.spawn_character_gem_effect(
+                            commands,
+                            asset_server,
+                            particle_materials,
+                            effect_mesh_materials,
+                            model_list,
+                            &model_parts,
+                            model_id,
+                            item.gem as usize,
+                            item_data.gem_position as usize,
+                        ) {
+                            model_parts.push(gem_effect_entity);
+                        }
+                    }
+                }
+            }
+        }
+        if matches!(model_part, CharacterModelPart::SubWeapon) {
+            if let Some(item) = equipment.get_equipment_item(EquipmentIndex::SubWeapon) {
+                if item.has_socket && item.gem > 300 {
+                    if let Some(item_data) = self
+                        .item_database
+                        .get_sub_weapon_item(item.item.item_number)
+                    {
+                        if let Some(gem_effect_entity) = self.spawn_character_gem_effect(
+                            commands,
+                            asset_server,
+                            particle_materials,
+                            effect_mesh_materials,
+                            model_list,
+                            &model_parts,
+                            model_id,
+                            item.gem as usize,
+                            item_data.gem_position as usize,
+                        ) {
+                            model_parts.push(gem_effect_entity);
+                        }
+                    }
+                }
+            }
+        }
+
+        model_parts
+    }
+
     #[allow(clippy::too_many_arguments)]
     pub fn update_character_equipment(
         &self,
         commands: &mut Commands,
         asset_server: &AssetServer,
         object_materials: &mut Assets<ObjectMaterial>,
+        particle_materials: &mut Assets<ParticleMaterial>,
+        effect_mesh_materials: &mut Assets<EffectMeshMaterial>,
         model_entity: Entity,
         character_info: &CharacterInfo,
         equipment: &Equipment,
@@ -704,7 +845,7 @@ impl ModelLoader {
             if model_id != character_model.model_parts[model_part].0 {
                 // Despawn previous model
                 for &entity in character_model.model_parts[model_part].1.iter() {
-                    commands.entity(entity).despawn();
+                    commands.entity(entity).despawn_recursive();
                 }
 
                 // Spawn new model
@@ -714,30 +855,23 @@ impl ModelLoader {
                         CharacterModelPart::CharacterHair | CharacterModelPart::CharacterFace
                     )
                 {
-                    character_model.model_parts[model_part] = spawn_model(
-                        commands,
-                        asset_server,
-                        object_materials,
-                        model_entity,
-                        self.get_model_list(character_info.gender, model_part),
+                    character_model.model_parts[model_part] = (
                         model_id,
-                        Some(skinned_mesh),
-                        model_part.default_bone_id(dummy_bone_offset.index),
-                        dummy_bone_offset.index,
-                        matches!(model_part, CharacterModelPart::CharacterFace),
-                    );
-
-                    if matches!(model_part, CharacterModelPart::Weapon) {
-                        let weapon_trail_entities = self.spawn_character_weapon_trail(
+                        self.spawn_character_model_part(
+                            character_info,
+                            model_part,
                             commands,
+                            asset_server,
+                            object_materials,
+                            model_entity,
+                            model_id,
+                            skinned_mesh,
+                            dummy_bone_offset.index,
                             equipment,
-                            skinned_mesh.joints[dummy_bone_offset.index],
-                            skinned_mesh.joints[dummy_bone_offset.index + 1],
-                        );
-                        character_model.model_parts[model_part]
-                            .1
-                            .extend(weapon_trail_entities.into_iter());
-                    }
+                            particle_materials,
+                            effect_mesh_materials,
+                        ),
+                    );
                 } else {
                     character_model.model_parts[model_part].0 = model_id;
                     character_model.model_parts[model_part].1.clear();
@@ -875,12 +1009,12 @@ fn spawn_model(
     default_bone_index: Option<usize>,
     dummy_bone_offset: usize,
     load_clip_faces: bool,
-) -> (usize, Vec<Entity>) {
+) -> Vec<Entity> {
     let mut parts = Vec::new();
     let object = if let Some(object) = model_list.objects.get(model_id) {
         object
     } else {
-        return (model_id, parts);
+        return parts;
     };
 
     for object_part in object.parts.iter() {
@@ -960,7 +1094,7 @@ fn spawn_model(
         parts.push(entity);
     }
 
-    (model_id, parts)
+    parts
 }
 
 fn get_model_part_index(
