@@ -252,36 +252,43 @@ fn create_nametag_data(
     // Copy letters to texture
     for (row_index, row) in pending_data.galley.rows.iter().enumerate() {
         let row_font_texture = &font_source_textures[row_index];
-        let src_width = row_font_texture.width();
 
-        for glyph in row.glyphs.iter() {
-            let uv_min = glyph.uv_rect.min;
-            let uv_max = glyph.uv_rect.max;
+        unsafe {
+            let src = row_font_texture.pixels.as_ptr();
+            let src_stride = row_font_texture.width();
+            let dst = data.as_mut_ptr();
+            let dst_stride = target_texture_width as usize;
 
-            let mut dst_y = ((glyph.pos.y + glyph.uv_rect.offset.y) * pixels_per_point).round()
-                as usize
-                + 4
-                + row_index * 8;
-            for uv_y in uv_min[1]..uv_max[1] {
-                let mut dst_x = ((glyph.pos.x + glyph.uv_rect.offset.x) * pixels_per_point).round()
+            for glyph in row.glyphs.iter() {
+                let uv_min = glyph.uv_rect.min;
+                let uv_max = glyph.uv_rect.max;
+
+                let mut dst_y = ((glyph.pos.y + glyph.uv_rect.offset.y) * pixels_per_point).round()
+                    as usize
+                    + 4
+                    + row_index * 8;
+
+                let dst_x = ((glyph.pos.x + glyph.uv_rect.offset.x) * pixels_per_point).round()
                     as usize
                     + 4;
-                for uv_x in uv_min[0]..uv_max[0] {
-                    let pixel = row_font_texture.pixels[uv_y as usize * src_width + uv_x as usize]
-                        .to_array();
-                    let offset = dst_x * 4 + dst_y * 4 * target_texture_width as usize;
-                    unsafe {
-                        *data.get_unchecked_mut(offset) = pixel[0].max(*data.get_unchecked(offset));
-                        *data.get_unchecked_mut(offset + 1) =
-                            pixel[1].max(*data.get_unchecked(offset + 1));
-                        *data.get_unchecked_mut(offset + 2) =
-                            pixel[2].max(*data.get_unchecked(offset + 2));
-                        *data.get_unchecked_mut(offset + 3) =
-                            pixel[3].max(*data.get_unchecked(offset + 3));
+
+                for uv_y in uv_min[1]..uv_max[1] {
+                    let mut src_row = src.add(uv_y as usize * src_stride + uv_min[0] as usize);
+                    let mut dst_row = dst.add(dst_y * dst_stride * 4 + dst_x * 4);
+
+                    for _ in uv_min[0]..uv_max[0] {
+                        let pixel = (*src_row).to_array();
+
+                        *dst_row.add(0) = pixel[0];
+                        *dst_row.add(1) = pixel[1];
+                        *dst_row.add(2) = pixel[2];
+                        *dst_row.add(3) = pixel[3];
+
+                        src_row = src_row.add(1);
+                        dst_row = dst_row.add(4);
                     }
-                    dst_x += 1;
+                    dst_y += 1;
                 }
-                dst_y += 1;
             }
         }
     }
@@ -289,32 +296,36 @@ fn create_nametag_data(
     // Apply outline to text
     let mut outlined_data = data.clone();
     unsafe {
-        for y in 2..max_bounds.y as u32 - 2 {
-            for x in 2..max_bounds.x as u32 - 2 {
-                let px_alpha = |x: u32, y: u32| {
-                    let offset = (x * 4 + y * 4 * target_texture_width) as usize;
-                    *data.get_unchecked(offset + 3) as u32
+        let src = data.as_ptr();
+        let dst = outlined_data.as_mut_ptr();
+        let stride = target_texture_width as usize;
+
+        for y in 2..max_bounds.y as usize - 2 {
+            for x in 2..max_bounds.x as usize - 2 {
+                let px_alpha = |x: usize, y: usize| {
+                    let pixel_offset = x * 4 + y * 4 * stride;
+                    *src.add(pixel_offset + 3) as u32
                 };
 
                 let mut alpha = 0u32;
-                alpha += px_alpha(x, y - 2);
+                alpha += px_alpha(x, y - 2) / 2;
                 alpha += px_alpha(x, y - 1);
                 alpha += px_alpha(x, y + 1);
-                alpha += px_alpha(x, y + 2);
+                alpha += px_alpha(x, y + 2) / 2;
 
-                alpha += px_alpha(x - 2, y);
+                alpha += px_alpha(x - 2, y) / 2;
                 alpha += px_alpha(x - 1, y);
                 alpha += px_alpha(x + 1, y);
-                alpha += px_alpha(x + 2, y);
+                alpha += px_alpha(x + 2, y) / 2;
 
-                alpha += px_alpha(x - 1, y - 1);
-                alpha += px_alpha(x - 1, y + 1);
-                alpha += px_alpha(x + 1, y - 1);
-                alpha += px_alpha(x + 1, y + 1);
+                alpha += px_alpha(x - 1, y - 1) / 2;
+                alpha += px_alpha(x - 1, y + 1) / 2;
+                alpha += px_alpha(x + 1, y - 1) / 2;
+                alpha += px_alpha(x + 1, y + 1) / 2;
                 alpha = alpha.min(255);
 
-                let offset = (x * 4 + y * 4 * target_texture_width) as usize;
-                *outlined_data.get_unchecked_mut(offset + 3) = alpha as u8;
+                let pixel_offset = x * 4 + y * 4 * stride;
+                *dst.add(pixel_offset + 3) = alpha as u8;
             }
         }
     }
