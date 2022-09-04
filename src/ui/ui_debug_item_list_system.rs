@@ -255,6 +255,28 @@ pub fn ui_debug_item_list_system(
                                             equipment.equipped_items[equipment_index] = None;
                                         }
                                     }
+                                    if matches!(
+                                        ui_state_debug_item_list.item_list_type,
+                                        ItemType::Gem
+                                    ) {
+                                        for mut equipment in query_set.p0().iter_mut() {
+                                            if let Some(mut weapon) = equipment.equipped_items
+                                                [EquipmentIndex::Weapon]
+                                                .as_mut()
+                                            {
+                                                weapon.has_socket = false;
+                                                weapon.gem = 0;
+                                            }
+
+                                            if let Some(mut sub_weapon) = equipment.equipped_items
+                                                [EquipmentIndex::SubWeapon]
+                                                .as_mut()
+                                            {
+                                                sub_weapon.has_socket = false;
+                                                sub_weapon.gem = 0;
+                                            }
+                                        }
+                                    }
                                 }
                             });
                         });
@@ -360,6 +382,30 @@ pub fn ui_debug_item_list_system(
                                                     equipment.equipped_items
                                                         [EquipmentIndex::SubWeapon] = None;
                                                 }
+                                            }
+                                        }
+                                    }
+
+                                    if matches!(
+                                        ui_state_debug_item_list.item_list_type,
+                                        ItemType::Gem
+                                    ) && ui.button("Equip").clicked()
+                                    {
+                                        for mut equipment in query_set.p0().iter_mut() {
+                                            if let Some(mut weapon) = equipment.equipped_items
+                                                [EquipmentIndex::Weapon]
+                                                .as_mut()
+                                            {
+                                                weapon.has_socket = true;
+                                                weapon.gem = item_reference.item_number as u16;
+                                            }
+
+                                            if let Some(mut sub_weapon) = equipment.equipped_items
+                                                [EquipmentIndex::SubWeapon]
+                                                .as_mut()
+                                            {
+                                                sub_weapon.has_socket = true;
+                                                sub_weapon.gem = item_reference.item_number as u16;
                                             }
                                         }
                                     }
