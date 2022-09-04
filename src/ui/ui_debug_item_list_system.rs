@@ -15,6 +15,9 @@ pub struct UiStateDebugItemList {
     item_list_type: ItemType,
     item_name_filter: String,
     spawn_as_drop: bool,
+    spawn_has_socket: bool,
+    spawn_gem: usize,
+    spawn_grade: u8,
     spawn_quantity: usize,
 }
 
@@ -24,6 +27,9 @@ impl Default for UiStateDebugItemList {
             item_list_type: ItemType::Face,
             item_name_filter: String::new(),
             spawn_as_drop: false,
+            spawn_has_socket: false,
+            spawn_gem: 0,
+            spawn_grade: 0,
             spawn_quantity: 1,
         }
     }
@@ -54,20 +60,71 @@ pub fn ui_debug_item_list_system(
             egui::Grid::new("item_list_controls_grid")
                 .num_columns(2)
                 .show(ui, |ui| {
-                    ui.label("Spawn Quantity:");
-                    ui.add(
-                        egui::DragValue::new(&mut ui_state_debug_item_list.spawn_quantity)
-                            .speed(1)
-                            .clamp_range(1..=999usize),
-                    );
-                    ui.end_row();
+                    if matches!(app_state.current(), AppState::Game) {
+                        ui.label("Spawn Quantity:");
+                        ui.add(
+                            egui::DragValue::new(&mut ui_state_debug_item_list.spawn_quantity)
+                                .speed(1)
+                                .clamp_range(1..=999usize),
+                        );
+                        ui.end_row();
 
-                    ui.label("Spawn as item drop:");
-                    ui.add(egui::Checkbox::new(
-                        &mut ui_state_debug_item_list.spawn_as_drop,
-                        "As item drop",
-                    ));
-                    ui.end_row();
+                        ui.label("Socket:");
+                        ui.add(egui::Checkbox::new(
+                            &mut ui_state_debug_item_list.spawn_has_socket,
+                            "Has socket",
+                        ));
+                        ui.end_row();
+
+                        ui.label("Gem:");
+                        egui::ComboBox::from_label("Gem")
+                            .selected_text(
+                                game_data
+                                    .items
+                                    .get_gem_item(ui_state_debug_item_list.spawn_gem)
+                                    .map_or("None", |item_data| item_data.item_data.name),
+                            )
+                            .show_ui(ui, |ui| {
+                                ui.selectable_value(
+                                    &mut ui_state_debug_item_list.spawn_gem,
+                                    0,
+                                    "None",
+                                );
+
+                                for (item_reference, item_data) in game_data
+                                    .items
+                                    .iter_items(ItemType::Gem)
+                                    .filter_map(|item_reference| {
+                                        game_data
+                                            .items
+                                            .get_base_item(item_reference)
+                                            .map(|item_data| (item_reference, item_data))
+                                    })
+                                {
+                                    ui.selectable_value(
+                                        &mut ui_state_debug_item_list.spawn_gem,
+                                        item_reference.item_number,
+                                        item_data.name,
+                                    );
+                                }
+                            });
+                        ui.end_row();
+
+                        ui.label("Grade:");
+                        ui.add(
+                            egui::DragValue::new(&mut ui_state_debug_item_list.spawn_grade)
+                                .speed(1)
+                                .clamp_range(0..=9u8),
+                        );
+                        ui.end_row();
+
+                        ui.label("Spawn item drop:");
+                        ui.add(egui::Checkbox::new(
+                            &mut ui_state_debug_item_list.spawn_as_drop,
+                            "As item drop",
+                        ));
+                        ui.end_row();
+                    }
 
                     ui.label("Item Name Filter:");
                     ui.text_edit_singleline(&mut ui_state_debug_item_list.item_name_filter);
@@ -267,7 +324,7 @@ pub fn ui_debug_item_list_system(
                                                 game_connection
                                                     .client_message_tx
                                                     .send(ClientMessage::Chat(format!(
-                                                        "{} {} {} {}",
+                                                        "{} {} {} {} {} {} {}",
                                                         if ui_state_debug_item_list.spawn_as_drop {
                                                             "/drop"
                                                         } else {
@@ -276,6 +333,14 @@ pub fn ui_debug_item_list_system(
                                                         item_type,
                                                         item_reference.item_number,
                                                         ui_state_debug_item_list.spawn_quantity,
+                                                        if ui_state_debug_item_list.spawn_has_socket
+                                                        {
+                                                            "1"
+                                                        } else {
+                                                            "0"
+                                                        },
+                                                        ui_state_debug_item_list.spawn_gem,
+                                                        ui_state_debug_item_list.spawn_grade
                                                     )))
                                                     .ok();
                                             }
