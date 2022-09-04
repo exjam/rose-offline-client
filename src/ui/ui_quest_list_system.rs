@@ -59,6 +59,7 @@ fn ui_add_quest_item_slot(
                     DragAndDropSlot::new(
                         DragAndDropId::NotDraggable,
                         sprite,
+                        None,
                         quantity,
                         None,
                         |_| false,

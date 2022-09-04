@@ -78,7 +78,7 @@ fn ui_add_hotbar_slot(
     player_command_events: &mut EventWriter<PlayerCommandEvent>,
 ) {
     let hotbar_slot = player.hotbar.pages[hotbar_index.0][hotbar_index.1].as_ref();
-    let (sprite, quantity, cooldown_percent) = match hotbar_slot {
+    let (sprite, socket_sprite, quantity, cooldown_percent) = match hotbar_slot {
         Some(HotbarSlot::Skill(skill_slot)) => {
             let skill = player.skill_list.get_skill(*skill_slot);
             let skill_data = skill
@@ -91,6 +91,7 @@ fn ui_add_hotbar_slot(
                         skill_data.icon_number as usize,
                     )
                 }),
+                None,
                 None,
                 skill_data.and_then(|skill_data| match &skill_data.cooldown {
                     SkillCooldown::Skill(_) => {
@@ -112,6 +113,24 @@ fn ui_add_hotbar_slot(
                     ui_resources
                         .get_sprite_by_index(UiSpriteSheetType::Item, item_data.icon_index as usize)
                 }),
+                item.as_ref()
+                    .and_then(|item| item.as_equipment())
+                    .and_then(|equipment_item| {
+                        if equipment_item.has_socket {
+                            if equipment_item.gem > 300 {
+                                let gem_item_data =
+                                    game_data.items.get_gem_item(equipment_item.gem as usize)?;
+                                ui_resources.get_sprite_by_index(
+                                    UiSpriteSheetType::ItemSocketGem,
+                                    gem_item_data.gem_sprite_id as usize,
+                                )
+                            } else {
+                                ui_resources.get_item_socket_sprite()
+                            }
+                        } else {
+                            None
+                        }
+                    }),
                 match item.as_ref() {
                     Some(Item::Stackable(stackable_item)) => Some(stackable_item.quantity as usize),
                     _ => None,
@@ -123,7 +142,7 @@ fn ui_add_hotbar_slot(
                     .and_then(|group| player.cooldowns.get_consumable_cooldown_percent(group)),
             )
         }
-        _ => (None, None, None),
+        _ => (None, None, None, None),
     };
 
     let mut dropped_item = None;
@@ -135,6 +154,7 @@ fn ui_add_hotbar_slot(
                     DragAndDropSlot::new(
                         DragAndDropId::Hotbar(hotbar_index.0, hotbar_index.1),
                         sprite,
+                        socket_sprite,
                         quantity,
                         cooldown_percent,
                         hotbar_drag_accepts,

@@ -66,6 +66,21 @@ fn ui_add_store_item_slot(
     let sprite = item_data.and_then(|item_data| {
         ui_resources.get_sprite_by_index(UiSpriteSheetType::Item, item_data.icon_index as usize)
     });
+    let socket_sprite = item.as_equipment().and_then(|equipment_item| {
+        if equipment_item.has_socket {
+            if equipment_item.gem > 300 {
+                let gem_item_data = game_data.items.get_gem_item(equipment_item.gem as usize)?;
+                ui_resources.get_sprite_by_index(
+                    UiSpriteSheetType::ItemSocketGem,
+                    gem_item_data.gem_sprite_id as usize,
+                )
+            } else {
+                ui_resources.get_item_socket_sprite()
+            }
+        } else {
+            None
+        }
+    });
     let quantity = if item.get_item_type().is_stackable_item() {
         Some(item.get_quantity() as usize)
     } else {
@@ -81,6 +96,7 @@ fn ui_add_store_item_slot(
                     DragAndDropSlot::new(
                         dnd_id,
                         sprite,
+                        socket_sprite,
                         quantity,
                         None,
                         |_| false,

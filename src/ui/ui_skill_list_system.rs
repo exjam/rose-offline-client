@@ -87,6 +87,7 @@ fn ui_add_skill_list_slot(
                         DragAndDropId::Skill(skill_slot),
                         sprite,
                         None,
+                        None,
                         None, // TODO: Show skill cooldown
                         |_| false,
                         &mut ui_state_dnd.dragged_item,

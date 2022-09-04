@@ -21,6 +21,7 @@ pub struct DragAndDropSlot<'a> {
     size: egui::Vec2,
     border_width: f32,
     sprite: Option<UiSprite>,
+    socket_sprite: Option<UiSprite>,
     cooldown_percent: Option<f32>,
     quantity: Option<usize>,
     quantity_margin: f32,
@@ -33,6 +34,7 @@ impl<'a> DragAndDropSlot<'a> {
     pub fn new(
         dnd_id: DragAndDropId,
         sprite: Option<UiSprite>,
+        socket_sprite: Option<UiSprite>,
         quantity: Option<usize>,
         cooldown_percent: Option<f32>,
         accepts: fn(&DragAndDropId) -> bool,
@@ -45,6 +47,7 @@ impl<'a> DragAndDropSlot<'a> {
             size: size.into(),
             border_width: 1.0,
             sprite,
+            socket_sprite,
             cooldown_percent,
             quantity,
             quantity_margin: 2.0,
@@ -185,6 +188,19 @@ impl<'w> DragAndDropSlot<'w> {
                 let mut mesh = Mesh::with_texture(sprite.texture_id);
                 mesh.add_rect_with_uv(content_rect, sprite.uv, egui::Color32::WHITE);
                 ui.painter().add(Shape::mesh(mesh));
+
+                if let Some(socket_sprite) = self.socket_sprite.as_ref() {
+                    let mut mesh = Mesh::with_texture(socket_sprite.texture_id);
+                    mesh.add_rect_with_uv(
+                        egui::Rect::from_min_size(
+                            content_rect.min,
+                            egui::vec2(socket_sprite.width, socket_sprite.height),
+                        ),
+                        socket_sprite.uv,
+                        egui::Color32::WHITE,
+                    );
+                    ui.painter().add(Shape::mesh(mesh));
+                }
 
                 if let Some(cooldown_percent) = self.cooldown_percent {
                     ui.painter().add(Shape::mesh(generate_cooldown_mesh(

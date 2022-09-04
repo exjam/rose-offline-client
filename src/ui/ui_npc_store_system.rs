@@ -133,6 +133,7 @@ fn ui_add_store_item_slot(
                     DragAndDropSlot::new(
                         DragAndDropId::NpcStore(store_tab_index, store_tab_slot),
                         sprite,
+                        None,
                         quantity,
                         None,
                         |_| false,
@@ -263,6 +264,7 @@ fn ui_add_buy_item_slot(
                     DragAndDropSlot::new(
                         DragAndDropId::NpcStoreBuyList(buy_slot_index),
                         sprite,
+                        None,
                         quantity,
                         None,
                         buy_slot_drag_accepts,
@@ -355,6 +357,7 @@ fn ui_add_sell_item_slot(
                     DragAndDropSlot::new(
                         DragAndDropId::NpcStoreSellList(sell_slot_index),
                         sprite,
+                        None,
                         quantity,
                         None,
                         sell_slot_drag_accepts,
