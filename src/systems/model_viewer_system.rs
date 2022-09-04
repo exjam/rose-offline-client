@@ -14,7 +14,8 @@ use enum_map::{enum_map, EnumMap};
 use rand::{prelude::SliceRandom, Rng};
 
 use rose_data::{
-    CharacterMotionAction, EquipmentIndex, EquipmentItem, ItemReference, NpcMotionAction, ZoneId,
+    CharacterMotionAction, EquipmentIndex, EquipmentItem, ItemReference, ItemType, NpcMotionAction,
+    ZoneId,
 };
 use rose_game_common::components::{CharacterGender, CharacterInfo, Equipment, Npc};
 
@@ -34,6 +35,7 @@ const NPC_SPACING: f32 = 7.5;
 
 pub struct ModelViewerState {
     valid_items: EnumMap<EquipmentIndex, Vec<ItemReference>>,
+    valid_gems: Vec<ItemReference>,
 
     npcs: Vec<Entity>,
     num_npcs: usize,
@@ -83,6 +85,7 @@ pub fn model_viewer_enter_system(
         valid_items: enum_map! {
             equipment_index => get_valid_items(equipment_index.into()),
         },
+        valid_gems: get_valid_items(ItemType::Gem),
 
         npcs: Vec::new(),
         num_npcs: 1,
@@ -252,8 +255,22 @@ pub fn model_viewer_system(
                     let mut equipment = Equipment::default();
                     for (equipment_index, valid_items) in ui_state.valid_items.iter() {
                         if let Some(item) = valid_items.choose(&mut rng) {
-                            equipment.equipped_items[equipment_index] =
-                                EquipmentItem::new(*item, 0);
+                            let mut equipment_item = EquipmentItem::new(*item, 0);
+
+                            if let Some(equipment_item) = equipment_item.as_mut() {
+                                if matches!(
+                                    equipment_index,
+                                    EquipmentIndex::Weapon | EquipmentIndex::SubWeapon
+                                ) && rng.gen_ratio(2, 3)
+                                {
+                                    if let Some(gem) = ui_state.valid_gems.choose(&mut rng) {
+                                        equipment_item.has_socket = true;
+                                        equipment_item.gem = gem.item_number as u16;
+                                    }
+                                }
+                            }
+
+                            equipment.equipped_items[equipment_index] = equipment_item;
                         }
                     }
 

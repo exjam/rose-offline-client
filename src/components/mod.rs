@@ -30,7 +30,7 @@ mod zone;
 mod zone_object;
 
 pub use active_motion::ActiveMotion;
-pub use character_model::{CharacterModel, CharacterModelPart};
+pub use character_model::{CharacterModel, CharacterModelPart, CharacterModelPartIndex};
 pub use client_entity::{ClientEntity, ClientEntityId, ClientEntityType};
 pub use client_entity_name::ClientEntityName;
 pub use collision::{

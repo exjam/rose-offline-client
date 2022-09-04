@@ -22,8 +22,8 @@ use rose_game_common::components::{
 
 use crate::{
     components::{
-        CharacterModel, CharacterModelPart, DummyBoneOffset, ItemDropModel, NpcModel,
-        PersonalStoreModel,
+        CharacterModel, CharacterModelPart, CharacterModelPartIndex, DummyBoneOffset,
+        ItemDropModel, NpcModel, PersonalStoreModel,
     },
     effect_loader::spawn_effect,
     render::{EffectMeshMaterial, ObjectMaterial, ParticleMaterial, RgbTextureLoader, TrailEffect},
@@ -682,7 +682,7 @@ impl ModelLoader {
                         asset_server,
                         object_materials,
                         model_entity,
-                        model_id,
+                        model_id.id,
                         &skinned_mesh,
                         dummy_bone_offset,
                         equipment,
@@ -814,14 +814,18 @@ impl ModelLoader {
         dummy_bone_offset: &DummyBoneOffset,
         skinned_mesh: &SkinnedMesh,
     ) {
-        let weapon_model_id = get_model_part_index(
+        let weapon_model_index = get_model_part_index(
             &self.item_database,
             character_info,
             equipment,
             CharacterModelPart::Weapon,
         )
-        .unwrap_or(0);
-        if weapon_model_id != character_model.model_parts[CharacterModelPart::Weapon].0 {
+        .unwrap_or(CharacterModelPartIndex {
+            id: 0,
+            gem: 0,
+            grade: 0,
+        });
+        if weapon_model_index.id != character_model.model_parts[CharacterModelPart::Weapon].0.id {
             character_model.action_motions =
                 self.load_character_action_motions(asset_server, character_info, equipment);
         }
@@ -840,7 +844,11 @@ impl ModelLoader {
         ] {
             let model_id =
                 get_model_part_index(&self.item_database, character_info, equipment, model_part)
-                    .unwrap_or(0);
+                    .unwrap_or(CharacterModelPartIndex {
+                        id: 0,
+                        gem: 0,
+                        grade: 0,
+                    });
 
             if model_id != character_model.model_parts[model_part].0 {
                 // Despawn previous model
@@ -849,7 +857,7 @@ impl ModelLoader {
                 }
 
                 // Spawn new model
-                if model_id != 0
+                if model_id.id != 0
                     || matches!(
                         model_part,
                         CharacterModelPart::CharacterHair | CharacterModelPart::CharacterFace
@@ -864,7 +872,7 @@ impl ModelLoader {
                             asset_server,
                             object_materials,
                             model_entity,
-                            model_id,
+                            model_id.id,
                             skinned_mesh,
                             dummy_bone_offset.index,
                             equipment,
@@ -1102,9 +1110,13 @@ fn get_model_part_index(
     character_info: &CharacterInfo,
     equipment: &Equipment,
     model_part: CharacterModelPart,
-) -> Option<usize> {
+) -> Option<CharacterModelPartIndex> {
     match model_part {
-        CharacterModelPart::CharacterFace => Some(character_info.face as usize),
+        CharacterModelPart::CharacterFace => Some(CharacterModelPartIndex {
+            id: character_info.face as usize,
+            gem: 0,
+            grade: 0,
+        }),
         CharacterModelPart::CharacterHair => {
             let head_hair_type = equipment.equipped_items[EquipmentIndex::Head]
                 .as_ref()
@@ -1112,40 +1124,92 @@ fn get_model_part_index(
                 .and_then(|item_number| item_database.get_head_item(item_number))
                 .map_or(0, |head_item_data| head_item_data.hair_type as usize);
 
-            Some(character_info.hair as usize + head_hair_type)
+            Some(CharacterModelPartIndex {
+                id: character_info.hair as usize + head_hair_type,
+                gem: 0,
+                grade: 0,
+            })
         }
-        CharacterModelPart::Head => equipment.equipped_items[EquipmentIndex::Head]
-            .as_ref()
-            .map(|equipment_item| equipment_item.item.item_number),
+        CharacterModelPart::Head => {
+            equipment.equipped_items[EquipmentIndex::Head]
+                .as_ref()
+                .map(|equipment_item| CharacterModelPartIndex {
+                    id: equipment_item.item.item_number,
+                    gem: equipment_item.gem as usize,
+                    grade: equipment_item.grade as usize,
+                })
+        }
         CharacterModelPart::FaceItem => equipment.equipped_items[EquipmentIndex::Face]
             .as_ref()
-            .map(|equipment_item| equipment_item.item.item_number),
+            .map(|equipment_item| CharacterModelPartIndex {
+                id: equipment_item.item.item_number,
+                gem: equipment_item.gem as usize,
+                grade: equipment_item.grade as usize,
+            }),
         CharacterModelPart::Body => Some(
             equipment.equipped_items[EquipmentIndex::Body]
                 .as_ref()
-                .map(|equipment_item| equipment_item.item.item_number)
-                .unwrap_or(1),
+                .map(|equipment_item| CharacterModelPartIndex {
+                    id: equipment_item.item.item_number,
+                    gem: equipment_item.gem as usize,
+                    grade: equipment_item.grade as usize,
+                })
+                .unwrap_or(CharacterModelPartIndex {
+                    id: 1,
+                    gem: 0,
+                    grade: 0,
+                }),
         ),
         CharacterModelPart::Hands => Some(
             equipment.equipped_items[EquipmentIndex::Hands]
                 .as_ref()
-                .map(|equipment_item| equipment_item.item.item_number)
-                .unwrap_or(1),
+                .map(|equipment_item| CharacterModelPartIndex {
+                    id: equipment_item.item.item_number,
+                    gem: equipment_item.gem as usize,
+                    grade: equipment_item.grade as usize,
+                })
+                .unwrap_or(CharacterModelPartIndex {
+                    id: 1,
+                    gem: 0,
+                    grade: 0,
+                }),
         ),
         CharacterModelPart::Feet => Some(
             equipment.equipped_items[EquipmentIndex::Feet]
                 .as_ref()
-                .map(|equipment_item| equipment_item.item.item_number)
-                .unwrap_or(1),
+                .map(|equipment_item| CharacterModelPartIndex {
+                    id: equipment_item.item.item_number,
+                    gem: equipment_item.gem as usize,
+                    grade: equipment_item.grade as usize,
+                })
+                .unwrap_or(CharacterModelPartIndex {
+                    id: 1,
+                    gem: 0,
+                    grade: 0,
+                }),
         ),
-        CharacterModelPart::Back => equipment.equipped_items[EquipmentIndex::Back]
-            .as_ref()
-            .map(|equipment_item| equipment_item.item.item_number),
+        CharacterModelPart::Back => {
+            equipment.equipped_items[EquipmentIndex::Back]
+                .as_ref()
+                .map(|equipment_item| CharacterModelPartIndex {
+                    id: equipment_item.item.item_number,
+                    gem: equipment_item.gem as usize,
+                    grade: equipment_item.grade as usize,
+                })
+        }
         CharacterModelPart::Weapon => equipment.equipped_items[EquipmentIndex::Weapon]
             .as_ref()
-            .map(|equipment_item| equipment_item.item.item_number),
+            .map(|equipment_item| CharacterModelPartIndex {
+                id: equipment_item.item.item_number,
+                gem: equipment_item.gem as usize,
+                grade: equipment_item.grade as usize,
+            }),
         CharacterModelPart::SubWeapon => equipment.equipped_items[EquipmentIndex::SubWeapon]
             .as_ref()
-            .map(|equipment_item| equipment_item.item.item_number),
+            .map(|equipment_item| CharacterModelPartIndex {
+                id: equipment_item.item.item_number,
+                gem: equipment_item.gem as usize,
+                grade: equipment_item.grade as usize,
+            }),
     }
 }
