@@ -277,9 +277,9 @@ fn QF_getQuestItemQuantity(
             }
         }
 
-        None
+        Some(0)
     }()
-    .unwrap_or(0);
+    .unwrap_or(-1);
 
     vec![result.into()]
 }
