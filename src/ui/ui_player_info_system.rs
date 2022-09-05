@@ -3,16 +3,19 @@ use bevy::{
     prelude::{Assets, Entity, Query, Res, ResMut, With},
 };
 use bevy_egui::{egui, EguiContext};
+use rose_data::{AmmoIndex, EquipmentIndex, Item, ItemClass};
 use rose_game_common::components::{
-    AbilityValues, CharacterInfo, ExperiencePoints, HealthPoints, Level, ManaPoints,
+    AbilityValues, CharacterInfo, Equipment, ExperiencePoints, HealthPoints, Level, ManaPoints,
 };
 
 use crate::{
     components::PlayerCharacter,
-    resources::{GameData, SelectedTarget, UiResources},
+    resources::{GameData, SelectedTarget, UiResources, UiSpriteSheetType},
     ui::{
+        tooltips::{PlayerTooltipQuery, PlayerTooltipQueryItem},
+        ui_add_item_tooltip,
         widgets::{DataBindings, Dialog, DrawText},
-        UiStateWindows,
+        DragAndDropId, DragAndDropSlot, UiStateWindows,
     },
 };
 
@@ -34,12 +37,108 @@ pub struct PlayerQuery<'w> {
     health_points: &'w HealthPoints,
     mana_points: &'w ManaPoints,
     experience_points: &'w ExperiencePoints,
+    equipment: &'w Equipment,
+}
+
+fn add_equipped_weapon_slot(
+    ui: &mut egui::Ui,
+    pos: egui::Pos2,
+    player: &PlayerQueryItem,
+    player_tooltip_data: Option<&PlayerTooltipQueryItem>,
+    game_data: &GameData,
+    ui_resources: &UiResources,
+) {
+    let mut item = None;
+
+    if let Some(weapon_item) = player.equipment.get_equipment_item(EquipmentIndex::Weapon) {
+        item = Some(Item::Equipment(weapon_item.clone()));
+
+        if let Some(weapon_item_data) = game_data
+            .items
+            .get_weapon_item(weapon_item.item.item_number)
+        {
+            let ammo_index = match weapon_item_data.item_data.class {
+                ItemClass::Bow | ItemClass::Crossbow => Some(AmmoIndex::Arrow),
+                ItemClass::Gun | ItemClass::DualGuns => Some(AmmoIndex::Bullet),
+                ItemClass::Launcher => Some(AmmoIndex::Throw),
+                _ => None,
+            };
+
+            if let Some(ammo_index) = ammo_index {
+                if let Some(ammo) = player.equipment.get_ammo_item(ammo_index) {
+                    item = Some(Item::Stackable(ammo.clone()));
+                }
+            }
+        }
+    }
+
+    let item_data = item
+        .as_ref()
+        .and_then(|item| game_data.items.get_base_item(item.get_item_reference()));
+    let sprite = item_data.and_then(|item_data| {
+        ui_resources.get_sprite_by_index(UiSpriteSheetType::Item, item_data.icon_index as usize)
+    });
+    let socket_sprite =
+        item.as_ref()
+            .and_then(|item| item.as_equipment())
+            .and_then(|equipment_item| {
+                if equipment_item.has_socket {
+                    if equipment_item.gem > 300 {
+                        let gem_item_data =
+                            game_data.items.get_gem_item(equipment_item.gem as usize)?;
+                        ui_resources.get_sprite_by_index(
+                            UiSpriteSheetType::ItemSocketGem,
+                            gem_item_data.gem_sprite_id as usize,
+                        )
+                    } else {
+                        ui_resources.get_item_socket_sprite()
+                    }
+                } else {
+                    None
+                }
+            });
+
+    let mut dragged_item = None;
+    let mut dropped_item = None;
+    let response = ui
+        .allocate_ui_at_rect(
+            egui::Rect::from_min_size(ui.min_rect().min + pos.to_vec2(), egui::vec2(40.0, 40.0)),
+            |ui| {
+                egui::Widget::ui(
+                    DragAndDropSlot::new(
+                        DragAndDropId::NotDraggable,
+                        sprite,
+                        socket_sprite,
+                        match item.as_ref() {
+                            Some(Item::Stackable(stackable_item)) => {
+                                Some(stackable_item.quantity as usize)
+                            }
+                            _ => None,
+                        },
+                        None,
+                        |_| false,
+                        &mut dragged_item,
+                        &mut dropped_item,
+                        [40.0, 40.0],
+                    ),
+                    ui,
+                )
+            },
+        )
+        .inner;
+
+    if let Some(item) = item {
+        response.on_hover_ui(|ui| {
+            ui_add_item_tooltip(ui, game_data, player_tooltip_data, &item);
+        });
+    }
 }
 
 pub fn ui_player_info_system(
     mut egui_context: ResMut<EguiContext>,
     mut ui_state_windows: ResMut<UiStateWindows>,
     query_player: Query<PlayerQuery, With<PlayerCharacter>>,
+    query_player_tooltip: Query<PlayerTooltipQuery, With<PlayerCharacter>>,
     game_data: Res<GameData>,
     ui_resources: Res<UiResources>,
     dialog_assets: Res<Assets<Dialog>>,
@@ -56,6 +155,7 @@ pub fn ui_player_info_system(
     } else {
         return;
     };
+    let player_tooltip_data = query_player_tooltip.get_single().ok();
 
     let mut response_menu_button = None;
 
@@ -120,6 +220,15 @@ pub fn ui_player_info_system(
                                 14.0,
                                 egui::FontFamily::Name("Ubuntu-M".into()),
                             )),
+                    );
+
+                    add_equipped_weapon_slot(
+                        ui,
+                        egui::pos2(186.0, 36.0),
+                        &player,
+                        player_tooltip_data.as_ref(),
+                        &game_data,
+                        &ui_resources,
                     );
                 },
             )
