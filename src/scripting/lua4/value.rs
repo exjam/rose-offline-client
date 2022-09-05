@@ -4,7 +4,7 @@ use num_traits::ToPrimitive;
 
 use crate::scripting::lua4::Lua4Function;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Lua4Value {
     Nil,
     UserData(Arc<dyn Any + Send + Sync>),

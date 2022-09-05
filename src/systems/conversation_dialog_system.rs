@@ -262,16 +262,22 @@ impl GeneratedDialog {
                             .unwrap_or(0);
 
                         if result == 0 {
-                            log::debug!(
+                            log::trace!(target: "con",
                                 "Menu check function {} failed with result: {}",
                                 &message.condition_function,
                                 result
                             );
                             continue;
+                        } else {
+                            log::trace!(target: "con",
+                                "Menu check function {} passed with result: {}",
+                                &message.condition_function,
+                                result
+                            );
                         }
                     }
                     Err(error) => {
-                        log::error!(
+                        log::error!(target: "con",
                             "Error running conversation script function {}: {}",
                             &message.condition_function,
                             error
@@ -285,41 +291,44 @@ impl GeneratedDialog {
                 ConMessageType::Close
                 | ConMessageType::PlayerSelect
                 | ConMessageType::JumpSelect => {
-                    self.responses.push(GeneratedDialogResponse {
-                        text: message_layout_job(
-                            Some(self.responses.len()),
-                            game_data
-                                .ltb_event
-                                .get_string(message.string_id as usize, 2)
-                                .map(|message| parse_message(&message, user_context))
-                                .unwrap_or_else(|| "???".into())
-                                .as_str(),
-                        ),
-                        galley: None,
-                        action_function: message.action_function.clone(),
-                        menu_index: message.message_value,
-                    });
+                    if let Some(response_text) = game_data
+                        .ltb_event
+                        .get_string(message.string_id as usize, 2)
+                        .map(|message| parse_message(&message, user_context))
+                    {
+                        self.responses.push(GeneratedDialogResponse {
+                            text: message_layout_job(
+                                Some(self.responses.len()),
+                                response_text.as_str(),
+                            ),
+                            galley: None,
+                            action_function: message.action_function.clone(),
+                            menu_index: message.message_value,
+                        });
+                    } else {
+                        log::debug!(target: "con", "Failed to get LTB response string in menu_idx {} with string_id {}", menu_idx, message.string_id);
+                    }
                 }
                 ConMessageType::NextMessage | ConMessageType::ShowMessage => {
-                    self.message = message_layout_job(
-                        None,
-                        game_data
-                            .ltb_event
-                            .get_string(message.string_id as usize, 2)
-                            .map(|message| parse_message(&message, user_context))
-                            .unwrap_or_else(|| "???".into())
-                            .as_str(),
-                    );
-                    self.responses.clear();
+                    if let Some(message_text) = game_data
+                        .ltb_event
+                        .get_string(message.string_id as usize, 2)
+                        .map(|message| parse_message(&message, user_context))
+                    {
+                        self.message = message_layout_job(None, message_text.as_str());
+                        self.responses.clear();
 
-                    self.run_menu(
-                        lua_vm,
-                        user_context,
-                        con_file,
-                        event_object_handle,
-                        game_data,
-                        message.message_value,
-                    );
+                        self.run_menu(
+                            lua_vm,
+                            user_context,
+                            con_file,
+                            event_object_handle,
+                            game_data,
+                            message.message_value,
+                        );
+                    } else {
+                        log::debug!(target: "con", "Failed to get LTB message string in menu_idx {} with string_id {}", menu_idx, message.string_id);
+                    }
                 }
             }
 
@@ -440,7 +449,7 @@ pub fn conversation_dialog_system(
                             .and_then(|value| value.to_i32().ok())
                             .unwrap_or(0);
                         if result < 1 {
-                            log::debug!(
+                            log::trace!(target: "con",
                                 "Conversation check open function {} failed with value {}",
                                 check_open_function,
                                 result
@@ -460,7 +469,7 @@ pub fn conversation_dialog_system(
                         }
                     }
                     Err(error) => {
-                        log::error!(
+                        log::error!(target: "con",
                             "Error running conversation open script function {}: {}",
                             check_open_function,
                             error

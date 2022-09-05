@@ -771,6 +771,7 @@ impl ModelLoader {
                 }
             }
         }
+
         if matches!(model_part, CharacterModelPart::SubWeapon) {
             if let Some(item) = equipment.get_equipment_item(EquipmentIndex::SubWeapon) {
                 if item.has_socket && item.gem > 300 {

@@ -473,7 +473,8 @@ fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsC
         })
         .insert_resource(LogSettings {
             level: Level::INFO,
-            filter: "wgpu=error,packets=debug,quest=trace,lua=trace,animation=info".to_string(),
+            filter: "wgpu=error,packets=debug,quest=trace,lua=debug,con=trace,animation=info"
+                .to_string(),
         })
         .add_plugin(bevy::log::LogPlugin::default())
         .add_plugin(bevy::core::CorePlugin::default())

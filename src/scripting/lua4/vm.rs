@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt::Write};
 use thiserror::Error;
 
 use crate::scripting::lua4::{Lua4Function, Lua4Instruction, Lua4Value};
@@ -17,6 +17,7 @@ pub enum Lua4VMError {
     #[error("Unimplemented instruction {0:?}")]
     Unimplemented(Lua4Instruction),
 }
+
 pub trait Lua4VMRustClosures {
     fn call_rust_closure(
         &mut self,
@@ -59,6 +60,7 @@ impl Lua4VM {
         loop {
             let instruction = function.instructions[pc];
             pc += 1;
+            log::trace!(target: "lua", "[{:03}] {:?}", pc, instruction);
             match instruction {
                 Lua4Instruction::OP_END => break,
                 Lua4Instruction::OP_RETURN(return_stack_index) => {
@@ -75,8 +77,41 @@ impl Lua4VM {
                         let function = function.clone();
                         self.call_lua_function(rust_closures, &function, &parameters)?
                     } else if let Lua4Value::RustClosure(function_name) = closure {
-                        log::debug!(target: "lua", "Call rust closure: {}", function_name);
-                        rust_closures.call_rust_closure(&function_name, parameters)?
+                        let mut debug_message = String::new();
+
+                        if log::log_enabled!(target: "lua", log::Level::Debug) {
+                            write!(&mut debug_message, "Call rust closure: {}(", function_name)
+                                .ok();
+
+                            for paremeter in parameters.iter().take(1) {
+                                write!(&mut debug_message, "{:?}", paremeter).ok();
+                            }
+
+                            for paremeter in parameters.iter().skip(1) {
+                                write!(&mut debug_message, ", {:?}", paremeter).ok();
+                            }
+                            debug_message.push(')');
+                        }
+
+                        let results =
+                            rust_closures.call_rust_closure(&function_name, parameters)?;
+
+                        if log::log_enabled!(target: "lua", log::Level::Debug) {
+                            write!(&mut debug_message, " = [").ok();
+
+                            for value in results.iter().take(1) {
+                                write!(&mut debug_message, "{:?}", value).ok();
+                            }
+
+                            for value in results.iter().skip(1) {
+                                write!(&mut debug_message, ", {:?}", value).ok();
+                            }
+                            debug_message.push(']');
+                        }
+
+                        log::debug!(target: "lua", "{}", debug_message);
+
+                        results
                     } else {
                         return Err(Lua4VMError::NotClosure.into());
                     };

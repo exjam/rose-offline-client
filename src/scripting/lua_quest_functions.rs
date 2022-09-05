@@ -75,8 +75,6 @@ fn QF_checkQuestCondition(
     parameters: Vec<Lua4Value>,
 ) -> Vec<Lua4Value> {
     if let Ok(quest_trigger_name) = parameters[0].to_string() {
-        log::trace!(target: "lua", "QF_checkQuestCondition({})", &quest_trigger_name);
-
         if let Ok(true) =
             quest_check_conditions(resources, context, quest_trigger_name.as_str().into())
         {
@@ -94,8 +92,6 @@ fn QF_doQuestTrigger(
     parameters: Vec<Lua4Value>,
 ) -> Vec<Lua4Value> {
     let result = if let Ok(quest_trigger_name) = parameters[0].to_string() {
-        log::trace!(target: "lua", "QF_doQuestTrigger({})", &quest_trigger_name);
-
         if let Ok(true) =
             quest_check_conditions(resources, context, quest_trigger_name.as_str().into())
         {
@@ -127,7 +123,6 @@ fn QF_findQuest(
 ) -> Vec<Lua4Value> {
     let result = || -> Option<i32> {
         let quest_id = parameters.get(0)?.to_usize().ok()?;
-        log::trace!(target: "lua", "QF_findQuest({})", quest_id);
 
         let quest_state = context.query_quest.get_single().ok()?;
         quest_state
@@ -146,8 +141,6 @@ fn QF_getEventOwner(
     parameters: Vec<Lua4Value>,
 ) -> Vec<Lua4Value> {
     if let Ok(lua_value_entity) = parameters[0].to_user_type::<LuaUserValueEntity>() {
-        log::trace!(target: "lua", "QF_getEventOwner(..)");
-
         if let Some(entity) = lua_value_entity.owner_entity {
             if let Ok(client_entity) = context.query_client_entity.get(entity) {
                 return vec![client_entity.id.0.into()];
@@ -166,7 +159,6 @@ fn QF_getEpisodeVAR(
 ) -> Vec<Lua4Value> {
     let result = || -> Option<i32> {
         let var_id = parameters.get(0)?.to_usize().ok()?;
-        log::trace!(target: "lua", "QF_getEpisodeVAR({})", var_id);
 
         let quest_state = context.query_quest.get_single().ok()?;
         Some(*quest_state.episode_variables.get(var_id)? as i32)
@@ -184,7 +176,6 @@ fn QF_getJobVAR(
 ) -> Vec<Lua4Value> {
     let result = || -> Option<i32> {
         let var_id = parameters.get(0)?.to_usize().ok()?;
-        log::trace!(target: "lua", "QF_getJobVAR({})", var_id);
 
         let quest_state = context.query_quest.get_single().ok()?;
         Some(*quest_state.job_variables.get(var_id)? as i32)
@@ -202,7 +193,6 @@ fn QF_getPlanetVAR(
 ) -> Vec<Lua4Value> {
     let result = || -> Option<i32> {
         let var_id = parameters.get(0)?.to_usize().ok()?;
-        log::trace!(target: "lua", "QF_getPlanetVAR({})", var_id);
 
         let quest_state = context.query_quest.get_single().ok()?;
         Some(*quest_state.planet_variables.get(var_id)? as i32)
@@ -219,8 +209,6 @@ fn QF_getQuestCount(
     _parameters: Vec<Lua4Value>,
 ) -> Vec<Lua4Value> {
     let result = || -> Option<i32> {
-        log::trace!(target: "lua", "QF_getQuestCount()");
-
         let quest_state = context.query_quest.get_single().ok()?;
         Some(
             quest_state
@@ -243,7 +231,6 @@ fn QF_getQuestID(
 ) -> Vec<Lua4Value> {
     let result = || -> Option<i32> {
         let quest_index = parameters.get(0)?.to_usize().ok()?;
-        log::trace!(target: "lua", "QF_getQuestID({})", quest_index);
 
         let quest_state = context.query_quest.get_single().ok()?;
         let quest = quest_state.get_quest(quest_index)?;
@@ -263,7 +250,6 @@ fn QF_getQuestItemQuantity(
     let result = || -> Option<i32> {
         let quest_id = parameters.get(0)?.to_usize().ok()?;
         let item_base1000 = parameters.get(1)?.to_usize().ok()?;
-        log::trace!(target: "lua", "QF_getQuestItemQuantity({}, {})", quest_id, item_base1000);
 
         let item_reference = resources
             .game_data
@@ -293,7 +279,6 @@ fn QF_getQuestSwitch(
     let result = || -> Option<i32> {
         let quest_index = parameters.get(0)?.to_usize().ok()?;
         let quest_switch_id = parameters.get(1)?.to_usize().ok()?;
-        log::trace!(target: "lua", "QF_getQuestSwitch({}, {})", quest_index, quest_switch_id);
 
         let quest_state = context.query_quest.get_single().ok()?;
         let quest = quest_state.get_quest(quest_index)?;
@@ -313,7 +298,6 @@ fn QF_getQuestVar(
     let result = || -> Option<i32> {
         let quest_index = parameters.get(0)?.to_usize().ok()?;
         let quest_var_id = parameters.get(1)?.to_usize().ok()?;
-        log::trace!(target: "lua", "QF_getQuestVar({}, {})", quest_index, quest_var_id);
 
         let quest_state = context.query_quest.get_single().ok()?;
         let quest = quest_state.get_quest(quest_index)?;
@@ -332,7 +316,6 @@ fn QF_getUserSwitch(
 ) -> Vec<Lua4Value> {
     let result = || -> Option<i32> {
         let switch_id = parameters.get(0)?.to_usize().ok()?;
-        log::trace!(target: "lua", "QF_getUserSwitch({})", switch_id);
 
         let quest_state = context.query_quest.get_single().ok()?;
         Some(*quest_state.quest_switches.get(switch_id)? as i32)
@@ -350,7 +333,6 @@ fn QF_getNpcQuestZeroVal(
 ) -> Vec<Lua4Value> {
     let result = || -> Option<i32> {
         let npc_id = parameters.get(0)?.to_usize().ok()?;
-        log::trace!(target: "lua", "QF_getNpcQuestZeroVal({})", npc_id);
 
         for npc in context.query_npc.iter() {
             if npc.id.get() as usize == npc_id {
