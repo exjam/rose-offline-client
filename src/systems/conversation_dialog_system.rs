@@ -554,7 +554,7 @@ pub fn conversation_dialog_system(
                         ui.put(
                             egui::Rect::from_min_size(ui.min_rect().min, egui::vec2(350.0, 20.0)),
                             egui::Label::new(
-                                egui::RichText::new(title).color(egui::Color32::BLACK).font(
+                                egui::RichText::new(title).color(egui::Color32::WHITE).font(
                                     egui::FontId::new(
                                         14.0,
                                         egui::FontFamily::Name("Ubuntu-M".into()),

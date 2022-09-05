@@ -53,7 +53,7 @@ pub mod zone_loader;
 
 use audio::OddioPlugin;
 use events::{
-    AnimationFrameEvent, CharacterSelectEvent, ChatboxEvent, ClientEntityEvent,
+    AnimationFrameEvent, BankEvent, CharacterSelectEvent, ChatboxEvent, ClientEntityEvent,
     ConversationDialogEvent, GameConnectionEvent, HitEvent, LoadZoneEvent, LoginEvent,
     MessageBoxEvent, NetworkEvent, NpcStoreEvent, NumberInputDialogEvent, PartyEvent,
     PersonalStoreEvent, PlayerCommandEvent, QuestTriggerEvent, SpawnEffectEvent,
@@ -95,9 +95,9 @@ use systems::{
     zone_viewer_enter_system, DebugInspectorPlugin,
 };
 use ui::{
-    load_dialog_sprites_system, ui_character_create_system, ui_character_info_system,
-    ui_character_select_name_tag_system, ui_character_select_system, ui_chatbox_system,
-    ui_debug_camera_info_system, ui_debug_client_entity_list_system,
+    load_dialog_sprites_system, ui_bank_system, ui_character_create_system,
+    ui_character_info_system, ui_character_select_name_tag_system, ui_character_select_system,
+    ui_chatbox_system, ui_debug_camera_info_system, ui_debug_client_entity_list_system,
     ui_debug_command_viewer_system, ui_debug_diagnostics_system, ui_debug_dialog_list_system,
     ui_debug_entity_inspector_system, ui_debug_item_list_system, ui_debug_menu_system,
     ui_debug_npc_list_system, ui_debug_physics_system, ui_debug_render_system,
@@ -550,6 +550,7 @@ fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsC
     app.add_state(app_state);
 
     app.init_resource::<Events<AnimationFrameEvent>>()
+        .init_resource::<Events<BankEvent>>()
         .init_resource::<Events<ChatboxEvent>>()
         .init_resource::<Events<CharacterSelectEvent>>()
         .init_resource::<Events<ClientEntityEvent>>()
@@ -805,6 +806,7 @@ fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsC
                         .after(ui_message_box_system)
                         .after(ui_number_input_dialog_system),
                 )
+                .with_system(ui_bank_system.label("ui_system"))
                 .with_system(ui_chatbox_system.label("ui_system"))
                 .with_system(ui_character_info_system.label("ui_system"))
                 .with_system(ui_inventory_system.label("ui_system"))

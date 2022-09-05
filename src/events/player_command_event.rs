@@ -21,4 +21,6 @@ pub enum PlayerCommandEvent {
     EquipEquipment(ItemSlot),
     EquipVehicle(ItemSlot),
     DropMoney(usize),
+    BankDepositItem(ItemSlot),
+    BankWithdrawItem(usize),
 }

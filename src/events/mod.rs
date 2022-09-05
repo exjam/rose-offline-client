@@ -1,4 +1,5 @@
 mod animation_frame_event;
+mod bank_event;
 mod character_select_event;
 mod chatbox_event;
 mod client_entity_event;
@@ -21,6 +22,7 @@ mod world_connection_event;
 mod zone_event;
 
 pub use animation_frame_event::AnimationFrameEvent;
+pub use bank_event::BankEvent;
 pub use character_select_event::CharacterSelectEvent;
 pub use chatbox_event::ChatboxEvent;
 pub use client_entity_event::ClientEntityEvent;

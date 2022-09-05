@@ -1,6 +1,7 @@
 mod dialog_loader;
 mod drag_and_drop_slot;
 mod tooltips;
+mod ui_bank_system;
 mod ui_character_create_system;
 mod ui_character_info_system;
 mod ui_character_select_name_tag_system;
@@ -58,6 +59,7 @@ pub struct UiStateWindows {
 pub use dialog_loader::{load_dialog_sprites_system, DialogInstance, DialogLoader};
 pub use drag_and_drop_slot::{DragAndDropId, DragAndDropSlot};
 pub use tooltips::{ui_add_item_tooltip, ui_add_skill_tooltip};
+pub use ui_bank_system::ui_bank_system;
 pub use ui_character_create_system::ui_character_create_system;
 pub use ui_character_info_system::ui_character_info_system;
 pub use ui_character_select_name_tag_system::ui_character_select_name_tag_system;

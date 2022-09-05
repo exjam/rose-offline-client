@@ -16,7 +16,8 @@ use rose_game_common::{
 
 use crate::{
     components::{
-        ClientEntity, ConsumableCooldownGroup, Cooldowns, PartyInfo, PlayerCharacter, Position,
+        Bank, ClientEntity, ConsumableCooldownGroup, Cooldowns, PartyInfo, PlayerCharacter,
+        Position,
     },
     events::{ChatboxEvent, PlayerCommandEvent},
     resources::{GameConnection, GameData, SelectedTarget},
@@ -27,6 +28,7 @@ use crate::{
 pub struct PlayerQuery<'w> {
     _player_character: With<PlayerCharacter>,
     entity: Entity,
+    bank: Option<&'w Bank>,
     cooldowns: &'w mut Cooldowns,
     hotbar: &'w mut Hotbar,
     inventory: &'w Inventory,
@@ -522,7 +524,7 @@ pub fn player_command_system(
             }
             PlayerCommandEvent::DropItem(item_slot) => {
                 if let Some(item) = player.inventory.get_item(item_slot) {
-                    // TODO: if item.get_quantity() > 1, show dialog to pick how many to drop
+                    // TODO: if item.get_quantity() > 1, show number input dialog for quantity
                     if let Some(game_connection) = game_connection.as_ref() {
                         game_connection
                             .client_message_tx
@@ -590,6 +592,40 @@ pub fn player_command_system(
                             slot: hotbar_slot,
                         }))
                         .ok();
+                }
+            }
+            PlayerCommandEvent::BankDepositItem(item_slot) => {
+                if let Some(item) = player.inventory.get_item(item_slot) {
+                    // TODO: if item.get_quantity() > 1, show number input dialog for quantity
+                    if let Some(game_connection) = game_connection.as_ref() {
+                        game_connection
+                            .client_message_tx
+                            .send(ClientMessage::BankDepositItem {
+                                item_slot,
+                                item: item.clone(),
+                                is_premium: false,
+                            })
+                            .ok();
+                    }
+                }
+            }
+            PlayerCommandEvent::BankWithdrawItem(bank_slot) => {
+                if let Some(item) = player
+                    .bank
+                    .and_then(|bank| bank.slots.get(bank_slot))
+                    .and_then(|x| x.as_ref())
+                {
+                    // TODO: if item.get_quantity() > 1, show number input dialog for quantity
+                    if let Some(game_connection) = game_connection.as_ref() {
+                        game_connection
+                            .client_message_tx
+                            .send(ClientMessage::BankWithdrawItem {
+                                bank_slot,
+                                item: item.clone(),
+                                is_premium: false,
+                            })
+                            .ok();
+                    }
                 }
             }
             PlayerCommandEvent::UseHotbar(_, _) => {} // Handled above

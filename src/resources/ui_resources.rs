@@ -69,6 +69,7 @@ pub struct UiResources {
 
     pub dialog_files: HashMap<String, Handle<Dialog>>,
     pub dialog_login: Handle<Dialog>,
+    pub dialog_bank: Handle<Dialog>,
     pub dialog_character_info: Handle<Dialog>,
     pub dialog_chatbox: Handle<Dialog>,
     pub dialog_create_avatar: Handle<Dialog>,
@@ -432,6 +433,7 @@ pub fn load_ui_resources(
                 })
             }
         },
+        dialog_bank: dialog_files["DLGBANK.XML"].clone(),
         dialog_character_info: dialog_files["DLGAVATA.XML"].clone(),
         dialog_chatbox: dialog_files["DLGCHAT.XML"].clone(),
         dialog_create_avatar: dialog_files[

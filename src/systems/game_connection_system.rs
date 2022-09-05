@@ -30,14 +30,14 @@ use rose_network_common::ConnectionError;
 use crate::{
     bundles::{ability_values_add_value_exclusive, ability_values_set_value_exclusive},
     components::{
-        ClientEntity, ClientEntityName, ClientEntityType, CollisionHeightOnly, CollisionPlayer,
-        Command, CommandCastSkillTarget, Cooldowns, NextCommand, PartyInfo, PartyOwner,
-        PassiveRecoveryTime, PendingDamage, PendingDamageList, PendingSkillEffect,
+        Bank, ClientEntity, ClientEntityName, ClientEntityType, CollisionHeightOnly,
+        CollisionPlayer, Command, CommandCastSkillTarget, Cooldowns, NextCommand, PartyInfo,
+        PartyOwner, PassiveRecoveryTime, PendingDamage, PendingDamageList, PendingSkillEffect,
         PendingSkillEffectList, PendingSkillTarget, PendingSkillTargetList, PersonalStore,
         PlayerCharacter, Position, VisibleStatusEffects,
     },
     events::{
-        ChatboxEvent, ClientEntityEvent, GameConnectionEvent, LoadZoneEvent, PartyEvent,
+        BankEvent, ChatboxEvent, ClientEntityEvent, GameConnectionEvent, LoadZoneEvent, PartyEvent,
         PersonalStoreEvent, QuestTriggerEvent,
     },
     resources::{AppState, ClientEntityList, GameConnection, GameData, WorldRates, WorldTime},
@@ -1921,6 +1921,80 @@ pub fn game_connection_system(
                         }
 
                         update_inventory_and_money(world, player_entity, items, Some(money));
+                    });
+                }
+            }
+            Ok(ServerMessage::BankOpen) => {
+                commands.add(move |world: &mut World| {
+                    let mut chatbox_events = world.resource_mut::<Events<BankEvent>>();
+                    chatbox_events.send(BankEvent::Show);
+                });
+            }
+            Ok(ServerMessage::BankSetItems { items }) => {
+                if let Some(player_entity) = client_entity_list.player_entity {
+                    let mut slots = vec![None; 160];
+
+                    for (bank_slot_index, item) in items {
+                        let bank_slot_index = bank_slot_index as usize;
+                        if bank_slot_index > slots.len() {
+                            slots.resize(bank_slot_index + 1, None);
+                        }
+                        slots[bank_slot_index] = item;
+                    }
+
+                    commands.add(move |world: &mut World| {
+                        world.entity_mut(player_entity).insert(Bank { slots });
+
+                        let mut chatbox_events = world.resource_mut::<Events<BankEvent>>();
+                        chatbox_events.send(BankEvent::Show);
+                    });
+                }
+            }
+            Ok(ServerMessage::BankUpdateItems { items }) => {
+                if let Some(player_entity) = client_entity_list.player_entity {
+                    commands.add(move |world: &mut World| {
+                        if let Some(mut bank) = world.entity_mut(player_entity).get_mut::<Bank>() {
+                            for (bank_slot_index, item) in items {
+                                let bank_slot_index = bank_slot_index as usize;
+
+                                if bank_slot_index > bank.slots.len() {
+                                    bank.slots.resize(bank_slot_index + 1, None);
+                                }
+
+                                bank.slots[bank_slot_index] = item;
+                            }
+                        }
+                    });
+                }
+            }
+            Ok(ServerMessage::BankTransaction {
+                inventory_item_slot,
+                inventory_item,
+                inventory_money,
+                bank_slot,
+                bank_item,
+            }) => {
+                if let Some(player_entity) = client_entity_list.player_entity {
+                    commands.add(move |world: &mut World| {
+                        if let Some(mut inventory) =
+                            world.entity_mut(player_entity).get_mut::<Inventory>()
+                        {
+                            if let Some(item_slot) =
+                                inventory.get_item_slot_mut(inventory_item_slot)
+                            {
+                                *item_slot = inventory_item;
+                            }
+
+                            if let Some(inventory_money) = inventory_money {
+                                inventory.money = inventory_money;
+                            }
+                        }
+
+                        if let Some(mut bank) = world.entity_mut(player_entity).get_mut::<Bank>() {
+                            if let Some(bank_slot) = bank.slots.get_mut(bank_slot) {
+                                *bank_slot = bank_item;
+                            }
+                        }
                     });
                 }
             }

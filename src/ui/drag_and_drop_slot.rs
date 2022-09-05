@@ -14,6 +14,7 @@ pub enum DragAndDropId {
     NpcStoreBuyList(usize),
     NpcStoreSellList(usize),
     PersonalStoreSell(usize),
+    Bank(usize),
 }
 
 pub struct DragAndDropSlot<'a> {

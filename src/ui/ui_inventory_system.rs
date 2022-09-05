@@ -149,11 +149,19 @@ fn drag_accepts_equipment(drag_source: &DragAndDropId) -> bool {
     )
 }
 
+fn drag_accepts_equipment_or_bank(drag_source: &DragAndDropId) -> bool {
+    drag_accepts_equipment(drag_source) || matches!(drag_source, DragAndDropId::Bank(_))
+}
+
 fn drag_accepts_consumables(drag_source: &DragAndDropId) -> bool {
     matches!(
         drag_source,
         DragAndDropId::Inventory(ItemSlot::Inventory(InventoryPageType::Consumables, _))
     )
+}
+
+fn drag_accepts_consumables_or_bank(drag_source: &DragAndDropId) -> bool {
+    drag_accepts_consumables(drag_source) || matches!(drag_source, DragAndDropId::Bank(_))
 }
 
 fn drag_accepts_materials(drag_source: &DragAndDropId) -> bool {
@@ -164,12 +172,20 @@ fn drag_accepts_materials(drag_source: &DragAndDropId) -> bool {
     )
 }
 
+fn drag_accepts_materials_or_bank(drag_source: &DragAndDropId) -> bool {
+    drag_accepts_materials(drag_source) || matches!(drag_source, DragAndDropId::Bank(_))
+}
+
 fn drag_accepts_vehicles(drag_source: &DragAndDropId) -> bool {
     matches!(
         drag_source,
         DragAndDropId::Inventory(ItemSlot::Inventory(InventoryPageType::Vehicles, _))
             | DragAndDropId::Inventory(ItemSlot::Vehicle(_))
     )
+}
+
+fn drag_accepts_vehicles_or_bank(drag_source: &DragAndDropId) -> bool {
+    drag_accepts_vehicles(drag_source) || matches!(drag_source, DragAndDropId::Bank(_))
 }
 
 pub trait GetItem {
@@ -213,10 +229,10 @@ fn ui_add_inventory_slot(
 ) {
     let drag_accepts = match inventory_slot {
         ItemSlot::Inventory(page_type, _) => match page_type {
-            InventoryPageType::Equipment => drag_accepts_equipment,
-            InventoryPageType::Consumables => drag_accepts_consumables,
-            InventoryPageType::Materials => drag_accepts_materials,
-            InventoryPageType::Vehicles => drag_accepts_vehicles,
+            InventoryPageType::Equipment => drag_accepts_equipment_or_bank,
+            InventoryPageType::Consumables => drag_accepts_consumables_or_bank,
+            InventoryPageType::Materials => drag_accepts_materials_or_bank,
+            InventoryPageType::Vehicles => drag_accepts_vehicles_or_bank,
         },
         ItemSlot::Equipment(_) => drag_accepts_equipment,
         ItemSlot::Ammo(_) => drag_accepts_materials,
@@ -447,6 +463,12 @@ fn ui_add_inventory_slot(
                 }
             }
         }
+    }
+
+    if let Some(DragAndDropId::Bank(dropped_bank_slot_index)) = dropped_item {
+        player_command_events.send(PlayerCommandEvent::BankWithdrawItem(
+            dropped_bank_slot_index,
+        ));
     }
 
     if let Some(item_slot) = equip_equipment_inventory_slot {

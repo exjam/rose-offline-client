@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use rose_game_common::{components::CharacterGender, messages::ClientEntityId};
 
 use crate::{
-    events::NpcStoreEvent,
+    events::{BankEvent, NpcStoreEvent},
     scripting::{
         lua4::Lua4Value,
         lua_game_constants::{
@@ -33,6 +33,7 @@ impl Default for LuaGameFunctions {
         > = HashMap::new();
 
         closures.insert("GF_getVariable".into(), GF_getVariable);
+        closures.insert("GF_openBank".into(), GF_openBank);
         closures.insert("GF_openStore".into(), GF_openStore);
 
         /*
@@ -67,7 +68,6 @@ impl Default for LuaGameFunctions {
         GF_movableXY
         GF_moveEvent
         GF_moveXY
-        GF_openBank
         GF_openDeliveryStore
         GF_openSeparate
         GF_openUpgrade
@@ -133,6 +133,25 @@ fn GF_getVariable(
     };
 
     vec![value.into()]
+}
+
+#[allow(non_snake_case)]
+fn GF_openBank(
+    _resources: &ScriptFunctionResources,
+    context: &mut ScriptFunctionContext,
+    parameters: Vec<Lua4Value>,
+) -> Vec<Lua4Value> {
+    (|| -> Option<()> {
+        let client_entity_id = ClientEntityId(parameters.get(0)?.to_usize().ok()?);
+
+        context
+            .bank_events
+            .send(BankEvent::OpenBankFromClientEntity { client_entity_id });
+
+        Some(())
+    })();
+
+    vec![]
 }
 
 #[allow(non_snake_case)]

@@ -26,7 +26,8 @@ use rose_game_common::{
 use rose_network_common::{Connection, Packet, PacketCodec};
 use rose_network_irose::{
     game_client_packets::{
-        PacketClientAttack, PacketClientCastSkillSelf, PacketClientCastSkillTargetEntity,
+        PacketClientAttack, PacketClientBankMoveItem, PacketClientBankOpen,
+        PacketClientCastSkillSelf, PacketClientCastSkillTargetEntity,
         PacketClientCastSkillTargetPosition, PacketClientChangeAmmo, PacketClientChangeEquipment,
         PacketClientChangeVehiclePart, PacketClientChat, PacketClientConnectRequest,
         PacketClientDropItemFromInventory, PacketClientEmote, PacketClientIncreaseBasicStat,
@@ -41,15 +42,16 @@ use rose_network_irose::{
     game_server_packets::{
         ConnectResult, PacketConnectionReply, PacketServerAdjustPosition, PacketServerAnnounceChat,
         PacketServerApplySkillDamage, PacketServerApplySkillEffect, PacketServerAttackEntity,
-        PacketServerCancelCastingSkill, PacketServerCastSkillSelf,
-        PacketServerCastSkillTargetEntity, PacketServerCastSkillTargetPosition,
-        PacketServerChangeNpcId, PacketServerCharacterInventory, PacketServerCharacterQuestData,
-        PacketServerDamageEntity, PacketServerFinishCastingSkill, PacketServerJoinZone,
-        PacketServerLearnSkillResult, PacketServerLevelUpSkillResult, PacketServerLocalChat,
-        PacketServerMoveEntity, PacketServerMoveToggle, PacketServerMoveToggleType,
-        PacketServerNpcStoreTransactionError, PacketServerPartyMemberRewardItem,
-        PacketServerPartyMemberUpdateInfo, PacketServerPartyMembers, PacketServerPartyReply,
-        PacketServerPartyRequest, PacketServerPartyUpdateRules, PacketServerPersonalStoreItemList,
+        PacketServerBankOpen, PacketServerBankTransaction, PacketServerCancelCastingSkill,
+        PacketServerCastSkillSelf, PacketServerCastSkillTargetEntity,
+        PacketServerCastSkillTargetPosition, PacketServerChangeNpcId,
+        PacketServerCharacterInventory, PacketServerCharacterQuestData, PacketServerDamageEntity,
+        PacketServerFinishCastingSkill, PacketServerJoinZone, PacketServerLearnSkillResult,
+        PacketServerLevelUpSkillResult, PacketServerLocalChat, PacketServerMoveEntity,
+        PacketServerMoveToggle, PacketServerMoveToggleType, PacketServerNpcStoreTransactionError,
+        PacketServerPartyMemberRewardItem, PacketServerPartyMemberUpdateInfo,
+        PacketServerPartyMembers, PacketServerPartyReply, PacketServerPartyRequest,
+        PacketServerPartyUpdateRules, PacketServerPersonalStoreItemList,
         PacketServerPersonalStoreTransactionResult,
         PacketServerPersonalStoreTransactionUpdateMoneyAndInventory,
         PacketServerPickupItemDropResult, PacketServerQuestResult, PacketServerQuestResultType,
@@ -840,6 +842,33 @@ impl GameClient {
                     })
                     .ok();
             }
+            Some(ServerPackets::BankOpen) => match PacketServerBankOpen::try_from(packet)? {
+                PacketServerBankOpen::Open => {
+                    self.server_message_tx.send(ServerMessage::BankOpen).ok();
+                }
+                PacketServerBankOpen::SetItems { items } => {
+                    self.server_message_tx
+                        .send(ServerMessage::BankSetItems { items })
+                        .ok();
+                }
+                PacketServerBankOpen::UpdateItems { items } => {
+                    self.server_message_tx
+                        .send(ServerMessage::BankUpdateItems { items })
+                        .ok();
+                }
+            },
+            Some(ServerPackets::BankTransaction) => {
+                let packet = PacketServerBankTransaction::try_from(packet)?;
+                self.server_message_tx
+                    .send(ServerMessage::BankTransaction {
+                        inventory_item_slot: packet.inventory_item_slot,
+                        inventory_item: packet.inventory_item,
+                        inventory_money: packet.inventory_money,
+                        bank_slot: packet.bank_slot,
+                        bank_item: packet.bank_item,
+                    })
+                    .ok();
+            }
             _ => log::info!("Unhandled GameClient packet {:?}", packet),
         }
 
@@ -1144,6 +1173,37 @@ impl GameClient {
                         store_entity_id,
                         store_slot_index,
                         buy_item,
+                    }))
+                    .await?
+            }
+            ClientMessage::BankOpen => {
+                connection
+                    .write_packet(Packet::from(&PacketClientBankOpen {}))
+                    .await?
+            }
+            ClientMessage::BankDepositItem {
+                item_slot,
+                item,
+                is_premium,
+            } => {
+                connection
+                    .write_packet(Packet::from(&PacketClientBankMoveItem::Deposit {
+                        item_slot,
+                        item,
+                        is_premium,
+                    }))
+                    .await?
+            }
+            ClientMessage::BankWithdrawItem {
+                bank_slot,
+                item,
+                is_premium,
+            } => {
+                connection
+                    .write_packet(Packet::from(&PacketClientBankMoveItem::Withdraw {
+                        bank_slot,
+                        item,
+                        is_premium,
                     }))
                     .await?
             }
