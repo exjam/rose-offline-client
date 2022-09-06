@@ -1,8 +1,10 @@
 use bevy::{
-    ecs::system::EntityCommands,
+    ecs::{query::WorldQuery, system::EntityCommands},
     hierarchy::DespawnRecursiveExt,
     math::{Quat, Vec3, Vec3Swizzles},
-    prelude::{AssetServer, Commands, Entity, EventWriter, Handle, Mut, Query, Res, Transform},
+    prelude::{
+        AssetServer, Commands, Entity, EventWriter, Handle, Mut, Or, Query, Res, Transform, With,
+    },
 };
 use rand::prelude::SliceRandom;
 
@@ -10,8 +12,7 @@ use rose_data::{CharacterMotionAction, EquipmentIndex, NpcMotionAction, SkillAct
 use rose_file_readers::VfsPathBuf;
 use rose_game_common::{
     components::{
-        AbilityValues, CharacterGender, Destination, Equipment, HealthPoints, MoveMode, MoveSpeed,
-        Npc, Target,
+        AbilityValues, CharacterGender, Destination, Equipment, MoveMode, MoveSpeed, Npc, Target,
     },
     messages::client::ClientMessage,
 };
@@ -232,25 +233,35 @@ fn get_move_animation_speed(move_speed: &MoveSpeed) -> f32 {
     (move_speed.speed + 180.0) / 600.0
 }
 
+#[derive(WorldQuery)]
+pub struct QueryAttackTarget<'w> {
+    entity: Entity,
+    position: &'w Position,
+    dead: Option<&'w Dead>,
+}
+
 pub fn command_system(
     mut commands: Commands,
-    mut query: Query<(
-        Entity,
-        Option<&PlayerCharacter>,
-        &AbilityValues,
-        Option<&mut ActiveMotion>,
-        Option<&CharacterModel>,
-        Option<&NpcModel>,
-        Option<&Equipment>,
-        &Position,
-        &MoveMode,
-        &MoveSpeed,
-        &mut Command,
-        &mut NextCommand,
-        &mut Transform,
-    )>,
+    mut query: Query<
+        (
+            Entity,
+            Option<&PlayerCharacter>,
+            &AbilityValues,
+            Option<&mut ActiveMotion>,
+            Option<&CharacterModel>,
+            Option<&NpcModel>,
+            Option<&Equipment>,
+            &Position,
+            &MoveMode,
+            &MoveSpeed,
+            &mut Command,
+            &mut NextCommand,
+            &mut Transform,
+        ),
+        Or<(With<CharacterModel>, With<NpcModel>)>,
+    >,
     query_move_target: Query<(&Position, &ClientEntity)>,
-    query_attack_target: Query<(&Position, &HealthPoints)>,
+    query_attack_target: Query<QueryAttackTarget>,
     query_npc: Query<&Npc>,
     query_personal_store: Query<&PersonalStore>,
     asset_server: Res<AssetServer>,
@@ -664,22 +675,22 @@ pub fn command_system(
             &mut Command::Attack(CommandAttack {
                 target: target_entity,
             }) => {
-                let query_result = query_attack_target.get(target_entity);
-                if query_result.is_err() {
+                let target = if let Ok(target) = query_attack_target.get(target_entity) {
+                    target
+                } else {
                     // Invalid target, stop attacking
                     *next_command = NextCommand::with_stop();
                     continue;
-                }
-                let (target_position, target_health_points) = query_result.unwrap();
+                };
 
-                if target_health_points.hp <= 0 {
+                if target.dead.is_some() {
                     // Target is dead, stop attacking
                     *next_command = NextCommand::with_stop();
                     continue;
                 }
 
                 let mut entity_commands = commands.entity(entity);
-                let distance = position.position.xy().distance(target_position.xy());
+                let distance = position.position.xy().distance(target.position.xy());
 
                 let attack_range = ability_values.get_attack_range() as f32;
                 if distance < attack_range {
@@ -687,8 +698,8 @@ pub fn command_system(
                     if let Some(motion) = get_attack_animation(&mut rng, character_model, npc_model)
                     {
                         // Update rotation to ensure facing enemy
-                        let dx = target_position.x - position.x;
-                        let dy = target_position.y - position.y;
+                        let dx = target.position.x - position.x;
+                        let dy = target.position.y - position.y;
                         transform.rotation = Quat::from_axis_angle(
                             Vec3::Y,
                             dy.atan2(dx) + std::f32::consts::PI / 2.0,
@@ -720,11 +731,11 @@ pub fn command_system(
                             true,
                         );
                         *command = Command::with_move(
-                            target_position.position,
+                            target.position.position,
                             Some(target_entity),
                             Some(MoveMode::Run),
                         );
-                        entity_commands.insert(Destination::new(target_position.position));
+                        entity_commands.insert(Destination::new(target.position.position));
                         entity_commands.insert(Target::new(target_entity));
                     } else {
                         // No move animation, stop attack
@@ -851,13 +862,15 @@ pub fn command_system(
                 if let Some(skill_data) = game_data.skills.get_skill(skill_id) {
                     let (target_position, target_entity) = match skill_target {
                         Some(CommandCastSkillTarget::Entity(target_entity)) => {
-                            let query_result = query_attack_target.get(target_entity);
-                            if query_result.is_err() {
+                            let target = if let Ok(target) = query_attack_target.get(target_entity)
+                            {
+                                target
+                            } else {
                                 // Invalid target, stop casting skill
                                 *next_command = NextCommand::with_stop();
                                 continue;
-                            }
-                            (Some(query_result.unwrap().0.position), Some(target_entity))
+                            };
+                            (Some(target.position.position), Some(target.entity))
                         }
                         Some(CommandCastSkillTarget::Position(target_position)) => (
                             Some(Vec3::new(target_position.x, target_position.y, 0.0)),
