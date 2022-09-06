@@ -4,7 +4,7 @@ use bevy_egui::{egui, EguiContext};
 use rose_game_common::components::{AbilityValues, HealthPoints, Npc};
 
 use crate::{
-    components::{ClientEntityName, Command},
+    components::{ClientEntityName, Dead},
     resources::{SelectedTarget, UiResources, UiSprite},
     ui::UiStateWindows,
 };
@@ -24,8 +24,8 @@ pub fn ui_selected_target_system(
     ui_state_windows: Res<UiStateWindows>,
     query_target: Query<(
         &AbilityValues,
-        &Command,
         &ClientEntityName,
+        Option<&Dead>,
         &HealthPoints,
         Option<&Npc>,
     )>,
@@ -45,10 +45,10 @@ pub fn ui_selected_target_system(
     }
 
     if let Some(selected_target_entity) = selected_target.selected {
-        if let Ok((ability_values, command, client_entity_name, health_points, npc)) =
+        if let Ok((ability_values, client_entity_name, dead, health_points, npc)) =
             query_target.get(selected_target_entity)
         {
-            if command.is_die() && npc.is_some() {
+            if dead.is_some() && npc.is_some() {
                 // Cannot target dead NPC
                 selected_target.selected = None;
             } else {

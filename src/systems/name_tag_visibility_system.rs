@@ -6,7 +6,7 @@ use rose_game_common::components::Npc;
 
 use crate::{
     components::{
-        Command, NameTag, NameTagEntity, NameTagHealthbarBackground, NameTagHealthbarForeground,
+        Dead, NameTag, NameTagEntity, NameTagHealthbarBackground, NameTagHealthbarForeground,
         NameTagTargetMark,
     },
     resources::{NameTagSettings, SelectedTarget},
@@ -39,13 +39,13 @@ pub fn name_tag_visibility_system(
             With<NameTagHealthbarForeground>,
         )>,
     >,
-    query_npc_command: Query<&Command, With<Npc>>,
+    query_npc_dead: Query<&Dead, With<Npc>>,
     name_tag_settings: Res<NameTagSettings>,
 ) {
     if selected_target
         .selected
-        .and_then(|entity| query_npc_command.get(entity).ok())
-        .map_or(false, |command| command.is_die())
+        .and_then(|entity| query_npc_dead.get(entity).ok())
+        .is_some()
     {
         // Cannot select dead NPCs
         selected_target.selected = None;
@@ -53,8 +53,8 @@ pub fn name_tag_visibility_system(
 
     if selected_target
         .hover
-        .and_then(|entity| query_npc_command.get(entity).ok())
-        .map_or(false, |command| command.is_die())
+        .and_then(|entity| query_npc_dead.get(entity).ok())
+        .is_some()
     {
         // Cannot hover dead NPCs
         selected_target.hover = None;

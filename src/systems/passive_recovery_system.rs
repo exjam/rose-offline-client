@@ -7,7 +7,7 @@ use rose_game_common::{
 };
 
 use crate::{
-    components::{Command, PassiveRecoveryTime},
+    components::{Command, Dead, PassiveRecoveryTime},
     resources::GameData,
 };
 
@@ -18,6 +18,7 @@ pub fn passive_recovery_system(
         &mut PassiveRecoveryTime,
         &AbilityValues,
         &Command,
+        Option<&Dead>,
         &mut HealthPoints,
         &mut ManaPoints,
     )>,
@@ -26,15 +27,21 @@ pub fn passive_recovery_system(
 ) {
     let delta = time.delta();
 
-    for (mut passive_recovery_time, ability_values, command, mut health_points, mut mana_points) in
-        query.iter_mut()
+    for (
+        mut passive_recovery_time,
+        ability_values,
+        command,
+        dead,
+        mut health_points,
+        mut mana_points,
+    ) in query.iter_mut()
     {
         passive_recovery_time.time += delta;
 
         if passive_recovery_time.time > RECOVERY_INTERVAL {
             passive_recovery_time.time -= RECOVERY_INTERVAL;
 
-            if command.is_die() {
+            if dead.is_some() {
                 // No recovery whilst dead!
                 continue;
             }
