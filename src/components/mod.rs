@@ -7,6 +7,7 @@ mod collision;
 mod command;
 mod cooldowns;
 mod damage_digits;
+mod dead;
 mod dummy_bone_offset;
 mod effect;
 mod event_object;
@@ -49,6 +50,7 @@ pub use command::{
 };
 pub use cooldowns::{ConsumableCooldownGroup, Cooldowns};
 pub use damage_digits::DamageDigits;
+pub use dead::Dead;
 pub use dummy_bone_offset::DummyBoneOffset;
 pub use effect::{Effect, EffectMesh, EffectParticle};
 pub use event_object::EventObject;

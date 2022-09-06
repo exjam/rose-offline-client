@@ -20,7 +20,7 @@ use crate::{
     components::{
         ActiveMotion, CharacterModel, ClientEntity, ClientEntityType, Command, CommandAttack,
         CommandCastSkill, CommandCastSkillState, CommandCastSkillTarget, CommandEmote, CommandMove,
-        CommandSit, NextCommand, NpcModel, PersonalStore, PlayerCharacter, Position,
+        CommandSit, Dead, NextCommand, NpcModel, PersonalStore, PlayerCharacter, Position,
     },
     events::{ClientEntityEvent, ConversationDialogEvent, PersonalStoreEvent},
     resources::{GameConnection, GameData},
@@ -750,6 +750,7 @@ pub fn command_system(
                 *next_command = NextCommand::default();
                 commands
                     .entity(entity)
+                    .insert(Dead)
                     .remove::<Destination>()
                     .remove::<Target>();
             }

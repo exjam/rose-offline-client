@@ -6,7 +6,7 @@ use bevy::{
 use rose_game_common::{components::HealthPoints, data::Damage};
 
 use crate::{
-    components::{ClientEntity, NextCommand, PendingDamageList},
+    components::{ClientEntity, Dead, NextCommand, PendingDamageList},
     resources::ClientEntityList,
 };
 
@@ -38,6 +38,7 @@ fn apply_damage(
     if is_killed {
         commands
             .entity(target.entity)
+            .insert(Dead)
             .insert(NextCommand::with_die())
             .remove::<ClientEntity>();
         client_entity_list.remove(target.client_entity.id);

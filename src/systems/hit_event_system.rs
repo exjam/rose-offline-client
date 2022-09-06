@@ -10,7 +10,7 @@ use rose_game_common::{
 
 use crate::{
     components::{
-        ClientEntity, ModelHeight, NextCommand, PendingDamageList, PendingSkillEffectList,
+        ClientEntity, Dead, ModelHeight, NextCommand, PendingDamageList, PendingSkillEffectList,
         PendingSkillTargetList,
     },
     events::{HitEvent, SpawnEffectData, SpawnEffectEvent},
@@ -69,6 +69,7 @@ fn apply_damage(
     if is_killed {
         commands
             .entity(defender.entity)
+            .insert(Dead)
             .insert(NextCommand::with_die())
             .remove::<ClientEntity>();
         client_entity_list.remove(defender.client_entity.id);
