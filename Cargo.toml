@@ -37,6 +37,7 @@ thiserror = "1.0"
 tokio = { version = "1.17", features = ["rt", "net", "sync", "macros", "io-util"] }
 toml = "0.5.9"
 quick-xml = { version = "0.23", features = ["serialize"] }
+regex = "1"
 rose-data = { git = "https://github.com/exjam/rose-offline", rev = "ae91ce3945b0813a4eeae8139f2f9cb74b1d636e" }
 rose-data-irose = { git = "https://github.com/exjam/rose-offline", rev = "ae91ce3945b0813a4eeae8139f2f9cb74b1d636e" }
 rose-file-readers = { git = "https://github.com/exjam/rose-offline", rev = "ae91ce3945b0813a4eeae8139f2f9cb74b1d636e" }

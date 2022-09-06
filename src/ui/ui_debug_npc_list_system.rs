@@ -1,6 +1,9 @@
 use bevy::prelude::{Local, Query, Res, ResMut, State};
 use bevy_egui::{egui, EguiContext};
 use rand::Rng;
+use regex::Regex;
+
+use rose_data::NpcId;
 use rose_game_common::{
     components::{Npc, Team},
     messages::client::ClientMessage,
@@ -19,19 +22,21 @@ pub enum UiStateSpawnNpcTeam {
 }
 
 pub struct UiStateDebugNpcList {
+    filter_name: String,
+    filtered_npcs: Vec<NpcId>,
     spawn_count: usize,
     spawn_distance: usize,
     spawn_team: UiStateSpawnNpcTeam,
-    num_npcs: Option<usize>,
 }
 
 impl Default for UiStateDebugNpcList {
     fn default() -> Self {
         Self {
+            filter_name: String::default(),
+            filtered_npcs: Vec::default(),
             spawn_count: 1,
             spawn_distance: 250,
             spawn_team: UiStateSpawnNpcTeam::Monster,
-            num_npcs: None,
         }
     }
 }
@@ -54,10 +59,21 @@ pub fn ui_debug_npc_list_system(
         .default_height(300.0)
         .open(&mut ui_state_debug_windows.npc_list_open)
         .show(egui_context.ctx_mut(), |ui| {
-            if matches!(app_state.current(), AppState::Game) {
-                egui::Grid::new("npc_list_controls_grid")
-                    .num_columns(2)
-                    .show(ui, |ui| {
+            let mut filter_changed = false;
+
+            egui::Grid::new("npc_list_controls_grid")
+                .num_columns(2)
+                .show(ui, |ui| {
+                    ui.label("NPC Name Filter:");
+                    if ui
+                        .text_edit_singleline(&mut ui_state_debug_npc_list.filter_name)
+                        .changed()
+                    {
+                        filter_changed = true;
+                    }
+                    ui.end_row();
+
+                    if matches!(app_state.current(), AppState::Game) {
                         ui.label("Spawn Count:");
                         ui.add(
                             egui::DragValue::new(&mut ui_state_debug_npc_list.spawn_count)
@@ -94,13 +110,39 @@ pub fn ui_debug_npc_list_system(
                                 );
                             });
                         ui.end_row();
-                    });
+                    }
+                });
+
+            if ui_state_debug_npc_list.filter_name.is_empty()
+                && ui_state_debug_npc_list.filtered_npcs.is_empty()
+            {
+                filter_changed = true;
             }
 
-            if ui_state_debug_npc_list.num_npcs.is_none() {
-                ui_state_debug_npc_list.num_npcs = Some(game_data.npcs.iter().count());
+            if filter_changed {
+                if ui_state_debug_npc_list.filter_name.is_empty() {
+                    ui_state_debug_npc_list.filtered_npcs =
+                        game_data.npcs.iter().map(|npc_data| npc_data.id).collect();
+                } else {
+                    let re = Regex::new(&format!(
+                        "(?i){}",
+                        regex::escape(&ui_state_debug_npc_list.filter_name)
+                    ))
+                    .unwrap();
+
+                    ui_state_debug_npc_list.filtered_npcs = game_data
+                        .npcs
+                        .iter()
+                        .filter_map(|npc_data| {
+                            if re.is_match(npc_data.name) {
+                                Some(npc_data.id)
+                            } else {
+                                None
+                            }
+                        })
+                        .collect();
+                }
             }
-            let num_npcs = ui_state_debug_npc_list.num_npcs.unwrap();
 
             egui_extras::TableBuilder::new(ui)
                 .striped(true)
@@ -120,15 +162,15 @@ pub fn ui_debug_npc_list_system(
                     });
                 })
                 .body(|body| {
-                    let mut itr = None;
-
-                    body.rows(20.0, num_npcs, |row_index, mut row| {
-                        if itr.is_none() {
-                            itr = Some(game_data.npcs.iter().skip(row_index));
-                        }
-
-                        if let Some(itr) = itr.as_mut() {
-                            if let Some(npc_data) = itr.next() {
+                    body.rows(
+                        20.0,
+                        ui_state_debug_npc_list.filtered_npcs.len(),
+                        |row_index, mut row| {
+                            if let Some(npc_data) = ui_state_debug_npc_list
+                                .filtered_npcs
+                                .get(row_index)
+                                .and_then(|id| game_data.npcs.get_npc(*id))
+                            {
                                 row.col(|ui| {
                                     ui.label(format!("{}", npc_data.id.get()));
                                 });
@@ -187,8 +229,8 @@ pub fn ui_debug_npc_list_system(
                                     _ => {}
                                 });
                             }
-                        }
-                    });
+                        },
+                    );
                 });
         });
 }
