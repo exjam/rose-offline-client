@@ -248,6 +248,7 @@ pub fn game_connection_system(
                         }
                     }
                     CommandState::PersonalStore => NextCommand::with_personal_store(),
+                    CommandState::Die => NextCommand::with_die(),
                     _ => NextCommand::default(),
                 };
                 let mut ability_values = game_data.ability_value_calculator.calculate(
@@ -337,6 +338,7 @@ pub fn game_connection_system(
                             NextCommand::default()
                         }
                     }
+                    CommandState::Die => NextCommand::with_die(),
                     _ => NextCommand::default(),
                 };
                 let name = game_data
@@ -417,6 +419,7 @@ pub fn game_connection_system(
                             NextCommand::default()
                         }
                     }
+                    CommandState::Die => NextCommand::with_die(),
                     _ => NextCommand::default(),
                 };
                 let mut equipment = Equipment::new();
