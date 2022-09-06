@@ -20,7 +20,7 @@ use rose_game_common::components::{CharacterInfo, Equipment};
 
 use crate::{
     components::{
-        CharacterModel, CharacterModelPart, ColliderEntity, ColliderParent, DummyBoneOffset,
+        CharacterModel, CharacterModelPart, ColliderEntity, ColliderParent, Dead, DummyBoneOffset,
         ModelHeight, PersonalStore, PersonalStoreModel, PlayerCharacter,
         COLLISION_FILTER_CLICKABLE, COLLISION_FILTER_INSPECTABLE, COLLISION_GROUP_CHARACTER,
         COLLISION_GROUP_PHYSICS_TOY, COLLISION_GROUP_PLAYER,
@@ -418,26 +418,40 @@ pub fn character_model_system(
 
 pub fn character_model_blink_system(
     mut commands: Commands,
-    mut query_characters: Query<(&CharacterModel, &mut CharacterBlinkTimer)>,
+    mut query_characters: Query<(&CharacterModel, &mut CharacterBlinkTimer, Option<&Dead>)>,
     query_material: Query<&Handle<ZmsMaterialNumFaces>>,
     material_assets: Res<Assets<ZmsMaterialNumFaces>>,
     time: Res<Time>,
 ) {
-    for (character_model, mut blink_timer) in query_characters.iter_mut() {
+    for (character_model, mut blink_timer, dead) in query_characters.iter_mut() {
         let mut changed = false;
-        blink_timer.timer += time.delta_seconds();
 
-        if blink_timer.is_open {
-            if blink_timer.timer >= blink_timer.open_duration {
-                blink_timer.is_open = false;
-                blink_timer.timer -= blink_timer.open_duration;
-                blink_timer.closed_duration = rand::thread_rng().gen_range(BLINK_CLOSED_DURATION);
+        if dead.is_none() {
+            blink_timer.timer += time.delta_seconds();
+
+            if blink_timer.is_open {
+                if blink_timer.timer >= blink_timer.open_duration {
+                    blink_timer.is_open = false;
+                    blink_timer.timer -= blink_timer.open_duration;
+                    blink_timer.closed_duration =
+                        rand::thread_rng().gen_range(BLINK_CLOSED_DURATION);
+                    changed = true;
+                }
+            } else if blink_timer.timer >= blink_timer.closed_duration {
+                blink_timer.is_open = true;
+                blink_timer.timer -= blink_timer.closed_duration;
+                blink_timer.open_duration = rand::thread_rng().gen_range(BLINK_OPEN_DURATION);
                 changed = true;
             }
-        } else if blink_timer.timer >= blink_timer.closed_duration {
-            blink_timer.is_open = true;
-            blink_timer.timer -= blink_timer.closed_duration;
-            blink_timer.open_duration = rand::thread_rng().gen_range(BLINK_OPEN_DURATION);
+        } else {
+            if blink_timer.is_open {
+                blink_timer.is_open = false;
+
+                // Set timer so the eyes open as soon as resurrected
+                blink_timer.closed_duration = rand::thread_rng().gen_range(BLINK_CLOSED_DURATION);
+                blink_timer.timer = blink_timer.closed_duration;
+            }
+
             changed = true;
         }
 
