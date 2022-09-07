@@ -1,12 +1,21 @@
-use bevy::prelude::{Commands, Entity, Local, Query, Res, ResMut, State, With};
+use bevy::{
+    ecs::query::WorldQuery,
+    prelude::{AssetServer, Commands, Entity, Local, Query, Res, ResMut, State, With},
+};
 use bevy_egui::{egui, EguiContext};
 use regex::Regex;
 
-use rose_data::SkillId;
-use rose_game_common::messages::client::ClientMessage;
+use rose_data::{EquipmentIndex, SkillId};
+use rose_game_common::{
+    components::{CharacterGender, Equipment},
+    messages::client::ClientMessage,
+};
 
 use crate::{
-    components::{Command, CommandCastSkillTarget, NextCommand, PlayerCharacter},
+    components::{
+        ActiveMotion, CharacterModel, Command, CommandCastSkill, CommandCastSkillState,
+        CommandCastSkillTarget, NextCommand, PlayerCharacter,
+    },
     resources::{
         AppState, GameConnection, GameData, SelectedTarget, UiResources, UiSpriteSheetType,
     },
@@ -15,6 +24,20 @@ use crate::{
         ui_add_skill_tooltip, UiStateDebugWindows,
     },
 };
+
+#[derive(WorldQuery)]
+#[world_query(mutable)]
+pub struct QueryCommand<'w> {
+    entity: Entity,
+    command: &'w mut Command,
+}
+
+#[derive(WorldQuery)]
+pub struct QueryCharacter<'w> {
+    entity: Entity,
+    character_model: &'w CharacterModel,
+    equipment: &'w Equipment,
+}
 
 #[derive(Default)]
 pub struct UiStateDebugSkillList {
@@ -29,10 +52,12 @@ pub fn ui_debug_skill_list_system(
     mut ui_state_debug_skill_list: Local<UiStateDebugSkillList>,
     mut ui_state_debug_windows: ResMut<UiStateDebugWindows>,
     app_state: Res<State<AppState>>,
+    asset_server: Res<AssetServer>,
     game_connection: Option<Res<GameConnection>>,
     game_data: Res<GameData>,
     ui_resources: Res<UiResources>,
-    mut query_player: Query<(Entity, &mut Command), With<PlayerCharacter>>,
+    mut query_player_command: Query<QueryCommand, With<PlayerCharacter>>,
+    query_character_models: Query<QueryCharacter, With<CharacterModel>>,
     query_player_tooltip: Query<PlayerTooltipQuery, With<PlayerCharacter>>,
     selected_target: Res<SelectedTarget>,
 ) {
@@ -114,8 +139,7 @@ pub fn ui_debug_skill_list_system(
                 .column(egui_extras::Size::initial(50.0).at_least(50.0))
                 .column(egui_extras::Size::remainder().at_least(80.0))
                 .column(egui_extras::Size::initial(100.0).at_least(100.0))
-                .column(egui_extras::Size::initial(60.0).at_least(60.0))
-                .column(egui_extras::Size::initial(60.0).at_least(60.0))
+                .column(egui_extras::Size::initial(100.0).at_least(100.0))
                 .header(20.0, |mut header| {
                     header.col(|ui| {
                         ui.heading("Icon");
@@ -128,9 +152,6 @@ pub fn ui_debug_skill_list_system(
                     });
                     header.col(|ui| {
                         ui.heading("Type");
-                    });
-                    header.col(|ui| {
-                        ui.heading("Action");
                     });
                     header.col(|ui| {
                         ui.heading("Action");
@@ -195,26 +216,28 @@ pub fn ui_debug_skill_list_system(
                                                 .ok();
                                         }
                                     }
-                                });
 
-                                row.col(|ui| {
-                                    if let Ok((player_entity, mut player_command)) =
-                                        query_player.get_single_mut()
-                                    {
-                                        if skill_data.casting_motion_id.is_some()
-                                            && ui.button("Cast").clicked()
-                                        {
-                                            if let Command::CastSkill(command_cast_skill) =
-                                                player_command.as_mut()
-                                            {
-                                                if command_cast_skill.skill_id == skill_data.id {
-                                                    command_cast_skill.ready_action = true;
-                                                } else {
-                                                    *player_command = Command::with_stop();
-                                                }
-                                            } else {
-                                                commands.entity(player_entity).insert(
-                                                    NextCommand::with_cast_skill(
+                                    if skill_data.casting_motion_id.is_some() {
+                                        let player = query_player_command.get_single_mut().ok();
+
+                                        if matches!(app_state.current(), AppState::Game) {
+                                            if let Some(mut player) = player {
+                                                if let Command::CastSkill(command_cast_skill) =
+                                                    player.command.as_mut()
+                                                {
+                                                    if command_cast_skill.skill_id
+                                                        == skill_data.id && !command_cast_skill.ready_action
+                                                    {
+                                                        if ui.button("Action").clicked() {
+                                                            command_cast_skill.ready_action = true;
+                                                        }
+                                                    } else if ui.button("Stop").clicked() {
+                                                        *player.command = Command::with_stop();
+                                                    }
+                                                } else if ui.button("Cast").clicked() {
+                                                    commands
+                                                        .entity(player.entity)
+                                                        .insert(NextCommand::with_cast_skill(
                                                         skill_data.id,
                                                         selected_target.selected.map(
                                                             |target_entity| {
@@ -226,8 +249,124 @@ pub fn ui_debug_skill_list_system(
                                                         None,
                                                         None,
                                                         None,
-                                                    ),
-                                                );
+                                                    ));
+                                                }
+                                            }
+                                        } else if matches!(
+                                            app_state.current(),
+                                            AppState::ModelViewer
+                                        ) {
+                                            if ui.button("Cast").clicked() {
+                                                for character in query_character_models.iter() {
+                                                    let weapon_item_data = character
+                                                        .equipment
+                                                        .get_equipment_item(EquipmentIndex::Weapon)
+                                                        .and_then(|weapon_item| {
+                                                            game_data.items.get_weapon_item(
+                                                                weapon_item.item.item_number,
+                                                            )
+                                                        });
+                                                    let weapon_motion_type = weapon_item_data
+                                                        .map(|weapon_item_data| {
+                                                            weapon_item_data.motion_type as usize
+                                                        })
+                                                        .unwrap_or(0);
+                                                    let weapon_motion_gender =
+                                                        match character.character_model.gender {
+                                                            CharacterGender::Male => 0,
+                                                            CharacterGender::Female => 1,
+                                                        };
+
+                                                    let motion_data = skill_data
+                                                        .casting_motion_id
+                                                        .and_then(|motion_id| {
+                                                            game_data
+                                                                .character_motion_database
+                                                                .find_first_character_motion(
+                                                                    motion_id,
+                                                                    weapon_motion_type,
+                                                                    weapon_motion_gender,
+                                                                )
+                                                        });
+
+                                                    if let Some(motion_data) = motion_data {
+                                                        commands.entity(character.entity)
+                                                        .insert(Command::CastSkill(CommandCastSkill {
+                                                            skill_id: skill_data.id,
+                                                            skill_target: None,
+                                                            action_motion_id: skill_data.action_motion_id,
+                                                            cast_motion_id: skill_data.casting_motion_id,
+                                                            cast_repeat_motion_id: skill_data.casting_repeat_motion_id,
+                                                            cast_skill_state: CommandCastSkillState::Casting,
+                                                            ready_action: true,
+                                                        }))
+                                                        .insert(
+                                                            ActiveMotion::new_once(
+                                                                asset_server
+                                                                    .load(motion_data.path.path()),
+                                                            )
+                                                            .with_animation_speed(
+                                                                skill_data.casting_motion_speed,
+                                                            ),
+                                                        );
+                                                    }
+                                                }
+                                            }
+
+                                            if ui.button("Action").clicked() {
+                                                for character in query_character_models.iter() {
+                                                    let weapon_item_data = character
+                                                        .equipment
+                                                        .get_equipment_item(EquipmentIndex::Weapon)
+                                                        .and_then(|weapon_item| {
+                                                            game_data.items.get_weapon_item(
+                                                                weapon_item.item.item_number,
+                                                            )
+                                                        });
+                                                    let weapon_motion_type = weapon_item_data
+                                                        .map(|weapon_item_data| {
+                                                            weapon_item_data.motion_type as usize
+                                                        })
+                                                        .unwrap_or(0);
+                                                    let weapon_motion_gender =
+                                                        match character.character_model.gender {
+                                                            CharacterGender::Male => 0,
+                                                            CharacterGender::Female => 1,
+                                                        };
+
+                                                    let motion_data = skill_data
+                                                        .action_motion_id
+                                                        .and_then(|motion_id| {
+                                                            game_data
+                                                                .character_motion_database
+                                                                .find_first_character_motion(
+                                                                    motion_id,
+                                                                    weapon_motion_type,
+                                                                    weapon_motion_gender,
+                                                                )
+                                                        });
+
+                                                    if let Some(motion_data) = motion_data {
+                                                        commands.entity(character.entity)
+                                                        .insert(Command::CastSkill(CommandCastSkill {
+                                                            skill_id: skill_data.id,
+                                                            skill_target: None,
+                                                            action_motion_id: skill_data.action_motion_id,
+                                                            cast_motion_id: skill_data.casting_motion_id,
+                                                            cast_repeat_motion_id: skill_data.casting_repeat_motion_id,
+                                                            cast_skill_state: CommandCastSkillState::Action,
+                                                            ready_action: true,
+                                                        })).insert(
+                                                            ActiveMotion::new_once(
+                                                                asset_server
+                                                                    .load(motion_data.path.path()),
+                                                            )
+                                                            .with_animation_speed(
+                                                                skill_data.action_motion_speed,
+                                                            ),
+                                                        );
+                                                    }
+                                                }
                                             }
                                         }
                                     }
