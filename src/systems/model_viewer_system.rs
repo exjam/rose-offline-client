@@ -5,8 +5,8 @@ use bevy::{
     math::Vec3,
     pbr::AmbientLight,
     prelude::{
-        Camera3d, Color, Commands, ComputedVisibility, Entity, EventWriter, GlobalTransform, Query,
-        Res, ResMut, Transform, Visibility, With,
+        Camera3d, Color, Commands, ComputedVisibility, Entity, GlobalTransform, Query, Res, ResMut,
+        Transform, Visibility, With,
     },
 };
 use bevy_egui::{egui, EguiContext};
@@ -21,9 +21,8 @@ use rose_game_common::components::{CharacterGender, CharacterInfo, Equipment, Np
 
 use crate::{
     components::{
-        ActiveMotion, CharacterModel, ClientEntityName, Effect, ModelHeight, NameTagType, NpcModel,
+        ActiveMotion, CharacterModel, ClientEntityName, ModelHeight, NameTagType, NpcModel,
     },
-    events::{SpawnEffectData, SpawnEffectEvent},
     free_camera::FreeCamera,
     orbit_camera::OrbitCamera,
     resources::{DamageDigitsSpawner, GameData, NameTagSettings},
@@ -44,8 +43,6 @@ pub struct ModelViewerState {
     characters: Vec<Entity>,
     num_characters: usize,
     max_num_characters: usize,
-
-    last_effect_entity: Option<Entity>,
 }
 
 pub fn model_viewer_enter_system(
@@ -94,8 +91,6 @@ pub fn model_viewer_enter_system(
         characters: Vec::new(),
         num_characters: 1,
         max_num_characters: 500,
-
-        last_effect_entity: None,
     });
 
     // Reset ambient light
@@ -136,10 +131,8 @@ pub fn model_viewer_exit_system(
 pub fn model_viewer_system(
     mut commands: Commands,
     mut ui_state: ResMut<ModelViewerState>,
-    mut spawn_effect_events: EventWriter<SpawnEffectEvent>,
     query_character_model: Query<(Entity, &CharacterModel)>,
     query_npc_model: Query<(Entity, &NpcModel)>,
-    query_effects: Query<Entity, With<Effect>>,
     game_data: Res<GameData>,
     mut egui_context: ResMut<EguiContext>,
     damage_digits_spawner: Res<DamageDigitsSpawner>,
@@ -351,71 +344,4 @@ pub fn model_viewer_system(
         );
         animation_button("Die", CharacterMotionAction::Die, NpcMotionAction::Die);
     });
-
-    egui::Window::new("Effect List")
-        .vscroll(true)
-        .resizable(true)
-        .default_height(300.0)
-        .show(egui_context.ctx_mut(), |ui| {
-            egui_extras::TableBuilder::new(ui)
-                .striped(true)
-                .cell_layout(egui::Layout::left_to_right().with_cross_align(egui::Align::Center))
-                .column(egui_extras::Size::initial(50.0).at_least(50.0))
-                .column(egui_extras::Size::remainder().at_least(50.0))
-                .column(egui_extras::Size::initial(60.0).at_least(60.0))
-                .header(20.0, |mut header| {
-                    header.col(|ui| {
-                        ui.heading("ID");
-                    });
-                    header.col(|ui| {
-                        ui.heading("Path");
-                    });
-                    header.col(|ui| {
-                        ui.heading("Action");
-                    });
-                })
-                .body(|mut body| {
-                    for (effect_file_id, effect_file_path) in game_data.effect_database.iter_files()
-                    {
-                        body.row(20.0, |mut row| {
-                            row.col(|ui| {
-                                ui.label(format!("{}", effect_file_id.get()));
-                            });
-
-                            row.col(|ui| {
-                                ui.label(effect_file_path.path().to_string_lossy().as_ref());
-                            });
-
-                            row.col(|ui| {
-                                if ui.button("View").clicked() {
-                                    if let Some(last_effect_entity) =
-                                        ui_state.last_effect_entity.take()
-                                    {
-                                        if query_effects.get(last_effect_entity).is_ok() {
-                                            commands.entity(last_effect_entity).despawn_recursive();
-                                        }
-                                    }
-
-                                    let effect_entity = commands
-                                        .spawn_bundle((
-                                            Transform::default(),
-                                            GlobalTransform::default(),
-                                            Visibility::default(),
-                                            ComputedVisibility::default(),
-                                        ))
-                                        .id();
-
-                                    spawn_effect_events.send(SpawnEffectEvent::InEntity(
-                                        effect_entity,
-                                        SpawnEffectData::with_path(effect_file_path.clone())
-                                            .manual_despawn(true),
-                                    ));
-
-                                    ui_state.last_effect_entity = Some(effect_entity);
-                                }
-                            });
-                        });
-                    }
-                });
-        });
 }

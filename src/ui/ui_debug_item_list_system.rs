@@ -65,6 +65,15 @@ pub fn ui_debug_item_list_system(
             egui::Grid::new("item_list_controls_grid")
                 .num_columns(2)
                 .show(ui, |ui| {
+                    ui.label("Item Name Filter:");
+                    if ui
+                        .text_edit_singleline(&mut ui_state_debug_item_list.filter_name)
+                        .changed()
+                    {
+                        filter_changed = true;
+                    }
+                    ui.end_row();
+
                     if matches!(app_state.current(), AppState::Game) {
                         ui.label("Spawn Quantity:");
                         ui.add(
@@ -130,15 +139,6 @@ pub fn ui_debug_item_list_system(
                         ));
                         ui.end_row();
                     }
-
-                    ui.label("Item Name Filter:");
-                    if ui
-                        .text_edit_singleline(&mut ui_state_debug_item_list.filter_name)
-                        .changed()
-                    {
-                        filter_changed = true;
-                    }
-                    ui.end_row();
                 });
 
             ui.separator();
