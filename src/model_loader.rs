@@ -594,7 +594,7 @@ impl ModelLoader {
             };
 
         let colour = TRAIL_COLOURS
-            .get(trail_colour_index.get() - 1)
+            .get(trail_colour_index.get())
             .cloned()
             .unwrap_or(Color::WHITE);
 
