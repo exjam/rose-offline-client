@@ -4,9 +4,9 @@ use arrayvec::ArrayVec;
 use bevy::{
     ecs::query::WorldQuery,
     prelude::{
-        Assets, BuildChildren, Color, Commands, ComputedVisibility, DespawnRecursiveExt, Entity,
-        EventReader, GlobalTransform, Handle, Image, Local, Query, Res, ResMut, Transform, Vec2,
-        Vec3, Visibility, With, Without,
+        Assets, BuildChildren, Changed, Color, Commands, ComputedVisibility, DespawnRecursiveExt,
+        Entity, EventReader, GlobalTransform, Handle, Image, Local, Query, Res, ResMut, Transform,
+        Vec2, Vec3, Visibility, With, Without,
     },
     render::{
         render_resource::{Extent3d, TextureDimension, TextureFormat},
@@ -383,6 +383,7 @@ pub fn name_tag_system(
     mut commands: Commands,
     mut name_tag_cache: Local<NameTagCache>,
     query_add: Query<NameTagObjectQuery, Without<NameTagEntity>>,
+    query_changed: Query<(Entity, Option<&NameTagEntity>), Changed<ClientEntityName>>,
     query_player: Query<PlayerQuery, With<PlayerCharacter>>,
     query_nametags: Query<(Entity, &NameTagEntity)>,
     egui_managed_textures: Res<bevy_egui::EguiManagedTextures>,
@@ -410,6 +411,17 @@ pub fn name_tag_system(
         name_tag_cache.pending.clear();
         name_tag_cache.pixels_per_point = pixels_per_point;
         return;
+    }
+
+    for (entity, name_tag_entity) in query_changed.iter() {
+        // Despawn previous name tag
+        if let Some(name_tag_entity) = name_tag_entity {
+            commands.entity(entity).remove::<NameTagEntity>();
+            commands.entity(name_tag_entity.0).despawn_recursive();
+        }
+
+        // Clear any pending name tag for this entity
+        name_tag_cache.pending.remove(&entity);
     }
 
     for object in query_add.iter() {

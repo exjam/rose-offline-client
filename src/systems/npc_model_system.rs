@@ -1,43 +1,32 @@
 use bevy::{
-    asset::LoadState,
-    ecs::query::QueryEntityError,
-    math::{Quat, Vec3, Vec3A},
+    math::Vec3,
     prelude::{
-        AssetServer, Assets, BuildChildren, Changed, Commands, Entity, GlobalTransform, Query, Res,
-        ResMut, Transform, With, Without,
+        AssetServer, Assets, Changed, Commands, DespawnRecursiveExt, Entity, Query, Res, ResMut,
+        Transform,
     },
-    render::{
-        mesh::skinning::{SkinnedMesh, SkinnedMeshInverseBindposes},
-        primitives::Aabb,
-    },
+    render::mesh::skinning::{SkinnedMesh, SkinnedMeshInverseBindposes},
 };
-use bevy_rapier3d::prelude::{Collider, CollisionGroups};
 use enum_map::EnumMap;
 
-use rose_data::NpcMotionAction;
 use rose_game_common::components::Npc;
 
 use crate::{
-    components::{
-        ColliderEntity, ColliderParent, ModelHeight, NpcModel, COLLISION_FILTER_CLICKABLE,
-        COLLISION_FILTER_INSPECTABLE, COLLISION_GROUP_NPC, COLLISION_GROUP_PHYSICS_TOY,
-    },
+    components::{ClientEntityName, DummyBoneOffset, ModelHeight, NpcModel, RemoveColliderCommand},
     model_loader::ModelLoader,
     render::{EffectMeshMaterial, ObjectMaterial, ParticleMaterial},
     resources::GameData,
-    zmo_asset_loader::ZmoAsset,
 };
 
-pub fn npc_model_system(
+pub fn npc_model_update_system(
     mut commands: Commands,
     mut query: Query<
         (
             Entity,
             &Npc,
-            Option<&mut NpcModel>,
-            Option<&SkinnedMesh>,
             &Transform,
-            Option<&ColliderEntity>,
+            Option<&mut NpcModel>,
+            Option<&mut SkinnedMesh>,
+            Option<&mut DummyBoneOffset>,
         ),
         Changed<Npc>,
     >,
@@ -49,151 +38,105 @@ pub fn npc_model_system(
     mut skinned_mesh_inverse_bindposes_assets: ResMut<Assets<SkinnedMeshInverseBindposes>>,
     game_data: Res<GameData>,
 ) {
-    for (entity, npc, mut current_npc_model, skinned_mesh, transform, collider_entity) in
-        query.iter_mut()
+    for (
+        entity,
+        npc,
+        transform,
+        mut current_npc_model,
+        mut current_skinned_mesh,
+        current_dummy_bone_offset,
+    ) in query.iter_mut()
     {
-        if let Some(current_npc_model) = current_npc_model.as_mut() {
-            if current_npc_model.npc_id == npc.id {
-                // Does not need new model, ignore
+        if let Some(previous_npc_model) = current_npc_model.as_mut() {
+            if npc.id == previous_npc_model.npc_id {
+                // NPC model has not changed
                 continue;
             }
 
             // Despawn model parts
-            for part_entity in current_npc_model.model_parts.iter() {
-                commands.entity(*part_entity).despawn();
+            for part_entity in previous_npc_model.model_parts.drain(..) {
+                commands.entity(part_entity).despawn_recursive();
             }
 
             // Despawn model skeleton
-            if let Some(skinned_mesh) = skinned_mesh {
-                for bone_entity in skinned_mesh.joints.iter() {
-                    commands.entity(*bone_entity).despawn();
+            if let Some(current_skinned_mesh) = current_skinned_mesh.as_mut() {
+                for bone_entity in current_skinned_mesh.joints.drain(..) {
+                    commands.entity(bone_entity).despawn_recursive();
                 }
             }
 
-            if let Some(collider_entity) = collider_entity {
-                commands.entity(entity).remove::<ColliderEntity>();
-                commands.entity(collider_entity.entity).despawn();
-            }
-        }
-
-        if let Some((npc_model, skinned_mesh, dummy_bone_offset)) = model_loader.spawn_npc_model(
-            &mut commands,
-            &asset_server,
-            &mut effect_mesh_materials,
-            &mut particle_materials,
-            &mut object_materials,
-            &mut skinned_mesh_inverse_bindposes_assets,
-            entity,
-            npc.id,
-        ) {
-            let transform = if let Some(npc_data) = game_data.npcs.get_npc(npc.id) {
-                transform.with_scale(Vec3::new(npc_data.scale, npc_data.scale, npc_data.scale))
-            } else {
-                *transform
-            };
-
-            commands.entity(entity).insert_bundle((
-                npc_model,
-                skinned_mesh,
-                dummy_bone_offset,
-                transform,
-            ));
-        } else {
+            // Remove the old model collider and height
             commands
                 .entity(entity)
-                .insert(NpcModel {
-                    npc_id: npc.id,
-                    model_parts: Vec::new(),
-                    action_motions: EnumMap::default(),
-                    root_bone_position: Vec3::ZERO,
-                })
-                .remove::<SkinnedMesh>();
-        }
-    }
-}
-
-pub fn npc_model_add_collider_system(
-    mut commands: Commands,
-    query_models: Query<(Entity, &NpcModel, &SkinnedMesh), Without<ColliderEntity>>,
-    query_aabb: Query<Option<&Aabb>, With<SkinnedMesh>>,
-    inverse_bindposes: Res<Assets<SkinnedMeshInverseBindposes>>,
-    zmo_assets: Res<Assets<ZmoAsset>>,
-    asset_server: Res<AssetServer>,
-) {
-    // Add colliders to NPC models without one
-    for (entity, npc_model, skinned_mesh) in query_models.iter() {
-        let mut min: Option<Vec3A> = None;
-        let mut max: Option<Vec3A> = None;
-        let mut all_parts_loaded = true;
-
-        // Collect the AABB of skinned mesh parts
-        for part_entity in npc_model.model_parts.iter() {
-            match query_aabb.get(*part_entity) {
-                Ok(Some(aabb)) => {
-                    min = Some(min.map_or_else(|| aabb.min(), |min| min.min(aabb.min())));
-                    max = Some(max.map_or_else(|| aabb.max(), |max| max.max(aabb.max())));
-                }
-                Ok(None) | Err(QueryEntityError::NoSuchEntity(_)) => {
-                    all_parts_loaded = false;
-                    break;
-                }
-                _ => {}
-            }
+                .remove_and_despawn_collider()
+                .remove::<ModelHeight>();
         }
 
-        let root_bone_height = if let Some(motion_data) =
-            zmo_assets.get(&npc_model.action_motions[NpcMotionAction::Stop])
-        {
-            // For flying NPCs their t-pose is often on the floor, so we should adjust model
-            // height by the difference in the root bone position between the t-pose and the
-            // first frame of their idle animation. And for safety, do not allow below 0.0
-            (motion_data
-                .get_translation(0, 0)
-                .map_or(0.0, |translation| translation.y)
-                - npc_model.root_bone_position.y)
-                .max(0.0)
-        } else {
-            match asset_server.get_load_state(&npc_model.action_motions[NpcMotionAction::Stop]) {
-                LoadState::NotLoaded | LoadState::Loading => all_parts_loaded = false,
-                LoadState::Loaded | LoadState::Failed | LoadState::Unloaded => {}
-            }
-            0.0
-        };
+        let (npc_model, skinned_mesh, dummy_bone_offset) =
+            if let Some((npc_model, skinned_mesh, dummy_bone_offset)) = model_loader
+                .spawn_npc_model(
+                    &mut commands,
+                    &asset_server,
+                    &mut effect_mesh_materials,
+                    &mut particle_materials,
+                    &mut object_materials,
+                    &mut skinned_mesh_inverse_bindposes_assets,
+                    entity,
+                    npc.id,
+                )
+            {
+                (npc_model, skinned_mesh, dummy_bone_offset)
+            } else {
+                // Insert empty model so we do not retry every frame.
+                (
+                    NpcModel {
+                        npc_id: npc.id,
+                        model_parts: Vec::new(),
+                        action_motions: EnumMap::default(),
+                        root_bone_position: Vec3::ZERO,
+                    },
+                    SkinnedMesh::default(),
+                    DummyBoneOffset { index: 0 },
+                )
+            };
 
-        let inverse_bindpose = inverse_bindposes.get(&skinned_mesh.inverse_bindposes);
-        let root_bone_entity = skinned_mesh.joints[0];
-        if min.is_none() || max.is_none() || !all_parts_loaded || inverse_bindpose.is_none() {
-            continue;
+        let mut entity_commands = commands.entity(entity);
+
+        // Update scale
+        if let Some(npc_data) = game_data.npcs.get_npc(npc.id) {
+            entity_commands.insert(transform.with_scale(Vec3::new(
+                npc_data.scale,
+                npc_data.scale,
+                npc_data.scale,
+            )));
         }
-        let root_bone_inverse_bindpose = Transform::from_matrix(inverse_bindpose.unwrap()[0]);
 
-        let min = Vec3::from(min.unwrap());
-        let max = Vec3::from(max.unwrap());
-        let local_bound_center = 0.5 * (min + max);
-        let half_extents = 0.5 * (max - min);
-        let root_bone_offset = root_bone_inverse_bindpose.mul_vec3(local_bound_center);
-
-        let collider_entity = commands
-            .spawn_bundle((
-                ColliderParent::new(entity),
-                Collider::cuboid(half_extents.x, half_extents.y, half_extents.z),
-                CollisionGroups::new(
-                    COLLISION_GROUP_NPC,
-                    COLLISION_FILTER_INSPECTABLE
-                        | COLLISION_FILTER_CLICKABLE
-                        | COLLISION_GROUP_PHYSICS_TOY,
-                ),
-                Transform::from_translation(root_bone_offset)
-                    .with_rotation(Quat::from_axis_angle(Vec3::Z, std::f32::consts::PI / 2.0)),
-                GlobalTransform::default(),
-            ))
-            .id();
-
-        commands.entity(root_bone_entity).add_child(collider_entity);
-
-        commands.entity(entity).insert_bundle((
-            ColliderEntity::new(collider_entity),
-            ModelHeight::new(root_bone_height + half_extents.y * 2.0),
+        // Update ClientEntityName
+        entity_commands.insert(ClientEntityName::new(
+            game_data
+                .npcs
+                .get_npc(npc.id)
+                .map(|npc_data| npc_data.name.to_string())
+                .unwrap_or_else(|| format!("??? [{}]", npc.id.get())),
         ));
+
+        // Update model
+        if let Some(mut current_npc_model) = current_npc_model {
+            *current_npc_model = npc_model;
+        } else {
+            entity_commands.insert(npc_model);
+        }
+
+        if let Some(mut current_skinned_mesh) = current_skinned_mesh {
+            *current_skinned_mesh = skinned_mesh;
+        } else {
+            entity_commands.insert(skinned_mesh);
+        }
+
+        if let Some(mut current_dummy_bone_offset) = current_dummy_bone_offset {
+            *current_dummy_bone_offset = dummy_bone_offset;
+        } else {
+            entity_commands.insert(dummy_bone_offset);
+        }
     }
 }

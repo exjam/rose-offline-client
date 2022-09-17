@@ -653,7 +653,7 @@ impl ModelLoader {
         let skinned_mesh = spawn_skeleton(
             commands,
             model_entity,
-            self.get_skeleton(character_info.gender),
+            skeleton,
             skinned_mesh_inverse_bindposes_assets,
         );
         let mut model_parts = EnumMap::default();

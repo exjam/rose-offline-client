@@ -17,8 +17,8 @@ use rose_game_common::{
     },
     messages::{
         server::{
-            CommandState, LearnSkillError, LevelUpSkillError, OpenPersonalStore, PartyMemberInfo,
-            PartyMemberInfoOffline, PartyMemberLeave, PartyMemberList,
+            CommandState, LearnSkillError, LevelUpSkillError, MoveToggle, OpenPersonalStore,
+            PartyMemberInfo, PartyMemberInfoOffline, PartyMemberLeave, PartyMemberList,
             PersonalStoreTransactionStatus, PickupItemDropContent, PickupItemDropError,
             QuestDeleteResult, QuestTriggerResult, ServerMessage, UpdateAbilityValue,
         },
@@ -341,15 +341,9 @@ pub fn game_connection_system(
                     CommandState::Die => NextCommand::with_die(),
                     _ => NextCommand::default(),
                 };
-                let name = game_data
-                    .npcs
-                    .get_npc(message.npc.id)
-                    .map(|npc_data| npc_data.name.to_string())
-                    .unwrap_or_else(|| format!("[NPC {}]", message.npc.id.get()));
 
                 let entity = commands
                     .spawn_bundle((
-                        ClientEntityName::new(name),
                         Command::with_stop(),
                         next_command,
                         message.npc,
@@ -423,7 +417,7 @@ pub fn game_connection_system(
                     _ => NextCommand::default(),
                 };
                 let mut equipment = Equipment::new();
-                let name = if let Some(npc_data) = game_data.npcs.get_npc(message.npc.id) {
+                if let Some(npc_data) = game_data.npcs.get_npc(message.npc.id) {
                     if npc_data.right_hand_part_index > 0 {
                         equipment
                             .equip_item(
@@ -453,15 +447,10 @@ pub fn game_connection_system(
                             )
                             .ok();
                     }
-
-                    npc_data.name.to_string()
-                } else {
-                    format!("[Monster {}]", message.npc.id.get())
-                };
+                }
 
                 let entity = commands
                     .spawn_bundle((
-                        ClientEntityName::new(name),
                         Command::with_stop(),
                         next_command,
                         message.npc,

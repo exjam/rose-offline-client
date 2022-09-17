@@ -1,291 +1,21 @@
-use std::ops::Range;
-
 use bevy::{
-    ecs::query::QueryEntityError,
     hierarchy::DespawnRecursiveExt,
-    math::{Quat, Vec3, Vec3A},
-    prelude::{
-        AssetServer, Assets, BuildChildren, Changed, Commands, Component, Entity, GlobalTransform,
-        Handle, Mesh, Or, Query, Res, ResMut, Time, Transform, With, Without,
-    },
-    render::{
-        mesh::skinning::{SkinnedMesh, SkinnedMeshInverseBindposes},
-        primitives::Aabb,
-    },
+    prelude::{AssetServer, Assets, Changed, Commands, Entity, Or, Query, Res, ResMut},
+    render::mesh::skinning::{SkinnedMesh, SkinnedMeshInverseBindposes},
 };
-use bevy_rapier3d::prelude::{Collider, CollisionGroups};
 
-use rand::Rng;
 use rose_game_common::components::{CharacterInfo, Equipment};
 
 use crate::{
     components::{
-        CharacterModel, CharacterModelPart, ColliderEntity, ColliderParent, Dead, DummyBoneOffset,
-        ModelHeight, PersonalStore, PersonalStoreModel, PlayerCharacter,
-        COLLISION_FILTER_CLICKABLE, COLLISION_FILTER_INSPECTABLE, COLLISION_GROUP_CHARACTER,
-        COLLISION_GROUP_PHYSICS_TOY, COLLISION_GROUP_PLAYER,
+        CharacterBlinkTimer, CharacterModel, DummyBoneOffset, ModelHeight, PersonalStore,
+        RemoveColliderCommand,
     },
     model_loader::ModelLoader,
-    render::{EffectMeshMaterial, ObjectMaterial, ObjectMaterialClipFace, ParticleMaterial},
-    zms_asset_loader::ZmsMaterialNumFaces,
+    render::{EffectMeshMaterial, ObjectMaterial, ParticleMaterial},
 };
 
-const BLINK_CLOSED_DURATION: Range<f32> = 0.010..0.110;
-const BLINK_OPEN_DURATION: Range<f32> = 0.100..3.000;
-
-#[derive(Component)]
-pub struct CharacterBlinkTimer {
-    pub timer: f32,
-    pub is_open: bool,
-    pub closed_duration: f32,
-    pub open_duration: f32,
-}
-
-impl CharacterBlinkTimer {
-    pub fn new() -> Self {
-        Self {
-            timer: 0.0,
-            is_open: false,
-            closed_duration: rand::thread_rng().gen_range(BLINK_CLOSED_DURATION),
-            open_duration: rand::thread_rng().gen_range(BLINK_OPEN_DURATION),
-        }
-    }
-}
-
-impl Default for CharacterBlinkTimer {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-pub fn character_model_add_collider_system(
-    mut commands: Commands,
-    query_models: Query<
-        (
-            Entity,
-            &CharacterModel,
-            &SkinnedMesh,
-            Option<&PlayerCharacter>,
-        ),
-        Without<ColliderEntity>,
-    >,
-    query_aabb: Query<Option<&Aabb>, With<Handle<Mesh>>>,
-    inverse_bindposes: Res<Assets<SkinnedMeshInverseBindposes>>,
-) {
-    // Add colliders to character models without one
-    for (entity, character_model, skinned_mesh, player_character) in query_models.iter() {
-        let mut min: Option<Vec3A> = None;
-        let mut max: Option<Vec3A> = None;
-        let mut all_parts_loaded = true;
-
-        // Collect the AABB of Body, Hands, Feet
-        for part_entity in character_model.model_parts[CharacterModelPart::Body]
-            .1
-            .iter()
-            .chain(
-                character_model.model_parts[CharacterModelPart::Hands]
-                    .1
-                    .iter(),
-            )
-            .chain(
-                character_model.model_parts[CharacterModelPart::Feet]
-                    .1
-                    .iter(),
-            )
-        {
-            match query_aabb.get(*part_entity) {
-                Ok(Some(aabb)) => {
-                    min = Some(min.map_or_else(|| aabb.min(), |min| min.min(aabb.min())));
-                    max = Some(max.map_or_else(|| aabb.max(), |max| max.max(aabb.max())));
-                }
-                Ok(None) | Err(QueryEntityError::NoSuchEntity(_)) => {
-                    all_parts_loaded = false;
-                    break;
-                }
-                _ => {}
-            }
-        }
-
-        let inverse_bindpose = inverse_bindposes.get(&skinned_mesh.inverse_bindposes);
-        let root_bone_entity = skinned_mesh.joints[0];
-        if min.is_none() || max.is_none() || !all_parts_loaded || inverse_bindpose.is_none() {
-            continue;
-        }
-        let min = Vec3::from(min.unwrap());
-        let max = Vec3::from(max.unwrap());
-        let root_bone_inverse_bindpose = Transform::from_matrix(inverse_bindpose.unwrap()[0]);
-
-        let local_bound_center = 0.5 * (min + max);
-        let half_extents = 0.5 * (max - min);
-        let root_bone_offset = root_bone_inverse_bindpose.mul_vec3(local_bound_center);
-
-        let collider_entity = commands
-            .spawn_bundle((
-                ColliderParent::new(entity),
-                Collider::cuboid(half_extents.x, half_extents.y, half_extents.z),
-                CollisionGroups::new(
-                    if player_character.is_some() {
-                        COLLISION_GROUP_PLAYER
-                    } else {
-                        COLLISION_GROUP_CHARACTER
-                    },
-                    COLLISION_FILTER_INSPECTABLE
-                        | COLLISION_FILTER_CLICKABLE
-                        | COLLISION_GROUP_PHYSICS_TOY,
-                ),
-                Transform::from_translation(root_bone_offset)
-                    .with_rotation(Quat::from_axis_angle(Vec3::Z, std::f32::consts::PI / 2.0)),
-                GlobalTransform::default(),
-            ))
-            .id();
-
-        commands.entity(root_bone_entity).add_child(collider_entity);
-
-        commands.entity(entity).insert_bundle((
-            ColliderEntity::new(collider_entity),
-            ModelHeight::new(0.65 + half_extents.y * 2.0),
-        ));
-    }
-}
-
-#[derive(Component)]
-pub struct ColliderDirty;
-
-pub fn character_model_changed_collider_system(
-    mut commands: Commands,
-    query_models: Query<
-        (Entity, &ColliderEntity, &CharacterModel, &SkinnedMesh),
-        Or<(Changed<CharacterModel>, With<ColliderDirty>)>,
-    >,
-    query_aabb: Query<Option<&Aabb>, With<Handle<Mesh>>>,
-    inverse_bindposes: Res<Assets<SkinnedMeshInverseBindposes>>,
-) {
-    // Add colliders to character models without one
-    for (entity, collider_entity, character_model, skinned_mesh) in query_models.iter() {
-        let mut min: Option<Vec3A> = None;
-        let mut max: Option<Vec3A> = None;
-        let mut all_parts_loaded = true;
-
-        // Collect the AABB of Body, Hands, Feet
-        for part_entity in character_model.model_parts[CharacterModelPart::Body]
-            .1
-            .iter()
-            .chain(
-                character_model.model_parts[CharacterModelPart::Hands]
-                    .1
-                    .iter(),
-            )
-            .chain(
-                character_model.model_parts[CharacterModelPart::Feet]
-                    .1
-                    .iter(),
-            )
-        {
-            match query_aabb.get(*part_entity) {
-                Ok(Some(aabb)) => {
-                    min = Some(min.map_or_else(|| aabb.min(), |min| min.min(aabb.min())));
-                    max = Some(max.map_or_else(|| aabb.max(), |max| max.max(aabb.max())));
-                }
-                Ok(None) | Err(QueryEntityError::NoSuchEntity(_)) => {
-                    all_parts_loaded = false;
-                    break;
-                }
-                _ => {}
-            }
-        }
-
-        let inverse_bindpose = inverse_bindposes.get(&skinned_mesh.inverse_bindposes);
-        if min.is_none() || max.is_none() || !all_parts_loaded || inverse_bindpose.is_none() {
-            commands.entity(entity).insert(ColliderDirty);
-            continue;
-        }
-        let min = Vec3::from(min.unwrap());
-        let max = Vec3::from(max.unwrap());
-        let root_bone_inverse_bindpose = Transform::from_matrix(inverse_bindpose.unwrap()[0]);
-
-        let local_bound_center = 0.5 * (min + max);
-        let half_extents = 0.5 * (max - min);
-        let root_bone_offset = root_bone_inverse_bindpose.mul_vec3(local_bound_center);
-
-        commands.entity(collider_entity.entity).insert_bundle((
-            Collider::cuboid(half_extents.x, half_extents.y, half_extents.z),
-            Transform::from_translation(root_bone_offset)
-                .with_rotation(Quat::from_axis_angle(Vec3::Z, std::f32::consts::PI / 2.0)),
-        ));
-
-        commands
-            .entity(entity)
-            .insert(ModelHeight::new(0.65 + half_extents.y * 2.0));
-    }
-}
-
-pub fn character_personal_store_model_add_collider_system(
-    mut commands: Commands,
-    query_models: Query<
-        (Entity, &PersonalStoreModel, Option<&PlayerCharacter>),
-        Without<ColliderEntity>,
-    >,
-    query_aabb: Query<Option<&Aabb>, With<Handle<Mesh>>>,
-) {
-    // Add colliders to character models without one
-    for (entity, personal_store_model, player_character) in query_models.iter() {
-        let mut min: Option<Vec3A> = None;
-        let mut max: Option<Vec3A> = None;
-        let mut all_parts_loaded = true;
-
-        // Collect the AABB of Body, Hands, Feet
-        for part_entity in personal_store_model.model_parts.iter() {
-            match query_aabb.get(*part_entity) {
-                Ok(Some(aabb)) => {
-                    min = Some(min.map_or_else(|| aabb.min(), |min| min.min(aabb.min())));
-                    max = Some(max.map_or_else(|| aabb.max(), |max| max.max(aabb.max())));
-                }
-                Ok(None) | Err(QueryEntityError::NoSuchEntity(_)) => {
-                    all_parts_loaded = false;
-                    break;
-                }
-                _ => {}
-            }
-        }
-
-        if min.is_none() || max.is_none() || !all_parts_loaded {
-            continue;
-        }
-        let min = Vec3::from(min.unwrap());
-        let max = Vec3::from(max.unwrap());
-        let half_extents = 0.5 * (max - min);
-
-        let collider_entity = commands
-            .spawn_bundle((
-                ColliderParent::new(entity),
-                Collider::cuboid(half_extents.x, half_extents.y, half_extents.z),
-                CollisionGroups::new(
-                    if player_character.is_some() {
-                        COLLISION_GROUP_PLAYER
-                    } else {
-                        COLLISION_GROUP_CHARACTER
-                    },
-                    COLLISION_FILTER_INSPECTABLE
-                        | COLLISION_FILTER_CLICKABLE
-                        | COLLISION_GROUP_PHYSICS_TOY,
-                ),
-                Transform::from_translation(Vec3::new(0.0, half_extents.y, 0.0)),
-                GlobalTransform::default(),
-            ))
-            .id();
-
-        commands
-            .entity(personal_store_model.model)
-            .add_child(collider_entity);
-
-        commands.entity(entity).insert_bundle((
-            ColliderEntity::new(collider_entity),
-            ModelHeight::new(0.65 + half_extents.y * 2.0),
-        ));
-    }
-}
-
-pub fn character_model_system(
+pub fn character_model_update_system(
     mut commands: Commands,
     mut query: Query<
         (
@@ -293,10 +23,9 @@ pub fn character_model_system(
             &CharacterInfo,
             &Equipment,
             Option<&mut CharacterModel>,
-            Option<&DummyBoneOffset>,
-            Option<&SkinnedMesh>,
+            Option<&mut DummyBoneOffset>,
+            Option<&mut SkinnedMesh>,
             Option<&PersonalStore>,
-            Option<&PersonalStoreModel>,
         ),
         Or<(
             Changed<CharacterInfo>,
@@ -315,16 +44,15 @@ pub fn character_model_system(
         entity,
         character_info,
         equipment,
-        mut character_model,
-        dummy_bone_offset,
-        skinned_mesh,
+        mut current_character_model,
+        current_dummy_bone_offset,
+        mut current_skinned_mesh,
         personal_store,
-        personal_store_model,
     ) in query.iter_mut()
     {
-        if let Some(character_model) = character_model.as_mut() {
-            // If gender has not changed, we can just update our equipment models
-            if personal_store.is_none() && character_model.gender == character_info.gender {
+        if let Some(current_character_model) = current_character_model.as_mut() {
+            if character_info.gender == current_character_model.gender {
+                // Update existing model
                 model_loader.update_character_equipment(
                     &mut commands,
                     &asset_server,
@@ -334,148 +62,82 @@ pub fn character_model_system(
                     entity,
                     character_info,
                     equipment,
-                    character_model,
-                    dummy_bone_offset.as_ref().unwrap(),
-                    skinned_mesh.as_ref().unwrap(),
+                    &mut *current_character_model,
+                    &*current_dummy_bone_offset.unwrap(),
+                    &*current_skinned_mesh.unwrap(),
                 );
+                commands
+                    .entity(entity)
+                    .remove_and_despawn_collider()
+                    .remove::<ModelHeight>();
                 continue;
             }
 
-            // Destroy the previous model
-            if let Some(skinned_mesh) = skinned_mesh {
-                if let Some(root_bone) = skinned_mesh.joints.first() {
-                    commands.entity(*root_bone).despawn_recursive();
+            // Despawn model parts
+            for (_, (_, model_parts)) in current_character_model.model_parts.iter_mut() {
+                for part_entity in model_parts.drain(..) {
+                    commands.entity(part_entity).despawn_recursive();
                 }
             }
 
-            commands.entity(entity).remove::<ColliderEntity>();
+            // Despawn model skeleton
+            if let Some(current_skinned_mesh) = current_skinned_mesh.as_mut() {
+                for bone_entity in current_skinned_mesh.joints.drain(..) {
+                    commands.entity(bone_entity).despawn_recursive();
+                }
+            }
+
+            // Remove the old model collider
+            commands.entity(entity).remove_and_despawn_collider();
 
             if personal_store.is_some() {
                 commands
                     .entity(entity)
+                    .remove::<CharacterBlinkTimer>()
                     .remove::<CharacterModel>()
-                    .remove::<SkinnedMesh>();
+                    .remove::<SkinnedMesh>()
+                    .remove::<DummyBoneOffset>();
             }
         }
 
-        if let Some(personal_store) = personal_store {
-            if let Some(personal_store_model) = personal_store_model {
-                // If the skin has changed, despawn it and spawn a new one
-                if personal_store_model.skin == personal_store.skin {
-                    continue;
-                }
+        if personal_store.is_some() {
+            continue;
+        }
 
-                commands
-                    .entity(personal_store_model.model)
-                    .despawn_recursive();
-
-                commands.entity(entity).remove::<ColliderEntity>();
-            }
-
-            // Spawn new personal store model
-            let personal_store_model = model_loader.spawn_personal_store_model(
+        let (character_model, skinned_mesh, dummy_bone_offset) = model_loader
+            .spawn_character_model(
                 &mut commands,
                 &asset_server,
                 &mut object_materials,
+                &mut particle_materials,
+                &mut effect_mesh_materials,
+                &mut skinned_mesh_inverse_bindposes_assets,
                 entity,
-                personal_store.skin,
+                character_info,
+                equipment,
             );
-            commands.entity(entity).insert(personal_store_model);
+
+        let mut entity_commands = commands.entity(entity);
+        entity_commands
+            .insert(CharacterBlinkTimer::new())
+            .remove_and_despawn_collider();
+
+        if let Some(mut current_character_model) = current_character_model {
+            *current_character_model = character_model;
         } else {
-            if let Some(personal_store_model) = personal_store_model {
-                // Despawn personal store model
-                commands
-                    .entity(personal_store_model.model)
-                    .despawn_recursive();
-                commands
-                    .entity(entity)
-                    .remove::<PersonalStoreModel>()
-                    .remove::<ColliderEntity>();
-            }
-
-            // Spawn new character model
-            let (character_model, skinned_mesh, dummy_bone_offset) = model_loader
-                .spawn_character_model(
-                    &mut commands,
-                    &asset_server,
-                    &mut object_materials,
-                    &mut particle_materials,
-                    &mut effect_mesh_materials,
-                    &mut skinned_mesh_inverse_bindposes_assets,
-                    entity,
-                    character_info,
-                    equipment,
-                );
-            commands.entity(entity).insert_bundle((
-                character_model,
-                skinned_mesh,
-                dummy_bone_offset,
-                CharacterBlinkTimer::new(),
-            ));
-        }
-    }
-}
-
-pub fn character_model_blink_system(
-    mut commands: Commands,
-    mut query_characters: Query<(&CharacterModel, &mut CharacterBlinkTimer, Option<&Dead>)>,
-    query_material: Query<&Handle<ZmsMaterialNumFaces>>,
-    material_assets: Res<Assets<ZmsMaterialNumFaces>>,
-    time: Res<Time>,
-) {
-    for (character_model, mut blink_timer, dead) in query_characters.iter_mut() {
-        let mut changed = false;
-
-        if dead.is_none() {
-            blink_timer.timer += time.delta_seconds();
-
-            if blink_timer.is_open {
-                if blink_timer.timer >= blink_timer.open_duration {
-                    blink_timer.is_open = false;
-                    blink_timer.timer -= blink_timer.open_duration;
-                    blink_timer.closed_duration =
-                        rand::thread_rng().gen_range(BLINK_CLOSED_DURATION);
-                    changed = true;
-                }
-            } else if blink_timer.timer >= blink_timer.closed_duration {
-                blink_timer.is_open = true;
-                blink_timer.timer -= blink_timer.closed_duration;
-                blink_timer.open_duration = rand::thread_rng().gen_range(BLINK_OPEN_DURATION);
-                changed = true;
-            }
-        } else {
-            if blink_timer.is_open {
-                blink_timer.is_open = false;
-
-                // Set timer so the eyes open as soon as resurrected
-                blink_timer.closed_duration = rand::thread_rng().gen_range(BLINK_CLOSED_DURATION);
-                blink_timer.timer = blink_timer.closed_duration;
-            }
-
-            changed = true;
+            entity_commands.insert(character_model);
         }
 
-        if changed {
-            for face_model_entity in character_model.model_parts[CharacterModelPart::CharacterFace]
-                .1
-                .iter()
-            {
-                if let Ok(face_mesh_handle) = query_material.get(*face_model_entity) {
-                    if let Some(face_mesh) = material_assets.get(face_mesh_handle) {
-                        if let Some(num_clip_faces) = face_mesh.material_num_faces.last() {
-                            if blink_timer.is_open {
-                                commands
-                                    .entity(*face_model_entity)
-                                    .insert(ObjectMaterialClipFace::First(*num_clip_faces as u32));
-                            } else {
-                                commands
-                                    .entity(*face_model_entity)
-                                    .insert(ObjectMaterialClipFace::Last(*num_clip_faces as u32));
-                            }
-                        }
-                    }
-                }
-            }
+        if let Some(mut current_skinned_mesh) = current_skinned_mesh {
+            *current_skinned_mesh = skinned_mesh;
+        } else {
+            entity_commands.insert(skinned_mesh);
+        }
+
+        if let Some(mut current_dummy_bone_offset) = current_dummy_bone_offset {
+            *current_dummy_bone_offset = dummy_bone_offset;
+        } else {
+            entity_commands.insert(dummy_bone_offset);
         }
     }
 }

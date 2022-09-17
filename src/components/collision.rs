@@ -1,4 +1,7 @@
-use bevy::prelude::{Component, Entity};
+use bevy::{
+    ecs::system::EntityCommands,
+    prelude::{Component, Entity, World},
+};
 use bevy_inspector_egui::Inspectable;
 
 #[derive(Component, Inspectable)]
@@ -9,6 +12,27 @@ pub struct ColliderEntity {
 impl ColliderEntity {
     pub fn new(entity: Entity) -> Self {
         Self { entity }
+    }
+}
+
+pub trait RemoveColliderCommand {
+    fn remove_and_despawn_collider(&mut self) -> &mut Self;
+}
+
+impl<'w, 's, 'a> RemoveColliderCommand for EntityCommands<'w, 's, 'a> {
+    fn remove_and_despawn_collider(&mut self) -> &mut Self {
+        let entity = self.id();
+
+        self.commands().add(move |world: &mut World| {
+            let mut world_entity = world.entity_mut(entity);
+            if let Some(collider_entity) = world_entity.get::<ColliderEntity>() {
+                let collider_entity = collider_entity.entity;
+                world_entity.remove::<ColliderEntity>();
+                world.despawn(collider_entity);
+            }
+        });
+
+        self
     }
 }
 

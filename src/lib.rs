@@ -73,8 +73,7 @@ use scripting::RoseScriptingPlugin;
 use systems::{
     ability_values_system, animation_effect_system, animation_sound_system, animation_system,
     auto_login_system, background_music_system, character_model_add_collider_system,
-    character_model_blink_system, character_model_changed_collider_system, character_model_system,
-    character_personal_store_model_add_collider_system, character_select_enter_system,
+    character_model_blink_system, character_model_update_system, character_select_enter_system,
     character_select_event_system, character_select_exit_system, character_select_input_system,
     character_select_models_system, character_select_system, client_entity_event_system,
     collision_height_only_system, collision_player_system, collision_player_system_join_zoin,
@@ -87,9 +86,10 @@ use systems::{
     login_state_exit_system, login_system, model_viewer_enter_system, model_viewer_exit_system,
     model_viewer_system, name_tag_system, name_tag_update_color_system,
     name_tag_update_healthbar_system, name_tag_visibility_system, network_thread_system,
-    npc_idle_sound_system, npc_model_add_collider_system, npc_model_system,
+    npc_idle_sound_system, npc_model_add_collider_system, npc_model_update_system,
     particle_sequence_system, passive_recovery_system, pending_damage_system,
-    pending_skill_effect_system, player_command_system, projectile_system, quest_trigger_system,
+    pending_skill_effect_system, personal_store_model_add_collider_system,
+    personal_store_model_system, player_command_system, projectile_system, quest_trigger_system,
     spawn_effect_system, spawn_projectile_system, system_func_event_system, update_position_system,
     visible_status_effects_system, world_connection_system, world_time_system, zone_time_system,
     zone_viewer_enter_system, DebugInspectorPlugin,
@@ -575,17 +575,19 @@ fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsC
 
     app.add_system(auto_login_system)
         .add_system(background_music_system)
-        .add_system(character_model_system)
-        .add_system(character_model_add_collider_system.after(character_model_system))
-        .add_system(character_model_changed_collider_system.after(character_model_system))
-        .add_system(
-            character_personal_store_model_add_collider_system.after(character_model_system),
-        )
-        .add_system(npc_model_system)
-        .add_system(npc_model_add_collider_system.after(npc_model_system))
+        .add_system(character_model_update_system)
+        .add_system(character_model_add_collider_system.after(character_model_update_system))
+        .add_system(personal_store_model_system)
+        .add_system(personal_store_model_add_collider_system.after(personal_store_model_system))
+        .add_system(npc_model_update_system)
+        .add_system(npc_model_add_collider_system.after(npc_model_update_system))
         .add_system(item_drop_model_system)
         .add_system(item_drop_model_add_collider_system.after(item_drop_model_system))
-        .add_system(animation_system)
+        .add_system(
+            animation_system
+                .after(character_model_update_system)
+                .after(npc_model_update_system),
+        )
         .add_system(particle_sequence_system)
         .add_system(effect_system)
         .add_system(
@@ -664,7 +666,8 @@ fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsC
                 .label("ui_system"),
         );
 
-    // character_model_blink_system must be in a stage after character_model_system
+    // character_model_blink_system in PostUpdate to avoid any conflicts with model destruction
+    // e.g. through the character select exit system.
     app.add_system_to_stage(CoreStage::PostUpdate, character_model_blink_system);
 
     // Run zone change system just before physics sync which is after Update

@@ -47,7 +47,7 @@ fn get_attack_animation<R: rand::Rng + ?Sized>(
         .unwrap();
 
         if !character_model.action_motions[action].is_strong() {
-            // Not all weapons have 3 attack animations ?
+            // Not all weapons have all 3 attack animations
             action = CharacterMotionAction::Attack;
         }
 
@@ -109,7 +109,7 @@ fn get_move_animation(
         let action = match move_mode {
             MoveMode::Walk => NpcMotionAction::Move,
             MoveMode::Run => NpcMotionAction::Run,
-            MoveMode::Drive => todo!("NPC drive animation"),
+            MoveMode::Drive => unreachable!("NPC cannot drive!"),
         };
 
         if npc_model.action_motions[action].is_strong() {
