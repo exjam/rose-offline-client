@@ -80,15 +80,15 @@ use systems::{
     command_system, conversation_dialog_system, cooldown_system, damage_digit_render_system,
     debug_render_collider_system, debug_render_polylines_setup_system,
     debug_render_polylines_update_system, debug_render_skeleton_system, effect_system,
-    game_connection_system, game_mouse_input_system, game_state_enter_system,
-    game_zone_change_system, hit_event_system, item_drop_model_add_collider_system,
-    item_drop_model_system, login_connection_system, login_event_system, login_state_enter_system,
-    login_state_exit_system, login_system, model_viewer_enter_system, model_viewer_exit_system,
-    model_viewer_system, name_tag_system, name_tag_update_color_system,
-    name_tag_update_healthbar_system, name_tag_visibility_system, network_thread_system,
-    npc_idle_sound_system, npc_model_add_collider_system, npc_model_update_system,
-    particle_sequence_system, passive_recovery_system, pending_damage_system,
-    pending_skill_effect_system, personal_store_model_add_collider_system,
+    facing_direction_system, game_connection_system, game_mouse_input_system,
+    game_state_enter_system, game_zone_change_system, hit_event_system,
+    item_drop_model_add_collider_system, item_drop_model_system, login_connection_system,
+    login_event_system, login_state_enter_system, login_state_exit_system, login_system,
+    model_viewer_enter_system, model_viewer_exit_system, model_viewer_system, name_tag_system,
+    name_tag_update_color_system, name_tag_update_healthbar_system, name_tag_visibility_system,
+    network_thread_system, npc_idle_sound_system, npc_model_add_collider_system,
+    npc_model_update_system, particle_sequence_system, passive_recovery_system,
+    pending_damage_system, pending_skill_effect_system, personal_store_model_add_collider_system,
     personal_store_model_system, player_command_system, projectile_system, quest_trigger_system,
     spawn_effect_system, spawn_projectile_system, system_func_event_system, update_position_system,
     vehicle_model_system, visible_status_effects_system, world_connection_system,
@@ -793,6 +793,7 @@ fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsC
             SystemSet::on_update(AppState::Game)
                 .with_system(ability_values_system)
                 .with_system(command_system.after(animation_system))
+                .with_system(facing_direction_system.after(command_system))
                 .with_system(update_position_system)
                 .with_system(
                     collision_player_system_join_zoin

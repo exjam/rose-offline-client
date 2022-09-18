@@ -1,23 +1,23 @@
 use bevy::{
-    math::{Quat, Vec3, Vec3Swizzles},
-    prelude::{Commands, Entity, Query, Res, Time, Transform},
+    math::Vec3Swizzles,
+    prelude::{Commands, Entity, Query, Res, Time},
 };
 use rose_game_common::components::{Destination, MoveSpeed};
 
-use crate::components::Position;
+use crate::components::{FacingDirection, Position};
 
 pub fn update_position_system(
     mut commands: Commands,
     mut query: Query<(
         Entity,
         &MoveSpeed,
+        &mut FacingDirection,
         &mut Position,
         &Destination,
-        &mut Transform,
     )>,
     time: Res<Time>,
 ) {
-    for (entity, move_speed, mut position, destination, mut transform) in query.iter_mut() {
+    for (entity, move_speed, mut facing_direction, mut position, destination) in query.iter_mut() {
         let direction = destination.position.xy() - position.xy();
         let distance_squared = direction.length_squared();
 
@@ -26,10 +26,7 @@ pub fn update_position_system(
             commands.entity(entity).remove::<Destination>();
         } else {
             // Update rotation
-            let dx = destination.position.x - position.x;
-            let dy = destination.position.y - position.y;
-            transform.rotation =
-                Quat::from_axis_angle(Vec3::Y, dy.atan2(dx) + std::f32::consts::PI / 2.0);
+            facing_direction.set_desired_vector(destination.position - position.position);
 
             // Move to position
             let move_vector = direction.normalize() * move_speed.speed * time.delta_seconds();

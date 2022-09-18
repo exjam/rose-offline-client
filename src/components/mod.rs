@@ -12,6 +12,7 @@ mod dead;
 mod dummy_bone_offset;
 mod effect;
 mod event_object;
+mod facing_direction;
 mod item_drop_model;
 mod model_height;
 mod name_tag_entity;
@@ -58,6 +59,7 @@ pub use dead::Dead;
 pub use dummy_bone_offset::DummyBoneOffset;
 pub use effect::{Effect, EffectMesh, EffectParticle};
 pub use event_object::EventObject;
+pub use facing_direction::FacingDirection;
 pub use item_drop_model::ItemDropModel;
 pub use model_height::ModelHeight;
 pub use name_tag_entity::{

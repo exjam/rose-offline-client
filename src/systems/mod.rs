@@ -19,6 +19,7 @@ mod debug_render_collider_system;
 mod debug_render_polylines_system;
 mod debug_render_skeleton_system;
 mod effect_system;
+mod facing_direction_system;
 mod game_connection_system;
 mod game_mouse_input_system;
 mod game_system;
@@ -83,6 +84,7 @@ pub use debug_render_polylines_system::{
 };
 pub use debug_render_skeleton_system::debug_render_skeleton_system;
 pub use effect_system::effect_system;
+pub use facing_direction_system::facing_direction_system;
 pub use game_connection_system::game_connection_system;
 pub use game_mouse_input_system::game_mouse_input_system;
 pub use game_system::{game_state_enter_system, game_zone_change_system};

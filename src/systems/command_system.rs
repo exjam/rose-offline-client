@@ -1,10 +1,8 @@
 use bevy::{
     ecs::{query::WorldQuery, system::EntityCommands},
     hierarchy::DespawnRecursiveExt,
-    math::{Quat, Vec3, Vec3Swizzles},
-    prelude::{
-        AssetServer, Commands, Entity, EventWriter, Handle, Mut, Or, Query, Res, Transform, With,
-    },
+    math::{Vec3, Vec3Swizzles},
+    prelude::{AssetServer, Commands, Entity, EventWriter, Handle, Mut, Or, Query, Res, With},
 };
 use rand::prelude::SliceRandom;
 
@@ -23,8 +21,8 @@ use crate::{
     components::{
         ActiveMotion, CharacterModel, ClientEntity, ClientEntityType, Command, CommandAttack,
         CommandCastSkill, CommandCastSkillState, CommandCastSkillTarget, CommandEmote, CommandMove,
-        CommandSit, Dead, NextCommand, NpcModel, PersonalStore, PlayerCharacter, Position, Vehicle,
-        VehicleModel,
+        CommandSit, Dead, FacingDirection, NextCommand, NpcModel, PersonalStore, PlayerCharacter,
+        Position, Vehicle, VehicleModel,
     },
     events::{ClientEntityEvent, ConversationDialogEvent, PersonalStoreEvent},
     resources::{GameConnection, GameData},
@@ -288,7 +286,7 @@ pub fn command_system(
             Option<&Vehicle>,
             &mut Command,
             &mut NextCommand,
-            &mut Transform,
+            &mut FacingDirection,
         ),
         Or<(With<CharacterModel>, With<NpcModel>)>,
     >,
@@ -320,7 +318,7 @@ pub fn command_system(
         vehicle,
         mut command,
         mut next_command,
-        mut transform,
+        mut facing_direction,
     ) in query.iter_mut()
     {
         let [mut active_motion, mut vehicle_active_motion] = {
@@ -671,12 +669,8 @@ pub fn command_system(
                         )) = pickup_item_entity
                         {
                             // Update rotation to face item
-                            let dx = pickup_item_position.x - position.x;
-                            let dy = pickup_item_position.y - position.y;
-                            transform.rotation = Quat::from_axis_angle(
-                                Vec3::Y,
-                                dy.atan2(dx) + std::f32::consts::PI / 2.0,
-                            );
+                            facing_direction
+                                .set_desired_vector(pickup_item_position - position.position);
 
                             // Ask the server to pick up the item
                             if let Some(game_connection) = game_connection.as_ref() {
@@ -692,12 +686,8 @@ pub fn command_system(
                         if let Some((talk_to_npc_entity, talk_to_npc_position)) = talk_to_npc_entity
                         {
                             // Update rotation to face NPC
-                            let dx = talk_to_npc_position.x - position.x;
-                            let dy = talk_to_npc_position.y - position.y;
-                            transform.rotation = Quat::from_axis_angle(
-                                Vec3::Y,
-                                dy.atan2(dx) + std::f32::consts::PI / 2.0,
-                            );
+                            facing_direction
+                                .set_desired_vector(talk_to_npc_position - position.position);
 
                             // Open dialog with npc
                             if let Ok(npc) = query_npc.get(talk_to_npc_entity) {
@@ -720,12 +710,8 @@ pub fn command_system(
                             move_to_character_entity
                         {
                             // Update rotation to face character
-                            let dx = move_to_character_position.x - position.x;
-                            let dy = move_to_character_position.y - position.y;
-                            transform.rotation = Quat::from_axis_angle(
-                                Vec3::Y,
-                                dy.atan2(dx) + std::f32::consts::PI / 2.0,
-                            );
+                            facing_direction
+                                .set_desired_vector(move_to_character_position - position.position);
 
                             // If character is running a personal store, open it
                             if query_personal_store.contains(move_to_character_entity) {
@@ -798,13 +784,10 @@ pub fn command_system(
                     if let Some(motion) = get_attack_animation(&mut rng, character_model, npc_model)
                     {
                         // Update rotation to ensure facing enemy
-                        let dx = target.position.x - position.x;
-                        let dy = target.position.y - position.y;
-                        transform.rotation = Quat::from_axis_angle(
-                            Vec3::Y,
-                            dy.atan2(dx) + std::f32::consts::PI / 2.0,
-                        );
+                        facing_direction
+                            .set_desired_vector(target.position.position - position.position);
 
+                        // Start attack animation
                         update_active_motion(
                             &mut entity_commands,
                             &mut active_motion,
@@ -812,6 +795,8 @@ pub fn command_system(
                             get_attack_animation_speed(ability_values),
                             false,
                         );
+
+                        // Update command state
                         *command = Command::with_attack(target_entity);
                         entity_commands.remove::<Destination>();
                         entity_commands.insert(Target::new(target_entity));
@@ -898,11 +883,9 @@ pub fn command_system(
             }
             &mut Command::PickupItem(item_entity) => {
                 if let Ok((target_position, _)) = query_move_target.get(item_entity) {
-                    // Update rotation to face pickup item
-                    let dx = target_position.x - position.x;
-                    let dy = target_position.y - position.y;
-                    transform.rotation =
-                        Quat::from_axis_angle(Vec3::Y, dy.atan2(dx) + std::f32::consts::PI / 2.0);
+                    // Update direction to face item
+                    facing_direction
+                        .set_desired_vector(target_position.position - position.position);
                 }
 
                 if let Some(motion) = get_pickup_animation(character_model, npc_model) {
@@ -1022,14 +1005,10 @@ pub fn command_system(
                         })
                         .unwrap_or(true);
                     if in_range {
-                        // Update rotation to face target
                         if let Some(target_position) = target_position.as_ref() {
-                            let dx = target_position.x - position.x;
-                            let dy = target_position.y - position.y;
-                            transform.rotation = Quat::from_axis_angle(
-                                Vec3::Y,
-                                dy.atan2(dx) + std::f32::consts::PI / 2.0,
-                            );
+                            // Update direction to face skill target
+                            facing_direction
+                                .set_desired_vector(*target_position - position.position);
                         }
 
                         let motion_data =

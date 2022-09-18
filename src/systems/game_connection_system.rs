@@ -31,10 +31,10 @@ use crate::{
     bundles::{ability_values_add_value_exclusive, ability_values_set_value_exclusive},
     components::{
         Bank, ClientEntity, ClientEntityName, ClientEntityType, CollisionHeightOnly,
-        CollisionPlayer, Command, CommandCastSkillTarget, Cooldowns, NextCommand, PartyInfo,
-        PartyOwner, PassiveRecoveryTime, PendingDamage, PendingDamageList, PendingSkillEffect,
-        PendingSkillEffectList, PendingSkillTarget, PendingSkillTargetList, PersonalStore,
-        PlayerCharacter, Position, VisibleStatusEffects,
+        CollisionPlayer, Command, CommandCastSkillTarget, Cooldowns, FacingDirection, NextCommand,
+        PartyInfo, PartyOwner, PassiveRecoveryTime, PendingDamage, PendingDamageList,
+        PendingSkillEffect, PendingSkillEffectList, PendingSkillTarget, PendingSkillTargetList,
+        PersonalStore, PlayerCharacter, Position, VisibleStatusEffects,
     },
     events::{
         BankEvent, ChatboxEvent, ClientEntityEvent, GameConnectionEvent, LoadZoneEvent, PartyEvent,
@@ -151,6 +151,7 @@ pub fn game_connection_system(
                         .insert_bundle((
                             Command::with_stop(),
                             NextCommand::with_stop(),
+                            FacingDirection::default(),
                             ability_values,
                             status_effects,
                             move_mode,
@@ -200,6 +201,7 @@ pub fn game_connection_system(
                         CollisionPlayer,
                         Command::with_stop(),
                         NextCommand::with_stop(),
+                        FacingDirection::default(),
                         message.experience_points,
                         message.team,
                         message.health_points,
@@ -282,6 +284,7 @@ pub fn game_connection_system(
                     .insert_bundle((
                         ClientEntity::new(message.entity_id, ClientEntityType::Character),
                         CollisionHeightOnly,
+                        FacingDirection::default(),
                         PendingDamageList::default(),
                         PendingSkillEffectList::default(),
                         PendingSkillTargetList::default(),
@@ -359,6 +362,7 @@ pub fn game_connection_system(
                     .insert_bundle((
                         ClientEntity::new(message.entity_id, ClientEntityType::Npc),
                         CollisionHeightOnly,
+                        FacingDirection::default(),
                         PendingDamageList::default(),
                         PendingSkillEffectList::default(),
                         PendingSkillTargetList::default(),
@@ -467,6 +471,7 @@ pub fn game_connection_system(
                     .insert_bundle((
                         ClientEntity::new(message.entity_id, ClientEntityType::Monster),
                         CollisionHeightOnly,
+                        FacingDirection::default(),
                         PendingDamageList::default(),
                         PendingSkillEffectList::default(),
                         PendingSkillTargetList::default(),
