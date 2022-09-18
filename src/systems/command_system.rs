@@ -263,6 +263,10 @@ fn get_move_animation_speed(move_speed: &MoveSpeed) -> f32 {
     (move_speed.speed + 180.0) / 600.0
 }
 
+fn get_vehicle_move_animation_speed(move_speed: &MoveSpeed) -> f32 {
+    (move_speed.speed + 500.0) / 1000.0
+}
+
 #[derive(WorldQuery)]
 pub struct QueryAttackTarget<'w> {
     entity: Entity,
@@ -751,7 +755,7 @@ pub fn command_system(
                                 &mut commands.entity(vehicle.entity),
                                 &mut vehicle_active_motion,
                                 motion,
-                                get_move_animation_speed(move_speed),
+                                get_vehicle_move_animation_speed(move_speed),
                                 true,
                             )
                         }
@@ -848,7 +852,7 @@ pub fn command_system(
                                     &mut commands.entity(vehicle.entity),
                                     &mut vehicle_active_motion,
                                     motion,
-                                    get_move_animation_speed(move_speed),
+                                    get_vehicle_move_animation_speed(move_speed),
                                     true,
                                 )
                             }
