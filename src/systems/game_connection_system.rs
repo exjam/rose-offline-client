@@ -1990,6 +1990,15 @@ pub fn game_connection_system(
                     });
                 }
             }
+            Ok(ServerMessage::MoveToggle(MoveToggle {
+                entity_id,
+                move_mode,
+                .. // TODO: run_speed
+            })) => {
+                if let Some(entity) = client_entity_list.get(entity_id) {
+                    commands.entity(entity).insert(move_mode);
+                }
+            }
             Ok(message) => {
                 log::warn!("Received unimplemented game server message: {:#?}", message);
             }

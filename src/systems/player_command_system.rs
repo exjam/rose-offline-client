@@ -204,9 +204,16 @@ pub fn player_command_system(
                                     }
                                 }
                             }
+                            Some(SkillBasicCommand::DriveVehicle) => {
+                                if let Some(game_connection) = game_connection.as_ref() {
+                                    game_connection
+                                        .client_message_tx
+                                        .send(ClientMessage::DriveToggle)
+                                        .ok();
+                                }
+                            }
                             /*
                             Some(SkillBasicCommand::AutoTarget) => {}
-                            Some(SkillBasicCommand::DriveVehicle) => {}
                             Some(SkillBasicCommand::AddFriend) => {}
                             Some(SkillBasicCommand::Trade) => {}
                             Some(SkillBasicCommand::PrivateStore) => {}

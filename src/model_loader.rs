@@ -13,6 +13,7 @@ use enum_map::{enum_map, EnumMap};
 
 use rose_data::{
     CharacterMotionAction, CharacterMotionDatabase, EffectDatabase, ItemClass, ItemDatabase, NpcId,
+    VehiclePartIndex,
 };
 use rose_data::{EquipmentIndex, ItemType, NpcDatabase};
 use rose_file_readers::{ChrFile, VirtualFilesystem, ZmdFile, ZscFile};
@@ -23,7 +24,7 @@ use rose_game_common::components::{
 use crate::{
     components::{
         CharacterModel, CharacterModelPart, CharacterModelPartIndex, DummyBoneOffset,
-        ItemDropModel, NpcModel, PersonalStoreModel,
+        ItemDropModel, NpcModel, PersonalStoreModel, VehicleModel,
     },
     effect_loader::spawn_effect,
     render::{EffectMeshMaterial, ObjectMaterial, ParticleMaterial, RgbTextureLoader, TrailEffect},
@@ -75,6 +76,11 @@ pub struct ModelLoader {
     weapon: ZscFile,
     sub_weapon: ZscFile,
 
+    // Vehicle
+    skeleton_cart: ZmdFile,
+    _skeleton_castle_gear: ZmdFile,
+    vehicle: ZscFile,
+
     // Npc
     npc_chr: ChrFile,
     npc_zsc: ZscFile,
@@ -117,6 +123,12 @@ impl ModelLoader {
             back: vfs.read_file::<ZscFile, _>("3DDATA/AVATAR/LIST_BACK.ZSC")?,
             weapon: vfs.read_file::<ZscFile, _>("3DDATA/WEAPON/LIST_WEAPON.ZSC")?,
             sub_weapon: vfs.read_file::<ZscFile, _>("3DDATA/WEAPON/LIST_SUBWPN.ZSC")?,
+
+            // Vehicle
+            skeleton_cart: vfs.read_file::<ZmdFile, _>("3DDATA/PAT/CART/CART01.ZMD")?,
+            _skeleton_castle_gear: vfs
+                .read_file::<ZmdFile, _>("3DDATA/PAT/CASTLEGEAR/CASTLEGEAR02/CASTLEGEAR02.ZMD")?,
+            vehicle: vfs.read_file::<ZscFile, _>("3DDATA/PAT/LIST_PAT.ZSC")?,
 
             // NPC
             npc_chr: vfs.read_file::<ChrFile, _>("3DDATA/NPC/LIST_NPC.CHR")?,
@@ -887,6 +899,123 @@ impl ModelLoader {
                 }
             }
         }
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn spawn_vehicle_model(
+        &self,
+        commands: &mut Commands,
+        asset_server: &AssetServer,
+        object_materials: &mut Assets<ObjectMaterial>,
+        _particle_materials: &mut Assets<ParticleMaterial>,
+        _effect_mesh_materials: &mut Assets<EffectMeshMaterial>,
+        skinned_mesh_inverse_bindposes_assets: &mut Assets<SkinnedMeshInverseBindposes>,
+        model_entity: Entity,
+        equipment: &Equipment,
+    ) -> (VehicleModel, SkinnedMesh, DummyBoneOffset) {
+        let skeleton = &self.skeleton_cart; // TODO: Cart or CG
+        let dummy_bone_offset = skeleton.bones.len();
+        let skinned_mesh = spawn_skeleton(
+            commands,
+            model_entity,
+            skeleton,
+            skinned_mesh_inverse_bindposes_assets,
+        );
+        let mut model_parts = EnumMap::default();
+
+        for vehicle_part_index in [
+            VehiclePartIndex::Body,
+            VehiclePartIndex::Engine,
+            VehiclePartIndex::Leg,
+            VehiclePartIndex::Ability,
+            VehiclePartIndex::Arms,
+        ] {
+            if let Some(model_id) = equipment.equipped_vehicle[vehicle_part_index]
+                .as_ref()
+                .map(|equipment_item| equipment_item.item.item_number)
+            {
+                model_parts[vehicle_part_index] = (
+                    model_id,
+                    spawn_model(
+                        commands,
+                        asset_server,
+                        object_materials,
+                        model_entity,
+                        &self.vehicle,
+                        model_id,
+                        Some(&skinned_mesh),
+                        None,
+                        dummy_bone_offset,
+                        false,
+                    ),
+                );
+            }
+        }
+
+        let base_motion_index = equipment.equipped_vehicle[VehiclePartIndex::Body]
+            .as_ref()
+            .and_then(|equipment_item| {
+                self.item_database
+                    .get_vehicle_item(equipment_item.item.item_number)
+            })
+            .map(|vehicle_item_data| {
+                (
+                    vehicle_item_data.base_motion_index as usize,
+                    vehicle_item_data.base_avatar_motion_index as usize,
+                )
+            });
+
+        let weapon_motion_type = equipment.equipped_vehicle[VehiclePartIndex::Ability]
+            .as_ref()
+            .and_then(|equipment_item| {
+                self.item_database
+                    .get_vehicle_item(equipment_item.item.item_number)
+            })
+            .map_or(0, |vehicle_item_data| {
+                vehicle_item_data.base_motion_index as usize
+            });
+
+        (
+            VehicleModel {
+                model_parts,
+                vehicle_action_motions: enum_map! {
+                    action =>  {
+                        if let Some((base_vehicle_motion_index, _)) = base_motion_index.as_ref() {
+                            if let Some(motion_data) = self.character_motion_database.get_vehicle_action_motion(
+                                action,
+                                *base_vehicle_motion_index,
+                                weapon_motion_type,
+                            ) {
+                                asset_server.load(motion_data.path.path())
+                            } else {
+                                Handle::default()
+                            }
+                        } else {
+                            Handle::default()
+                        }
+                    }
+                },
+                character_action_motions: enum_map! {
+                    action =>  {
+                        if let Some((_, base_avatar_motion_index)) = base_motion_index.as_ref() {
+                            if let Some(motion_data) = self.character_motion_database.get_vehicle_action_motion(
+                                action,
+                                *base_avatar_motion_index,
+                                0,
+                            ) {
+                                asset_server.load(motion_data.path.path())
+                            } else {
+                                Handle::default()
+                            }
+                        } else {
+                            Handle::default()
+                        }
+                    }
+                },
+            },
+            skinned_mesh,
+            DummyBoneOffset::new(dummy_bone_offset),
+        )
     }
 }
 
