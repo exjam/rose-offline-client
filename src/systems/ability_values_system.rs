@@ -40,7 +40,7 @@ pub fn ability_values_system(
                 &mut HealthPoints,
                 Option<&mut ManaPoints>,
             ),
-            Changed<AbilityValues>,
+            Or<(Changed<AbilityValues>, Changed<MoveMode>)>,
         >,
     )>,
     game_data: Res<GameData>,
