@@ -37,8 +37,28 @@ fn get_attack_animation<R: rand::Rng + ?Sized>(
     rng: &mut R,
     character_model: Option<&CharacterModel>,
     npc_model: Option<&NpcModel>,
+    vehicle: Option<&Vehicle>,
 ) -> Option<Handle<ZmoAsset>> {
-    if let Some(character_model) = character_model {
+    if let Some(vehicle) = vehicle {
+        let mut action = *[
+            VehicleMotionAction::Attack1,
+            VehicleMotionAction::Attack2,
+            VehicleMotionAction::Attack3,
+        ]
+        .choose(rng)
+        .unwrap();
+
+        if !vehicle.action_motions[action].is_strong() {
+            // Not all weapons have all 3 attack animations
+            action = VehicleMotionAction::Attack1;
+        }
+
+        if vehicle.action_motions[action].is_strong() {
+            Some(vehicle.action_motions[action].clone())
+        } else {
+            None
+        }
+    } else if let Some(character_model) = character_model {
         let mut action = *[
             CharacterMotionAction::Attack,
             CharacterMotionAction::Attack2,
@@ -175,21 +195,6 @@ fn get_standing_animation(
     }
 }
 
-fn get_vehicle_action_animation(
-    vehicle_model: Option<&VehicleModel>,
-    action: VehicleMotionAction,
-) -> Option<Handle<ZmoAsset>> {
-    if let Some(vehicle_model) = vehicle_model {
-        if vehicle_model.vehicle_action_motions[action].is_strong() {
-            Some(vehicle_model.vehicle_action_motions[action].clone())
-        } else {
-            None
-        }
-    } else {
-        None
-    }
-}
-
 fn get_stop_animation(
     character_model: Option<&CharacterModel>,
     npc_model: Option<&NpcModel>,
@@ -230,6 +235,40 @@ fn get_pickup_animation(
         }
     } else {
         None
+    }
+}
+
+fn get_vehicle_action_animation(
+    vehicle_model: Option<&VehicleModel>,
+    action: VehicleMotionAction,
+) -> Option<Handle<ZmoAsset>> {
+    if let Some(vehicle_model) = vehicle_model {
+        if vehicle_model.vehicle_action_motions[action].is_strong() {
+            Some(vehicle_model.vehicle_action_motions[action].clone())
+        } else {
+            None
+        }
+    } else {
+        None
+    }
+}
+
+fn get_vehicle_attack_animation<R: rand::Rng + ?Sized>(
+    rng: &mut R,
+    vehicle_model: Option<&VehicleModel>,
+) -> Option<Handle<ZmoAsset>> {
+    let action = *[
+        VehicleMotionAction::Attack1,
+        VehicleMotionAction::Attack2,
+        VehicleMotionAction::Attack3,
+    ]
+    .choose(rng)
+    .unwrap();
+
+    if let Some(motion) = get_vehicle_action_animation(vehicle_model, action) {
+        Some(motion)
+    } else {
+        get_vehicle_action_animation(vehicle_model, VehicleMotionAction::Attack1)
     }
 }
 
@@ -294,7 +333,7 @@ pub fn command_system(
         ),
         Or<(With<CharacterModel>, With<NpcModel>)>,
     >,
-    mut query_active_motion: Query<&mut ActiveMotion>,
+    mut query_active_motion: Query<Option<&mut ActiveMotion>>,
     query_vehicle_model: Query<&VehicleModel>,
     query_move_target: Query<(&Position, &ClientEntity)>,
     query_attack_target: Query<QueryAttackTarget>,
@@ -325,22 +364,29 @@ pub fn command_system(
         mut facing_direction,
     ) in query.iter_mut()
     {
-        let [mut active_motion, mut vehicle_active_motion] = {
+        let (
+            active_motion_entity,
+            mut active_motion,
+            vehicle_active_motion_entity,
+            mut vehicle_active_motion,
+        ) = {
             if let Some(vehicle) = vehicle.as_ref() {
                 query_active_motion
-                    .get_many_mut([entity, vehicle.entity])
-                    .ok()
-                    .map_or([None, None], |[a, b]| [Some(a), Some(b)])
+                    .get_many_mut([vehicle.driver_model_entity, entity])
+                    .map_or(
+                        (vehicle.driver_model_entity, None, entity, None),
+                        |[a, b]| (vehicle.driver_model_entity, a, entity, b),
+                    )
             } else {
                 query_active_motion
                     .get_mut(entity)
                     .ok()
-                    .map_or([None, None], |x| [Some(x), None])
+                    .map_or((entity, None, entity, None), |x| (entity, x, entity, None))
             }
         };
         let vehicle_model = vehicle
             .as_ref()
-            .and_then(|vehicle| query_vehicle_model.get(vehicle.entity).ok());
+            .and_then(|vehicle| query_vehicle_model.get(vehicle.vehicle_model_entity).ok());
 
         let requires_animation_complete = if command.is_emote() {
             // Emote has an animation, but can be interrupted by any other command
@@ -351,7 +397,8 @@ pub fn command_system(
 
         if !next_command.is_die()
             && requires_animation_complete
-            && (vehicle_active_motion.is_some() || active_motion.is_some())
+            && ((vehicle.is_none() && active_motion.is_some())
+                || (vehicle.is_some() && vehicle_active_motion.is_some()))
         {
             // Current command still in animation
             continue;
@@ -372,7 +419,7 @@ pub fn command_system(
         if command.is_sitting() {
             if let Some(motion) = get_sit_animation(character_model, npc_model) {
                 update_active_motion(
-                    &mut commands.entity(entity),
+                    &mut commands.entity(active_motion_entity),
                     &mut active_motion,
                     motion,
                     1.0,
@@ -434,7 +481,7 @@ pub fn command_system(
 
                     if let Some(motion_data) = motion_data {
                         update_active_motion(
-                            &mut commands.entity(entity),
+                            &mut commands.entity(active_motion_entity),
                             &mut active_motion,
                             asset_server.load(motion_data.path.path()),
                             1.0,
@@ -464,7 +511,7 @@ pub fn command_system(
 
                     if let Some(motion_data) = motion_data {
                         update_active_motion(
-                            &mut commands.entity(entity),
+                            &mut commands.entity(active_motion_entity),
                             &mut active_motion,
                             asset_server.load(motion_data.path.path()),
                             1.0,
@@ -501,7 +548,7 @@ pub fn command_system(
                 // Nothing to do, ensure we are using correct idle animation
                 if let Some(motion) = get_stop_animation(character_model, npc_model, vehicle) {
                     update_active_motion(
-                        &mut commands.entity(entity),
+                        &mut commands.entity(active_motion_entity),
                         &mut active_motion,
                         motion,
                         1.0,
@@ -509,18 +556,16 @@ pub fn command_system(
                     );
                 }
 
-                if let Some(vehicle) = vehicle {
-                    if let Some(motion) =
-                        get_vehicle_action_animation(vehicle_model, VehicleMotionAction::Stop)
-                    {
-                        update_active_motion(
-                            &mut commands.entity(vehicle.entity),
-                            &mut vehicle_active_motion,
-                            motion,
-                            1.0,
-                            true,
-                        )
-                    }
+                if let Some(motion) =
+                    get_vehicle_action_animation(vehicle_model, VehicleMotionAction::Stop)
+                {
+                    update_active_motion(
+                        &mut commands.entity(vehicle_active_motion_entity),
+                        &mut vehicle_active_motion,
+                        motion,
+                        1.0,
+                        true,
+                    )
                 }
 
                 continue;
@@ -531,7 +576,7 @@ pub fn command_system(
             // If current command is sit, we must stand before performing NextCommand
             if let Some(motion) = get_standing_animation(character_model, npc_model) {
                 update_active_motion(
-                    &mut commands.entity(entity),
+                    &mut commands.entity(active_motion_entity),
                     &mut active_motion,
                     motion,
                     1.0,
@@ -552,7 +597,7 @@ pub fn command_system(
 
                 if let Some(motion) = get_stop_animation(character_model, npc_model, vehicle) {
                     update_active_motion(
-                        &mut commands.entity(entity),
+                        &mut commands.entity(active_motion_entity),
                         &mut active_motion,
                         motion,
                         1.0,
@@ -560,18 +605,16 @@ pub fn command_system(
                     );
                 }
 
-                if let Some(vehicle) = vehicle {
-                    if let Some(motion) =
-                        get_vehicle_action_animation(vehicle_model, VehicleMotionAction::Stop)
-                    {
-                        update_active_motion(
-                            &mut commands.entity(vehicle.entity),
-                            &mut vehicle_active_motion,
-                            motion,
-                            1.0,
-                            true,
-                        )
-                    }
+                if let Some(motion) =
+                    get_vehicle_action_animation(vehicle_model, VehicleMotionAction::Stop)
+                {
+                    update_active_motion(
+                        &mut commands.entity(vehicle_active_motion_entity),
+                        &mut vehicle_active_motion,
+                        motion,
+                        1.0,
+                        true,
+                    )
                 }
 
                 *command = Command::with_stop();
@@ -634,29 +677,14 @@ pub fn command_system(
                     }
                 }
 
-                match command_move_mode {
-                    Some(MoveMode::Walk) => {
-                        if !matches!(move_mode, MoveMode::Walk) {
-                            entity_commands
-                                .insert(MoveMode::Walk)
-                                .insert(MoveSpeed::new(ability_values.get_walk_speed()));
-                        }
+                // If this move command has a different move mode, update move mode and move speed
+                if let Some(command_move_mode) = command_move_mode.as_ref() {
+                    if command_move_mode != move_mode {
+                        entity_commands.insert_bundle((
+                            *command_move_mode,
+                            MoveSpeed::new(ability_values.get_move_speed(command_move_mode)),
+                        ));
                     }
-                    Some(MoveMode::Run) => {
-                        if !matches!(move_mode, MoveMode::Run) {
-                            entity_commands
-                                .insert(MoveMode::Run)
-                                .insert(MoveSpeed::new(ability_values.get_run_speed()));
-                        }
-                    }
-                    Some(MoveMode::Drive) => {
-                        if !matches!(move_mode, MoveMode::Drive) {
-                            entity_commands
-                                .insert(MoveMode::Drive)
-                                .insert(MoveSpeed::new(ability_values.get_drive_speed()));
-                        }
-                    }
-                    None => {}
                 }
 
                 let distance = position.xy().distance(destination.xy());
@@ -727,18 +755,6 @@ pub fn command_system(
                     }
                 } else {
                     // Move towards destination
-                    if let Some(motion) =
-                        get_move_animation(move_mode, character_model, npc_model, vehicle)
-                    {
-                        update_active_motion(
-                            &mut entity_commands,
-                            &mut active_motion,
-                            motion,
-                            get_move_animation_speed(move_speed),
-                            true,
-                        );
-                    }
-
                     *command = Command::with_move(*destination, *target, *command_move_mode);
                     entity_commands.insert(Destination::new(*destination));
 
@@ -746,19 +762,29 @@ pub fn command_system(
                         entity_commands.insert(Target::new(target_entity));
                     }
 
+                    if let Some(motion) =
+                        get_move_animation(move_mode, character_model, npc_model, vehicle)
+                    {
+                        update_active_motion(
+                            &mut commands.entity(active_motion_entity),
+                            &mut active_motion,
+                            motion,
+                            get_move_animation_speed(move_speed),
+                            true,
+                        );
+                    }
+
                     // Update vehicle motion
-                    if let Some(vehicle) = vehicle {
-                        if let Some(motion) =
-                            get_vehicle_action_animation(vehicle_model, VehicleMotionAction::Move)
-                        {
-                            update_active_motion(
-                                &mut commands.entity(vehicle.entity),
-                                &mut vehicle_active_motion,
-                                motion,
-                                get_vehicle_move_animation_speed(move_speed),
-                                true,
-                            )
-                        }
+                    if let Some(motion) =
+                        get_vehicle_action_animation(vehicle_model, VehicleMotionAction::Move)
+                    {
+                        update_active_motion(
+                            &mut commands.entity(vehicle_active_motion_entity),
+                            &mut vehicle_active_motion,
+                            motion,
+                            get_vehicle_move_animation_speed(move_speed),
+                            true,
+                        )
                     }
                 }
             }
@@ -785,40 +811,36 @@ pub fn command_system(
                 let attack_range = ability_values.get_attack_range() as f32;
                 if distance < attack_range {
                     // Target in range, start attack
-                    if let Some(motion) = get_attack_animation(&mut rng, character_model, npc_model)
+                    if let Some(motion) =
+                        get_attack_animation(&mut rng, character_model, npc_model, vehicle)
                     {
                         // Update rotation to ensure facing enemy
                         facing_direction
                             .set_desired_vector(target.position.position - position.position);
-
-                        // Start attack animation
-                        update_active_motion(
-                            &mut entity_commands,
-                            &mut active_motion,
-                            motion,
-                            get_attack_animation_speed(ability_values),
-                            false,
-                        );
 
                         // Update command state
                         *command = Command::with_attack(target_entity);
                         entity_commands.remove::<Destination>();
                         entity_commands.insert(Target::new(target_entity));
 
-                        if let Some(vehicle) = vehicle {
-                            if let Some(motion) = get_vehicle_action_animation(
-                                vehicle_model,
-                                VehicleMotionAction::Attack1,
-                            ) {
-                                // TODO: Rng 1/2/3
-                                update_active_motion(
-                                    &mut commands.entity(vehicle.entity),
-                                    &mut vehicle_active_motion,
-                                    motion,
-                                    get_attack_animation_speed(ability_values),
-                                    false,
-                                )
-                            }
+                        // Start attack animation
+                        update_active_motion(
+                            &mut commands.entity(active_motion_entity),
+                            &mut active_motion,
+                            motion,
+                            get_attack_animation_speed(ability_values),
+                            false,
+                        );
+
+                        if let Some(motion) = get_vehicle_attack_animation(&mut rng, vehicle_model)
+                        {
+                            update_active_motion(
+                                &mut commands.entity(vehicle_active_motion_entity),
+                                &mut vehicle_active_motion,
+                                motion,
+                                get_attack_animation_speed(ability_values),
+                                false,
+                            )
                         }
                     } else {
                         // No attack animation, stop attack
@@ -828,13 +850,6 @@ pub fn command_system(
                     // Not in range, move towards target
                     let motion = get_move_animation(move_mode, character_model, npc_model, vehicle);
                     if let Some(motion) = motion {
-                        update_active_motion(
-                            &mut entity_commands,
-                            &mut active_motion,
-                            motion,
-                            get_move_animation_speed(move_speed),
-                            true,
-                        );
                         *command = Command::with_move(
                             target.position.position,
                             Some(target_entity),
@@ -843,19 +858,24 @@ pub fn command_system(
                         entity_commands.insert(Destination::new(target.position.position));
                         entity_commands.insert(Target::new(target_entity));
 
-                        if let Some(vehicle) = vehicle {
-                            if let Some(motion) = get_vehicle_action_animation(
-                                vehicle_model,
-                                VehicleMotionAction::Move,
-                            ) {
-                                update_active_motion(
-                                    &mut commands.entity(vehicle.entity),
-                                    &mut vehicle_active_motion,
-                                    motion,
-                                    get_vehicle_move_animation_speed(move_speed),
-                                    true,
-                                )
-                            }
+                        update_active_motion(
+                            &mut commands.entity(active_motion_entity),
+                            &mut active_motion,
+                            motion,
+                            get_move_animation_speed(move_speed),
+                            true,
+                        );
+
+                        if let Some(motion) =
+                            get_vehicle_action_animation(vehicle_model, VehicleMotionAction::Move)
+                        {
+                            update_active_motion(
+                                &mut commands.entity(vehicle_active_motion_entity),
+                                &mut vehicle_active_motion,
+                                motion,
+                                get_vehicle_move_animation_speed(move_speed),
+                                true,
+                            )
                         }
                     } else {
                         // No move animation, stop attack
@@ -867,7 +887,7 @@ pub fn command_system(
                 let motion = get_die_animation(character_model, npc_model);
                 if let Some(motion) = motion {
                     update_active_motion(
-                        &mut commands.entity(entity),
+                        &mut commands.entity(active_motion_entity),
                         &mut active_motion,
                         motion,
                         1.0,
@@ -894,7 +914,7 @@ pub fn command_system(
 
                 if let Some(motion) = get_pickup_animation(character_model, npc_model) {
                     update_active_motion(
-                        &mut commands.entity(entity),
+                        &mut commands.entity(active_motion_entity),
                         &mut active_motion,
                         motion,
                         1.0,
@@ -920,7 +940,7 @@ pub fn command_system(
 
                 if let Some(motion_data) = motion_data {
                     update_active_motion(
-                        &mut commands.entity(entity),
+                        &mut commands.entity(active_motion_entity),
                         &mut active_motion,
                         asset_server.load(motion_data.path.path()),
                         1.0,
@@ -938,7 +958,7 @@ pub fn command_system(
             Command::Sit(CommandSit::Sitting) => {
                 if let Some(motion) = get_sitting_animation(character_model, npc_model) {
                     update_active_motion(
-                        &mut commands.entity(entity),
+                        &mut commands.entity(active_motion_entity),
                         &mut active_motion,
                         motion,
                         1.0,
@@ -1034,7 +1054,7 @@ pub fn command_system(
 
                         if let Some(motion_data) = motion_data {
                             update_active_motion(
-                                &mut commands.entity(entity),
+                                &mut commands.entity(active_motion_entity),
                                 &mut active_motion,
                                 asset_server.load(motion_data.path.path()),
                                 skill_data.casting_motion_speed,
@@ -1085,13 +1105,6 @@ pub fn command_system(
                         let motion =
                             get_move_animation(move_mode, character_model, npc_model, vehicle);
                         if let Some(motion) = motion {
-                            update_active_motion(
-                                &mut entity_commands,
-                                &mut active_motion,
-                                motion,
-                                get_move_animation_speed(move_speed),
-                                false,
-                            );
                             *command = Command::with_move(
                                 target_position,
                                 target_entity,
@@ -1102,6 +1115,14 @@ pub fn command_system(
                             if let Some(target_entity) = target_entity {
                                 entity_commands.insert(Target::new(target_entity));
                             }
+
+                            update_active_motion(
+                                &mut commands.entity(active_motion_entity),
+                                &mut active_motion,
+                                motion,
+                                get_move_animation_speed(move_speed),
+                                false,
+                            );
                         } else {
                             // No move animation, stop attack
                             *next_command = NextCommand::default();

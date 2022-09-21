@@ -126,7 +126,7 @@ pub fn game_connection_system(
                     &status_effects,
                 );
                 let move_mode = MoveMode::Run;
-                let move_speed = MoveSpeed::new(ability_values.get_run_speed());
+                let move_speed = MoveSpeed::new(ability_values.get_move_speed(&move_mode));
 
                 // Spawn character
                 client_entity_list.player_entity = Some(
@@ -317,11 +317,7 @@ pub fn game_connection_system(
                     .ability_value_calculator
                     .calculate_npc(message.npc.id, &status_effects, None, None)
                     .unwrap();
-                let move_speed = match message.move_mode {
-                    MoveMode::Walk => MoveSpeed::new(ability_values.get_walk_speed()),
-                    MoveMode::Run => MoveSpeed::new(ability_values.get_run_speed()),
-                    MoveMode::Drive => MoveSpeed::new(ability_values.get_drive_speed()),
-                };
+                let move_speed = MoveSpeed::new(ability_values.get_move_speed(&message.move_mode));
                 let level = Level::new(ability_values.get_level() as u32);
                 let target_entity = message
                     .target_entity_id
@@ -393,11 +389,7 @@ pub fn game_connection_system(
                     .ability_value_calculator
                     .calculate_npc(message.npc.id, &status_effects, None, None)
                     .unwrap();
-                let move_speed = match message.move_mode {
-                    MoveMode::Walk => MoveSpeed::new(ability_values.get_walk_speed()),
-                    MoveMode::Run => MoveSpeed::new(ability_values.get_run_speed()),
-                    MoveMode::Drive => MoveSpeed::new(ability_values.get_drive_speed()),
-                };
+                let move_speed = MoveSpeed::new(ability_values.get_move_speed(&message.move_mode));
                 let level = Level::new(ability_values.get_level() as u32);
                 let target_entity = message
                     .target_entity_id

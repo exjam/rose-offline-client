@@ -7,6 +7,7 @@ use crate::zmo_asset_loader::ZmoAsset;
 
 #[derive(Component)]
 pub struct Vehicle {
-    pub entity: Entity,
+    pub driver_model_entity: Entity,
+    pub vehicle_model_entity: Entity,
     pub action_motions: EnumMap<VehicleMotionAction, Handle<ZmoAsset>>,
 }

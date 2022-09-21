@@ -34,7 +34,7 @@ pub fn ability_values_system(
         >,
         Query<
             (
-                &AbilityValues,
+                &mut AbilityValues,
                 &MoveMode,
                 &mut MoveSpeed,
                 &mut HealthPoints,
@@ -55,6 +55,7 @@ pub fn ability_values_system(
             skill_list,
             status_effects,
         )| {
+            // Update character ability values
             *ability_values = game_data.ability_value_calculator.calculate(
                 character_info,
                 level,
@@ -69,6 +70,7 @@ pub fn ability_values_system(
     query_set
         .p1()
         .for_each_mut(|(mut ability_values, npc, status_effects)| {
+            // Update NPC ability values
             *ability_values = game_data
                 .ability_value_calculator
                 .calculate_npc(
@@ -81,7 +83,10 @@ pub fn ability_values_system(
         });
 
     query_set.p2().for_each_mut(
-        |(ability_values, move_mode, mut move_speed, mut health_points, mana_points)| {
+        |(mut ability_values, move_mode, mut move_speed, mut health_points, mana_points)| {
+            // Update is_driving so vehicle stats are used correctly
+            ability_values.is_driving = matches!(move_mode, MoveMode::Drive);
+
             // Limit hp to max health
             let max_hp = ability_values.get_max_health();
             if health_points.hp > max_hp {
@@ -97,11 +102,7 @@ pub fn ability_values_system(
             }
 
             // Update move speed
-            let updated_move_speed = match move_mode {
-                MoveMode::Run => ability_values.get_run_speed(),
-                MoveMode::Walk => ability_values.get_walk_speed(),
-                MoveMode::Drive => ability_values.get_drive_speed(),
-            };
+            let updated_move_speed = ability_values.get_move_speed(move_mode);
             if (move_speed.speed - updated_move_speed).abs() > f32::EPSILON {
                 move_speed.speed = updated_move_speed;
             }
