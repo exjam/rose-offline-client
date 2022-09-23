@@ -810,9 +810,15 @@ pub fn command_system(
 
                 let attack_range = ability_values.get_attack_range() as f32;
                 if distance < attack_range {
+                    let vehicle_attack_animation =
+                        get_vehicle_attack_animation(&mut rng, vehicle_model);
+                    let attack_animation =
+                        get_attack_animation(&mut rng, character_model, npc_model, vehicle);
+                    let attack_animation_speed = get_attack_animation_speed(ability_values);
+
                     // Target in range, start attack
-                    if let Some(motion) =
-                        get_attack_animation(&mut rng, character_model, npc_model, vehicle)
+                    if (vehicle.is_none() && attack_animation.is_some())
+                        || (vehicle.is_some() && vehicle_attack_animation.is_some())
                     {
                         // Update rotation to ensure facing enemy
                         facing_direction
@@ -824,21 +830,22 @@ pub fn command_system(
                         entity_commands.insert(Target::new(target_entity));
 
                         // Start attack animation
-                        update_active_motion(
-                            &mut commands.entity(active_motion_entity),
-                            &mut active_motion,
-                            motion,
-                            get_attack_animation_speed(ability_values),
-                            false,
-                        );
+                        if let Some(motion) = attack_animation {
+                            update_active_motion(
+                                &mut commands.entity(active_motion_entity),
+                                &mut active_motion,
+                                motion,
+                                attack_animation_speed,
+                                false,
+                            );
+                        }
 
-                        if let Some(motion) = get_vehicle_attack_animation(&mut rng, vehicle_model)
-                        {
+                        if let Some(motion) = vehicle_attack_animation {
                             update_active_motion(
                                 &mut commands.entity(vehicle_active_motion_entity),
                                 &mut vehicle_active_motion,
                                 motion,
-                                get_attack_animation_speed(ability_values),
+                                attack_animation_speed,
                                 false,
                             )
                         }
