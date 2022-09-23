@@ -13,7 +13,7 @@ use enum_map::{enum_map, EnumMap};
 
 use rose_data::{
     CharacterMotionAction, CharacterMotionDatabase, EffectDatabase, ItemClass, ItemDatabase, NpcId,
-    VehiclePartIndex, VehicleType,
+    VehicleMotionAction, VehiclePartIndex, VehicleType,
 };
 use rose_data::{EquipmentIndex, ItemType, NpcDatabase};
 use rose_file_readers::{ChrFile, VirtualFilesystem, ZmdFile, ZscFile};
@@ -921,6 +921,7 @@ impl ModelLoader {
                     .get_vehicle_item(equipment_item.item.item_number)
             })
             .unwrap(); // TODO: No panic on invalid vehicle
+        let is_cart = matches!(body_item_data.vehicle_type, VehicleType::Cart);
         let skeleton = match body_item_data.vehicle_type {
             VehicleType::Cart => &self.skeleton_cart,
             VehicleType::CastleGear => &self.skeleton_castle_gear,
@@ -971,8 +972,6 @@ impl ModelLoader {
             .map_or(0, |vehicle_item_data| {
                 vehicle_item_data.base_motion_index as usize
             });
-        let base_vehicle_motion_index = body_item_data.base_motion_index as usize;
-        let base_avatar_motion_index = body_item_data.base_avatar_motion_index as usize;
 
         (
             VehicleModel {
@@ -982,8 +981,13 @@ impl ModelLoader {
                 vehicle_action_motions: enum_map! {
                     action =>  {
                         if let Some(motion_data) = self.character_motion_database.get_vehicle_action_motion(
-                            action,
-                            base_vehicle_motion_index,
+                            if is_cart && matches!(action, VehicleMotionAction::Attack2 | VehicleMotionAction::Attack3) {
+                                // Carts only have a single attack animation
+                                VehicleMotionAction::Attack1
+                            } else {
+                                action
+                            },
+                            body_item_data.base_motion_index as usize,
                             weapon_motion_type,
                         ) {
                             asset_server.load(motion_data.path.path())
@@ -995,8 +999,13 @@ impl ModelLoader {
                 character_action_motions: enum_map! {
                     action =>  {
                         if let Some(motion_data) = self.character_motion_database.get_vehicle_action_motion(
-                            action,
-                            base_avatar_motion_index,
+                            if is_cart && matches!(action, VehicleMotionAction::Attack2 | VehicleMotionAction::Attack3) {
+                                // Carts only have a single attack animation
+                                VehicleMotionAction::Attack1
+                            } else {
+                                action
+                            },
+                            body_item_data.base_avatar_motion_index as usize,
                             0,
                         ) {
                             asset_server.load(motion_data.path.path())
