@@ -3,8 +3,6 @@ use bevy::{
     prelude::{AssetEvent, Assets, EventReader, Handle, Local, Res, ResMut},
 };
 
-use quick_xml::de::from_slice;
-
 use crate::{
     resources::UiResources,
     ui::widgets::{Dialog, LoadWidget},
@@ -20,7 +18,8 @@ impl AssetLoader for DialogLoader {
         load_context: &'a mut LoadContext,
     ) -> BoxedFuture<'a, Result<(), anyhow::Error>> {
         Box::pin(async move {
-            let dialog: Dialog = from_slice(bytes)?;
+            let bytes_str = std::str::from_utf8(bytes)?;
+            let dialog: Dialog = quick_xml::de::from_str(bytes_str)?;
             load_context.set_default_asset(LoadedAsset::new(dialog));
             Ok(())
         })
