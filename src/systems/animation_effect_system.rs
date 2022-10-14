@@ -2,9 +2,9 @@ use bevy::prelude::{Entity, EventReader, EventWriter, Query, Res};
 
 use rose_data::{
     AmmoIndex, AnimationEventFlags, EffectBulletMoveType, EquipmentIndex, ItemClass, SkillData,
-    SkillType,
+    SkillType, VehiclePartIndex,
 };
-use rose_game_common::components::{Equipment, MoveSpeed, Npc};
+use rose_game_common::components::{Equipment, MoveMode, MoveSpeed, Npc};
 
 use crate::{
     components::{Command, CommandCastSkillTarget},
@@ -22,6 +22,7 @@ pub fn animation_effect_system(
     mut hit_events: EventWriter<HitEvent>,
     query_command: Query<&Command>,
     query_equipment: Query<&Equipment>,
+    query_move_mode: Query<&MoveMode>,
     query_npc: Query<&Npc>,
     game_data: Res<GameData>,
     client_entity_list: Res<ClientEntityList>,
@@ -36,25 +37,37 @@ pub fn animation_effect_system(
             .contains(AnimationEventFlags::EFFECT_WEAPON_ATTACK_HIT)
         {
             if let Ok(Command::Attack(command_attack)) = query_command.get(event.entity) {
-                let effect_id = query_equipment
+                let effect_id = if query_move_mode
                     .get(event.entity)
-                    .ok()
-                    .and_then(|equipment| {
-                        game_data.items.get_weapon_item(
-                            equipment
-                                .get_equipment_item(EquipmentIndex::Weapon)
-                                .map(|weapon| weapon.item.item_number)
-                                .unwrap_or(0),
-                        )
-                    })
-                    .and_then(|weapon_item_data| weapon_item_data.effect_id)
-                    .or_else(|| {
-                        query_npc
-                            .get(event.entity)
-                            .ok()
-                            .and_then(|npc| game_data.npcs.get_npc(npc.id))
-                            .and_then(|npc_data| npc_data.hand_hit_effect_id)
-                    });
+                    .map_or(false, |move_mode| matches!(move_mode, MoveMode::Drive))
+                {
+                    query_equipment
+                        .get(event.entity)
+                        .ok()
+                        .and_then(|equipment| equipment.get_vehicle_item(VehiclePartIndex::Arms))
+                        .and_then(|legs| game_data.items.get_vehicle_item(legs.item.item_number))
+                        .and_then(|vehicle_item_data| vehicle_item_data.hit_effect_id)
+                } else {
+                    query_equipment
+                        .get(event.entity)
+                        .ok()
+                        .and_then(|equipment| {
+                            game_data.items.get_weapon_item(
+                                equipment
+                                    .get_equipment_item(EquipmentIndex::Weapon)
+                                    .map(|weapon| weapon.item.item_number)
+                                    .unwrap_or(0),
+                            )
+                        })
+                        .and_then(|weapon_item_data| weapon_item_data.effect_id)
+                        .or_else(|| {
+                            query_npc
+                                .get(event.entity)
+                                .ok()
+                                .and_then(|npc| game_data.npcs.get_npc(npc.id))
+                                .and_then(|npc_data| npc_data.hand_hit_effect_id)
+                        })
+                };
 
                 hit_events.send(HitEvent::with_weapon(
                     event.entity,
@@ -69,36 +82,53 @@ pub fn animation_effect_system(
             .contains(AnimationEventFlags::EFFECT_WEAPON_FIRE_BULLET)
         {
             if let Ok(Command::Attack(command_attack)) = query_command.get(event.entity) {
-                let projectile_effect_data = query_equipment
+                let projectile_effect_data = if query_move_mode
                     .get(event.entity)
-                    .ok()
-                    .and_then(|equipment| {
-                        game_data
-                            .items
-                            .get_weapon_item(
-                                equipment
-                                    .get_equipment_item(EquipmentIndex::Weapon)
-                                    .map(|weapon| weapon.item.item_number)
-                                    .unwrap_or(0),
-                            )
-                            .and_then(|weapon_item_data| {
-                                match weapon_item_data.item_data.class {
-                                    ItemClass::Bow | ItemClass::Crossbow => Some(AmmoIndex::Arrow),
-                                    ItemClass::Gun | ItemClass::DualGuns => Some(AmmoIndex::Bullet),
-                                    ItemClass::Launcher => Some(AmmoIndex::Throw),
-                                    _ => None,
-                                }
-                                .and_then(|ammo_index| equipment.get_ammo_item(ammo_index))
-                                .and_then(|ammo_item| {
-                                    game_data
-                                        .items
-                                        .get_material_item(ammo_item.item.item_number)
+                    .map_or(false, |move_mode| matches!(move_mode, MoveMode::Drive))
+                {
+                    query_equipment
+                        .get(event.entity)
+                        .ok()
+                        .and_then(|equipment| equipment.get_vehicle_item(VehiclePartIndex::Arms))
+                        .and_then(|legs| game_data.items.get_vehicle_item(legs.item.item_number))
+                        .and_then(|vehicle_item_data| vehicle_item_data.bullet_effect_id)
+                        .and_then(|id| game_data.effect_database.get_effect(id))
+                } else {
+                    query_equipment
+                        .get(event.entity)
+                        .ok()
+                        .and_then(|equipment| {
+                            game_data
+                                .items
+                                .get_weapon_item(
+                                    equipment
+                                        .get_equipment_item(EquipmentIndex::Weapon)
+                                        .map(|weapon| weapon.item.item_number)
+                                        .unwrap_or(0),
+                                )
+                                .and_then(|weapon_item_data| {
+                                    match weapon_item_data.item_data.class {
+                                        ItemClass::Bow | ItemClass::Crossbow => {
+                                            Some(AmmoIndex::Arrow)
+                                        }
+                                        ItemClass::Gun | ItemClass::DualGuns => {
+                                            Some(AmmoIndex::Bullet)
+                                        }
+                                        ItemClass::Launcher => Some(AmmoIndex::Throw),
+                                        _ => None,
+                                    }
+                                    .and_then(|ammo_index| equipment.get_ammo_item(ammo_index))
+                                    .and_then(|ammo_item| {
+                                        game_data
+                                            .items
+                                            .get_material_item(ammo_item.item.item_number)
+                                    })
+                                    .and_then(|ammo_item_data| ammo_item_data.bullet_effect_id)
+                                    .or(weapon_item_data.bullet_effect_id)
                                 })
-                                .and_then(|ammo_item_data| ammo_item_data.bullet_effect_id)
-                                .or(weapon_item_data.bullet_effect_id)
-                            })
-                    })
-                    .and_then(|id| game_data.effect_database.get_effect(id));
+                        })
+                        .and_then(|id| game_data.effect_database.get_effect(id))
+                };
 
                 if let Some(projectile_effect_data) = projectile_effect_data {
                     if projectile_effect_data.bullet_effect.is_some() {
@@ -356,6 +386,44 @@ pub fn animation_effect_system(
                 if let Some(skill_data) = game_data.skills.get_skill(command_cast_skill.skill_id) {
                     show_casting_effect(event.entity, skill_data, 3, &mut spawn_effect_events);
                 }
+            }
+        }
+
+        if event
+            .flags
+            .contains(AnimationEventFlags::EFFECT_MOVE_VEHCILE_DUMMY1)
+        {
+            if let Some(effect_file_id) = query_equipment
+                .get(event.entity)
+                .ok()
+                .and_then(|equipment| equipment.get_vehicle_item(VehiclePartIndex::Leg))
+                .and_then(|legs| game_data.items.get_vehicle_item(legs.item.item_number))
+                .and_then(|vehicle_item_data| vehicle_item_data.move_effect_file_id)
+            {
+                spawn_effect_events.send(SpawnEffectEvent::OnEntity(
+                    event.entity,
+                    Some(1),
+                    SpawnEffectData::with_file_id(effect_file_id),
+                ));
+            }
+        }
+
+        if event
+            .flags
+            .contains(AnimationEventFlags::EFFECT_MOVE_VEHCILE_DUMMY2)
+        {
+            if let Some(effect_file_id) = query_equipment
+                .get(event.entity)
+                .ok()
+                .and_then(|equipment| equipment.get_vehicle_item(VehiclePartIndex::Leg))
+                .and_then(|legs| game_data.items.get_vehicle_item(legs.item.item_number))
+                .and_then(|vehicle_item_data| vehicle_item_data.move_effect_file_id)
+            {
+                spawn_effect_events.send(SpawnEffectEvent::OnEntity(
+                    event.entity,
+                    Some(2),
+                    SpawnEffectData::with_file_id(effect_file_id),
+                ));
             }
         }
     }
