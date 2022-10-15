@@ -1,4 +1,7 @@
-use bevy::prelude::{Entity, EventReader, EventWriter, Query, Res};
+use bevy::{
+    ecs::query::WorldQuery,
+    prelude::{Entity, EventReader, EventWriter, Query, Res},
+};
 
 use rose_data::{
     AmmoIndex, AnimationEventFlags, EffectBulletMoveType, EquipmentIndex, ItemClass, SkillData,
@@ -7,28 +10,41 @@ use rose_data::{
 use rose_game_common::components::{Equipment, MoveMode, MoveSpeed, Npc};
 
 use crate::{
-    components::{Command, CommandCastSkillTarget},
+    components::{Command, PlayerCharacter},
     events::{
         AnimationFrameEvent, HitEvent, SpawnEffectData, SpawnEffectEvent, SpawnProjectileEvent,
         SpawnProjectileTarget,
     },
-    resources::{ClientEntityList, GameData},
+    resources::GameData,
 };
+
+#[derive(WorldQuery)]
+pub struct EventEntity<'w> {
+    entity: Entity,
+    command: &'w Command,
+    move_mode: Option<&'w MoveMode>,
+    equipment: Option<&'w Equipment>,
+    npc: Option<&'w Npc>,
+    player: Option<&'w PlayerCharacter>,
+}
 
 pub fn animation_effect_system(
     mut animation_frame_events: EventReader<AnimationFrameEvent>,
     mut spawn_effect_events: EventWriter<SpawnEffectEvent>,
     mut spawn_projectile_events: EventWriter<SpawnProjectileEvent>,
     mut hit_events: EventWriter<HitEvent>,
-    query_command: Query<&Command>,
-    query_equipment: Query<&Equipment>,
-    query_move_mode: Query<&MoveMode>,
-    query_npc: Query<&Npc>,
+    query_event_entity: Query<EventEntity>,
     game_data: Res<GameData>,
-    client_entity_list: Res<ClientEntityList>,
 ) {
     for event in animation_frame_events.iter() {
-        if client_entity_list.player_entity == Some(event.entity) {
+        let event_entity = if let Ok(event_entity) = query_event_entity.get(event.entity) {
+            event_entity
+        } else {
+            continue;
+        };
+        let target_entity = event_entity.command.get_target();
+
+        if event_entity.player.is_some() {
             log::debug!(target: "animation", "Player animation event flags: {:?}", event.flags);
         }
 
@@ -36,21 +52,19 @@ pub fn animation_effect_system(
             .flags
             .contains(AnimationEventFlags::EFFECT_WEAPON_ATTACK_HIT)
         {
-            if let Ok(Command::Attack(command_attack)) = query_command.get(event.entity) {
-                let effect_id = if query_move_mode
-                    .get(event.entity)
+            if let Some(target_entity) = target_entity {
+                let effect_id = if event_entity
+                    .move_mode
                     .map_or(false, |move_mode| matches!(move_mode, MoveMode::Drive))
                 {
-                    query_equipment
-                        .get(event.entity)
-                        .ok()
+                    event_entity
+                        .equipment
                         .and_then(|equipment| equipment.get_vehicle_item(VehiclePartIndex::Arms))
                         .and_then(|legs| game_data.items.get_vehicle_item(legs.item.item_number))
                         .and_then(|vehicle_item_data| vehicle_item_data.hit_effect_id)
                 } else {
-                    query_equipment
-                        .get(event.entity)
-                        .ok()
+                    event_entity
+                        .equipment
                         .and_then(|equipment| {
                             game_data.items.get_weapon_item(
                                 equipment
@@ -61,9 +75,8 @@ pub fn animation_effect_system(
                         })
                         .and_then(|weapon_item_data| weapon_item_data.effect_id)
                         .or_else(|| {
-                            query_npc
-                                .get(event.entity)
-                                .ok()
+                            event_entity
+                                .npc
                                 .and_then(|npc| game_data.npcs.get_npc(npc.id))
                                 .and_then(|npc_data| npc_data.hand_hit_effect_id)
                         })
@@ -71,7 +84,7 @@ pub fn animation_effect_system(
 
                 hit_events.send(HitEvent::with_weapon(
                     event.entity,
-                    command_attack.target,
+                    target_entity,
                     effect_id,
                 ));
             }
@@ -81,22 +94,20 @@ pub fn animation_effect_system(
             .flags
             .contains(AnimationEventFlags::EFFECT_WEAPON_FIRE_BULLET)
         {
-            if let Ok(Command::Attack(command_attack)) = query_command.get(event.entity) {
-                let projectile_effect_data = if query_move_mode
-                    .get(event.entity)
+            if let Some(target_entity) = target_entity {
+                let projectile_effect_data = if event_entity
+                    .move_mode
                     .map_or(false, |move_mode| matches!(move_mode, MoveMode::Drive))
                 {
-                    query_equipment
-                        .get(event.entity)
-                        .ok()
+                    event_entity
+                        .equipment
                         .and_then(|equipment| equipment.get_vehicle_item(VehiclePartIndex::Arms))
                         .and_then(|legs| game_data.items.get_vehicle_item(legs.item.item_number))
                         .and_then(|vehicle_item_data| vehicle_item_data.bullet_effect_id)
                         .and_then(|id| game_data.effect_database.get_effect(id))
                 } else {
-                    query_equipment
-                        .get(event.entity)
-                        .ok()
+                    event_entity
+                        .equipment
                         .and_then(|equipment| {
                             game_data
                                 .items
@@ -137,7 +148,7 @@ pub fn animation_effect_system(
                             source: event.entity,
                             source_dummy_bone_id: Some(0),
                             source_skill_id: None,
-                            target: SpawnProjectileTarget::Entity(command_attack.target),
+                            target: SpawnProjectileTarget::Entity(target_entity),
                             move_type: projectile_effect_data
                                 .bullet_move_type
                                 .as_ref()
@@ -155,35 +166,35 @@ pub fn animation_effect_system(
             AnimationEventFlags::EFFECT_SKILL_FIRE_BULLET
                 | AnimationEventFlags::EFFECT_SKILL_FIRE_DUMMY_BULLET,
         ) {
-            if let Ok(Command::CastSkill(command_cast_skill)) = query_command.get(event.entity) {
-                if let Some(skill_data) = game_data.skills.get_skill(command_cast_skill.skill_id) {
-                    if let Some(CommandCastSkillTarget::Entity(target_entity)) =
-                        command_cast_skill.skill_target
+            if let Some(target_entity) = target_entity {
+                if let Some(skill_data) = event_entity
+                    .command
+                    .get_skill_id()
+                    .and_then(|skill_id| game_data.skills.get_skill(skill_id))
+                {
+                    if let Some(effect_data) = skill_data
+                        .bullet_effect_id
+                        .and_then(|id| game_data.effect_database.get_effect(id))
                     {
-                        if let Some(effect_data) = skill_data
-                            .bullet_effect_id
-                            .and_then(|id| game_data.effect_database.get_effect(id))
-                        {
-                            if effect_data.bullet_effect.is_some() {
-                                spawn_projectile_events.send(SpawnProjectileEvent {
-                                    effect_id: effect_data.id,
-                                    source: event.entity,
-                                    source_dummy_bone_id: Some(
-                                        skill_data.bullet_link_dummy_bone_id as usize,
-                                    ),
-                                    source_skill_id: Some(skill_data.id),
-                                    target: SpawnProjectileTarget::Entity(target_entity),
-                                    move_type: effect_data
-                                        .bullet_move_type
-                                        .as_ref()
-                                        .cloned()
-                                        .unwrap_or(EffectBulletMoveType::Linear),
-                                    move_speed: MoveSpeed::new(effect_data.bullet_speed / 100.0),
-                                    apply_damage: !event.flags.contains(
-                                        AnimationEventFlags::EFFECT_SKILL_FIRE_DUMMY_BULLET,
-                                    ),
-                                });
-                            }
+                        if effect_data.bullet_effect.is_some() {
+                            spawn_projectile_events.send(SpawnProjectileEvent {
+                                effect_id: effect_data.id,
+                                source: event.entity,
+                                source_dummy_bone_id: Some(
+                                    skill_data.bullet_link_dummy_bone_id as usize,
+                                ),
+                                source_skill_id: Some(skill_data.id),
+                                target: SpawnProjectileTarget::Entity(target_entity),
+                                move_type: effect_data
+                                    .bullet_move_type
+                                    .as_ref()
+                                    .cloned()
+                                    .unwrap_or(EffectBulletMoveType::Linear),
+                                move_speed: MoveSpeed::new(effect_data.bullet_speed / 100.0),
+                                apply_damage: !event
+                                    .flags
+                                    .contains(AnimationEventFlags::EFFECT_SKILL_FIRE_DUMMY_BULLET),
+                            });
                         }
                     }
                 }
@@ -194,154 +205,182 @@ pub fn animation_effect_system(
             .flags
             .contains(AnimationEventFlags::EFFECT_SKILL_ACTION)
         {
-            if let Ok(Command::CastSkill(command_cast_skill)) = query_command.get(event.entity) {
-                if let Some(skill_data) = game_data.skills.get_skill(command_cast_skill.skill_id) {
-                    match skill_data.skill_type {
-                        SkillType::BasicAction => {}
-                        SkillType::CreateWindow => {}
-                        SkillType::Immediate => {}
-                        SkillType::SelfBound
-                        | SkillType::SelfBoundDuration
-                        | SkillType::SelfStateDuration
-                        | SkillType::SelfDamage => {
+            if let Some(skill_data) = event_entity
+                .command
+                .get_skill_id()
+                .and_then(|skill_id| game_data.skills.get_skill(skill_id))
+            {
+                match skill_data.skill_type {
+                    SkillType::BasicAction => {}
+                    SkillType::CreateWindow => {}
+                    SkillType::Immediate => {}
+                    SkillType::SelfBound
+                    | SkillType::SelfBoundDuration
+                    | SkillType::SelfStateDuration
+                    | SkillType::SelfDamage => {
+                        if let Some(effect_data) = skill_data
+                            .bullet_effect_id
+                            .and_then(|id| game_data.effect_database.get_effect(id))
+                        {
+                            if let Some(effect_file_id) = effect_data.bullet_effect {
+                                spawn_effect_events.send(SpawnEffectEvent::OnEntity(
+                                    event.entity,
+                                    Some(skill_data.bullet_link_dummy_bone_id as usize),
+                                    SpawnEffectData::with_file_id(effect_file_id),
+                                ));
+                            }
+                        }
+
+                        if let Some(hit_effect_file_id) = skill_data.hit_effect_file_id {
+                            spawn_effect_events.send(SpawnEffectEvent::OnEntity(
+                                event.entity,
+                                skill_data.hit_link_dummy_bone_id,
+                                SpawnEffectData::with_file_id(hit_effect_file_id),
+                            ));
+                        }
+                    }
+                    SkillType::FireBullet => {
+                        if let Some(target_entity) = target_entity {
                             if let Some(effect_data) = skill_data
                                 .bullet_effect_id
                                 .and_then(|id| game_data.effect_database.get_effect(id))
                             {
-                                if let Some(effect_file_id) = effect_data.bullet_effect {
-                                    spawn_effect_events.send(SpawnEffectEvent::OnEntity(
-                                        event.entity,
-                                        Some(skill_data.bullet_link_dummy_bone_id as usize),
-                                        SpawnEffectData::with_file_id(effect_file_id),
-                                    ));
-                                }
-                            }
-
-                            if let Some(hit_effect_file_id) = skill_data.hit_effect_file_id {
-                                spawn_effect_events.send(SpawnEffectEvent::OnEntity(
-                                    event.entity,
-                                    skill_data.hit_link_dummy_bone_id,
-                                    SpawnEffectData::with_file_id(hit_effect_file_id),
-                                ));
-                            }
-                        }
-                        SkillType::FireBullet => {
-                            if let Some(CommandCastSkillTarget::Entity(target_entity)) =
-                                command_cast_skill.skill_target
-                            {
-                                if let Some(effect_data) = skill_data
-                                    .bullet_effect_id
-                                    .and_then(|id| game_data.effect_database.get_effect(id))
-                                {
-                                    if effect_data.bullet_effect.is_some() {
-                                        spawn_projectile_events.send(SpawnProjectileEvent {
-                                            effect_id: effect_data.id,
-                                            source: event.entity,
-                                            source_dummy_bone_id: Some(
-                                                skill_data.bullet_link_dummy_bone_id as usize,
-                                            ),
-                                            source_skill_id: Some(skill_data.id),
-                                            target: SpawnProjectileTarget::Entity(target_entity),
-                                            move_type: effect_data
-                                                .bullet_move_type
-                                                .as_ref()
-                                                .cloned()
-                                                .unwrap_or(EffectBulletMoveType::Linear),
-                                            move_speed: MoveSpeed::new(
-                                                effect_data.bullet_speed / 100.0,
-                                            ),
-                                            apply_damage: true,
-                                        });
-                                    }
+                                if effect_data.bullet_effect.is_some() {
+                                    spawn_projectile_events.send(SpawnProjectileEvent {
+                                        effect_id: effect_data.id,
+                                        source: event.entity,
+                                        source_dummy_bone_id: Some(
+                                            skill_data.bullet_link_dummy_bone_id as usize,
+                                        ),
+                                        source_skill_id: Some(skill_data.id),
+                                        target: SpawnProjectileTarget::Entity(target_entity),
+                                        move_type: effect_data
+                                            .bullet_move_type
+                                            .as_ref()
+                                            .cloned()
+                                            .unwrap_or(EffectBulletMoveType::Linear),
+                                        move_speed: MoveSpeed::new(
+                                            effect_data.bullet_speed / 100.0,
+                                        ),
+                                        apply_damage: true,
+                                    });
                                 }
                             }
                         }
-                        SkillType::TargetBound
-                        | SkillType::TargetBoundDuration
-                        | SkillType::TargetStateDuration
-                        | SkillType::Resurrection => {
-                            if let Some(CommandCastSkillTarget::Entity(target_entity)) =
-                                command_cast_skill.skill_target
-                            {
-                                if let Some(effect_data) = skill_data
-                                    .bullet_effect_id
-                                    .and_then(|id| game_data.effect_database.get_effect(id))
-                                {
-                                    if effect_data.bullet_effect.is_some() {
-                                        spawn_projectile_events.send(SpawnProjectileEvent {
-                                            effect_id: effect_data.id,
-                                            source: event.entity,
-                                            source_dummy_bone_id: Some(
-                                                skill_data.bullet_link_dummy_bone_id as usize,
-                                            ),
-                                            source_skill_id: Some(skill_data.id),
-                                            target: SpawnProjectileTarget::Entity(target_entity),
-                                            move_type: effect_data
-                                                .bullet_move_type
-                                                .as_ref()
-                                                .cloned()
-                                                .unwrap_or(EffectBulletMoveType::Linear),
-                                            move_speed: MoveSpeed::new(
-                                                effect_data.bullet_speed / 100.0,
-                                            ),
-                                            apply_damage: false,
-                                        });
-                                    }
-                                }
-                            }
-                        }
-                        _ => log::warn!(
-                            "Unimplemented EFFECT_SKILL_ACTION for skill type {:?}",
-                            skill_data.skill_type
-                        ),
                     }
+                    SkillType::TargetBound
+                    | SkillType::TargetBoundDuration
+                    | SkillType::TargetStateDuration
+                    | SkillType::Resurrection => {
+                        if let Some(target_entity) = target_entity {
+                            if let Some(effect_data) = skill_data
+                                .bullet_effect_id
+                                .and_then(|id| game_data.effect_database.get_effect(id))
+                            {
+                                if effect_data.bullet_effect.is_some() {
+                                    spawn_projectile_events.send(SpawnProjectileEvent {
+                                        effect_id: effect_data.id,
+                                        source: event.entity,
+                                        source_dummy_bone_id: Some(
+                                            skill_data.bullet_link_dummy_bone_id as usize,
+                                        ),
+                                        source_skill_id: Some(skill_data.id),
+                                        target: SpawnProjectileTarget::Entity(target_entity),
+                                        move_type: effect_data
+                                            .bullet_move_type
+                                            .as_ref()
+                                            .cloned()
+                                            .unwrap_or(EffectBulletMoveType::Linear),
+                                        move_speed: MoveSpeed::new(
+                                            effect_data.bullet_speed / 100.0,
+                                        ),
+                                        apply_damage: false,
+                                    });
+                                }
+                            }
+                        }
+                    }
+                    _ => log::warn!(
+                        "Unimplemented EFFECT_SKILL_ACTION for skill type {:?}",
+                        skill_data.skill_type
+                    ),
                 }
             }
         }
 
         if event.flags.contains(AnimationEventFlags::EFFECT_SKILL_HIT) {
-            if let Ok(Command::CastSkill(command_cast_skill)) = query_command.get(event.entity) {
-                if let Some(CommandCastSkillTarget::Entity(target_entity)) =
-                    command_cast_skill.skill_target
-                {
-                    if let Some(skill_data) =
-                        game_data.skills.get_skill(command_cast_skill.skill_id)
-                    {
-                        let weapon_effect_id = query_equipment
-                            .get(event.entity)
-                            .ok()
-                            .and_then(|equipment| {
-                                game_data.items.get_weapon_item(
-                                    equipment
-                                        .get_equipment_item(EquipmentIndex::Weapon)
-                                        .map(|weapon| weapon.item.item_number)
-                                        .unwrap_or(0),
-                                )
-                            })
-                            .and_then(|weapon_item_data| weapon_item_data.effect_id)
-                            .or_else(|| {
-                                query_npc
-                                    .get(event.entity)
-                                    .ok()
-                                    .and_then(|npc| game_data.npcs.get_npc(npc.id))
-                                    .and_then(|npc_data| npc_data.hand_hit_effect_id)
-                            });
+            if let Some(skill_data) = event_entity
+                .command
+                .get_skill_id()
+                .and_then(|skill_id| game_data.skills.get_skill(skill_id))
+            {
+                let weapon_effect_id = event_entity
+                    .equipment
+                    .and_then(|equipment| {
+                        game_data.items.get_weapon_item(
+                            equipment
+                                .get_equipment_item(EquipmentIndex::Weapon)
+                                .map(|weapon| weapon.item.item_number)
+                                .unwrap_or(0),
+                        )
+                    })
+                    .and_then(|weapon_item_data| weapon_item_data.effect_id)
+                    .or_else(|| {
+                        event_entity
+                            .npc
+                            .and_then(|npc| game_data.npcs.get_npc(npc.id))
+                            .and_then(|npc_data| npc_data.hand_hit_effect_id)
+                    });
 
-                        if skill_data.hit_effect_file_id.is_some() {
-                            hit_events.send(HitEvent::with_skill(
-                                event.entity,
-                                target_entity,
-                                command_cast_skill.skill_id,
-                            ));
-                        } else {
-                            hit_events.send(HitEvent::with_weapon(
-                                event.entity,
-                                target_entity,
-                                weapon_effect_id,
-                            ));
-                        }
-                    }
+                if skill_data.hit_effect_file_id.is_some() {
+                    hit_events.send(HitEvent::with_skill(
+                        event.entity,
+                        target_entity.unwrap_or(event.entity),
+                        skill_data.id,
+                    ));
+                } else {
+                    hit_events.send(HitEvent::with_weapon(
+                        event.entity,
+                        target_entity.unwrap_or(event.entity),
+                        weapon_effect_id,
+                    ));
                 }
+            }
+        }
+
+        if event
+            .flags
+            .contains(AnimationEventFlags::EFFECT_SKILL_DUMMY_HIT_0)
+        {
+            if let Some(effect_file_id) = event_entity
+                .command
+                .get_skill_id()
+                .and_then(|skill_id| game_data.skills.get_skill(skill_id))
+                .and_then(|skill_data| skill_data.hit_dummy_effect_file_id[0])
+            {
+                spawn_effect_events.send(SpawnEffectEvent::OnEntity(
+                    target_entity.unwrap_or(event.entity),
+                    None,
+                    SpawnEffectData::with_file_id(effect_file_id),
+                ));
+            }
+        }
+
+        if event
+            .flags
+            .contains(AnimationEventFlags::EFFECT_SKILL_DUMMY_HIT_1)
+        {
+            if let Some(effect_file_id) = event_entity
+                .command
+                .get_skill_id()
+                .and_then(|skill_id| game_data.skills.get_skill(skill_id))
+                .and_then(|skill_data| skill_data.hit_dummy_effect_file_id[1])
+            {
+                spawn_effect_events.send(SpawnEffectEvent::OnEntity(
+                    target_entity.unwrap_or(event.entity),
+                    None,
+                    SpawnEffectData::with_file_id(effect_file_id),
+                ));
             }
         }
 
@@ -349,10 +388,12 @@ pub fn animation_effect_system(
             .flags
             .contains(AnimationEventFlags::EFFECT_SKILL_CASTING_0)
         {
-            if let Ok(Command::CastSkill(command_cast_skill)) = query_command.get(event.entity) {
-                if let Some(skill_data) = game_data.skills.get_skill(command_cast_skill.skill_id) {
-                    show_casting_effect(event.entity, skill_data, 0, &mut spawn_effect_events);
-                }
+            if let Some(skill_data) = event_entity
+                .command
+                .get_skill_id()
+                .and_then(|skill_id| game_data.skills.get_skill(skill_id))
+            {
+                show_casting_effect(event.entity, skill_data, 0, &mut spawn_effect_events);
             }
         }
 
@@ -360,10 +401,12 @@ pub fn animation_effect_system(
             .flags
             .contains(AnimationEventFlags::EFFECT_SKILL_CASTING_1)
         {
-            if let Ok(Command::CastSkill(command_cast_skill)) = query_command.get(event.entity) {
-                if let Some(skill_data) = game_data.skills.get_skill(command_cast_skill.skill_id) {
-                    show_casting_effect(event.entity, skill_data, 1, &mut spawn_effect_events);
-                }
+            if let Some(skill_data) = event_entity
+                .command
+                .get_skill_id()
+                .and_then(|skill_id| game_data.skills.get_skill(skill_id))
+            {
+                show_casting_effect(event.entity, skill_data, 1, &mut spawn_effect_events);
             }
         }
 
@@ -371,10 +414,12 @@ pub fn animation_effect_system(
             .flags
             .contains(AnimationEventFlags::EFFECT_SKILL_CASTING_2)
         {
-            if let Ok(Command::CastSkill(command_cast_skill)) = query_command.get(event.entity) {
-                if let Some(skill_data) = game_data.skills.get_skill(command_cast_skill.skill_id) {
-                    show_casting_effect(event.entity, skill_data, 2, &mut spawn_effect_events);
-                }
+            if let Some(skill_data) = event_entity
+                .command
+                .get_skill_id()
+                .and_then(|skill_id| game_data.skills.get_skill(skill_id))
+            {
+                show_casting_effect(event.entity, skill_data, 2, &mut spawn_effect_events);
             }
         }
 
@@ -382,10 +427,12 @@ pub fn animation_effect_system(
             .flags
             .contains(AnimationEventFlags::EFFECT_SKILL_CASTING_3)
         {
-            if let Ok(Command::CastSkill(command_cast_skill)) = query_command.get(event.entity) {
-                if let Some(skill_data) = game_data.skills.get_skill(command_cast_skill.skill_id) {
-                    show_casting_effect(event.entity, skill_data, 3, &mut spawn_effect_events);
-                }
+            if let Some(skill_data) = event_entity
+                .command
+                .get_skill_id()
+                .and_then(|skill_id| game_data.skills.get_skill(skill_id))
+            {
+                show_casting_effect(event.entity, skill_data, 3, &mut spawn_effect_events);
             }
         }
 
@@ -393,9 +440,8 @@ pub fn animation_effect_system(
             .flags
             .contains(AnimationEventFlags::EFFECT_MOVE_VEHCILE_DUMMY1)
         {
-            if let Some(effect_file_id) = query_equipment
-                .get(event.entity)
-                .ok()
+            if let Some(effect_file_id) = event_entity
+                .equipment
                 .and_then(|equipment| equipment.get_vehicle_item(VehiclePartIndex::Leg))
                 .and_then(|legs| game_data.items.get_vehicle_item(legs.item.item_number))
                 .and_then(|vehicle_item_data| vehicle_item_data.move_effect_file_id)
@@ -412,9 +458,8 @@ pub fn animation_effect_system(
             .flags
             .contains(AnimationEventFlags::EFFECT_MOVE_VEHCILE_DUMMY2)
         {
-            if let Some(effect_file_id) = query_equipment
-                .get(event.entity)
-                .ok()
+            if let Some(effect_file_id) = event_entity
+                .equipment
                 .and_then(|equipment| equipment.get_vehicle_item(VehiclePartIndex::Leg))
                 .and_then(|legs| game_data.items.get_vehicle_item(legs.item.item_number))
                 .and_then(|vehicle_item_data| vehicle_item_data.move_effect_file_id)

@@ -139,6 +139,32 @@ impl Command {
         Self::Sit(CommandSit::Standing)
     }
 
+    pub fn get_target(&self) -> Option<Entity> {
+        match self {
+            Command::Move(CommandMove { target, .. }) => *target,
+            Command::Attack(CommandAttack { target }) => Some(*target),
+            Command::PickupItem(target) => Some(*target),
+            Command::CastSkill(CommandCastSkill {
+                skill_target: Some(CommandCastSkillTarget::Entity(skill_target_entity)),
+                ..
+            }) => Some(*skill_target_entity),
+            Command::Stop
+            | Command::CastSkill(_)
+            | Command::Die
+            | Command::Emote(_)
+            | Command::Sit(_)
+            | Command::PersonalStore => None,
+        }
+    }
+
+    pub fn get_skill_id(&self) -> Option<SkillId> {
+        if let Command::CastSkill(CommandCastSkill { skill_id, .. }) = self {
+            Some(*skill_id)
+        } else {
+            None
+        }
+    }
+
     pub fn is_die(&self) -> bool {
         matches!(self, Command::Die)
     }
