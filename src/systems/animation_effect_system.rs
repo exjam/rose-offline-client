@@ -95,50 +95,60 @@ pub fn animation_effect_system(
             .contains(AnimationEventFlags::EFFECT_WEAPON_FIRE_BULLET)
         {
             if let Some(target_entity) = target_entity {
-                let projectile_effect_data = if event_entity
+                let (source_dummy_bone_id, projectile_effect_data) = if event_entity
                     .move_mode
                     .map_or(false, |move_mode| matches!(move_mode, MoveMode::Drive))
                 {
-                    event_entity
-                        .equipment
-                        .and_then(|equipment| equipment.get_vehicle_item(VehiclePartIndex::Arms))
-                        .and_then(|legs| game_data.items.get_vehicle_item(legs.item.item_number))
-                        .and_then(|vehicle_item_data| vehicle_item_data.bullet_effect_id)
-                        .and_then(|id| game_data.effect_database.get_effect(id))
+                    (
+                        Some(8),
+                        event_entity
+                            .equipment
+                            .and_then(|equipment| {
+                                equipment.get_vehicle_item(VehiclePartIndex::Arms)
+                            })
+                            .and_then(|legs| {
+                                game_data.items.get_vehicle_item(legs.item.item_number)
+                            })
+                            .and_then(|vehicle_item_data| vehicle_item_data.bullet_effect_id)
+                            .and_then(|id| game_data.effect_database.get_effect(id)),
+                    )
                 } else {
-                    event_entity
-                        .equipment
-                        .and_then(|equipment| {
-                            game_data
-                                .items
-                                .get_weapon_item(
-                                    equipment
-                                        .get_equipment_item(EquipmentIndex::Weapon)
-                                        .map(|weapon| weapon.item.item_number)
-                                        .unwrap_or(0),
-                                )
-                                .and_then(|weapon_item_data| {
-                                    match weapon_item_data.item_data.class {
-                                        ItemClass::Bow | ItemClass::Crossbow => {
-                                            Some(AmmoIndex::Arrow)
+                    (
+                        None,
+                        event_entity
+                            .equipment
+                            .and_then(|equipment| {
+                                game_data
+                                    .items
+                                    .get_weapon_item(
+                                        equipment
+                                            .get_equipment_item(EquipmentIndex::Weapon)
+                                            .map(|weapon| weapon.item.item_number)
+                                            .unwrap_or(0),
+                                    )
+                                    .and_then(|weapon_item_data| {
+                                        match weapon_item_data.item_data.class {
+                                            ItemClass::Bow | ItemClass::Crossbow => {
+                                                Some(AmmoIndex::Arrow)
+                                            }
+                                            ItemClass::Gun | ItemClass::DualGuns => {
+                                                Some(AmmoIndex::Bullet)
+                                            }
+                                            ItemClass::Launcher => Some(AmmoIndex::Throw),
+                                            _ => None,
                                         }
-                                        ItemClass::Gun | ItemClass::DualGuns => {
-                                            Some(AmmoIndex::Bullet)
-                                        }
-                                        ItemClass::Launcher => Some(AmmoIndex::Throw),
-                                        _ => None,
-                                    }
-                                    .and_then(|ammo_index| equipment.get_ammo_item(ammo_index))
-                                    .and_then(|ammo_item| {
-                                        game_data
-                                            .items
-                                            .get_material_item(ammo_item.item.item_number)
+                                        .and_then(|ammo_index| equipment.get_ammo_item(ammo_index))
+                                        .and_then(|ammo_item| {
+                                            game_data
+                                                .items
+                                                .get_material_item(ammo_item.item.item_number)
+                                        })
+                                        .and_then(|ammo_item_data| ammo_item_data.bullet_effect_id)
+                                        .or(weapon_item_data.bullet_effect_id)
                                     })
-                                    .and_then(|ammo_item_data| ammo_item_data.bullet_effect_id)
-                                    .or(weapon_item_data.bullet_effect_id)
-                                })
-                        })
-                        .and_then(|id| game_data.effect_database.get_effect(id))
+                            })
+                            .and_then(|id| game_data.effect_database.get_effect(id)),
+                    )
                 };
 
                 if let Some(projectile_effect_data) = projectile_effect_data {
@@ -146,7 +156,7 @@ pub fn animation_effect_system(
                         spawn_projectile_events.send(SpawnProjectileEvent {
                             effect_id: projectile_effect_data.id,
                             source: event.entity,
-                            source_dummy_bone_id: Some(0),
+                            source_dummy_bone_id,
                             source_skill_id: None,
                             target: SpawnProjectileTarget::Entity(target_entity),
                             move_type: projectile_effect_data
