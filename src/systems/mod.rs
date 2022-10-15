@@ -16,8 +16,10 @@ mod cooldown_system;
 mod damage_digit_render_system;
 mod debug_inspector_system;
 mod debug_render_collider_system;
+mod debug_render_directional_light_system;
 mod debug_render_polylines_system;
 mod debug_render_skeleton_system;
+mod directional_light_system;
 mod effect_system;
 mod facing_direction_system;
 mod game_connection_system;
@@ -79,10 +81,12 @@ pub use cooldown_system::cooldown_system;
 pub use damage_digit_render_system::damage_digit_render_system;
 pub use debug_inspector_system::DebugInspectorPlugin;
 pub use debug_render_collider_system::debug_render_collider_system;
+pub use debug_render_directional_light_system::debug_render_directional_light_system;
 pub use debug_render_polylines_system::{
     debug_render_polylines_setup_system, debug_render_polylines_update_system,
 };
 pub use debug_render_skeleton_system::debug_render_skeleton_system;
+pub use directional_light_system::directional_light_system;
 pub use effect_system::effect_system;
 pub use facing_direction_system::facing_direction_system;
 pub use game_connection_system::game_connection_system;

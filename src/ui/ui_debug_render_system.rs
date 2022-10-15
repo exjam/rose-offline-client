@@ -37,6 +37,10 @@ pub fn ui_debug_render_system(
             ui.checkbox(&mut debug_render_config.colliders, "Show Colliders");
             ui.checkbox(&mut debug_render_config.skeleton, "Show Skeletons");
             ui.checkbox(&mut debug_render_config.bone_up, "Show Bone Up");
+            ui.checkbox(
+                &mut debug_render_config.directional_light_frustum,
+                "Show Directional Light Frustum",
+            );
 
             if ui
                 .checkbox(

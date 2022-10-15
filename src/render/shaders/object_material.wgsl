@@ -6,6 +6,7 @@
 var<uniform> mesh: Mesh;
 
 #import bevy_pbr::mesh_functions
+#import bevy_pbr::shadows
 
 #ifdef SKINNED
 @group(2) @binding(1)
@@ -41,7 +42,6 @@ struct VertexOutput {
 
 @vertex
 fn vertex(vertex: Vertex) -> VertexOutput {
-
     var out: VertexOutput;
     out.uv = vertex.uv;
 
@@ -104,8 +104,12 @@ struct FragmentInput {
 @fragment
 fn fragment(in: FragmentInput) -> @location(0) vec4<f32> {
     var output_color: vec4<f32> = textureSample(base_texture, base_sampler, in.uv);
+
 #ifdef HAS_OBJECT_LIGHTMAP
-    output_color = output_color * textureSample(lightmap_texture, lightmap_sampler, (in.lightmap_uv + material.lightmap_uv_offset) * material.lightmap_uv_scale) * 2.0;
+    var lightmap = textureSample(lightmap_texture, lightmap_sampler, (in.lightmap_uv + material.lightmap_uv_offset) * material.lightmap_uv_scale);
+    let shadow = fetch_directional_shadow(0u, in.world_position, in.world_normal);
+    lightmap = vec4<f32>(lightmap.xyz * (shadow * 0.2 + 0.8), lightmap.w);
+    output_color = output_color * lightmap * 2.0;
 #endif
 
     if ((material.flags & OBJECT_MATERIAL_FLAGS_SPECULAR) != 0u) {

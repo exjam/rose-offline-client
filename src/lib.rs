@@ -9,9 +9,9 @@ use bevy::{
     pbr::AmbientLight,
     prelude::{
         AddAsset, App, AssetServer, Assets, Camera3dBundle, Color, Commands, CoreStage,
-        ExclusiveSystemDescriptorCoercion, IntoExclusiveSystem, Msaa,
-        ParallelSystemDescriptorCoercion, Quat, Res, ResMut, StageLabel, StartupStage, State,
-        SystemSet, SystemStage, Transform, Vec3,
+        DirectionalLight, DirectionalLightBundle, EulerRot, ExclusiveSystemDescriptorCoercion,
+        IntoExclusiveSystem, Msaa, ParallelSystemDescriptorCoercion, Quat, Res, ResMut, StageLabel,
+        StartupStage, State, SystemSet, SystemStage, Transform, Vec3,
     },
     render::{render_resource::WgpuFeatures, settings::WgpuSettings},
     window::{WindowDescriptor, WindowMode},
@@ -78,17 +78,18 @@ use systems::{
     character_select_models_system, character_select_system, client_entity_event_system,
     collision_height_only_system, collision_player_system, collision_player_system_join_zoin,
     command_system, conversation_dialog_system, cooldown_system, damage_digit_render_system,
-    debug_render_collider_system, debug_render_polylines_setup_system,
-    debug_render_polylines_update_system, debug_render_skeleton_system, effect_system,
-    facing_direction_system, game_connection_system, game_mouse_input_system,
-    game_state_enter_system, game_zone_change_system, hit_event_system,
-    item_drop_model_add_collider_system, item_drop_model_system, login_connection_system,
-    login_event_system, login_state_enter_system, login_state_exit_system, login_system,
-    model_viewer_enter_system, model_viewer_exit_system, model_viewer_system, name_tag_system,
-    name_tag_update_color_system, name_tag_update_healthbar_system, name_tag_visibility_system,
-    network_thread_system, npc_idle_sound_system, npc_model_add_collider_system,
-    npc_model_update_system, particle_sequence_system, passive_recovery_system,
-    pending_damage_system, pending_skill_effect_system, personal_store_model_add_collider_system,
+    debug_render_collider_system, debug_render_directional_light_system,
+    debug_render_polylines_setup_system, debug_render_polylines_update_system,
+    debug_render_skeleton_system, directional_light_system, effect_system, facing_direction_system,
+    game_connection_system, game_mouse_input_system, game_state_enter_system,
+    game_zone_change_system, hit_event_system, item_drop_model_add_collider_system,
+    item_drop_model_system, login_connection_system, login_event_system, login_state_enter_system,
+    login_state_exit_system, login_system, model_viewer_enter_system, model_viewer_exit_system,
+    model_viewer_system, name_tag_system, name_tag_update_color_system,
+    name_tag_update_healthbar_system, name_tag_visibility_system, network_thread_system,
+    npc_idle_sound_system, npc_model_add_collider_system, npc_model_update_system,
+    particle_sequence_system, passive_recovery_system, pending_damage_system,
+    pending_skill_effect_system, personal_store_model_add_collider_system,
     personal_store_model_system, player_command_system, projectile_system, quest_trigger_system,
     spawn_effect_system, spawn_projectile_system, system_func_event_system, update_position_system,
     vehicle_model_system, visible_status_effects_system, world_connection_system,
@@ -688,6 +689,9 @@ fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsC
         SystemStage::parallel()
             .with_system(debug_render_collider_system.before(debug_render_polylines_update_system))
             .with_system(debug_render_skeleton_system.before(debug_render_polylines_update_system))
+            .with_system(
+                debug_render_directional_light_system.before(debug_render_polylines_update_system),
+            )
             .with_system(debug_render_polylines_update_system),
     );
 
@@ -795,6 +799,7 @@ fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsC
                 .with_system(command_system.after(animation_system))
                 .with_system(facing_direction_system.after(command_system))
                 .with_system(update_position_system)
+                .with_system(directional_light_system.after(update_position_system))
                 .with_system(
                     collision_player_system_join_zoin
                         .after(update_position_system)
@@ -1034,6 +1039,20 @@ fn load_common_game_data(
     );
 
     commands.spawn_bundle(Camera3dBundle::default());
+    commands.spawn_bundle(DirectionalLightBundle {
+        transform: Transform::from_rotation(Quat::from_euler(
+            EulerRot::ZYX,
+            0.0,
+            std::f32::consts::PI * (2.0 / 3.0),
+            -std::f32::consts::PI / 4.0,
+        )),
+        directional_light: DirectionalLight {
+            shadows_enabled: true,
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+
     commands.insert_resource(AmbientLight {
         color: Color::rgb(1.0, 1.0, 1.0),
         brightness: 0.9,

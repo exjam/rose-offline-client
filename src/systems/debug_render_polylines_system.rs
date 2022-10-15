@@ -1,7 +1,10 @@
 use bevy::prelude::{Assets, Color, Commands, ResMut};
 use bevy_polyline::prelude::{Polyline, PolylineBundle, PolylineMaterial};
 
-use crate::resources::{DebugRenderColliderData, DebugRenderPolyline, DebugRenderSkeletonData};
+use crate::resources::{
+    DebugRenderColliderData, DebugRenderDirectionalLightData, DebugRenderPolyline,
+    DebugRenderSkeletonData,
+};
 
 const COLOR_LIST: [Color; 8] = [
     Color::RED,
@@ -44,6 +47,9 @@ pub fn debug_render_polylines_setup_system(
             vertices: Vec::with_capacity(3 * 1024),
         });
     }
+    commands.insert_resource(DebugRenderColliderData {
+        collider: collider_line_data,
+    });
 
     let skeleton = {
         let polyline = polylines.add(Polyline {
@@ -94,11 +100,33 @@ pub fn debug_render_polylines_setup_system(
             vertices: Vec::with_capacity(3 * 1024),
         }
     };
-
-    commands.insert_resource(DebugRenderColliderData {
-        collider: collider_line_data,
-    });
     commands.insert_resource(DebugRenderSkeletonData { skeleton, bone_up });
+
+    let frustum = {
+        let polyline = polylines.add(Polyline {
+            vertices: Vec::with_capacity(32),
+        });
+
+        let material = materials.add(PolylineMaterial {
+            width: 2.0,
+            color: Color::LIME_GREEN,
+            perspective: false,
+            depth_bias: -1.0,
+        });
+
+        DebugRenderPolyline {
+            entity: commands
+                .spawn_bundle(PolylineBundle {
+                    polyline: polyline.clone(),
+                    material,
+                    ..Default::default()
+                })
+                .id(),
+            polyline,
+            vertices: Vec::with_capacity(32),
+        }
+    };
+    commands.insert_resource(DebugRenderDirectionalLightData { frustum });
 }
 
 fn update_line_data(polylines: &mut Assets<Polyline>, line_data: &mut DebugRenderPolyline) {
@@ -111,6 +139,7 @@ fn update_line_data(polylines: &mut Assets<Polyline>, line_data: &mut DebugRende
 pub fn debug_render_polylines_update_system(
     mut render_collider_data: ResMut<DebugRenderColliderData>,
     mut render_skeleton_data: ResMut<DebugRenderSkeletonData>,
+    mut render_directional_light_data: ResMut<DebugRenderDirectionalLightData>,
     mut polylines: ResMut<Assets<Polyline>>,
 ) {
     for collider in render_collider_data.collider.iter_mut() {
@@ -119,4 +148,9 @@ pub fn debug_render_polylines_update_system(
 
     update_line_data(polylines.as_mut(), &mut render_skeleton_data.bone_up);
     update_line_data(polylines.as_mut(), &mut render_skeleton_data.skeleton);
+
+    update_line_data(
+        polylines.as_mut(),
+        &mut render_directional_light_data.frustum,
+    );
 }

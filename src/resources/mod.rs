@@ -34,7 +34,8 @@ pub use current_zone::CurrentZone;
 pub use damage_digits_spawner::DamageDigitsSpawner;
 pub use debug_inspector::DebugInspector;
 pub use debug_render::{
-    DebugRenderColliderData, DebugRenderConfig, DebugRenderPolyline, DebugRenderSkeletonData,
+    DebugRenderColliderData, DebugRenderConfig, DebugRenderDirectionalLightData,
+    DebugRenderPolyline, DebugRenderSkeletonData,
 };
 pub use game_connection::GameConnection;
 pub use game_data::GameData;

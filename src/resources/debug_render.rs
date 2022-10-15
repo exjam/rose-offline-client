@@ -9,6 +9,7 @@ pub struct DebugRenderConfig {
     pub colliders: bool,
     pub skeleton: bool,
     pub bone_up: bool,
+    pub directional_light_frustum: bool,
 }
 
 pub struct DebugRenderPolyline {
@@ -24,4 +25,8 @@ pub struct DebugRenderColliderData {
 pub struct DebugRenderSkeletonData {
     pub skeleton: DebugRenderPolyline,
     pub bone_up: DebugRenderPolyline,
+}
+
+pub struct DebugRenderDirectionalLightData {
+    pub frustum: DebugRenderPolyline,
 }

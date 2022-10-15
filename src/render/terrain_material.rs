@@ -182,9 +182,10 @@ impl SpecializedMeshPipeline for TerrainMaterialPipeline {
 
         let vertex_layout = layout.get_layout(&[
             Mesh::ATTRIBUTE_POSITION.at_shader_location(0),
-            Mesh::ATTRIBUTE_UV_0.at_shader_location(1),
-            MESH_ATTRIBUTE_UV_1.at_shader_location(2),
-            TERRAIN_MESH_ATTRIBUTE_TILE_INFO.at_shader_location(3),
+            Mesh::ATTRIBUTE_NORMAL.at_shader_location(1),
+            Mesh::ATTRIBUTE_UV_0.at_shader_location(2),
+            MESH_ATTRIBUTE_UV_1.at_shader_location(3),
+            TERRAIN_MESH_ATTRIBUTE_TILE_INFO.at_shader_location(4),
         ])?;
         descriptor.vertex.buffers = vec![vertex_layout];
 
