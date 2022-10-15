@@ -645,7 +645,7 @@ pub fn ui_inventory_system(
                                     ui_add_inventory_slot(
                                         ui,
                                         *item_slot,
-                                        *pos - egui::vec2(-1.0, -1.0),
+                                        *pos + egui::vec2(-1.0, -3.0),
                                         &player,
                                         player_tooltip_data.as_ref(),
                                         &game_data,
