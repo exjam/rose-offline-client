@@ -907,8 +907,8 @@ impl ModelLoader {
         commands: &mut Commands,
         asset_server: &AssetServer,
         object_materials: &mut Assets<ObjectMaterial>,
-        _particle_materials: &mut Assets<ParticleMaterial>,
-        _effect_mesh_materials: &mut Assets<EffectMeshMaterial>,
+        particle_materials: &mut Assets<ParticleMaterial>,
+        effect_mesh_materials: &mut Assets<EffectMeshMaterial>,
         skinned_mesh_inverse_bindposes_assets: &mut Assets<SkinnedMeshInverseBindposes>,
         vehicle_model_entity: Entity,
         driver_model_entity: Entity,
@@ -960,6 +960,34 @@ impl ModelLoader {
                         false,
                     ),
                 );
+
+                if let Some(item_data) = self.item_database.get_vehicle_item(model_id) {
+                    for (dummy_index, effect_file_id) in
+                        item_data.dummy_effect_file_ids.iter().enumerate()
+                    {
+                        if let Some(effect_path) =
+                            effect_file_id.and_then(|id| self.effect_database.get_effect_file(id))
+                        {
+                            if let Some(dummy_bone_entity) =
+                                skinned_mesh.joints.get(dummy_bone_offset + dummy_index)
+                            {
+                                if let Some(effect_entity) = spawn_effect(
+                                    &self.vfs,
+                                    commands,
+                                    asset_server,
+                                    particle_materials,
+                                    effect_mesh_materials,
+                                    effect_path.into(),
+                                    false,
+                                    None,
+                                ) {
+                                    commands.entity(*dummy_bone_entity).add_child(effect_entity);
+                                    model_parts[vehicle_part_index].1.push(effect_entity);
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
 
