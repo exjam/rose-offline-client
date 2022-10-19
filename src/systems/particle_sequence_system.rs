@@ -306,7 +306,7 @@ pub fn particle_sequence_system(
         for particle_index in 0..particle_sequence.particles.len() {
             if apply_timestep(&mut particle_sequence, particle_index, 4.8 * delta_time) {
                 let gravity = if matches!(particle_sequence.update_coords, PtlUpdateCoords::World) {
-                    particle_sequence.particles[particle_index].gravity_local
+                    4.8 * particle_sequence.particles[particle_index].gravity_local
                 } else {
                     Vec3::new(
                         rng_gen_range(&mut rng, &particle_sequence.gravity_x),
@@ -314,6 +314,7 @@ pub fn particle_sequence_system(
                         rng_gen_range(&mut rng, &particle_sequence.gravity_z),
                     )
                 };
+
                 particle_sequence.particles[particle_index].velocity += gravity * delta_time;
 
                 apply_keyframes(&mut rng, &mut particle_sequence, particle_index);
