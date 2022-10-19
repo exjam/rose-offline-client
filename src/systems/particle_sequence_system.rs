@@ -360,7 +360,7 @@ pub fn particle_sequence_system(
                         global_rotation.w,
                     );
                     world_direction = Some(rotation);
-                    gravity_local = rotation.mul_vec3(Vec3::new(
+                    gravity_local = rotation.inverse().mul_vec3(Vec3::new(
                         rng_gen_range(&mut rng, &particle_sequence.gravity_x),
                         rng_gen_range(&mut rng, &particle_sequence.gravity_y),
                         rng_gen_range(&mut rng, &particle_sequence.gravity_z),
