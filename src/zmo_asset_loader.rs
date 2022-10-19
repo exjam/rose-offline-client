@@ -127,8 +127,10 @@ impl AssetLoader for ZmoAssetLoader {
                         fps: zmo.fps,
                         bones,
                         frame_events: zmo.frame_events,
-                        interpolation_interval: zmo.interpolation_interval_ms.unwrap_or(500) as f32
-                            / 1000.0,
+                        interpolation_interval: (zmo.interpolation_interval_ms.unwrap_or(500)
+                            as f32
+                            / 1000.0)
+                            .max(0.0001),
                     }));
                     Ok(())
                 }
