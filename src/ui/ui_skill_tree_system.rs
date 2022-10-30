@@ -87,6 +87,7 @@ fn ui_add_skill_tree_slot(
                         DragAndDropId::NotDraggable,
                         sprite,
                         None,
+                        false,
                         None,
                         if learned_level.is_some() {
                             None

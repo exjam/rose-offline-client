@@ -23,6 +23,7 @@ pub struct DragAndDropSlot<'a> {
     border_width: f32,
     sprite: Option<UiSprite>,
     socket_sprite: Option<UiSprite>,
+    broken: bool,
     cooldown_percent: Option<f32>,
     quantity: Option<usize>,
     quantity_margin: f32,
@@ -36,6 +37,7 @@ impl<'a> DragAndDropSlot<'a> {
         dnd_id: DragAndDropId,
         sprite: Option<UiSprite>,
         socket_sprite: Option<UiSprite>,
+        broken: bool,
         quantity: Option<usize>,
         cooldown_percent: Option<f32>,
         accepts: fn(&DragAndDropId) -> bool,
@@ -49,6 +51,7 @@ impl<'a> DragAndDropSlot<'a> {
             border_width: 1.0,
             sprite,
             socket_sprite,
+            broken,
             cooldown_percent,
             quantity,
             quantity_margin: 2.0,
@@ -187,7 +190,15 @@ impl<'w> DragAndDropSlot<'w> {
             if let Some(sprite) = self.sprite.as_ref() {
                 let content_rect = rect;
                 let mut mesh = Mesh::with_texture(sprite.texture_id);
-                mesh.add_rect_with_uv(content_rect, sprite.uv, egui::Color32::WHITE);
+                mesh.add_rect_with_uv(
+                    content_rect,
+                    sprite.uv,
+                    if !self.broken {
+                        egui::Color32::WHITE
+                    } else {
+                        egui::Color32::LIGHT_RED
+                    },
+                );
                 ui.painter().add(Shape::mesh(mesh));
 
                 if let Some(socket_sprite) = self.socket_sprite.as_ref() {

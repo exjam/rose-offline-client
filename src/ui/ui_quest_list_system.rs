@@ -60,6 +60,7 @@ fn ui_add_quest_item_slot(
                         DragAndDropId::NotDraggable,
                         sprite,
                         None,
+                        false,
                         quantity,
                         None,
                         |_| false,

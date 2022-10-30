@@ -97,6 +97,9 @@ fn ui_add_bank_slot(
                     None
                 }
             });
+    let broken = item
+        .and_then(|item| item.as_equipment())
+        .map_or(false, |item| item.life == 0);
 
     let mut dropped_item = None;
     let response = ui
@@ -108,6 +111,7 @@ fn ui_add_bank_slot(
                         DragAndDropId::Bank(bank_slot_index),
                         sprite,
                         socket_sprite,
+                        broken,
                         match item.as_ref() {
                             Some(Item::Stackable(stackable_item)) => {
                                 Some(stackable_item.quantity as usize)

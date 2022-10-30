@@ -265,6 +265,10 @@ fn ui_add_inventory_slot(
                     None
                 }
             });
+    let broken = item
+        .as_ref()
+        .and_then(|item| item.as_equipment())
+        .map_or(false, |item| item.life == 0);
 
     let mut cooldown_percent = None;
     if let Some(item) = item.as_ref() {
@@ -318,6 +322,7 @@ fn ui_add_inventory_slot(
                         DragAndDropId::Inventory(inventory_slot),
                         sprite,
                         socket_sprite,
+                        broken,
                         match item.as_ref() {
                             Some(Item::Stackable(stackable_item)) => {
                                 Some(stackable_item.quantity as usize)

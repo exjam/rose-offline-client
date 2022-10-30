@@ -97,6 +97,10 @@ fn add_equipped_weapon_slot(
                     None
                 }
             });
+    let broken = item
+        .as_ref()
+        .and_then(|item| item.as_equipment())
+        .map_or(false, |item| item.life == 0);
 
     let mut dragged_item = None;
     let mut dropped_item = None;
@@ -109,6 +113,7 @@ fn add_equipped_weapon_slot(
                         DragAndDropId::NotDraggable,
                         sprite,
                         socket_sprite,
+                        broken,
                         match item.as_ref() {
                             Some(Item::Stackable(stackable_item)) => {
                                 Some(stackable_item.quantity as usize)

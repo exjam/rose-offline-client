@@ -86,6 +86,7 @@ fn ui_add_store_item_slot(
     } else {
         None
     };
+    let broken = item.as_equipment().map_or(false, |item| item.life == 0);
 
     let mut dropped_item = None;
     let response = ui
@@ -97,6 +98,7 @@ fn ui_add_store_item_slot(
                         dnd_id,
                         sprite,
                         socket_sprite,
+                        broken,
                         quantity,
                         None,
                         |_| false,
