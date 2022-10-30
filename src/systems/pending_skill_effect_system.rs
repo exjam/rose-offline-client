@@ -200,7 +200,7 @@ pub fn pending_skill_effect_system(
         }
     }
 
-    // Apply expired skill effects
+    // TODO: Apply expired skill effects
     /*
     for (caster_entity, mut pending_skill_effect_list) in query_defender.iter_mut() {
         let mut i = 0;

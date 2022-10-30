@@ -61,10 +61,10 @@ use rose_network_irose::{
         PacketServerSpawnEntityMonster, PacketServerSpawnEntityNpc, PacketServerStartCastingSkill,
         PacketServerStopMoveEntity, PacketServerTeleport, PacketServerUpdateAbilityValue,
         PacketServerUpdateAmmo, PacketServerUpdateBasicStat, PacketServerUpdateEquipment,
-        PacketServerUpdateInventory, PacketServerUpdateLevel, PacketServerUpdateMoney,
-        PacketServerUpdateSpeed, PacketServerUpdateStatusEffects, PacketServerUpdateVehiclePart,
-        PacketServerUpdateXpStamina, PacketServerUseEmote, PacketServerUseItem,
-        PacketServerWhisper, ServerPackets,
+        PacketServerUpdateInventory, PacketServerUpdateItemLife, PacketServerUpdateLevel,
+        PacketServerUpdateMoney, PacketServerUpdateSpeed, PacketServerUpdateStatusEffects,
+        PacketServerUpdateVehiclePart, PacketServerUpdateXpStamina, PacketServerUseEmote,
+        PacketServerUseItem, PacketServerWhisper, ServerPackets,
     },
     ClientPacketCodec, IROSE_112_TABLE,
 };
@@ -398,6 +398,15 @@ impl GameClient {
                         vehicle_part_index: message.vehicle_part_index,
                         item: message.item,
                     }))
+                    .ok();
+            }
+            Some(ServerPackets::UpdateItemLife) => {
+                let message = PacketServerUpdateItemLife::try_from(packet)?;
+                self.server_message_tx
+                    .send(ServerMessage::UpdateItemLife {
+                        item_slot: message.item_slot,
+                        life: message.life,
+                    })
                     .ok();
             }
             Some(ServerPackets::UpdateBasicStat) => {

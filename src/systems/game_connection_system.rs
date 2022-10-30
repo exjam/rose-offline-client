@@ -754,6 +754,39 @@ pub fn game_connection_system(
                     });
                 }
             }
+            Ok(ServerMessage::UpdateItemLife { item_slot, life }) => {
+                if let Some(entity) = client_entity_list.player_entity {
+                    commands.add(move |world: &mut World| {
+                        match item_slot {
+                            ItemSlot::Equipment(index) => {
+                                if let Some(mut equipment) = world.entity_mut(entity).get_mut::<Equipment>() {
+                                    if let Some(mut equipment_item) = equipment.get_equipment_item_mut(index) {
+                                        equipment_item.life = life;
+                                    }
+                                }
+                            },
+                            ItemSlot::Vehicle(index) => {
+                                if let Some(mut equipment) = world.entity_mut(entity).get_mut::<Equipment>() {
+                                    if let Some(mut equipment_item) = equipment.get_vehicle_item_mut(index) {
+                                        equipment_item.life = life;
+                                    }
+                                }
+                            },
+                            ItemSlot::Inventory(inventory_page, inventory_slot) => {
+                                if let Some(mut inventory) =  world.entity_mut(entity).get_mut::<Inventory>() {
+                                    if let Some(item) = inventory.get_item_mut(ItemSlot::Inventory(inventory_page, inventory_slot)) {
+                                        match item {
+                                            Item::Equipment(equipment_item) => equipment_item.life = life,
+                                            Item::Stackable(_) => {},
+                                        }
+                                    }
+                                }
+                            },
+                            ItemSlot::Ammo(_) => {},
+                        }
+                    });
+                }
+            }
             Ok(ServerMessage::UpdateInventory(update_items, update_money)) => {
                 if let Some(player_entity) = client_entity_list.player_entity {
                     commands.add(move |world: &mut World| {
