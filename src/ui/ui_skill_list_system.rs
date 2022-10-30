@@ -10,9 +10,9 @@ use rose_game_common::components::{CharacterInfo, SkillList, SkillPoints, SkillS
 
 use crate::{
     bundles::ability_values_get_value,
-    components::PlayerCharacter,
+    components::{Cooldowns, PlayerCharacter},
     events::PlayerCommandEvent,
-    resources::{GameData, UiResources, UiSpriteSheetType},
+    resources::{GameData, UiResources},
     ui::{
         tooltips::{PlayerTooltipQuery, PlayerTooltipQueryItem, SkillTooltipType},
         ui_add_skill_tooltip,
@@ -71,25 +71,18 @@ fn ui_add_skill_list_slot(
     player_command_events: &mut EventWriter<PlayerCommandEvent>,
 ) {
     let skill = player.skill_list.get_skill(skill_slot);
-    let skill_data = skill
-        .as_ref()
-        .and_then(|skill| game_data.skills.get_skill(*skill));
-    let sprite = skill_data.and_then(|skill_data| {
-        ui_resources.get_sprite_by_index(UiSpriteSheetType::Skill, skill_data.icon_number as usize)
-    });
     let mut dropped_item = None;
     let response = ui
         .allocate_ui_at_rect(
             egui::Rect::from_min_size(pos, egui::vec2(40.0, 40.0)),
             |ui| {
                 egui::Widget::ui(
-                    DragAndDropSlot::new(
+                    DragAndDropSlot::with_skill(
                         DragAndDropId::Skill(skill_slot),
-                        sprite,
-                        None,
-                        false,
-                        None,
-                        None, // TODO: Show skill cooldown
+                        skill.as_ref(),
+                        Some(player.cooldowns),
+                        game_data,
+                        ui_resources,
                         |_| false,
                         &mut ui_state_dnd.dragged_item,
                         &mut dropped_item,
@@ -128,6 +121,7 @@ pub struct PlayerQuery<'w> {
     character_info: &'w CharacterInfo,
     skill_list: &'w SkillList,
     skill_points: &'w SkillPoints,
+    cooldowns: &'w Cooldowns,
 }
 
 pub fn ui_skill_list_system(

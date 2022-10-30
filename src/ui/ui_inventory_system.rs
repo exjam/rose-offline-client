@@ -5,17 +5,15 @@ use bevy::{
 use bevy_egui::{egui, EguiContext};
 use enum_map::{enum_map, EnumMap};
 
-use rose_data::{
-    AmmoIndex, EquipmentIndex, Item, ItemClass, ItemType, StatusEffectType, VehiclePartIndex,
-};
+use rose_data::{AmmoIndex, EquipmentIndex, Item, VehiclePartIndex};
 use rose_game_common::components::{
     Equipment, Inventory, InventoryPageType, ItemSlot, INVENTORY_PAGE_SIZE,
 };
 
 use crate::{
-    components::{ConsumableCooldownGroup, Cooldowns, PlayerCharacter},
+    components::{Cooldowns, PlayerCharacter},
     events::{NumberInputDialogEvent, PlayerCommandEvent},
-    resources::{GameData, UiResources, UiSpriteSheetType},
+    resources::{GameData, UiResources},
     ui::{
         tooltips::{PlayerTooltipQuery, PlayerTooltipQueryItem},
         ui_add_item_tooltip,
@@ -238,79 +236,7 @@ fn ui_add_inventory_slot(
         ItemSlot::Ammo(_) => drag_accepts_materials,
         ItemSlot::Vehicle(_) => drag_accepts_vehicles,
     };
-
     let item = (player.equipment, player.inventory).get_item(inventory_slot);
-    let item_data = item
-        .as_ref()
-        .and_then(|item| game_data.items.get_base_item(item.get_item_reference()));
-    let sprite = item_data.and_then(|item_data| {
-        ui_resources.get_sprite_by_index(UiSpriteSheetType::Item, item_data.icon_index as usize)
-    });
-    let socket_sprite =
-        item.as_ref()
-            .and_then(|item| item.as_equipment())
-            .and_then(|equipment_item| {
-                if equipment_item.has_socket {
-                    if equipment_item.gem > 300 {
-                        let gem_item_data =
-                            game_data.items.get_gem_item(equipment_item.gem as usize)?;
-                        ui_resources.get_sprite_by_index(
-                            UiSpriteSheetType::ItemSocketGem,
-                            gem_item_data.gem_sprite_id as usize,
-                        )
-                    } else {
-                        ui_resources.get_item_socket_sprite()
-                    }
-                } else {
-                    None
-                }
-            });
-    let broken = item
-        .as_ref()
-        .and_then(|item| item.as_equipment())
-        .map_or(false, |item| item.life == 0);
-
-    let mut cooldown_percent = None;
-    if let Some(item) = item.as_ref() {
-        if item.get_item_type() == ItemType::Consumable {
-            if let Some(consumable_item_data) =
-                game_data.items.get_consumable_item(item.get_item_number())
-            {
-                if matches!(consumable_item_data.item_data.class, ItemClass::MagicItem) {
-                    cooldown_percent = player
-                        .cooldowns
-                        .get_consumable_cooldown_percent(ConsumableCooldownGroup::MagicItem);
-                } else if let Some(status_effect) = consumable_item_data
-                    .apply_status_effect
-                    .and_then(|(status_effect_id, _)| {
-                        game_data.status_effects.get_status_effect(status_effect_id)
-                    })
-                {
-                    match status_effect.status_effect_type {
-                        StatusEffectType::IncreaseHp => {
-                            cooldown_percent = player.cooldowns.get_consumable_cooldown_percent(
-                                ConsumableCooldownGroup::HealthRecovery,
-                            )
-                        }
-                        StatusEffectType::IncreaseMp => {
-                            cooldown_percent = player.cooldowns.get_consumable_cooldown_percent(
-                                ConsumableCooldownGroup::ManaRecovery,
-                            )
-                        }
-                        _ => {
-                            cooldown_percent = player
-                                .cooldowns
-                                .get_consumable_cooldown_percent(ConsumableCooldownGroup::Others)
-                        }
-                    }
-                } else {
-                    cooldown_percent = player
-                        .cooldowns
-                        .get_consumable_cooldown_percent(ConsumableCooldownGroup::Others);
-                }
-            }
-        }
-    }
 
     let mut dropped_item = None;
     let response = ui
@@ -318,18 +244,12 @@ fn ui_add_inventory_slot(
             egui::Rect::from_min_size(ui.min_rect().min + pos.to_vec2(), egui::vec2(40.0, 40.0)),
             |ui| {
                 egui::Widget::ui(
-                    DragAndDropSlot::new(
+                    DragAndDropSlot::with_item(
                         DragAndDropId::Inventory(inventory_slot),
-                        sprite,
-                        socket_sprite,
-                        broken,
-                        match item.as_ref() {
-                            Some(Item::Stackable(stackable_item)) => {
-                                Some(stackable_item.quantity as usize)
-                            }
-                            _ => None,
-                        },
-                        cooldown_percent,
+                        item.as_ref(),
+                        Some(player.cooldowns),
+                        game_data,
+                        ui_resources,
                         drag_accepts,
                         &mut ui_state_dnd.dragged_item,
                         &mut dropped_item,

@@ -6,7 +6,7 @@ use rose_game_common::components::QuestState;
 
 use crate::{
     components::PlayerCharacter,
-    resources::{GameData, UiResources, UiSpriteSheetType},
+    resources::{GameData, UiResources},
     ui::{
         tooltips::{PlayerTooltipQuery, PlayerTooltipQueryItem},
         ui_add_item_tooltip,
@@ -37,18 +37,6 @@ fn ui_add_quest_item_slot(
     game_data: &GameData,
     ui_resources: &UiResources,
 ) {
-    let item_data = item.and_then(|item| game_data.items.get_base_item(item.get_item_reference()));
-    let sprite = item_data.and_then(|item_data| {
-        ui_resources.get_sprite_by_index(UiSpriteSheetType::Item, item_data.icon_index as usize)
-    });
-    let quantity = item.and_then(|item| {
-        if item.get_item_type().is_stackable_item() {
-            Some(item.get_quantity() as usize)
-        } else {
-            None
-        }
-    });
-
     let mut dragged_item = None;
     let mut dropped_item = None;
     let response = ui
@@ -56,13 +44,12 @@ fn ui_add_quest_item_slot(
             egui::Rect::from_min_size(pos, egui::vec2(40.0, 40.0)),
             |ui| {
                 egui::Widget::ui(
-                    DragAndDropSlot::new(
+                    DragAndDropSlot::with_item(
                         DragAndDropId::NotDraggable,
-                        sprite,
+                        item,
                         None,
-                        false,
-                        quantity,
-                        None,
+                        game_data,
+                        ui_resources,
                         |_| false,
                         &mut dragged_item,
                         &mut dropped_item,

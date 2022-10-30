@@ -5,7 +5,6 @@ use bevy::{
 };
 use bevy_egui::{egui, EguiContext};
 
-use rose_data::Item;
 use rose_game_common::{
     components::{CharacterInfo, ItemSlot},
     messages::client::ClientMessage,
@@ -14,7 +13,7 @@ use rose_game_common::{
 use crate::{
     components::{Bank, PlayerCharacter, Position},
     events::{BankEvent, PlayerCommandEvent},
-    resources::{ClientEntityList, GameConnection, GameData, UiResources, UiSpriteSheetType},
+    resources::{ClientEntityList, GameConnection, GameData, UiResources},
     ui::{
         tooltips::{PlayerTooltipQuery, PlayerTooltipQueryItem},
         ui_add_item_tooltip,
@@ -72,34 +71,6 @@ fn ui_add_bank_slot(
         .slots
         .get(bank_slot_index)
         .and_then(|x| x.as_ref());
-    let item_data = item
-        .as_ref()
-        .and_then(|item| game_data.items.get_base_item(item.get_item_reference()));
-    let sprite = item_data.and_then(|item_data| {
-        ui_resources.get_sprite_by_index(UiSpriteSheetType::Item, item_data.icon_index as usize)
-    });
-    let socket_sprite =
-        item.as_ref()
-            .and_then(|item| item.as_equipment())
-            .and_then(|equipment_item| {
-                if equipment_item.has_socket {
-                    if equipment_item.gem > 300 {
-                        let gem_item_data =
-                            game_data.items.get_gem_item(equipment_item.gem as usize)?;
-                        ui_resources.get_sprite_by_index(
-                            UiSpriteSheetType::ItemSocketGem,
-                            gem_item_data.gem_sprite_id as usize,
-                        )
-                    } else {
-                        ui_resources.get_item_socket_sprite()
-                    }
-                } else {
-                    None
-                }
-            });
-    let broken = item
-        .and_then(|item| item.as_equipment())
-        .map_or(false, |item| item.life == 0);
 
     let mut dropped_item = None;
     let response = ui
@@ -107,18 +78,12 @@ fn ui_add_bank_slot(
             egui::Rect::from_min_size(ui.min_rect().min + pos.to_vec2(), egui::vec2(40.0, 40.0)),
             |ui| {
                 egui::Widget::ui(
-                    DragAndDropSlot::new(
+                    DragAndDropSlot::with_item(
                         DragAndDropId::Bank(bank_slot_index),
-                        sprite,
-                        socket_sprite,
-                        broken,
-                        match item.as_ref() {
-                            Some(Item::Stackable(stackable_item)) => {
-                                Some(stackable_item.quantity as usize)
-                            }
-                            _ => None,
-                        },
+                        item,
                         None,
+                        game_data,
+                        ui_resources,
                         |drag_source: &DragAndDropId| -> bool {
                             matches!(
                                 drag_source,

@@ -10,7 +10,7 @@ use rose_game_common::components::{
 
 use crate::{
     components::PlayerCharacter,
-    resources::{GameData, SelectedTarget, UiResources, UiSpriteSheetType},
+    resources::{GameData, SelectedTarget, UiResources},
     ui::{
         tooltips::{PlayerTooltipQuery, PlayerTooltipQueryItem},
         ui_add_item_tooltip,
@@ -72,36 +72,6 @@ fn add_equipped_weapon_slot(
         }
     }
 
-    let item_data = item
-        .as_ref()
-        .and_then(|item| game_data.items.get_base_item(item.get_item_reference()));
-    let sprite = item_data.and_then(|item_data| {
-        ui_resources.get_sprite_by_index(UiSpriteSheetType::Item, item_data.icon_index as usize)
-    });
-    let socket_sprite =
-        item.as_ref()
-            .and_then(|item| item.as_equipment())
-            .and_then(|equipment_item| {
-                if equipment_item.has_socket {
-                    if equipment_item.gem > 300 {
-                        let gem_item_data =
-                            game_data.items.get_gem_item(equipment_item.gem as usize)?;
-                        ui_resources.get_sprite_by_index(
-                            UiSpriteSheetType::ItemSocketGem,
-                            gem_item_data.gem_sprite_id as usize,
-                        )
-                    } else {
-                        ui_resources.get_item_socket_sprite()
-                    }
-                } else {
-                    None
-                }
-            });
-    let broken = item
-        .as_ref()
-        .and_then(|item| item.as_equipment())
-        .map_or(false, |item| item.life == 0);
-
     let mut dragged_item = None;
     let mut dropped_item = None;
     let response = ui
@@ -109,18 +79,12 @@ fn add_equipped_weapon_slot(
             egui::Rect::from_min_size(ui.min_rect().min + pos.to_vec2(), egui::vec2(40.0, 40.0)),
             |ui| {
                 egui::Widget::ui(
-                    DragAndDropSlot::new(
+                    DragAndDropSlot::with_item(
                         DragAndDropId::NotDraggable,
-                        sprite,
-                        socket_sprite,
-                        broken,
-                        match item.as_ref() {
-                            Some(Item::Stackable(stackable_item)) => {
-                                Some(stackable_item.quantity as usize)
-                            }
-                            _ => None,
-                        },
+                        item.as_ref(),
                         None,
+                        game_data,
+                        ui_resources,
                         |_| false,
                         &mut dragged_item,
                         &mut dropped_item,

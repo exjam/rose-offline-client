@@ -14,7 +14,7 @@ use rose_game_common::{
 use crate::{
     components::{ClientEntity, PersonalStore, PlayerCharacter, Position},
     events::{MessageBoxEvent, PersonalStoreEvent},
-    resources::{GameConnection, GameData, UiResources, UiSpriteSheetType},
+    resources::{GameConnection, GameData, UiResources},
     ui::{
         tooltips::{PlayerTooltipQuery, PlayerTooltipQueryItem},
         ui_add_item_tooltip,
@@ -63,30 +63,6 @@ fn ui_add_store_item_slot(
     message_box_events: &mut EventWriter<MessageBoxEvent>,
 ) {
     let item_data = game_data.items.get_base_item(item.get_item_reference());
-    let sprite = item_data.and_then(|item_data| {
-        ui_resources.get_sprite_by_index(UiSpriteSheetType::Item, item_data.icon_index as usize)
-    });
-    let socket_sprite = item.as_equipment().and_then(|equipment_item| {
-        if equipment_item.has_socket {
-            if equipment_item.gem > 300 {
-                let gem_item_data = game_data.items.get_gem_item(equipment_item.gem as usize)?;
-                ui_resources.get_sprite_by_index(
-                    UiSpriteSheetType::ItemSocketGem,
-                    gem_item_data.gem_sprite_id as usize,
-                )
-            } else {
-                ui_resources.get_item_socket_sprite()
-            }
-        } else {
-            None
-        }
-    });
-    let quantity = if item.get_item_type().is_stackable_item() {
-        Some(item.get_quantity() as usize)
-    } else {
-        None
-    };
-    let broken = item.as_equipment().map_or(false, |item| item.life == 0);
 
     let mut dropped_item = None;
     let response = ui
@@ -94,13 +70,12 @@ fn ui_add_store_item_slot(
             egui::Rect::from_min_size(ui.min_rect().min + pos.to_vec2(), egui::vec2(40.0, 40.0)),
             |ui| {
                 egui::Widget::ui(
-                    DragAndDropSlot::new(
+                    DragAndDropSlot::with_item(
                         dnd_id,
-                        sprite,
-                        socket_sprite,
-                        broken,
-                        quantity,
+                        Some(item),
                         None,
+                        game_data,
+                        ui_resources,
                         |_| false,
                         &mut ui_state_dnd.dragged_item,
                         &mut dropped_item,

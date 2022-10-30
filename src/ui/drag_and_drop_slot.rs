@@ -1,8 +1,12 @@
 use bevy_egui::egui;
 
+use rose_data::{Item, ItemClass, ItemType, SkillCooldown, SkillId, StatusEffectType};
 use rose_game_common::components::{ItemSlot, SkillSlot};
 
-use crate::resources::UiSprite;
+use crate::{
+    components::{ConsumableCooldownGroup, Cooldowns},
+    resources::{GameData, UiResources, UiSprite, UiSpriteSheetType},
+};
 
 #[derive(Copy, Clone, Debug)]
 pub enum DragAndDropId {
@@ -54,6 +58,151 @@ impl<'a> DragAndDropSlot<'a> {
             broken,
             cooldown_percent,
             quantity,
+            quantity_margin: 2.0,
+            accepts,
+            dragged_item: Some(dragged_item),
+            dropped_item: Some(dropped_item),
+        }
+    }
+
+    pub fn with_item(
+        dnd_id: DragAndDropId,
+        item: Option<&Item>,
+        cooldowns: Option<&Cooldowns>,
+        game_data: &GameData,
+        ui_resources: &UiResources,
+        accepts: fn(&DragAndDropId) -> bool,
+        dragged_item: &'a mut Option<DragAndDropId>,
+        dropped_item: &'a mut Option<DragAndDropId>,
+        size: impl Into<egui::Vec2>,
+    ) -> Self {
+        let item_data =
+            item.and_then(|item| game_data.items.get_base_item(item.get_item_reference()));
+        let sprite = item_data.and_then(|item_data| {
+            ui_resources.get_sprite_by_index(UiSpriteSheetType::Item, item_data.icon_index as usize)
+        });
+        let socket_sprite = item
+            .and_then(|item| item.as_equipment())
+            .and_then(|equipment_item| {
+                if equipment_item.has_socket {
+                    if equipment_item.gem > 300 {
+                        let gem_item_data =
+                            game_data.items.get_gem_item(equipment_item.gem as usize)?;
+                        ui_resources.get_sprite_by_index(
+                            UiSpriteSheetType::ItemSocketGem,
+                            gem_item_data.gem_sprite_id as usize,
+                        )
+                    } else {
+                        ui_resources.get_item_socket_sprite()
+                    }
+                } else {
+                    None
+                }
+            });
+        let broken = item
+            .and_then(|item| item.as_equipment())
+            .map_or(false, |item| item.life == 0);
+        let quantity = match item {
+            Some(Item::Stackable(stackable_item)) => Some(stackable_item.quantity as usize),
+            _ => None,
+        };
+        let mut cooldown_percent = None;
+        if let Some(cooldowns) = cooldowns {
+            if let Some(item) = item.as_ref() {
+                if item.get_item_type() == ItemType::Consumable {
+                    if let Some(consumable_item_data) =
+                        game_data.items.get_consumable_item(item.get_item_number())
+                    {
+                        if matches!(consumable_item_data.item_data.class, ItemClass::MagicItem) {
+                            cooldown_percent = cooldowns.get_consumable_cooldown_percent(
+                                ConsumableCooldownGroup::MagicItem,
+                            );
+                        } else if let Some(status_effect) = consumable_item_data
+                            .apply_status_effect
+                            .and_then(|(status_effect_id, _)| {
+                                game_data.status_effects.get_status_effect(status_effect_id)
+                            })
+                        {
+                            match status_effect.status_effect_type {
+                                StatusEffectType::IncreaseHp => {
+                                    cooldown_percent = cooldowns.get_consumable_cooldown_percent(
+                                        ConsumableCooldownGroup::HealthRecovery,
+                                    )
+                                }
+                                StatusEffectType::IncreaseMp => {
+                                    cooldown_percent = cooldowns.get_consumable_cooldown_percent(
+                                        ConsumableCooldownGroup::ManaRecovery,
+                                    )
+                                }
+                                _ => {
+                                    cooldown_percent = cooldowns.get_consumable_cooldown_percent(
+                                        ConsumableCooldownGroup::Others,
+                                    )
+                                }
+                            }
+                        } else {
+                            cooldown_percent = cooldowns
+                                .get_consumable_cooldown_percent(ConsumableCooldownGroup::Others);
+                        }
+                    }
+                }
+            }
+        }
+
+        Self {
+            dnd_id,
+            size: size.into(),
+            border_width: 1.0,
+            sprite,
+            socket_sprite,
+            broken,
+            cooldown_percent,
+            quantity,
+            quantity_margin: 2.0,
+            accepts,
+            dragged_item: Some(dragged_item),
+            dropped_item: Some(dropped_item),
+        }
+    }
+
+    pub fn with_skill(
+        dnd_id: DragAndDropId,
+        skill: Option<&SkillId>,
+        cooldowns: Option<&Cooldowns>,
+        game_data: &GameData,
+        ui_resources: &UiResources,
+        accepts: fn(&DragAndDropId) -> bool,
+        dragged_item: &'a mut Option<DragAndDropId>,
+        dropped_item: &'a mut Option<DragAndDropId>,
+        size: impl Into<egui::Vec2>,
+    ) -> Self {
+        let skill_data = skill.and_then(|skill| game_data.skills.get_skill(*skill));
+
+        let sprite = skill_data.and_then(|skill_data| {
+            ui_resources
+                .get_sprite_by_index(UiSpriteSheetType::Skill, skill_data.icon_number as usize)
+        });
+
+        let cooldown_percent = if let Some(cooldowns) = cooldowns {
+            skill_data.and_then(|skill_data| match &skill_data.cooldown {
+                SkillCooldown::Skill(_) => cooldowns.get_skill_cooldown_percent(skill_data.id),
+                SkillCooldown::Group(group, _) => {
+                    cooldowns.get_skill_group_cooldown_percent(*group)
+                }
+            })
+        } else {
+            None
+        };
+
+        Self {
+            dnd_id,
+            size: size.into(),
+            border_width: 1.0,
+            sprite,
+            socket_sprite: None,
+            broken: false,
+            cooldown_percent,
+            quantity: None,
             quantity_margin: 2.0,
             accepts,
             dragged_item: Some(dragged_item),

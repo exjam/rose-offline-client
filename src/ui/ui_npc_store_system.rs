@@ -321,17 +321,6 @@ fn ui_add_sell_item_slot(
             .as_ref()
             .and_then(|pending_sell_item| player.inventory.get_item(pending_sell_item.item_slot))
     });
-    let item_data = item.and_then(|item| game_data.items.get_base_item(item.get_item_reference()));
-    let sprite = item_data.and_then(|item_data| {
-        ui_resources.get_sprite_by_index(UiSpriteSheetType::Item, item_data.icon_index as usize)
-    });
-    let quantity = item.as_ref().and_then(|item| {
-        if item.get_item_type().is_stackable_item() {
-            Some(pending_sell_item.as_ref().unwrap().quantity)
-        } else {
-            None
-        }
-    });
 
     let item_price = if let Some(item) = item {
         game_data
@@ -345,7 +334,7 @@ fn ui_add_sell_item_slot(
                 world_rates.map_or(0, |x| x.town_price_rate),
             )
             .unwrap_or(0) as i64
-            * quantity.unwrap_or(1) as i64
+            * item.get_quantity() as i64
     } else {
         0
     };
@@ -356,13 +345,12 @@ fn ui_add_sell_item_slot(
             egui::Rect::from_min_size(ui.min_rect().min + pos.to_vec2(), egui::vec2(40.0, 40.0)),
             |ui| {
                 egui::Widget::ui(
-                    DragAndDropSlot::new(
+                    DragAndDropSlot::with_item(
                         DragAndDropId::NpcStoreSellList(sell_slot_index),
-                        sprite,
+                        item,
                         None,
-                        false,
-                        quantity,
-                        None,
+                        game_data,
+                        ui_resources,
                         sell_slot_drag_accepts,
                         &mut ui_state_dnd.dragged_item,
                         &mut dropped_item,

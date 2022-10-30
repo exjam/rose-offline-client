@@ -5,15 +5,14 @@ use bevy::{
 };
 use bevy_egui::{egui, EguiContext};
 
-use rose_data::{Item, SkillCooldown};
 use rose_game_common::components::{
     Equipment, Hotbar, HotbarSlot, Inventory, SkillList, HOTBAR_NUM_PAGES, HOTBAR_PAGE_SIZE,
 };
 
 use crate::{
-    components::{ConsumableCooldownGroup, Cooldowns, PlayerCharacter},
+    components::{Cooldowns, PlayerCharacter},
     events::PlayerCommandEvent,
-    resources::{GameData, UiResources, UiSpriteSheetType},
+    resources::{GameData, UiResources},
     ui::{
         tooltips::{PlayerTooltipQuery, PlayerTooltipQueryItem, SkillTooltipType},
         ui_add_item_tooltip, ui_add_skill_tooltip,
@@ -78,98 +77,56 @@ fn ui_add_hotbar_slot(
     player_command_events: &mut EventWriter<PlayerCommandEvent>,
 ) {
     let hotbar_slot = player.hotbar.pages[hotbar_index.0][hotbar_index.1].as_ref();
-    let (sprite, socket_sprite, broken, quantity, cooldown_percent) = match hotbar_slot {
+    let mut dropped_item = None;
+    let drag_and_drop_slot = match hotbar_slot {
         Some(HotbarSlot::Skill(skill_slot)) => {
             let skill = player.skill_list.get_skill(*skill_slot);
-            let skill_data = skill
-                .as_ref()
-                .and_then(|skill| game_data.skills.get_skill(*skill));
-            (
-                skill_data.and_then(|skill_data| {
-                    ui_resources.get_sprite_by_index(
-                        UiSpriteSheetType::Skill,
-                        skill_data.icon_number as usize,
-                    )
-                }),
-                None,
-                false,
-                None,
-                skill_data.and_then(|skill_data| match &skill_data.cooldown {
-                    SkillCooldown::Skill(_) => {
-                        player.cooldowns.get_skill_cooldown_percent(skill_data.id)
-                    }
-                    SkillCooldown::Group(group, _) => {
-                        player.cooldowns.get_skill_group_cooldown_percent(*group)
-                    }
-                }),
+
+            DragAndDropSlot::with_skill(
+                DragAndDropId::Hotbar(hotbar_index.0, hotbar_index.1),
+                skill.as_ref(),
+                Some(player.cooldowns),
+                game_data,
+                ui_resources,
+                hotbar_drag_accepts,
+                &mut ui_state_dnd.dragged_item,
+                &mut dropped_item,
+                [40.0, 40.0],
             )
         }
         Some(HotbarSlot::Inventory(item_slot)) => {
             let item = (player.equipment, player.inventory).get_item(*item_slot);
-            let item_data = item
-                .as_ref()
-                .and_then(|item| game_data.items.get_base_item(item.get_item_reference()));
-            (
-                item_data.and_then(|item_data| {
-                    ui_resources
-                        .get_sprite_by_index(UiSpriteSheetType::Item, item_data.icon_index as usize)
-                }),
-                item.as_ref()
-                    .and_then(|item| item.as_equipment())
-                    .and_then(|equipment_item| {
-                        if equipment_item.has_socket {
-                            if equipment_item.gem > 300 {
-                                let gem_item_data =
-                                    game_data.items.get_gem_item(equipment_item.gem as usize)?;
-                                ui_resources.get_sprite_by_index(
-                                    UiSpriteSheetType::ItemSocketGem,
-                                    gem_item_data.gem_sprite_id as usize,
-                                )
-                            } else {
-                                ui_resources.get_item_socket_sprite()
-                            }
-                        } else {
-                            None
-                        }
-                    }),
-                item.as_ref()
-                    .and_then(|item| item.as_equipment())
-                    .map_or(false, |item| item.life == 0),
-                match item.as_ref() {
-                    Some(Item::Stackable(stackable_item)) => Some(stackable_item.quantity as usize),
-                    _ => None,
-                },
-                item.as_ref()
-                    .and_then(|item| {
-                        ConsumableCooldownGroup::from_item(&item.get_item_reference(), game_data)
-                    })
-                    .and_then(|group| player.cooldowns.get_consumable_cooldown_percent(group)),
+
+            DragAndDropSlot::with_item(
+                DragAndDropId::Hotbar(hotbar_index.0, hotbar_index.1),
+                item.as_ref(),
+                Some(player.cooldowns),
+                game_data,
+                ui_resources,
+                hotbar_drag_accepts,
+                &mut ui_state_dnd.dragged_item,
+                &mut dropped_item,
+                [40.0, 40.0],
             )
         }
-        _ => (None, None, false, None, None),
+        _ => DragAndDropSlot::new(
+            DragAndDropId::Hotbar(hotbar_index.0, hotbar_index.1),
+            None,
+            None,
+            false,
+            None,
+            None,
+            hotbar_drag_accepts,
+            &mut ui_state_dnd.dragged_item,
+            &mut dropped_item,
+            [40.0, 40.0],
+        ),
     };
 
-    let mut dropped_item = None;
     let response = ui
         .allocate_ui_at_rect(
             egui::Rect::from_min_size(pos, egui::vec2(40.0, 40.0)),
-            |ui| {
-                egui::Widget::ui(
-                    DragAndDropSlot::new(
-                        DragAndDropId::Hotbar(hotbar_index.0, hotbar_index.1),
-                        sprite,
-                        socket_sprite,
-                        broken,
-                        quantity,
-                        cooldown_percent,
-                        hotbar_drag_accepts,
-                        &mut ui_state_dnd.dragged_item,
-                        &mut dropped_item,
-                        [40.0, 40.0],
-                    ),
-                    ui,
-                )
-            },
+            |ui| egui::Widget::ui(drag_and_drop_slot, ui),
         )
         .inner;
 
