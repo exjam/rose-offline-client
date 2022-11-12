@@ -471,8 +471,7 @@ impl GameClient {
                     .send(ServerMessage::UpdateStatusEffects(UpdateStatusEffects {
                         entity_id: message.entity_id,
                         status_effects: message.status_effects,
-                        updated_hp: message.updated_hp,
-                        updated_mp: message.updated_mp,
+                        updated_values: message.updated_values,
                     }))
                     .ok();
             }

@@ -18,6 +18,7 @@ mod quest_trigger_event;
 mod spawn_effect_event;
 mod spawn_projectile_event;
 mod system_func_event;
+mod use_item_event;
 mod world_connection_event;
 mod zone_event;
 
@@ -41,5 +42,6 @@ pub use quest_trigger_event::QuestTriggerEvent;
 pub use spawn_effect_event::{SpawnEffect, SpawnEffectData, SpawnEffectEvent};
 pub use spawn_projectile_event::{SpawnProjectileEvent, SpawnProjectileTarget};
 pub use system_func_event::SystemFuncEvent;
+pub use use_item_event::UseItemEvent;
 pub use world_connection_event::WorldConnectionEvent;
 pub use zone_event::{LoadZoneEvent, ZoneEvent};

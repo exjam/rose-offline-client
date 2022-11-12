@@ -41,7 +41,7 @@ use crate::{
     },
     events::{
         BankEvent, ChatboxEvent, ClientEntityEvent, GameConnectionEvent, LoadZoneEvent, PartyEvent,
-        PersonalStoreEvent, QuestTriggerEvent,
+        PersonalStoreEvent, QuestTriggerEvent, UseItemEvent,
     },
     resources::{AppState, ClientEntityList, GameConnection, GameData, WorldRates, WorldTime},
 };
@@ -98,6 +98,7 @@ pub fn game_connection_system(
     mut chatbox_events: EventWriter<ChatboxEvent>,
     mut game_connection_events: EventWriter<GameConnectionEvent>,
     mut load_zone_events: EventWriter<LoadZoneEvent>,
+    mut use_item_events: EventWriter<UseItemEvent>,
     mut client_entity_events: EventWriter<ClientEntityEvent>,
     mut party_events: EventWriter<PartyEvent>,
     mut personal_store_events: EventWriter<PersonalStoreEvent>,
@@ -1346,7 +1347,7 @@ pub fn game_connection_system(
             }
             Ok(ServerMessage::UseItem(message)) => {
                 if let Some(entity) = client_entity_list.get(message.entity_id) {
-                    client_entity_events.send(ClientEntityEvent::UseItem(entity, message.item));
+                    use_item_events.send(UseItemEvent { entity, item: message.item });
                 }
             }
             Ok(ServerMessage::CastSkillSelf(message)) => {

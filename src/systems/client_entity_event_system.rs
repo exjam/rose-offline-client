@@ -2,7 +2,7 @@ use bevy::prelude::{
     AssetServer, Commands, EventReader, EventWriter, GlobalTransform, Query, Res, Transform,
 };
 
-use rose_data::{ItemType, SoundId};
+use rose_data::SoundId;
 use rose_file_readers::VfsPathBuf;
 use rose_game_common::components::Npc;
 
@@ -87,23 +87,6 @@ pub fn client_entity_event_system(
                     None,
                     SpawnEffectData::with_path(VfsPathBuf::new("3DDATA/EFFECT/LEVELUP_01.EFT")),
                 ));
-            }
-            ClientEntityEvent::UseItem(entity, item) => {
-                if item.item_type != ItemType::Consumable {
-                    continue;
-                }
-
-                if let Some(consumable_item_data) =
-                    game_data.items.get_consumable_item(item.item_number)
-                {
-                    if let Some(effect_file_id) = consumable_item_data.effect_file_id {
-                        spawn_effect_events.send(SpawnEffectEvent::OnEntity(
-                            entity,
-                            None,
-                            SpawnEffectData::with_file_id(effect_file_id),
-                        ));
-                    }
-                }
             }
         }
     }
