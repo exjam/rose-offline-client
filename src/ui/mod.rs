@@ -42,6 +42,7 @@ mod ui_server_select_system;
 mod ui_settings_system;
 mod ui_skill_list_system;
 mod ui_skill_tree_system;
+mod ui_status_effects_system;
 pub mod widgets;
 
 #[derive(Default)]
@@ -101,4 +102,5 @@ pub use ui_server_select_system::ui_server_select_system;
 pub use ui_settings_system::ui_settings_system;
 pub use ui_skill_list_system::ui_skill_list_system;
 pub use ui_skill_tree_system::ui_skill_tree_system;
+pub use ui_status_effects_system::ui_status_effects_system;
 pub use widgets::DataBindings;

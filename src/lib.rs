@@ -109,8 +109,8 @@ use ui::{
     ui_message_box_system, ui_minimap_system, ui_npc_store_system, ui_number_input_dialog_system,
     ui_party_option_system, ui_party_system, ui_personal_store_system, ui_player_info_system,
     ui_quest_list_system, ui_selected_target_system, ui_server_select_system, ui_settings_system,
-    ui_skill_list_system, ui_skill_tree_system, widgets::Dialog, DialogLoader, UiStateDebugWindows,
-    UiStateDragAndDrop, UiStateWindows,
+    ui_skill_list_system, ui_skill_tree_system, ui_status_effects_system, widgets::Dialog,
+    DialogLoader, UiStateDebugWindows, UiStateDragAndDrop, UiStateWindows,
 };
 use vfs_asset_io::VfsAssetIo;
 use zmo_asset_loader::{ZmoAsset, ZmoAssetLoader};
@@ -840,6 +840,7 @@ fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsC
                 .with_system(ui_skill_list_system.label("ui_system"))
                 .with_system(ui_skill_tree_system.label("ui_system"))
                 .with_system(ui_settings_system.label("ui_system"))
+                .with_system(ui_status_effects_system.label("ui_system"))
                 .with_system(conversation_dialog_system.label("ui_system")),
         );
 
