@@ -8,12 +8,15 @@ use bevy::{
     },
 };
 
-use rose_data::{AbilityType, EquipmentItem, Item, ItemReference, ItemSlotBehaviour, ItemType};
+use rose_data::{
+    AbilityType, EquipmentItem, Item, ItemReference, ItemSlotBehaviour, ItemType, StatusEffectType,
+};
 use rose_game_common::{
     components::{
         AbilityValues, BasicStatType, BasicStats, CharacterInfo, DroppedItem, Equipment,
         ExperiencePoints, HealthPoints, Hotbar, Inventory, ItemDrop, ItemSlot, Level, ManaPoints,
         Money, MoveMode, MoveSpeed, QuestState, SkillList, Stamina, StatPoints, StatusEffects,
+        StatusEffectsRegen,
     },
     messages::{
         server::{
@@ -154,6 +157,7 @@ pub fn game_connection_system(
                             FacingDirection::default(),
                             ability_values,
                             status_effects,
+                            StatusEffectsRegen::new(),
                             move_mode,
                             move_speed,
                             Cooldowns::default(),
@@ -280,6 +284,7 @@ pub fn game_connection_system(
                         message.move_speed,
                         ability_values,
                         status_effects,
+                        StatusEffectsRegen::new(),
                     ))
                     .insert_bundle((
                         ClientEntity::new(message.entity_id, ClientEntityType::Character),
@@ -992,9 +997,58 @@ pub fn game_connection_system(
             }
             Ok(ServerMessage::UpdateStatusEffects(message)) => {
                 if let Some(entity) = client_entity_list.get(message.entity_id) {
-                    commands.entity(entity).insert(StatusEffects {
-                        active: message.status_effects,
-                        ..Default::default()
+                    commands.add(move |world: &mut World| {
+                        let mut entity_mut = world.entity_mut(entity);
+                        let mut updated_hp = None;
+                        let mut updated_mp = None;
+
+                        // Clear StatusEffects for status effects which do not exist in the packet
+                        if let Some(mut status_effects) = entity_mut.get_mut::<StatusEffects>() {
+                            for (status_effect_type, active) in message.status_effects.iter() {
+                                if active.is_some() {
+                                    continue;
+                                }
+
+                                if status_effects.active[status_effect_type].is_some() {
+                                    match status_effect_type {
+                                        StatusEffectType::IncreaseHp => {
+                                            updated_hp = message.updated_values.first().cloned();
+                                        },
+                                        StatusEffectType::IncreaseMp => {
+                                            updated_mp = message.updated_values.last().cloned();
+                                        },
+                                        _ => {}
+                                    }
+                                    status_effects.active[status_effect_type] = None;
+                                    status_effects.expire_times[status_effect_type] = None;
+                                }
+                            }
+                        }
+
+                        // Clear StatusEffectsRegen for status effects which do not exist in the packet
+                        if let Some(mut status_effects_regen) = entity_mut.get_mut::<StatusEffectsRegen>() {
+                            for (status_effect_type, active) in message.status_effects {
+                                if active.is_some() {
+                                    continue;
+                                }
+
+                                if status_effects_regen.regens[status_effect_type].is_some() {
+                                    status_effects_regen.regens[status_effect_type] = None;
+                                }
+                            }
+                        }
+
+                        if let Some(updated_hp) = updated_hp {
+                            if let Some(mut health_points) = entity_mut.get_mut::<HealthPoints>() {
+                                health_points.hp = updated_hp;
+                            }
+                        }
+
+                        if let Some(updated_mp) = updated_mp {
+                            if let Some(mut mana_points) = entity_mut.get_mut::<ManaPoints>() {
+                                mana_points.mp = updated_mp;
+                            }
+                        }
                     });
                 }
             }
