@@ -299,7 +299,7 @@ pub fn ui_debug_item_list_system(
                     body.rows(
                         45.0,
                         ui_state_debug_item_list.filtered_items.len()
-                            + if is_equipment_item { 1 } else { 0 },
+                            + usize::from(is_equipment_item),
                         |row_index, mut row| {
                             if is_equipment_item && row_index == 0 {
                                 row.col(|_| {});
@@ -347,7 +347,7 @@ pub fn ui_debug_item_list_system(
                                 });
                             } else if let Some(item_data) = ui_state_debug_item_list
                                 .filtered_items
-                                .get(row_index - if is_equipment_item { 1 } else { 0 })
+                                .get(row_index - usize::from(is_equipment_item))
                                 .and_then(|id| {
                                     game_data.items.get_base_item(ItemReference::new(
                                         ui_state_debug_item_list.filter_item_type,
@@ -359,7 +359,7 @@ pub fn ui_debug_item_list_system(
                                     ui_state_debug_item_list.filter_item_type,
                                     *ui_state_debug_item_list
                                         .filtered_items
-                                        .get(row_index - if is_equipment_item { 1 } else { 0 })
+                                        .get(row_index - usize::from(is_equipment_item))
                                         .unwrap() as usize,
                                 );
 

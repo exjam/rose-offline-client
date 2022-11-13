@@ -63,8 +63,8 @@ pub fn character_model_update_system(
                     character_info,
                     equipment,
                     &mut *current_character_model,
-                    &*current_dummy_bone_offset.unwrap(),
-                    &*current_skinned_mesh.unwrap(),
+                    &current_dummy_bone_offset.unwrap(),
+                    &current_skinned_mesh.unwrap(),
                 );
                 commands
                     .entity(entity)
