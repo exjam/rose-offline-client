@@ -46,7 +46,7 @@ pub fn visible_status_effects_system(
                 {
                     if let Some(effect_file_id) = status_effect_data.effect_file_id {
                         let effect_entity = commands
-                            .spawn_bundle((
+                            .spawn((
                                 VisibleStatusEffect {
                                     status_effect_type: effect_type,
                                 },

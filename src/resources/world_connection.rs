@@ -1,3 +1,4 @@
+use bevy::prelude::Resource;
 use rose_game_common::{
     data::Password,
     messages::{
@@ -6,6 +7,7 @@ use rose_game_common::{
     },
 };
 
+#[derive(Resource)]
 pub struct WorldConnection {
     pub client_message_tx: tokio::sync::mpsc::UnboundedSender<ClientMessage>,
     pub server_message_rx: crossbeam_channel::Receiver<ServerMessage>,

@@ -87,17 +87,19 @@ pub fn npc_model_add_collider_system(
         let max = Vec3::from(max.unwrap());
         let local_bound_center = 0.5 * (min + max);
         let half_extents = 0.5 * (max - min);
-        let root_bone_offset = root_bone_inverse_bindpose.mul_vec3(local_bound_center);
+        let root_bone_offset = root_bone_inverse_bindpose.transform_point(local_bound_center);
 
         let collider_entity = commands
-            .spawn_bundle((
+            .spawn((
                 ColliderParent::new(entity),
                 Collider::cuboid(half_extents.x, half_extents.y, half_extents.z),
                 CollisionGroups::new(
-                    COLLISION_GROUP_NPC,
-                    COLLISION_FILTER_INSPECTABLE
-                        | COLLISION_FILTER_CLICKABLE
-                        | COLLISION_GROUP_PHYSICS_TOY,
+                    bevy_rapier3d::geometry::Group::from_bits_truncate(COLLISION_GROUP_NPC),
+                    bevy_rapier3d::geometry::Group::from_bits_truncate(
+                        COLLISION_FILTER_INSPECTABLE
+                            | COLLISION_FILTER_CLICKABLE
+                            | COLLISION_GROUP_PHYSICS_TOY,
+                    ),
                 ),
                 Transform::from_translation(root_bone_offset)
                     .with_rotation(Quat::from_axis_angle(Vec3::Z, std::f32::consts::PI / 2.0)),
@@ -107,7 +109,7 @@ pub fn npc_model_add_collider_system(
 
         commands.entity(root_bone_entity).add_child(collider_entity);
 
-        commands.entity(entity).insert_bundle((
+        commands.entity(entity).insert((
             ColliderEntity::new(collider_entity),
             ModelHeight::new(root_bone_height + half_extents.y * 2.0),
         ));

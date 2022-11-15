@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use bevy::{
     asset::LoadState,
-    prelude::{AssetServer, Assets, Commands, Handle, Image, Res, ResMut, Vec2},
+    prelude::{AssetServer, Assets, Commands, Handle, Image, Res, ResMut, Resource, Vec2},
 };
 use bevy_egui::{egui, EguiContext};
 use enum_map::{enum_map, Enum, EnumMap};
@@ -63,6 +63,7 @@ pub struct UiSpriteSheet {
     pub sprites_by_name: Option<IdFile>,
 }
 
+#[derive(Resource)]
 pub struct UiResources {
     pub loaded_all_textures: bool,
     pub sprite_sheets: EnumMap<UiSpriteSheetType, Option<UiSpriteSheet>>,

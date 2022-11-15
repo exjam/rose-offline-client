@@ -1,6 +1,6 @@
 use arrayvec::ArrayVec;
 use bevy::{
-    prelude::{Handle, Image, Vec2},
+    prelude::{Handle, Image, Resource, Vec2},
     utils::HashMap,
 };
 
@@ -12,7 +12,7 @@ pub struct NameTagData {
     pub rects: ArrayVec<WorldUiRect, 2>, // NPC names are 2 rows
 }
 
-#[derive(Default)]
+#[derive(Default, Resource)]
 pub struct NameTagCache {
     pub cache: HashMap<String, NameTagData>,
 }

@@ -6,7 +6,7 @@ use bevy::{
     pbr::AmbientLight,
     prelude::{
         Camera3d, Color, Commands, ComputedVisibility, Entity, GlobalTransform, Query, Res, ResMut,
-        Transform, Visibility, With,
+        Resource, Transform, Visibility, With,
     },
 };
 use bevy_egui::{egui, EguiContext};
@@ -32,6 +32,7 @@ use crate::{
 const CHARACTER_SPACING: f32 = 7.5;
 const NPC_SPACING: f32 = 7.5;
 
+#[derive(Resource)]
 pub struct ModelViewerState {
     valid_items: EnumMap<EquipmentIndex, Vec<ItemReference>>,
     valid_gems: Vec<ItemReference>,
@@ -190,7 +191,7 @@ pub fn model_viewer_system(
                     .take(ui_state.num_npcs - ui_state.npcs.len())
                 {
                     let entity = commands
-                        .spawn_bundle((
+                        .spawn((
                             ClientEntityName {
                                 name: npc.name.to_string(),
                             },
@@ -282,7 +283,7 @@ pub fn model_viewer_system(
                     }
 
                     let entity = commands
-                        .spawn_bundle((
+                        .spawn((
                             ClientEntityName {
                                 name: character_info.name.clone(),
                             },

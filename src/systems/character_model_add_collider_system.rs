@@ -77,21 +77,25 @@ pub fn character_model_add_collider_system(
 
         let local_bound_center = 0.5 * (min + max);
         let half_extents = 0.5 * (max - min);
-        let root_bone_offset = root_bone_inverse_bindpose.mul_vec3(local_bound_center);
+        let root_bone_offset = root_bone_inverse_bindpose.transform_point(local_bound_center);
 
         let collider_entity = commands
-            .spawn_bundle((
+            .spawn((
                 Collider::cuboid(half_extents.x, half_extents.y, half_extents.z),
                 ColliderParent::new(entity),
                 CollisionGroups::new(
-                    if player_character.is_some() {
-                        COLLISION_GROUP_PLAYER
-                    } else {
-                        COLLISION_GROUP_CHARACTER
-                    },
-                    COLLISION_FILTER_INSPECTABLE
-                        | COLLISION_FILTER_CLICKABLE
-                        | COLLISION_GROUP_PHYSICS_TOY,
+                    bevy_rapier3d::geometry::Group::from_bits_truncate(
+                        if player_character.is_some() {
+                            COLLISION_GROUP_PLAYER
+                        } else {
+                            COLLISION_GROUP_CHARACTER
+                        },
+                    ),
+                    bevy_rapier3d::geometry::Group::from_bits_truncate(
+                        COLLISION_FILTER_INSPECTABLE
+                            | COLLISION_FILTER_CLICKABLE
+                            | COLLISION_GROUP_PHYSICS_TOY,
+                    ),
                 ),
                 Transform::from_translation(root_bone_offset)
                     .with_rotation(Quat::from_axis_angle(Vec3::Z, std::f32::consts::PI / 2.0)),
@@ -103,9 +107,9 @@ pub fn character_model_add_collider_system(
             .entity(skinned_mesh.joints[0])
             .add_child(collider_entity);
 
-        commands
-            .entity(entity)
-            .insert(ColliderEntity::new(collider_entity))
-            .insert_bundle((ModelHeight::new(0.65 + half_extents.y * 2.0),));
+        commands.entity(entity).insert((
+            ColliderEntity::new(collider_entity),
+            ModelHeight::new(0.65 + half_extents.y * 2.0),
+        ));
     }
 }

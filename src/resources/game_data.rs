@@ -1,4 +1,4 @@
-use bevy::prelude::Transform;
+use bevy::prelude::{Resource, Transform};
 use std::sync::Arc;
 
 use rose_data::{
@@ -9,6 +9,7 @@ use rose_data::{
 use rose_file_readers::{LtbFile, StbFile, ZscFile};
 use rose_game_common::data::AbilityValueCalculator;
 
+#[derive(Resource)]
 pub struct GameData {
     pub ability_value_calculator: Box<dyn AbilityValueCalculator + Send + Sync>,
     pub animation_event_flags: Vec<AnimationEventFlags>,

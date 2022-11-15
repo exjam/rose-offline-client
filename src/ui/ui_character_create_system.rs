@@ -333,7 +333,7 @@ pub fn ui_character_create_system(
         }
     } else {
         let create_character_entity = commands
-            .spawn_bundle((
+            .spawn((
                 CharacterInfo {
                     name: "CreateCharacter".to_string(),
                     gender: ui_state.gender,

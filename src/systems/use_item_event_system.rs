@@ -75,7 +75,7 @@ pub fn use_item_event_system(
                 SoundCategory::OtherCombat
             };
 
-            commands.spawn_bundle((
+            commands.spawn((
                 category,
                 sound_settings.gain(category),
                 SpatialSound::new(asset_server.load(sound_data.path.path())),

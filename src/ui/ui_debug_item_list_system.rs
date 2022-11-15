@@ -269,7 +269,7 @@ pub fn ui_debug_item_list_system(
 
             egui_extras::TableBuilder::new(ui)
                 .striped(true)
-                .cell_layout(egui::Layout::left_to_right().with_cross_align(egui::Align::Center))
+                .cell_layout(egui::Layout::left_to_right(egui::Align::Center))
                 .column(egui_extras::Size::exact(45.0))
                 .column(egui_extras::Size::initial(50.0).at_least(50.0))
                 .column(egui_extras::Size::remainder().at_least(80.0))

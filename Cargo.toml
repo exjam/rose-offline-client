@@ -7,11 +7,11 @@ edition = "2021"
 anyhow = "1.0.4"
 arrayvec = "0.7"
 async-trait = "0.1"
-bevy = { version = "0.8.0", features = ["dds", "tga"] }
-bevy_egui = "0.15.0"
-bevy-inspector-egui = "0.12.1"
-bevy_polyline = "0.3.0"
-bevy_rapier3d = "0.16.0"
+bevy = { version = "0.9.0", features = ["dds", "tga"] }
+bevy_egui = "0.17.1"
+bevy-inspector-egui = "0.14.0"
+bevy_polyline = "0.4.0"
+bevy_rapier3d = "0.18.0"
 bitflags = "1.2"
 bytemuck = { version = "1.7.0", features = ["derive"] }
 chrono = "0.4"
@@ -19,8 +19,8 @@ clap = "3.2"
 cpal = "0.14"
 crossbeam-channel = "0.5"
 directories = "4.0"
-dolly = "0.3.1"
-egui_extras = "0.18"
+dolly = "0.4.0"
+egui_extras = "0.19.0"
 enum-map = { version = "2.0", features = ["serde"] }
 hound = "3.4"
 image = { version = "0.24", default-features = false, features = ["dds"] }
@@ -38,21 +38,18 @@ tokio = { version = "1.17", features = ["rt", "net", "sync", "macros", "io-util"
 toml = "0.5.9"
 quick-xml = { version = "0.24.0", features = ["serialize"] }
 regex = "1"
-rose-data = { git = "https://github.com/exjam/rose-offline", rev = "0c0d442d1926fd4a66ef5690a28eb0715e93f4f5" }
-rose-data-irose = { git = "https://github.com/exjam/rose-offline", rev = "0c0d442d1926fd4a66ef5690a28eb0715e93f4f5" }
-rose-file-readers = { git = "https://github.com/exjam/rose-offline", rev = "0c0d442d1926fd4a66ef5690a28eb0715e93f4f5" }
-rose-game-common = { git = "https://github.com/exjam/rose-offline", rev = "0c0d442d1926fd4a66ef5690a28eb0715e93f4f5" }
-rose-game-irose = { git = "https://github.com/exjam/rose-offline", rev = "0c0d442d1926fd4a66ef5690a28eb0715e93f4f5" }
-rose-network-common = { git = "https://github.com/exjam/rose-offline", rev = "0c0d442d1926fd4a66ef5690a28eb0715e93f4f5" }
-rose-network-irose = { git = "https://github.com/exjam/rose-offline", rev = "0c0d442d1926fd4a66ef5690a28eb0715e93f4f5" }
+rose-data = { git = "https://github.com/exjam/rose-offline", rev = "df3571f2e2de3fed4ed13a0e08a09262b4cdf420" }
+rose-data-irose = { git = "https://github.com/exjam/rose-offline", rev = "df3571f2e2de3fed4ed13a0e08a09262b4cdf420" }
+rose-file-readers = { git = "https://github.com/exjam/rose-offline", rev = "df3571f2e2de3fed4ed13a0e08a09262b4cdf420" }
+rose-game-common = { git = "https://github.com/exjam/rose-offline", rev = "df3571f2e2de3fed4ed13a0e08a09262b4cdf420" }
+rose-game-irose = { git = "https://github.com/exjam/rose-offline", rev = "df3571f2e2de3fed4ed13a0e08a09262b4cdf420" }
+rose-network-common = { git = "https://github.com/exjam/rose-offline", rev = "df3571f2e2de3fed4ed13a0e08a09262b4cdf420" }
+rose-network-irose = { git = "https://github.com/exjam/rose-offline", rev = "df3571f2e2de3fed4ed13a0e08a09262b4cdf420" }
 
 [patch.crates-io]
-bevy = { git = "https://github.com/exjam/bevy", rev = "88e688d68c9b31d14baa7582c67cb92877847c32" }
-bevy_polyline = { git = "https://github.com/exjam/bevy_polyline", rev = "3c7bae575481f5a561442a8327f0f465c092917b" }
-bevy_egui = { git = "https://github.com/exjam/bevy_egui", rev = "0b91c6e95b96ea305158e293d9eaddc634a39690" }
-bevy-inspector-egui = { git = "https://github.com/exjam/bevy-inspector-egui", rev = "a1a4379b0fe787e4830ce7b919fa75cfc2b6390b" }
-bevy_rapier3d = { git = "https://github.com/exjam/bevy_rapier", rev = "f0809f556fb2e97eba3fd1a07d50ab522e2f57df" }
-egui = { git = "https://github.com/exjam/egui", rev = "b5ea40aaf5a527dbf0d5bc867cfa6e5dc6945770" }
+bevy = { git = "https://github.com/exjam/bevy", rev = "80ba2cbad128d99072357bb763e62bf19e8b8951" }
+bevy_rapier3d = { git = "https://github.com/exjam/bevy_rapier", rev = "d5542960bc1f58ce4969bb42b1e8ecae75f1d8b5" }
+egui = { git = "https://github.com/exjam/egui", rev = "ca9f8a58f27b8e25698e5b28fbbd8506bd9f1dfa" }
 oddio = { git = "https://github.com/exjam/oddio", rev = "3c20292903fe629d7eab08c1790db70b9fddac96" }
 
 [profile.dev.package."*"]

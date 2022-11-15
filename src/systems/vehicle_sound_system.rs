@@ -104,14 +104,14 @@ pub fn vehicle_sound_system(
                     };
 
                     let sound_entity = if let Some(sound_data) = sound_data {
-                        commands.spawn_bundle((
+                        commands.spawn((
                             SpatialSound::new_repeating(asset_server.load(sound_data.path.path())),
                             sound_category,
                             Transform::default(),
                             *global_transform,
                         )).id()
                     } else {
-                        commands.spawn_bundle((
+                        commands.spawn((
                             sound_category,
                             Transform::default(),
                             *global_transform,

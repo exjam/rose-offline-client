@@ -1,5 +1,7 @@
+use bevy::prelude::Resource;
 use rose_game_common::messages::{client::ClientMessage, server::ServerMessage};
 
+#[derive(Resource)]
 pub struct LoginConnection {
     pub client_message_tx: tokio::sync::mpsc::UnboundedSender<ClientMessage>,
     pub server_message_rx: crossbeam_channel::Receiver<ServerMessage>,

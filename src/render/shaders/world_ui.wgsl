@@ -29,8 +29,8 @@ fn vertex(vertex: Vertex) -> VertexOutput {
     out.clip_position = out.clip_position / out.clip_position.w;
 
     // Offset by the proportion of the screen in x and y.
-    out.clip_position.x = out.clip_position.x + (vertex.screen_offset.x * 2.0 / view.width);
-    out.clip_position.y = out.clip_position.y + (vertex.screen_offset.y * 2.0 / view.height);
+    out.clip_position.x = out.clip_position.x + (vertex.screen_offset.x * 2.0 / view.viewport.z);
+    out.clip_position.y = out.clip_position.y + (vertex.screen_offset.y * 2.0 / view.viewport.w);
 
     out.uv = vertex.uv;
     out.color = vertex.color;

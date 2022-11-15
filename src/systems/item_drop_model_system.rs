@@ -51,7 +51,7 @@ pub fn item_drop_model_system(
         let root_model_bone = item_drop_model.root_bone;
         commands
             .entity(root_model_bone)
-            .insert_bundle((ActiveMotion::new_once(drop_motion),));
+            .insert(ActiveMotion::new_once(drop_motion));
 
         commands.entity(entity).insert(item_drop_model);
     }
@@ -93,14 +93,16 @@ pub fn item_drop_model_add_collider_system(
         let half_extents = 0.5 * (max - min);
 
         let collider_entity = commands
-            .spawn_bundle((
+            .spawn((
                 ColliderParent::new(entity),
                 Collider::cuboid(half_extents.x, half_extents.y, half_extents.z),
                 CollisionGroups::new(
-                    COLLISION_GROUP_ITEM_DROP,
-                    COLLISION_FILTER_INSPECTABLE
-                        | COLLISION_FILTER_CLICKABLE
-                        | COLLISION_GROUP_PHYSICS_TOY,
+                    bevy_rapier3d::geometry::Group::from_bits_truncate(COLLISION_GROUP_ITEM_DROP),
+                    bevy_rapier3d::geometry::Group::from_bits_truncate(
+                        COLLISION_FILTER_INSPECTABLE
+                            | COLLISION_FILTER_CLICKABLE
+                            | COLLISION_GROUP_PHYSICS_TOY,
+                    ),
                 ),
                 Transform::from_translation(local_bound_center),
                 GlobalTransform::default(),

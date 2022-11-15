@@ -8,7 +8,7 @@ use bevy::{
         App, Component, EventReader, KeyCode, Local, MouseButton, Plugin, Query, Res, ResMut, Time,
         Transform,
     },
-    window::Windows,
+    window::{CursorGrabMode, Windows},
 };
 use bevy_egui::EguiContext;
 use dolly::prelude::{CameraRig, LeftHanded, Position, Smooth, YawPitch};
@@ -77,7 +77,7 @@ fn free_camera_update(
                 window.set_cursor_position(saved_cursor_position);
             }
 
-            window.set_cursor_lock_mode(false);
+            window.set_cursor_grab_mode(CursorGrabMode::None);
             window.set_cursor_visibility(true);
             control_state.is_dragging = false;
         }
@@ -167,7 +167,7 @@ fn free_camera_update(
             .rotate_yaw_pitch(-sensitivity * cursor_delta.x, -sensitivity * cursor_delta.y);
 
         if !control_state.is_dragging {
-            window.set_cursor_lock_mode(true);
+            window.set_cursor_grab_mode(CursorGrabMode::Locked);
             window.set_cursor_visibility(false);
             control_state.saved_cursor_position = window.cursor_position();
             control_state.is_dragging = true;
@@ -177,7 +177,7 @@ fn free_camera_update(
             window.set_cursor_position(saved_cursor_position);
         }
 
-        window.set_cursor_lock_mode(false);
+        window.set_cursor_grab_mode(CursorGrabMode::None);
         window.set_cursor_visibility(true);
         control_state.is_dragging = false;
     }

@@ -84,8 +84,8 @@ pub fn vehicle_model_system(
         } else if matches!(move_mode, MoveMode::Drive) {
             let driver_model_entity = skinned_mesh.joints[0];
             let vehicle_model_entity = commands
-                .spawn_bundle((
-                    Visibility::visible(),
+                .spawn((
+                    Visibility::VISIBLE,
                     ComputedVisibility::default(),
                     Transform::default(),
                     GlobalTransform::default(),
@@ -143,10 +143,10 @@ pub fn vehicle_model_system(
                 }
 
                 let mut vehicle_model_entity_mut = world.entity_mut(vehicle_model_entity);
-                vehicle_model_entity_mut.insert_bundle((vehicle_model,));
+                vehicle_model_entity_mut.insert(vehicle_model);
 
                 let mut root_entity_mut = world.entity_mut(entity);
-                root_entity_mut.insert_bundle((vehicle_skinned_mesh, vehicle_dummy_bone_offset));
+                root_entity_mut.insert((vehicle_skinned_mesh, vehicle_dummy_bone_offset));
             });
         }
     }

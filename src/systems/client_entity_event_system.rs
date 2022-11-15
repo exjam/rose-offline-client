@@ -36,7 +36,7 @@ pub fn client_entity_event_system(
                             .die_sound_id
                             .and_then(|id| game_data.sounds.get_sound(id))
                         {
-                            commands.spawn_bundle((
+                            commands.spawn((
                                 SoundCategory::NpcSounds,
                                 sound_settings.gain(SoundCategory::NpcSounds),
                                 SpatialSound::new(asset_server.load(sound_data.path.path())),
@@ -72,7 +72,7 @@ pub fn client_entity_event_system(
                 if let Ok(global_transform) = query_global_transform.get(entity) {
                     if let Some(sound_data) = game_data.sounds.get_sound(SoundId::new(16).unwrap())
                     {
-                        commands.spawn_bundle((
+                        commands.spawn((
                             sound_category,
                             sound_settings.gain(sound_category),
                             SpatialSound::new(asset_server.load(sound_data.path.path())),

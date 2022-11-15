@@ -83,7 +83,7 @@ pub fn ui_debug_dialog_list_system(
 
             egui_extras::TableBuilder::new(ui)
                 .striped(true)
-                .cell_layout(egui::Layout::left_to_right().with_cross_align(egui::Align::Center))
+                .cell_layout(egui::Layout::left_to_right(egui::Align::Center))
                 .column(egui_extras::Size::remainder().at_least(80.0))
                 .column(egui_extras::Size::initial(60.0).at_least(60.0))
                 .header(20.0, |mut header| {

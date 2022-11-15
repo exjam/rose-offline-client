@@ -1,3 +1,4 @@
+use bevy::prelude::Resource;
 use std::collections::HashMap;
 
 use rose_game_common::{components::CharacterGender, messages::ClientEntityId};
@@ -14,6 +15,7 @@ use crate::{
     },
 };
 
+#[derive(Resource)]
 pub struct LuaGameFunctions {
     pub closures: HashMap<
         String,

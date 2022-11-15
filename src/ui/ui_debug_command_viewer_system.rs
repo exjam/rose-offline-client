@@ -38,13 +38,13 @@ pub fn format_command(ui: &mut egui::Ui, command: &Command) {
             ));
         }
         Command::Attack(command_attack) => {
-            ui.label(format!("Attack {}", command_attack.target.id()));
+            ui.label(format!("Attack {}", command_attack.target.index()));
         }
         Command::Die => {
             ui.label("Die");
         }
         Command::PickupItem(pickup_entity) => {
-            ui.label(format!("Pickup {}", pickup_entity.id()));
+            ui.label(format!("Pickup {}", pickup_entity.index()));
         }
         Command::Emote(command_emote) => {
             ui.label(format!("Emote {}", command_emote.motion_id.get()));
@@ -67,7 +67,7 @@ pub fn format_command(ui: &mut egui::Ui, command: &Command) {
 
             match command_cast_skill.skill_target {
                 Some(CommandCastSkillTarget::Entity(skill_target_entity)) => {
-                    write!(label, " on {}", skill_target_entity.id()).ok();
+                    write!(label, " on {}", skill_target_entity.index()).ok();
                 }
                 Some(CommandCastSkillTarget::Position(skill_position)) => {
                     write!(label, " at ({}, {})", skill_position.x, skill_position.y).ok();

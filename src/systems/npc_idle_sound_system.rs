@@ -66,7 +66,7 @@ pub fn npc_idle_sound_system(
                 .and_then(|sound_id| game_data.sounds.get_sound(sound_id))
             {
                 commands.entity(entity).with_children(|builder| {
-                    builder.spawn_bundle((
+                    builder.spawn((
                         SpatialSound::new(asset_server.load(sound_data.path.path())),
                         SoundRadius::new(4.0),
                         SoundCategory::NpcSounds,

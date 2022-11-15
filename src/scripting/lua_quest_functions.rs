@@ -1,3 +1,4 @@
+use bevy::prelude::Resource;
 use std::collections::HashMap;
 
 use rose_game_common::messages::client::ClientMessage;
@@ -7,6 +8,7 @@ use crate::scripting::{
     ScriptFunctionResources,
 };
 
+#[derive(Resource)]
 pub struct LuaQuestFunctions {
     pub closures: HashMap<
         String,

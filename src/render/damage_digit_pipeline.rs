@@ -54,6 +54,7 @@ impl Plugin for DamageDigitRenderPlugin {
     }
 }
 
+#[derive(Resource)]
 struct DamageDigitPipeline {
     view_layout: BindGroupLayout,
     particle_layout: BindGroupLayout,
@@ -239,7 +240,7 @@ struct ExtractedDamageDigitRenderData {
     uvs: Vec<Vec4>,
 }
 
-#[derive(Default, Component)]
+#[derive(Default, Component, Resource)]
 struct ExtractedDamageDigits {
     particles: Vec<ExtractedDamageDigitRenderData>,
 }
@@ -281,6 +282,7 @@ fn extract_damage_digits(
     }
 }
 
+#[derive(Resource)]
 struct DamageDigitMeta {
     ranges: Vec<Range<u64>>,
     total_count: u64,
@@ -345,10 +347,10 @@ fn prepare_damage_digits(
             if let Some(current_batch_material) = &current_batch {
                 if current_batch_material != &particle.material {
                     let current_batch_material = current_batch.take().unwrap();
-                    commands.spawn_bundle((DamageDigitBatch {
+                    commands.spawn(DamageDigitBatch {
                         range: start..end,
                         handle: current_batch_material,
-                    },));
+                    });
                     current_batch = Some(particle.material.clone_weak());
                     start = end;
                 }
@@ -365,10 +367,10 @@ fn prepare_damage_digits(
 
     if start != end {
         if let Some(current_batch_material) = current_batch {
-            commands.spawn_bundle((DamageDigitBatch {
+            commands.spawn(DamageDigitBatch {
                 range: start..end,
                 handle: current_batch_material,
-            },));
+            });
         }
     }
 
@@ -403,7 +405,7 @@ struct DamageDigitBatch {
     handle: Handle<DamageDigitMaterial>,
 }
 
-#[derive(Default)]
+#[derive(Default, Resource)]
 struct MaterialBindGroups {
     values: HashMap<Handle<DamageDigitMaterial>, BindGroup>,
 }

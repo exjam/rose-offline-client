@@ -135,7 +135,7 @@ pub fn game_connection_system(
                 // Spawn character
                 client_entity_list.player_entity = Some(
                     commands
-                        .spawn_bundle((
+                        .spawn(((
                             PlayerCharacter {},
                             ClientEntityName::new(character_data.character_info.name.clone()),
                             character_data.character_info,
@@ -151,8 +151,8 @@ pub fn game_connection_system(
                             character_data.skill_points,
                             character_data.union_membership,
                             character_data.stamina,
-                        ))
-                        .insert_bundle((
+                        ),
+                        (
                             Command::with_stop(),
                             NextCommand::with_stop(),
                             FacingDirection::default(),
@@ -168,8 +168,8 @@ pub fn game_connection_system(
                             PendingSkillEffectList::default(),
                             Position::new(character_data.position),
                             VisibleStatusEffects::default(),
-                        ))
-                        .insert_bundle((
+                        ),
+                        (
                             Transform::from_xyz(
                                 character_data.position.x / 100.0,
                                 character_data.position.z / 100.0 + 100.0,
@@ -178,8 +178,8 @@ pub fn game_connection_system(
                             GlobalTransform::default(),
                             Visibility::default(),
                             ComputedVisibility::default(),
-                        ))
-                        .id(),
+                        )))
+                        .id()
                 );
 
                 // Emit connected event, character select system will be responsible for
@@ -191,7 +191,7 @@ pub fn game_connection_system(
                 if let Some(player_entity) = client_entity_list.player_entity {
                     commands
                         .entity(player_entity)
-                        .insert_bundle((message.inventory, message.equipment));
+                        .insert((message.inventory, message.equipment));
                 }
             }
             Ok(ServerMessage::CharacterDataQuest(message)) => {
@@ -201,7 +201,7 @@ pub fn game_connection_system(
             }
             Ok(ServerMessage::JoinZone(message)) => {
                 if let Some(player_entity) = client_entity_list.player_entity {
-                    commands.entity(player_entity).insert_bundle((
+                    commands.entity(player_entity).insert((
                         ClientEntity::new(message.entity_id, ClientEntityType::Character),
                         CollisionPlayer,
                         Command::with_stop(),
@@ -271,7 +271,7 @@ pub fn game_connection_system(
                 ability_values.passive_attack_speed = message.passive_attack_speed;
 
                 let entity = commands
-                    .spawn_bundle((
+                    .spawn(((
                         ClientEntityName::new(message.character_info.name.clone()),
                         Command::with_stop(),
                         next_command,
@@ -286,8 +286,8 @@ pub fn game_connection_system(
                         ability_values,
                         status_effects,
                         StatusEffectsRegen::new(),
-                    ))
-                    .insert_bundle((
+                    ),
+                    (
                         ClientEntity::new(message.entity_id, ClientEntityType::Character),
                         CollisionHeightOnly,
                         FacingDirection::default(),
@@ -303,7 +303,7 @@ pub fn game_connection_system(
                         Visibility::default(),
                         ComputedVisibility::default(),
                         VisibleStatusEffects::default(),
-                    ))
+                    ),))
                     .id();
 
                 if let Some((skin, title)) = message.personal_store_info {
@@ -348,7 +348,8 @@ pub fn game_connection_system(
                 };
 
                 let entity = commands
-                    .spawn_bundle((
+                    .spawn((
+                        (
                         Command::with_stop(),
                         next_command,
                         message.npc,
@@ -360,8 +361,7 @@ pub fn game_connection_system(
                         level,
                         move_speed,
                         status_effects,
-                    ))
-                    .insert_bundle((
+                    ), (
                         ClientEntity::new(message.entity_id, ClientEntityType::Npc),
                         CollisionHeightOnly,
                         FacingDirection::default(),
@@ -381,6 +381,7 @@ pub fn game_connection_system(
                         GlobalTransform::default(),
                         Visibility::default(),
                         ComputedVisibility::default(),
+                    ),
                     ))
                     .id();
 
@@ -452,7 +453,7 @@ pub fn game_connection_system(
                 }
 
                 let entity = commands
-                    .spawn_bundle((
+                    .spawn(((
                         Command::with_stop(),
                         next_command,
                         message.npc,
@@ -465,8 +466,8 @@ pub fn game_connection_system(
                         level,
                         move_speed,
                         status_effects,
-                    ))
-                    .insert_bundle((
+                    ),
+                    (
                         ClientEntity::new(message.entity_id, ClientEntityType::Monster),
                         CollisionHeightOnly,
                         FacingDirection::default(),
@@ -482,7 +483,7 @@ pub fn game_connection_system(
                         GlobalTransform::default(),
                         Visibility::default(),
                         ComputedVisibility::default(),
-                    ))
+                    ),))
                     .id();
 
                 client_entity_list.add(message.entity_id, entity);
@@ -503,7 +504,7 @@ pub fn game_connection_system(
 
                 // TODO: Use message.remaining_time, message.owner_entity_id ?
                 let entity = commands
-                    .spawn_bundle((
+                    .spawn((
                         ClientEntityName::new(name),
                         ItemDrop::with_dropped_item(message.dropped_item),
                         Position::new(message.position),
@@ -601,7 +602,7 @@ pub fn game_connection_system(
                     // Update player position
                     commands
                         .entity(player_entity)
-                        .insert_bundle((
+                        .insert((
                             Position::new(Vec3::new(message.x, message.y, 0.0)),
                             Transform::from_xyz(message.x / 100.0, 100.0, -message.y / 100.0),
                         ))
@@ -889,7 +890,7 @@ pub fn game_connection_system(
                         Some(message.level.level),
                     ));
 
-                    commands.entity(entity).insert_bundle((
+                    commands.entity(entity).insert((
                         message.level,
                         message.experience_points,
                         message.stat_points,
@@ -1231,7 +1232,7 @@ pub fn game_connection_system(
 
                         commands
                             .entity(player_entity)
-                            .insert_bundle((message.updated_skill_points,));
+                            .insert(message.updated_skill_points);
                     }
                 }
                 Err(LearnSkillError::AlreadyLearnt) => chatbox_events.send(ChatboxEvent::System(
@@ -1314,7 +1315,7 @@ pub fn game_connection_system(
                 if let Some(player_entity) = client_entity_list.player_entity {
                     commands
                         .entity(player_entity)
-                        .insert_bundle((message.updated_skill_points,));
+                        .insert(message.updated_skill_points);
                 }
             }
             Ok(ServerMessage::UseEmote(message)) => {

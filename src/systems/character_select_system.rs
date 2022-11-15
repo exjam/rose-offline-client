@@ -6,10 +6,10 @@ use bevy::{
     prelude::{
         AssetServer, Camera, Camera3d, Commands, Component, ComputedVisibility,
         DespawnRecursiveExt, Entity, EventReader, EventWriter, GlobalTransform, Handle, Local,
-        MouseButton, Query, Res, ResMut, State, Transform, Visibility, With,
+        MouseButton, Query, Res, ResMut, Resource, State, Transform, Visibility, With,
     },
     render::{camera::Projection, mesh::skinning::SkinnedMesh},
-    window::Windows,
+    window::{CursorGrabMode, Windows},
 };
 use bevy_egui::{egui, EguiContext};
 use bevy_rapier3d::prelude::{InteractionGroups, QueryFilter, RapierContext};
@@ -41,6 +41,7 @@ pub struct CharacterSelectCharacter {
     pub index: usize,
 }
 
+#[derive(Resource)]
 pub struct CharacterSelectModelList {
     models: Vec<(Option<String>, Entity)>,
     select_motion: Handle<ZmoAsset>,
@@ -54,7 +55,7 @@ pub fn character_select_enter_system(
     game_data: Res<GameData>,
 ) {
     if let Some(window) = windows.get_primary_mut() {
-        window.set_cursor_lock_mode(false);
+        window.set_cursor_grab_mode(CursorGrabMode::None);
         window.set_cursor_visibility(true);
     }
 
@@ -80,7 +81,7 @@ pub fn character_select_enter_system(
     let mut models = Vec::with_capacity(game_data.character_select_positions.len());
     for (index, transform) in game_data.character_select_positions.iter().enumerate() {
         let entity = commands
-            .spawn_bundle((
+            .spawn((
                 CharacterSelectCharacter { index },
                 *transform,
                 GlobalTransform::default(),
@@ -126,7 +127,7 @@ pub fn character_select_models_system(
             if model_list.models[index].0.as_ref() != Some(&character.info.name) {
                 commands
                     .entity(model_list.models[index].1)
-                    .insert_bundle((character.info.clone(), character.equipment.clone()));
+                    .insert((character.info.clone(), character.equipment.clone()));
                 model_list.models[index].0 = Some(character.info.name.clone());
             }
 
@@ -148,7 +149,7 @@ pub fn character_select_models_system(
                     &character_model.action_motions[CharacterMotionAction::Stop1]
                 };
 
-                if active_motion.map_or(true, |x| x.motion.id != desired_motion.id) {
+                if active_motion.map_or(true, |x| x.motion.id() != desired_motion.id()) {
                     commands
                         .entity(entity)
                         .insert(ActiveMotion::new_repeating(desired_motion.clone()));
@@ -420,8 +421,12 @@ pub fn character_select_input_system(
                     10000000.0,
                     false,
                     QueryFilter::new().groups(InteractionGroups::new(
-                        COLLISION_FILTER_CLICKABLE,
-                        COLLISION_GROUP_CHARACTER | COLLISION_GROUP_PLAYER,
+                        bevy_rapier3d::rapier::geometry::Group::from_bits_truncate(
+                            COLLISION_FILTER_CLICKABLE,
+                        ),
+                        bevy_rapier3d::rapier::geometry::Group::from_bits_truncate(
+                            COLLISION_GROUP_CHARACTER | COLLISION_GROUP_PLAYER,
+                        ),
                     )),
                 ) {
                     let hit_entity = query_collider_parent

@@ -2,7 +2,8 @@ use bevy::{
     ecs::system::{lifetimeless::SRes, SystemParamItem},
     math::{Vec3, Vec4},
     prelude::{
-        App, Assets, Commands, Entity, FromWorld, HandleUntyped, Plugin, Res, ResMut, Shader, World,
+        App, Assets, Commands, Entity, FromWorld, HandleUntyped, Plugin, Res, ResMut, Resource,
+        Shader, World,
     },
     reflect::TypeUuid,
     render::{
@@ -58,6 +59,7 @@ impl Plugin for ZoneLightingPlugin {
     }
 }
 
+#[derive(Resource)]
 pub struct ZoneLighting {
     pub map_ambient_color: Vec3,
     pub character_ambient_color: Vec3,
@@ -78,7 +80,7 @@ pub struct ZoneLighting {
     pub fog_height_falloff: f32,
 }
 
-#[derive(Clone, ShaderType)]
+#[derive(Clone, ShaderType, Resource)]
 pub struct ZoneLightingUniformData {
     pub map_ambient_color: Vec4,
     pub character_ambient_color: Vec4,
@@ -98,6 +100,7 @@ pub struct ZoneLightingUniformData {
     pub fog_alpha_weight_end: f32,
 }
 
+#[derive(Resource)]
 pub struct ZoneLightingUniformMeta {
     buffer: Buffer,
     bind_group: BindGroup,

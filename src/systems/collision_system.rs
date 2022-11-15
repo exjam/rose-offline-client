@@ -56,8 +56,12 @@ pub fn collision_height_only_system(
             100000000.0,
             false,
             QueryFilter::new().groups(InteractionGroups::new(
-                COLLISION_FILTER_MOVEABLE,
-                u32::MAX & !COLLISION_GROUP_PHYSICS_TOY,
+                bevy_rapier3d::rapier::geometry::Group::from_bits_truncate(
+                    COLLISION_FILTER_MOVEABLE,
+                ),
+                bevy_rapier3d::rapier::geometry::Group::from_bits_truncate(
+                    u32::MAX & !COLLISION_GROUP_PHYSICS_TOY,
+                ),
             )),
         ) {
             Some((ray_origin + ray_direction * distance).y)
@@ -110,8 +114,12 @@ pub fn collision_player_system_join_zoin(
             100000000.0,
             false,
             QueryFilter::new().groups(InteractionGroups::new(
-                COLLISION_FILTER_MOVEABLE,
-                u32::MAX & !COLLISION_GROUP_PHYSICS_TOY,
+                bevy_rapier3d::rapier::geometry::Group::from_bits_truncate(
+                    COLLISION_FILTER_MOVEABLE,
+                ),
+                bevy_rapier3d::rapier::geometry::Group::from_bits_truncate(
+                    u32::MAX & !COLLISION_GROUP_PHYSICS_TOY,
+                ),
             )),
         ) {
             Some((ray_origin + ray_direction * distance).y)
@@ -183,8 +191,12 @@ pub fn collision_player_system(
                 &Collider::ball(collider_radius),
                 translation_delta.length(),
                 QueryFilter::new().groups(InteractionGroups::new(
-                    COLLISION_FILTER_COLLIDABLE,
-                    u32::MAX & !COLLISION_GROUP_ZONE_TERRAIN & !COLLISION_GROUP_PHYSICS_TOY,
+                    bevy_rapier3d::rapier::geometry::Group::from_bits_truncate(
+                        COLLISION_FILTER_COLLIDABLE,
+                    ),
+                    bevy_rapier3d::rapier::geometry::Group::from_bits_truncate(
+                        u32::MAX & !COLLISION_GROUP_ZONE_TERRAIN & !COLLISION_GROUP_PHYSICS_TOY,
+                    ),
                 )),
             ) {
                 let collision_translation =
@@ -221,8 +233,12 @@ pub fn collision_player_system(
             1.35 + fall_distance,
             false,
             QueryFilter::new().groups(InteractionGroups::new(
-                COLLISION_FILTER_MOVEABLE,
-                u32::MAX & !COLLISION_GROUP_PHYSICS_TOY,
+                bevy_rapier3d::rapier::geometry::Group::from_bits_truncate(
+                    COLLISION_FILTER_MOVEABLE,
+                ),
+                bevy_rapier3d::rapier::geometry::Group::from_bits_truncate(
+                    u32::MAX & !COLLISION_GROUP_PHYSICS_TOY,
+                ),
             )),
         ) {
             Some((ray_origin + ray_direction * distance).y)
@@ -260,28 +276,28 @@ pub fn collision_player_system(
             ),
             Quat::default(),
             &Collider::ball(1.0),
-            QueryFilter::new().groups(
-                InteractionGroups::all().with_filter(
+            QueryFilter::new().groups(InteractionGroups::all().with_filter(
+                bevy_rapier3d::rapier::geometry::Group::from_bits_truncate(
                     COLLISION_GROUP_ZONE_EVENT_OBJECT | COLLISION_GROUP_ZONE_WARP_OBJECT,
                 ),
-            ),
+            )),
             |hit_entity| {
                 let hit_entity = query_collider_parent
                     .get(hit_entity)
                     .map_or(hit_entity, |collider_parent| collider_parent.entity);
 
                 if let Ok(mut hit_event_object) = query_event_object.get_mut(hit_entity) {
-                    if time.seconds_since_startup() - hit_event_object.last_collision > 5.0 {
+                    if time.elapsed_seconds_f64() - hit_event_object.last_collision > 5.0 {
                         if !hit_event_object.quest_trigger_name.is_empty() {
                             quest_trigger_events.send(QuestTriggerEvent::DoTrigger(
                                 hit_event_object.quest_trigger_name.as_str().into(),
                             ));
                         }
 
-                        hit_event_object.last_collision = time.seconds_since_startup();
+                        hit_event_object.last_collision = time.elapsed_seconds_f64();
                     }
                 } else if let Ok(mut hit_warp_object) = query_warp_object.get_mut(hit_entity) {
-                    if time.seconds_since_startup() - hit_warp_object.last_collision > 5.0 {
+                    if time.elapsed_seconds_f64() - hit_warp_object.last_collision > 5.0 {
                         if let Some(game_connection) = game_connection.as_ref() {
                             game_connection
                                 .client_message_tx
@@ -289,7 +305,7 @@ pub fn collision_player_system(
                                 .ok();
                         }
 
-                        hit_warp_object.last_collision = time.seconds_since_startup();
+                        hit_warp_object.last_collision = time.elapsed_seconds_f64();
                     }
                 }
                 true

@@ -45,7 +45,7 @@ mod ui_skill_tree_system;
 mod ui_status_effects_system;
 pub mod widgets;
 
-#[derive(Default)]
+#[derive(Default, Resource)]
 pub struct UiStateWindows {
     pub character_info_open: bool,
     pub inventory_open: bool,
@@ -58,6 +58,7 @@ pub struct UiStateWindows {
     pub selected_target_ui_open: bool,
 }
 
+use bevy::prelude::Resource;
 pub use dialog_loader::{load_dialog_sprites_system, DialogInstance, DialogLoader};
 pub use drag_and_drop_slot::{DragAndDropId, DragAndDropSlot};
 pub use tooltips::{ui_add_item_tooltip, ui_add_skill_tooltip};

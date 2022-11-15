@@ -138,7 +138,7 @@ pub fn update_trail_effects(
     render_configuration: Res<RenderConfiguration>,
     time: Res<Time>,
 ) {
-    let now = time.seconds_since_startup() as f32;
+    let now = time.elapsed_seconds();
 
     for (trail_effect, mut history, transform) in query.iter_mut() {
         let transform = transform.compute_transform();
@@ -284,6 +284,7 @@ pub fn update_trail_effects(
     }
 }
 
+#[derive(Resource)]
 struct TrailEffectPipeline {
     view_layout: BindGroupLayout,
     material_layout: BindGroupLayout,
@@ -442,7 +443,7 @@ struct ExtractedTrailEffect {
     vertices: Vec<TrailEffectVertex>,
 }
 
-#[derive(Default, Component)]
+#[derive(Default, Resource)]
 struct ExtractedTrailEffects {
     trail_effects: Vec<ExtractedTrailEffect>,
 }
@@ -545,6 +546,7 @@ fn extract_trail_effects(
     extracted_trail_effects.trail_effects.truncate(trail_index);
 }
 
+#[derive(Resource)]
 struct TrailEffectMeta {
     ranges: Vec<Range<u64>>,
     vertex_count: u64,
@@ -598,10 +600,10 @@ fn prepare_trail_effects(
             if let Some(current_batch_texture) = &current_batch {
                 if current_batch_texture != &trail_effect.texture {
                     let current_batch_texture = current_batch.take().unwrap();
-                    commands.spawn_bundle((TrailEffectBatch {
+                    commands.spawn(TrailEffectBatch {
                         vertex_range: start..end,
                         handle: current_batch_texture,
-                    },));
+                    });
                     current_batch = Some(trail_effect.texture.clone_weak());
                     start = end;
                 }
@@ -616,10 +618,10 @@ fn prepare_trail_effects(
 
     if start != end {
         if let Some(current_batch_material) = current_batch {
-            commands.spawn_bundle((TrailEffectBatch {
+            commands.spawn(TrailEffectBatch {
                 vertex_range: start..end,
                 handle: current_batch_material,
-            },));
+            });
         }
     }
 
@@ -640,7 +642,7 @@ struct TrailEffectBatch {
     handle: Handle<Image>,
 }
 
-#[derive(Default)]
+#[derive(Default, Resource)]
 struct MaterialBindGroups {
     values: HashMap<Handle<Image>, BindGroup>,
 }

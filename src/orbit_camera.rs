@@ -8,7 +8,7 @@ use bevy::{
         App, Component, Entity, EventReader, GlobalTransform, Local, MouseButton, Plugin, Query,
         Res, ResMut, Time, Transform,
     },
-    window::Windows,
+    window::{CursorGrabMode, Windows},
 };
 use bevy_egui::EguiContext;
 use bevy_rapier3d::{
@@ -95,7 +95,7 @@ fn orbit_camera_update(
                 window.set_cursor_position(saved_cursor_position);
             }
 
-            window.set_cursor_lock_mode(false);
+            window.set_cursor_grab_mode(CursorGrabMode::None);
             window.set_cursor_visibility(true);
             control_state.is_dragging = false;
         }
@@ -130,7 +130,7 @@ fn orbit_camera_update(
             }
 
             if !control_state.is_dragging {
-                window.set_cursor_lock_mode(true);
+                window.set_cursor_grab_mode(CursorGrabMode::Locked);
                 window.set_cursor_visibility(false);
                 control_state.saved_cursor_position = window.cursor_position();
             }
@@ -143,7 +143,7 @@ fn orbit_camera_update(
                 window.set_cursor_position(saved_cursor_position);
             }
 
-            window.set_cursor_lock_mode(false);
+            window.set_cursor_grab_mode(CursorGrabMode::None);
             window.set_cursor_visibility(true);
         }
 
@@ -173,8 +173,12 @@ fn orbit_camera_update(
             &Collider::ball(ball_radius),
             orbit_camera.max_distance,
             QueryFilter::new().groups(InteractionGroups::new(
-                COLLISION_FILTER_MOVEABLE | COLLISION_FILTER_COLLIDABLE,
-                u32::MAX & !COLLISION_GROUP_PHYSICS_TOY,
+                bevy_rapier3d::rapier::geometry::Group::from_bits_truncate(
+                    COLLISION_FILTER_MOVEABLE | COLLISION_FILTER_COLLIDABLE,
+                ),
+                bevy_rapier3d::rapier::geometry::Group::from_bits_truncate(
+                    u32::MAX & !COLLISION_GROUP_PHYSICS_TOY,
+                ),
             )),
         ) {
             camera_collide_distance = distance.toi;

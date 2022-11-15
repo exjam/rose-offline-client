@@ -55,7 +55,7 @@ pub fn spawn_projectile_system(
         }
         let source_global_transform = source_global_transform.unwrap();
 
-        let mut entity_commands = commands.spawn_bundle((
+        let mut entity_commands = commands.spawn((
             Projectile::new(
                 event.source,
                 Some(event.effect_id),

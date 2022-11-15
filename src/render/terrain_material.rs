@@ -13,7 +13,7 @@ use bevy::{
     },
     prelude::{
         error, AddAsset, App, Assets, Entity, FromWorld, HandleUntyped, Mesh, Msaa, Plugin, Query,
-        Res, ResMut, World,
+        Res, ResMut, Resource, World,
     },
     reflect::TypeUuid,
     render::{
@@ -75,6 +75,7 @@ impl Plugin for TerrainMaterialPlugin {
     }
 }
 
+#[derive(Resource)]
 pub struct TerrainMaterialPipeline {
     pub mesh_pipeline: MeshPipeline,
     pub material_layout: BindGroupLayout,

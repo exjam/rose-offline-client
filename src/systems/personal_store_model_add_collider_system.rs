@@ -51,18 +51,22 @@ pub fn personal_store_model_add_collider_system(
         let half_extents = 0.5 * (max - min);
 
         let collider_entity = commands
-            .spawn_bundle((
+            .spawn((
                 Collider::cuboid(half_extents.x, half_extents.y, half_extents.z),
                 ColliderParent::new(entity),
                 CollisionGroups::new(
-                    if player_character.is_some() {
-                        COLLISION_GROUP_PLAYER
-                    } else {
-                        COLLISION_GROUP_CHARACTER
-                    },
-                    COLLISION_FILTER_INSPECTABLE
-                        | COLLISION_FILTER_CLICKABLE
-                        | COLLISION_GROUP_PHYSICS_TOY,
+                    bevy_rapier3d::geometry::Group::from_bits_truncate(
+                        if player_character.is_some() {
+                            COLLISION_GROUP_PLAYER
+                        } else {
+                            COLLISION_GROUP_CHARACTER
+                        },
+                    ),
+                    bevy_rapier3d::geometry::Group::from_bits_truncate(
+                        COLLISION_FILTER_INSPECTABLE
+                            | COLLISION_FILTER_CLICKABLE
+                            | COLLISION_GROUP_PHYSICS_TOY,
+                    ),
                 ),
                 Transform::from_translation(Vec3::new(0.0, half_extents.y - min.y, 0.0)),
                 GlobalTransform::default(),
@@ -73,9 +77,9 @@ pub fn personal_store_model_add_collider_system(
             .entity(personal_store_model.model)
             .add_child(collider_entity);
 
-        commands
-            .entity(entity)
-            .insert(ColliderEntity::new(collider_entity))
-            .insert_bundle((ModelHeight::new(0.65 + half_extents.y * 2.0),));
+        commands.entity(entity).insert((
+            ColliderEntity::new(collider_entity),
+            ModelHeight::new(0.65 + half_extents.y * 2.0),
+        ));
     }
 }

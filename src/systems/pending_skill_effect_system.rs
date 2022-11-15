@@ -183,7 +183,7 @@ pub fn pending_skill_effect_system(
                                 event.entity,
                                 target.entity,
                                 pending_skill_effect.skill_id,
-                            ));
+                            )); // .apply_damage(false));
 
                             apply_skill_effect(
                                 skill_data,

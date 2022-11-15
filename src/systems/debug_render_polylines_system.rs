@@ -37,7 +37,7 @@ pub fn debug_render_polylines_setup_system(
 
         collider_line_data.push(DebugRenderPolyline {
             entity: commands
-                .spawn_bundle(PolylineBundle {
+                .spawn(PolylineBundle {
                     polyline: polyline.clone(),
                     material,
                     ..Default::default()
@@ -65,7 +65,7 @@ pub fn debug_render_polylines_setup_system(
 
         DebugRenderPolyline {
             entity: commands
-                .spawn_bundle(PolylineBundle {
+                .spawn(PolylineBundle {
                     polyline: polyline.clone(),
                     material,
                     ..Default::default()
@@ -90,7 +90,7 @@ pub fn debug_render_polylines_setup_system(
 
         DebugRenderPolyline {
             entity: commands
-                .spawn_bundle(PolylineBundle {
+                .spawn(PolylineBundle {
                     polyline: polyline.clone(),
                     material,
                     ..Default::default()
@@ -116,7 +116,7 @@ pub fn debug_render_polylines_setup_system(
 
         DebugRenderPolyline {
             entity: commands
-                .spawn_bundle(PolylineBundle {
+                .spawn(PolylineBundle {
                     polyline: polyline.clone(),
                     material,
                     ..Default::default()

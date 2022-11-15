@@ -1,3 +1,6 @@
+use bevy::prelude::Resource;
+
+#[derive(Resource)]
 pub struct ServerConfiguration {
     pub ip: String,
     pub port: String,

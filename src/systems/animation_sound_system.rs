@@ -1,7 +1,9 @@
 use bevy::{
     ecs::query::WorldQuery,
     math::Vec3,
-    prelude::{AssetServer, Assets, Commands, EventReader, GlobalTransform, Query, Res, Transform},
+    prelude::{
+        AssetServer, Assets, Commands, Entity, EventReader, GlobalTransform, Query, Res, Transform,
+    },
     render::mesh::skinning::SkinnedMesh,
 };
 
@@ -103,7 +105,7 @@ pub fn animation_sound_system(
                     SoundCategory::OtherFootstep
                 };
 
-                commands.spawn_bundle((
+                commands.spawn((
                     sound_category,
                     sound_settings.gain(sound_category),
                     SpatialSound::new(asset_server.load(sound_data.path.path())),
@@ -143,7 +145,7 @@ pub fn animation_sound_system(
                         .get(event_entity.dummy_bone_offset.index + 1)
                         .and_then(|dummy_entity| query_global_transform.get(*dummy_entity).ok())
                     {
-                        commands.spawn_bundle((
+                        commands.spawn((
                             sound_category,
                             sound_settings.gain(sound_category),
                             SpatialSound::new(asset_server.load(sound_data.path.path())),
@@ -163,7 +165,7 @@ pub fn animation_sound_system(
                         .get(event_entity.dummy_bone_offset.index + 2)
                         .and_then(|dummy_entity| query_global_transform.get(*dummy_entity).ok())
                     {
-                        commands.spawn_bundle((
+                        commands.spawn((
                             sound_category,
                             sound_settings.gain(sound_category),
                             SpatialSound::new(asset_server.load(sound_data.path.path())),
@@ -204,7 +206,7 @@ pub fn animation_sound_system(
                     SoundCategory::OtherCombat
                 };
 
-                commands.spawn_bundle((
+                commands.spawn((
                     sound_category,
                     sound_settings.gain(sound_category),
                     SpatialSound::new(asset_server.load(sound_data.path.path())),
@@ -264,7 +266,7 @@ pub fn animation_sound_system(
                             SoundCategory::OtherCombat
                         };
 
-                    commands.spawn_bundle((
+                    commands.spawn((
                         sound_category,
                         sound_settings.gain(sound_category),
                         SpatialSound::new(asset_server.load(sound_data.path.path())),
@@ -340,7 +342,7 @@ pub fn animation_sound_system(
                             SoundCategory::OtherCombat
                         };
 
-                    commands.spawn_bundle((
+                    commands.spawn((
                         sound_category,
                         sound_settings.gain(sound_category),
                         SpatialSound::new(asset_server.load(sound_data.path.path())),
@@ -372,7 +374,7 @@ pub fn animation_sound_system(
                             SoundCategory::OtherCombat
                         };
 
-                    commands.spawn_bundle((
+                    commands.spawn((
                         sound_category,
                         sound_settings.gain(sound_category),
                         SpatialSound::new(asset_server.load(sound_data.path.path())),
@@ -401,7 +403,7 @@ pub fn animation_sound_system(
                             SoundCategory::OtherCombat
                         };
 
-                    commands.spawn_bundle((
+                    commands.spawn((
                         sound_category,
                         sound_settings.gain(sound_category),
                         SpatialSound::new(asset_server.load(sound_data.path.path())),
@@ -433,7 +435,7 @@ pub fn animation_sound_system(
                             SoundCategory::OtherCombat
                         };
 
-                    commands.spawn_bundle((
+                    commands.spawn((
                         sound_category,
                         sound_settings.gain(sound_category),
                         SpatialSound::new(asset_server.load(sound_data.path.path())),
@@ -465,7 +467,7 @@ pub fn animation_sound_system(
                             SoundCategory::OtherCombat
                         };
 
-                    commands.spawn_bundle((
+                    commands.spawn((
                         sound_category,
                         sound_settings.gain(sound_category),
                         SpatialSound::new(asset_server.load(sound_data.path.path())),

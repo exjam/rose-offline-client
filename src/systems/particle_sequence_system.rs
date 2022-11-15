@@ -413,7 +413,7 @@ pub fn particle_sequence_system(
             let texture_atlas_uv_y = texture_atlas_y as f32 * texture_atlas_uv_h;
 
             particle_render_data.add(
-                render_transform.mul_vec3(
+                render_transform.transform_point(
                     Vec3::new(
                         particle.position.x,
                         particle.position.z,

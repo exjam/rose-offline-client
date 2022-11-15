@@ -2,7 +2,8 @@ use bevy::{
     input::Input,
     math::{EulerRot, Vec3},
     prelude::{
-        Camera3d, Commands, Entity, KeyCode, Local, Query, Res, ResMut, State, Transform, With,
+        Camera3d, Commands, Entity, KeyCode, Local, Query, Res, ResMut, Resource, State, Transform,
+        With,
     },
 };
 use bevy_egui::{egui, EguiContext};
@@ -27,7 +28,7 @@ impl Default for DebugCameraType {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Resource)]
 pub struct UiStateDebugWindows {
     pub debug_ui_open: bool,
 

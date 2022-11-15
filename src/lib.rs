@@ -2,16 +2,14 @@
 #![allow(clippy::too_many_arguments)]
 
 use bevy::{
-    asset::AssetServerSettings,
     core_pipeline::clear_color::ClearColor,
     ecs::{event::Events, schedule::ShouldRun},
-    log::{Level, LogSettings},
+    log::Level,
     pbr::AmbientLight,
     prelude::{
         AddAsset, App, AssetServer, Assets, Camera3dBundle, Color, Commands, CoreStage,
-        DirectionalLight, DirectionalLightBundle, EulerRot, ExclusiveSystemDescriptorCoercion,
-        IntoExclusiveSystem, Msaa, ParallelSystemDescriptorCoercion, Quat, Res, ResMut, StageLabel,
-        StartupStage, State, SystemSet, SystemStage, Transform, Vec3,
+        DirectionalLight, DirectionalLightBundle, EulerRot, IntoSystemDescriptor, Msaa, Quat, Res,
+        ResMut, StageLabel, StartupStage, State, SystemSet, SystemStage, Transform, Vec3,
     },
     render::{render_resource::WgpuFeatures, settings::WgpuSettings},
     window::{WindowDescriptor, WindowMode},
@@ -451,34 +449,16 @@ fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsC
 
     // Initialise bevy engine
     app.insert_resource(Msaa { samples: 4 })
-        .insert_resource(AssetServerSettings::default())
-        .insert_resource(WindowDescriptor {
-            title: "rose-offline-client".to_string(),
-            present_mode: if config.graphics.disable_vsync {
-                bevy::window::PresentMode::Immediate
-            } else {
-                bevy::window::PresentMode::Fifo
-            },
-            width: window_width,
-            height: window_height,
-            mode: if matches!(config.graphics.mode, GraphicsModeConfig::Fullscreen) {
-                WindowMode::BorderlessFullscreen
-            } else {
-                WindowMode::Windowed
-            },
-            ..Default::default()
-        })
         .insert_resource(ClearColor(Color::rgb(0.70, 0.90, 1.0)))
         .insert_resource(WgpuSettings {
             features: WgpuFeatures::TEXTURE_COMPRESSION_BC,
             ..Default::default()
         })
-        .insert_resource(LogSettings {
+        .add_plugin(bevy::log::LogPlugin {
             level: Level::INFO,
             filter: "wgpu=error,packets=debug,quest=trace,lua=debug,con=trace,animation=info"
                 .to_string(),
         })
-        .add_plugin(bevy::log::LogPlugin::default())
         .add_plugin(bevy::core::CorePlugin::default())
         .add_plugin(bevy::time::TimePlugin::default())
         .add_plugin(bevy::diagnostic::EntityCountDiagnosticsPlugin::default())
@@ -487,11 +467,30 @@ fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsC
         .add_plugin(bevy::hierarchy::HierarchyPlugin::default())
         .add_plugin(bevy::diagnostic::DiagnosticsPlugin::default())
         .add_plugin(bevy::input::InputPlugin::default())
-        .add_plugin(bevy::window::WindowPlugin::default())
+        .add_plugin(bevy::window::WindowPlugin {
+            window: WindowDescriptor {
+                title: "rose-offline-client".to_string(),
+                present_mode: if config.graphics.disable_vsync {
+                    bevy::window::PresentMode::Immediate
+                } else {
+                    bevy::window::PresentMode::Fifo
+                },
+                width: window_width,
+                height: window_height,
+                mode: if matches!(config.graphics.mode, GraphicsModeConfig::Fullscreen) {
+                    WindowMode::BorderlessFullscreen
+                } else {
+                    WindowMode::Windowed
+                },
+                ..Default::default()
+            },
+            ..Default::default()
+        })
         .add_plugin(bevy::asset::AssetPlugin::default())
         .add_plugin(bevy::scene::ScenePlugin::default())
         .add_plugin(bevy::winit::WinitPlugin::default())
         .add_plugin(bevy::render::RenderPlugin::default())
+        .add_plugin(bevy::render::texture::ImagePlugin::default_linear())
         .add_plugin(bevy::core_pipeline::CorePipelinePlugin::default())
         .add_plugin(bevy::pbr::PbrPlugin::default());
 
@@ -665,11 +664,7 @@ fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsC
         .add_system(ui_debug_zone_list_system.label("ui_system"))
         .add_system(ui_debug_zone_time_system.label("ui_system"))
         .add_system(ui_debug_diagnostics_system.label("ui_system"))
-        .add_system(
-            ui_debug_entity_inspector_system
-                .exclusive_system()
-                .label("ui_system"),
-        );
+        .add_system(ui_debug_entity_inspector_system.label("ui_system"));
 
     // character_model_blink_system in PostUpdate to avoid any conflicts with model destruction
     // e.g. through the character select exit system.
@@ -1044,8 +1039,8 @@ fn load_common_game_data(
         .expect("Failed to create model loader"),
     );
 
-    commands.spawn_bundle(Camera3dBundle::default());
-    commands.spawn_bundle(DirectionalLightBundle {
+    commands.spawn(Camera3dBundle::default());
+    commands.spawn(DirectionalLightBundle {
         transform: Transform::from_rotation(Quat::from_euler(
             EulerRot::ZYX,
             0.0,

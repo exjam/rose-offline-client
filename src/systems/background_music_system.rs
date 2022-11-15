@@ -73,7 +73,7 @@ pub fn background_music_system(
                         if let Some(audio_source) = background_music.night_audio_source.as_ref() {
                             background_music.entity = Some(
                                 commands
-                                    .spawn_bundle((
+                                    .spawn((
                                         SoundCategory::BackgroundMusic,
                                         GlobalSound::new_repeating(audio_source.clone()),
                                         sound_settings.gain(SoundCategory::BackgroundMusic),
@@ -98,7 +98,7 @@ pub fn background_music_system(
                         if let Some(audio_source) = background_music.night_audio_source.as_ref() {
                             background_music.entity = Some(
                                 commands
-                                    .spawn_bundle((
+                                    .spawn((
                                         SoundCategory::BackgroundMusic,
                                         GlobalSound::new_repeating(audio_source.clone()),
                                         sound_settings.gain(SoundCategory::BackgroundMusic),

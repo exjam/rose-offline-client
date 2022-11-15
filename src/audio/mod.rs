@@ -1,5 +1,5 @@
 use bevy::prelude::{
-    AddAsset, App, Component, CoreStage, ParallelSystemDescriptorCoercion, Plugin, SystemSet, Vec3,
+    AddAsset, App, Component, CoreStage, IntoSystemDescriptor, Plugin, Resource, SystemSet, Vec3,
 };
 
 mod audio_source;
@@ -41,6 +41,7 @@ impl Default for SoundGain {
     }
 }
 
+#[derive(Resource)]
 pub struct OddioContext {
     pub mixer: oddio::Handle<oddio::Mixer<[f32; 2]>>,
     pub spatial: oddio::Handle<oddio::SpatialScene>,

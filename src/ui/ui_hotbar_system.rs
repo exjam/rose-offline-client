@@ -1,7 +1,7 @@
 use bevy::{
     ecs::query::WorldQuery,
     input::Input,
-    prelude::{Assets, EventWriter, KeyCode, Local, Query, Res, ResMut, With},
+    prelude::{Assets, Entity, EventWriter, KeyCode, Local, Query, Res, ResMut, With},
 };
 use bevy_egui::{egui, EguiContext};
 

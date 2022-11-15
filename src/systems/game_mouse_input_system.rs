@@ -82,8 +82,12 @@ pub fn game_mouse_input_system(
                 10000000.0,
                 false,
                 QueryFilter::new().groups(InteractionGroups::new(
-                    COLLISION_FILTER_CLICKABLE,
-                    u32::MAX & !COLLISION_GROUP_PLAYER & !COLLISION_GROUP_PHYSICS_TOY,
+                    bevy_rapier3d::rapier::geometry::Group::from_bits_truncate(
+                        COLLISION_FILTER_CLICKABLE,
+                    ),
+                    bevy_rapier3d::rapier::geometry::Group::from_bits_truncate(
+                        u32::MAX & !COLLISION_GROUP_PLAYER & !COLLISION_GROUP_PHYSICS_TOY,
+                    ),
                 )),
             ) {
                 let hit_position = ray_origin + ray_direction * distance;

@@ -17,7 +17,7 @@ use bevy::{
     },
     prelude::{
         error, AddAsset, App, AssetServer, Assets, Component, Entity, FromWorld, HandleUntyped,
-        Mesh, Msaa, Plugin, Query, Res, ResMut, Vec3, With, World,
+        Mesh, Msaa, Plugin, Query, Res, ResMut, Resource, Vec3, With, World,
     },
     reflect::TypeUuid,
     render::{
@@ -98,6 +98,7 @@ impl ExtractComponent for ObjectMaterialClipFace {
     }
 }
 
+#[derive(Resource)]
 pub struct ObjectMaterialPipeline {
     pub mesh_pipeline: MeshPipeline,
     pub material_layout: BindGroupLayout,

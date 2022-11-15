@@ -87,9 +87,11 @@ fn debug_inspector_picking_system(
                     ray_direction,
                     10000000.0,
                     false,
-                    QueryFilter::new().groups(
-                        InteractionGroups::all().with_memberships(COLLISION_FILTER_INSPECTABLE),
-                    ),
+                    QueryFilter::new().groups(InteractionGroups::all().with_memberships(
+                        bevy_rapier3d::rapier::geometry::Group::from_bits_truncate(
+                            COLLISION_FILTER_INSPECTABLE,
+                        ),
+                    )),
                 ) {
                     debug_inspector_state.entity = Some(collider_entity);
                 }

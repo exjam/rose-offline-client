@@ -273,7 +273,7 @@ pub fn ui_chatbox_system(
                         |ui| {
                             egui::ScrollArea::vertical()
                                 .auto_shrink([false; 2])
-                                .stick_to_bottom()
+                                .stick_to_bottom(true)
                                 .show(ui, |ui| {
                                     ui.label(ui_state_chatbox.textbox_layout_job.clone());
                                 });

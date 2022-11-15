@@ -13,7 +13,7 @@ use bevy::{
     },
     prelude::{
         error, AddAsset, App, Assets, Commands, Entity, FromWorld, HandleUntyped, Image, Mesh,
-        Msaa, Plugin, Query, Res, ResMut, World,
+        Msaa, Plugin, Query, Res, ResMut, Resource, World,
     },
     reflect::TypeUuid,
     render::{
@@ -73,7 +73,7 @@ impl Plugin for SkyMaterialPlugin {
     }
 }
 
-#[derive(Clone, ShaderType)]
+#[derive(Clone, ShaderType, Resource)]
 pub struct SkyUniformData {
     pub day_weight: f32,
 }
@@ -89,6 +89,7 @@ fn extract_sky_uniform_data(mut commands: Commands, zone_time: Extract<Res<ZoneT
     commands.insert_resource(SkyUniformData { day_weight });
 }
 
+#[derive(Resource)]
 struct SkyUniformMeta {
     buffer: Buffer,
     bind_group: BindGroup,
@@ -150,6 +151,7 @@ fn prepare_sky_uniform_data(
     render_queue.write_buffer(&sky_uniform_meta.buffer, 0, buffer.as_ref());
 }
 
+#[derive(Resource)]
 pub struct SkyMaterialPipeline {
     pub mesh_pipeline: MeshPipeline,
     pub material_layout: BindGroupLayout,

@@ -4,7 +4,7 @@ use bevy::{
         AssetServer, Camera3d, Commands, Entity, EventReader, EventWriter, Query, Res, ResMut,
         Transform, With,
     },
-    window::Windows,
+    window::{CursorGrabMode, Windows},
 };
 use bevy_egui::{egui, EguiContext};
 
@@ -28,7 +28,7 @@ pub fn login_state_enter_system(
 ) {
     // Ensure cursor is not locked
     if let Some(window) = windows.get_primary_mut() {
-        window.set_cursor_lock_mode(false);
+        window.set_cursor_grab_mode(CursorGrabMode::None);
         window.set_cursor_visibility(true);
     }
 

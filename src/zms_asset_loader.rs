@@ -2,7 +2,10 @@ use bevy::{
     asset::{AssetLoader, BoxedFuture, LoadContext, LoadedAsset},
     prelude::Mesh,
     reflect::TypeUuid,
-    render::{mesh::Indices, render_resource::PrimitiveTopology},
+    render::{
+        mesh::{Indices, VertexAttributeValues},
+        render_resource::PrimitiveTopology,
+    },
 };
 use rose_file_readers::{RoseFile, ZmsFile};
 
@@ -70,7 +73,10 @@ impl AssetLoader for ZmsAssetLoader {
                     }
 
                     if !zms.bone_indices.is_empty() {
-                        mesh.insert_attribute(Mesh::ATTRIBUTE_JOINT_INDEX, zms.bone_indices);
+                        mesh.insert_attribute(
+                            Mesh::ATTRIBUTE_JOINT_INDEX,
+                            VertexAttributeValues::Uint16x4(zms.bone_indices),
+                        );
                     }
 
                     if !zms.uv1.is_empty() {

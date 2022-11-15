@@ -1,3 +1,5 @@
+use bevy::prelude::Resource;
+
 use crate::protocol::ProtocolClient;
 
 pub enum NetworkThreadMessage {
@@ -5,6 +7,7 @@ pub enum NetworkThreadMessage {
     Exit,
 }
 
+#[derive(Resource)]
 pub struct NetworkThread {
     pub control_tx: tokio::sync::mpsc::UnboundedSender<NetworkThreadMessage>,
 }

@@ -1,7 +1,9 @@
+use bevy::prelude::Resource;
 use enum_map::EnumMap;
 
 use crate::{audio::SoundGain, components::SoundCategory};
 
+#[derive(Resource)]
 pub struct SoundSettings {
     pub enabled: bool,
     pub global_gain: f32,

@@ -59,12 +59,12 @@ pub fn spawn_effect(
     if let Some(effect_entity) = effect_entity {
         commands
             .entity(effect_entity)
-            .insert_bundle((Effect::new(manual_despawn),))
+            .insert(Effect::new(manual_despawn))
             .push_children(&child_entities);
         Some(effect_entity)
     } else {
         let root_entity = commands
-            .spawn_bundle((
+            .spawn((
                 Effect::new(manual_despawn),
                 Transform::default(),
                 GlobalTransform::default(),
@@ -114,7 +114,7 @@ fn spawn_mesh(
 ) -> Option<Entity> {
     Some(
         commands
-            .spawn_bundle((
+            .spawn((
                 Transform::from_translation(
                     Vec3::new(
                         eft_mesh.position.x,
@@ -132,7 +132,7 @@ fn spawn_mesh(
                 ComputedVisibility::default(),
             ))
             .with_children(|child_builder| {
-                child_builder.spawn_bundle((
+                child_builder.spawn((
                     EffectMesh {},
                     asset_server.load::<Mesh, _>(eft_mesh.mesh_file.path()),
                     effect_mesh_materials.add(EffectMeshMaterial {
@@ -197,7 +197,7 @@ fn spawn_particle(
 
     Some(
         commands
-            .spawn_bundle((
+            .spawn((
                 Transform::from_translation(
                     Vec3::new(
                         eft_particle.position.x,
@@ -216,7 +216,7 @@ fn spawn_particle(
             ))
             .with_children(|child_builder| {
                 for sequence in ptl_file.sequences {
-                    child_builder.spawn_bundle((
+                    child_builder.spawn((
                         EffectParticle {},
                         ParticleRenderData::new(
                             sequence.num_particles as usize,

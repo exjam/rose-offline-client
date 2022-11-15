@@ -10,7 +10,8 @@ use bevy::{
     pbr::MeshPipelineKey,
     prelude::{
         App, Assets, Color, Commands, Component, ComputedVisibility, Entity, FromWorld,
-        GlobalTransform, HandleUntyped, Msaa, Plugin, Query, Res, ResMut, Vec2, Vec3, World,
+        GlobalTransform, HandleUntyped, Msaa, Plugin, Query, Res, ResMut, Resource, Vec2, Vec3,
+        World,
     },
     reflect::TypeUuid,
     render::{
@@ -93,6 +94,7 @@ pub struct ExtractedRect {
     pub order: u8,
 }
 
+#[derive(Resource)]
 pub struct ExtractedWorldUi {
     pub rects: Vec<ExtractedRect>,
 }
@@ -124,7 +126,7 @@ fn extract_world_ui_rects(
             world_position: global_transform.translation(),
             screen_offset: rect.screen_offset,
             screen_size: rect.screen_size,
-            image_handle_id: rect.image.id,
+            image_handle_id: rect.image.id(),
             uv_min: rect.uv_min,
             uv_max: rect.uv_max,
             color: rect.color,
@@ -142,6 +144,7 @@ struct WorldUiVertex {
     color: [f32; 4],
 }
 
+#[derive(Resource)]
 pub struct WorldUiMeta {
     vertices: BufferVec<WorldUiVertex>,
     view_bind_group: Option<BindGroup>,
@@ -156,6 +159,7 @@ impl Default for WorldUiMeta {
     }
 }
 
+#[derive(Resource)]
 pub struct WorldUiPipeline {
     view_layout: BindGroupLayout,
     vertex_shader: Handle<Shader>,
@@ -397,7 +401,7 @@ pub struct WorldUiBatch {
     vertex_range: Range<u32>,
 }
 
-#[derive(Default)]
+#[derive(Default, Resource)]
 pub struct ImageBindGroups {
     values: HashMap<Handle<Image>, BindGroup>,
 }
@@ -424,6 +428,11 @@ pub fn queue_world_ui_meshes(
     }
 
     let msaa_key = MeshPipelineKey::from_msaa_samples(msaa.samples);
+    let pipeline = pipelines.specialize(&mut pipeline_cache, &world_ui_pipeline, msaa_key);
+    let draw_alpha_mask = transparent_draw_functions
+        .read()
+        .get_id::<DrawWorldUi>()
+        .unwrap();
 
     if let Some(view_bindings) = view_uniforms.uniforms.binding() {
         world_ui_meta.view_bind_group.get_or_insert_with(|| {
@@ -439,14 +448,11 @@ pub fn queue_world_ui_meshes(
     }
 
     for (view, mut transparent_phase) in views.iter_mut() {
-        let draw_alpha_mask = transparent_draw_functions
-            .read()
-            .get_id::<DrawWorldUi>()
-            .unwrap();
-
         let inverse_view_transform = view.transform.compute_matrix().inverse();
         let inverse_view_row_2 = inverse_view_transform.row(2);
         let view_proj = view.projection * inverse_view_transform;
+        let view_width = view.viewport.z as f32;
+        let view_height = view.viewport.w as f32;
 
         extracted_world_ui.rects.sort_unstable_by(|a, b| {
             match view_proj
@@ -458,9 +464,6 @@ pub fn queue_world_ui_meshes(
                 Some(other) => other,
             }
         });
-
-        let view_width = view.width as f32;
-        let view_height = view.height as f32;
 
         world_ui_meta.vertices.clear();
         world_ui_meta
@@ -532,10 +535,10 @@ pub fn queue_world_ui_meshes(
             let item_end = world_ui_meta.vertices.len() as u32;
 
             let visible_entity = commands
-                .spawn_bundle((WorldUiBatch {
+                .spawn(WorldUiBatch {
                     image_handle_id: rect.image_handle_id,
                     vertex_range: item_start..item_end,
-                },))
+                })
                 .id();
 
             image_bind_groups
@@ -558,16 +561,15 @@ pub fn queue_world_ui_meshes(
                     })
                 });
 
-            // println!("clip: {:?}, distance: {:?}", clip_pos.z , inverse_view_row_2.dot(rect.world_position.extend(1.0)));
-
             transparent_phase.add(Transparent3d {
                 entity: visible_entity,
                 draw_function: draw_alpha_mask,
-                pipeline: pipelines.specialize(&mut pipeline_cache, &world_ui_pipeline, msaa_key),
+                pipeline,
                 distance: inverse_view_row_2.dot(rect.world_position.extend(1.0)),
             });
         }
     }
+
     world_ui_meta
         .vertices
         .write_buffer(&render_device, &render_queue);

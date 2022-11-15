@@ -13,7 +13,7 @@ use bevy::{
     },
     prelude::{
         error, AddAsset, App, Assets, Commands, Entity, FromWorld, HandleUntyped, Mesh, Msaa,
-        Plugin, Query, Res, ResMut, Time, World,
+        Plugin, Query, Res, ResMut, Resource, Time, World,
     },
     reflect::TypeUuid,
     render::{
@@ -83,7 +83,7 @@ impl Plugin for WaterMaterialPlugin {
     }
 }
 
-#[derive(Clone, ShaderType)]
+#[derive(Clone, ShaderType, Resource)]
 pub struct WaterUniformData {
     pub current_index: i32,
     pub next_index: i32,
@@ -91,7 +91,7 @@ pub struct WaterUniformData {
 }
 
 fn extract_water_uniform_data(mut commands: Commands, time: Extract<Res<Time>>) {
-    let time = time.seconds_since_startup() * 10.0;
+    let time = time.elapsed_seconds() * 10.0;
     let current_index = (time as i32) % 25;
     let next_index = (current_index + 1) % 25;
     let next_weight = time.fract() as f32;
@@ -103,6 +103,7 @@ fn extract_water_uniform_data(mut commands: Commands, time: Extract<Res<Time>>) 
     });
 }
 
+#[derive(Resource)]
 pub struct WaterUniformMeta {
     buffer: Buffer,
 }
@@ -119,6 +120,7 @@ fn prepare_water_texture_index(
     render_queue.write_buffer(&water_uniform_meta.buffer, 0, buffer.as_ref());
 }
 
+#[derive(Resource)]
 pub struct WaterMaterialPipeline {
     pub mesh_pipeline: MeshPipeline,
     pub material_layout: BindGroupLayout,

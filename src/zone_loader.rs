@@ -534,7 +534,7 @@ pub fn spawn_zone(
 
     let mut zone_loading_assets: Vec<HandleUntyped> = Vec::default();
     let zone_entity = commands
-        .spawn_bundle((
+        .spawn((
             Zone {
                 id: zone_data.zone_id,
             },
@@ -720,7 +720,7 @@ fn spawn_skybox(
     skybox_data: &SkyboxData,
 ) -> Entity {
     commands
-        .spawn_bundle((
+        .spawn((
             asset_server.load::<Mesh, _>(skybox_data.mesh.path()),
             sky_materials.add(SkyMaterial {
                 texture_day: Some(asset_server.load(RgbTextureLoader::convert_path(
@@ -878,7 +878,7 @@ fn spawn_terrain(
     });
 
     commands
-        .spawn_bundle((
+        .spawn((
             ZoneObject::Terrain(ZoneObjectTerrain {
                 block_x: block_data.block_x as u32,
                 block_y: block_data.block_y as u32,
@@ -893,12 +893,14 @@ fn spawn_terrain(
             RigidBody::Fixed,
             Collider::trimesh(collider_verts, collider_indices),
             CollisionGroups::new(
-                COLLISION_GROUP_ZONE_TERRAIN,
-                COLLISION_FILTER_INSPECTABLE
-                    | COLLISION_FILTER_COLLIDABLE
-                    | COLLISION_GROUP_PHYSICS_TOY
-                    | COLLISION_FILTER_MOVEABLE
-                    | COLLISION_FILTER_CLICKABLE,
+                bevy_rapier3d::geometry::Group::from_bits_truncate(COLLISION_GROUP_ZONE_TERRAIN),
+                bevy_rapier3d::geometry::Group::from_bits_truncate(
+                    COLLISION_FILTER_INSPECTABLE
+                        | COLLISION_FILTER_COLLIDABLE
+                        | COLLISION_GROUP_PHYSICS_TOY
+                        | COLLISION_FILTER_MOVEABLE
+                        | COLLISION_FILTER_CLICKABLE,
+                ),
             ),
         ))
         .id()
@@ -952,8 +954,7 @@ fn spawn_water(
     mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, uvs);
 
     commands
-        .spawn()
-        .insert_bundle((
+        .spawn((
             ZoneObject::Water,
             meshes.add(mesh),
             water_material.clone(),
@@ -965,7 +966,10 @@ fn spawn_water(
             NotShadowReceiver,
             RigidBody::Fixed,
             Collider::trimesh(collider_verts, collider_indices),
-            CollisionGroups::new(COLLISION_GROUP_ZONE_WATER, COLLISION_FILTER_INSPECTABLE),
+            CollisionGroups::new(
+                bevy_rapier3d::geometry::Group::from_bits_truncate(COLLISION_GROUP_ZONE_WATER),
+                bevy_rapier3d::geometry::Group::from_bits_truncate(COLLISION_FILTER_INSPECTABLE),
+            ),
         ))
         .id()
 }
@@ -1014,7 +1018,7 @@ fn spawn_object(
     let mut mesh_cache: Vec<Option<Handle<Mesh>>> = vec![None; zsc.meshes.len()];
 
     let mut part_entities: ArrayVec<Entity, 256> = ArrayVec::new();
-    let mut object_entity_commands = commands.spawn_bundle((
+    let mut object_entity_commands = commands.spawn((
         object_type(ZoneObjectId {
             ifo_object_id,
             zsc_object_id,
@@ -1143,7 +1147,7 @@ fn spawn_object(
                 }
             }
 
-            let mut part_commands = object_commands.spawn_bundle((
+            let mut part_commands = object_commands.spawn((
                 part_object_type(ZoneObjectPart {
                     ifo_object_id,
                     zsc_object_id,
@@ -1181,7 +1185,10 @@ fn spawn_object(
                     handle: mesh,
                     shape: ComputedColliderShape::TriMesh,
                 },
-                CollisionGroups::new(collision_group, collision_filter),
+                CollisionGroups::new(
+                    bevy_rapier3d::geometry::Group::from_bits_truncate(collision_group),
+                    bevy_rapier3d::geometry::Group::from_bits_truncate(collision_filter),
+                ),
             ));
 
             let active_motion = object_part.animation_path.as_ref().map(|animation_path| {
@@ -1316,7 +1323,7 @@ fn spawn_animated_object(
 
     // TODO: Animation object morph targets, blocked by lack of bevy morph targets
     commands
-        .spawn_bundle((
+        .spawn((
             ZoneObject::AnimatedObject(ZoneObjectAnimatedObject {
                 mesh_path: mesh_path.to_string(),
                 motion_path: motion_path.to_string(),
@@ -1333,7 +1340,10 @@ fn spawn_animated_object(
                 handle: mesh,
                 shape: ComputedColliderShape::TriMesh,
             },
-            CollisionGroups::new(COLLISION_GROUP_ZONE_OBJECT, COLLISION_FILTER_INSPECTABLE),
+            CollisionGroups::new(
+                bevy_rapier3d::geometry::Group::from_bits_truncate(COLLISION_GROUP_ZONE_OBJECT),
+                bevy_rapier3d::geometry::Group::from_bits_truncate(COLLISION_FILTER_INSPECTABLE),
+            ),
         ))
         .id()
 }

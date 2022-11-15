@@ -1,5 +1,6 @@
-use bevy::prelude::{EventWriter, Local, ResMut};
+use bevy::prelude::{EventWriter, Local, ResMut, Resource};
 use bevy_egui::{egui, EguiContext};
+
 use rose_game_common::components::ItemSlot;
 
 use crate::{
@@ -7,7 +8,7 @@ use crate::{
     ui::DragAndDropId,
 };
 
-#[derive(Default)]
+#[derive(Default, Resource)]
 pub struct UiStateDragAndDrop {
     pub dragged_item: Option<DragAndDropId>,
 }

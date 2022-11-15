@@ -11,6 +11,7 @@ mod game_connection;
 mod game_data;
 mod login_connection;
 mod login_state;
+mod name_tag_cache;
 mod name_tag_settings;
 mod network_thread;
 mod render_configuration;

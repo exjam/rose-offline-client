@@ -1,7 +1,7 @@
 use bevy::{
     prelude::{
         AssetServer, Assets, BuildChildren, Commands, ComputedVisibility, GlobalTransform, Handle,
-        Transform, Vec3, Visibility,
+        Resource, Transform, Vec3, Visibility,
     },
     render::primitives::Aabb,
 };
@@ -12,6 +12,7 @@ use crate::{
     zmo_asset_loader::ZmoAsset,
 };
 
+#[derive(Resource)]
 pub struct DamageDigitsSpawner {
     pub texture_damage: Handle<DamageDigitMaterial>,
     pub texture_damage_player: Handle<DamageDigitMaterial>,
@@ -50,7 +51,7 @@ impl DamageDigitsSpawner {
 
         // We need to spawn inside a parent entity for positioning because the ActiveMotion will set the translation absolutely
         commands
-            .spawn_bundle((
+            .spawn((
                 Transform::from_translation(
                     translation + Vec3::new(0.0, model_height * scale.y, 0.0),
                 ),
@@ -59,7 +60,7 @@ impl DamageDigitsSpawner {
                 ComputedVisibility::default(),
             ))
             .with_children(|child_builder| {
-                child_builder.spawn_bundle((
+                child_builder.spawn((
                     DamageDigits { damage },
                     DamageDigitRenderData::new(4),
                     if damage == 0 {

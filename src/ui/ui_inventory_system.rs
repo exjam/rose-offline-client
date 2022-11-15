@@ -1,6 +1,6 @@
 use bevy::{
     ecs::query::WorldQuery,
-    prelude::{Assets, EventWriter, Events, Local, Query, Res, ResMut, With, World},
+    prelude::{Assets, Entity, EventWriter, Events, Local, Query, Res, ResMut, With, World},
 };
 use bevy_egui::{egui, EguiContext};
 use enum_map::{enum_map, EnumMap};

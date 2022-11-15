@@ -1,7 +1,9 @@
-use bevy::prelude::Entity;
+use bevy::prelude::{Entity, Resource};
+
 use rose_data::ZoneId;
 use rose_game_common::messages::ClientEntityId;
 
+#[derive(Resource)]
 pub struct ClientEntityList {
     pub client_entities: Vec<Option<Entity>>,
     pub player_entity: Option<Entity>,

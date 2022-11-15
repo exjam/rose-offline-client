@@ -67,7 +67,7 @@ fn advance_active_motion(
     zmo_asset: &ZmoAsset,
     time: &Time,
 ) -> Option<(f32, usize, usize)> {
-    let current_time = time.seconds_since_startup();
+    let current_time = time.elapsed_seconds_f64();
     let start_time = if let Some(start_time) = active_motion.start_time {
         start_time
     } else {

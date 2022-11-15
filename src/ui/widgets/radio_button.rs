@@ -107,7 +107,8 @@ impl DrawWidget for RadioButton {
             let label = bindings.get_label(self.id);
             if let Some(label) = label {
                 let rect = rect.shrink2(egui::vec2(4.0, 0.0));
-                let mut child_ui = ui.child_ui(rect, egui::Layout::left_to_right());
+                let mut child_ui =
+                    ui.child_ui(rect, egui::Layout::left_to_right(egui::Align::Center));
                 let style = ui.style();
                 let mut font_id = style.override_text_style.clone().map_or_else(
                     || egui::FontSelection::Default.resolve(style),

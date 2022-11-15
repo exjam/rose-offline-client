@@ -1,7 +1,7 @@
 use std::cmp::Ordering;
 use std::fmt::Write;
 
-use bevy::ecs::query::WorldQuery;
+use bevy::{ecs::query::WorldQuery, prelude::Entity};
 use bevy_egui::egui;
 
 use rose_data::{

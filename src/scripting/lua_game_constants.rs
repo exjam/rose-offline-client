@@ -1,3 +1,4 @@
+use bevy::prelude::Resource;
 use std::collections::HashMap;
 
 use rose_data::ItemType;
@@ -21,6 +22,7 @@ pub const SV_EXP: i32 = 12;
 pub const SV_LEVEL: i32 = 13;
 pub const SV_POINT: i32 = 14;
 
+#[derive(Resource)]
 pub struct LuaGameConstants {
     pub constants: HashMap<String, Lua4Value>,
 }

@@ -5,7 +5,8 @@ use bevy::{
     math::{Mat4, Quat, Vec3},
     prelude::{
         AssetServer, Assets, BuildChildren, Color, Commands, ComputedVisibility,
-        DespawnRecursiveExt, Entity, GlobalTransform, Handle, Image, Mesh, Transform, Visibility,
+        DespawnRecursiveExt, Entity, GlobalTransform, Handle, Image, Mesh, Resource, Transform,
+        Visibility,
     },
     render::mesh::skinning::{SkinnedMesh, SkinnedMeshInverseBindposes},
 };
@@ -44,6 +45,7 @@ const TRAIL_COLOURS: [Color; 9] = [
     Color::rgba(1.0, 0.5, 0.0, 1.0),
 ];
 
+#[derive(Resource)]
 pub struct ModelLoader {
     vfs: Arc<VirtualFilesystem>,
     character_motion_database: Arc<CharacterMotionDatabase>,
@@ -337,7 +339,7 @@ impl ModelLoader {
         skin: usize,
     ) -> PersonalStoreModel {
         let root_bone = commands
-            .spawn_bundle((
+            .spawn((
                 Visibility::default(),
                 ComputedVisibility::default(),
                 Transform::default(),
@@ -385,7 +387,7 @@ impl ModelLoader {
         };
 
         let root_bone = commands
-            .spawn_bundle((
+            .spawn((
                 Visibility::default(),
                 ComputedVisibility::default(),
                 Transform::default(),
@@ -485,7 +487,7 @@ impl ModelLoader {
         let end_position = object.effects.get(base_effect_index + 1)?.position;
         Some(
             commands
-                .spawn_bundle((
+                .spawn((
                     TrailEffect {
                         colour,
                         duration,
@@ -1121,7 +1123,7 @@ fn spawn_skeleton(
 
         bone_entities.push(
             commands
-                .spawn_bundle((
+                .spawn((
                     Visibility::default(),
                     ComputedVisibility::default(),
                     transform,
@@ -1210,7 +1212,7 @@ fn spawn_model(
             ..Default::default()
         });
 
-        let mut entity_commands = commands.spawn_bundle((
+        let mut entity_commands = commands.spawn((
             mesh,
             material,
             Transform::default(),

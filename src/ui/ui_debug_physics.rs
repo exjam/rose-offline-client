@@ -196,9 +196,11 @@ pub fn ui_debug_physics_system(
                     ray_direction,
                     10000000.0,
                     false,
-                    QueryFilter::new().groups(
-                        InteractionGroups::all().with_memberships(COLLISION_FILTER_CLICKABLE),
-                    ),
+                    QueryFilter::new().groups(InteractionGroups::all().with_memberships(
+                        bevy_rapier3d::rapier::geometry::Group::from_bits_truncate(
+                            COLLISION_FILTER_CLICKABLE,
+                        ),
+                    )),
                 ) {
                     while ui_state_debug_physics.spawn_timer
                         >= ui_state_debug_physics.spawn_interval
@@ -234,7 +236,7 @@ pub fn ui_debug_physics_system(
                         let hit_position = ray_origin + ray_direction * distance;
 
                         let entity_id = commands
-                            .spawn_bundle((
+                            .spawn((
                                 mesh,
                                 material,
                                 RigidBody::Dynamic,
@@ -248,12 +250,17 @@ pub fn ui_debug_physics_system(
                                 GlobalTransform::default(),
                                 Visibility::default(),
                                 ComputedVisibility::default(),
-                                CollisionGroups::new(COLLISION_GROUP_PHYSICS_TOY, u32::MAX),
+                                CollisionGroups::new(
+                                    bevy_rapier3d::geometry::Group::from_bits_truncate(
+                                        COLLISION_GROUP_PHYSICS_TOY,
+                                    ),
+                                    bevy_rapier3d::geometry::Group::all(),
+                                ),
                             ))
                             .id();
 
                         let npc_entity = commands
-                            .spawn_bundle((
+                            .spawn((
                                 Npc::new(NpcId::new(1).unwrap(), 0),
                                 ColliderEntity::new(entity_id),
                                 Transform::from_translation(Vec3::new(

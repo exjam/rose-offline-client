@@ -478,7 +478,7 @@ pub fn name_tag_system(
 
         // Spawn name tag entities
         let name_tag_entity = commands
-            .spawn_bundle((
+            .spawn((
                 NameTag { name_tag_type },
                 Visibility {
                     is_visible: name_tag_settings.show_all[name_tag_type],
@@ -629,7 +629,7 @@ pub fn name_tag_system(
 
         commands.entity(name_tag_entity).add_children(|builder| {
             for rect in name_tag_data.rects.iter() {
-                builder.spawn_bundle((
+                builder.spawn((
                     NameTagName,
                     rect.clone(),
                     Transform::default(),
@@ -641,7 +641,7 @@ pub fn name_tag_system(
             }
 
             for rect in target_marks.drain(..) {
-                builder.spawn_bundle((
+                builder.spawn((
                     NameTagTargetMark,
                     rect,
                     Transform::default(),
@@ -653,7 +653,7 @@ pub fn name_tag_system(
             }
 
             if let Some(rect) = healthbar_bg_rect.take() {
-                builder.spawn_bundle((
+                builder.spawn((
                     NameTagHealthbarBackground,
                     rect,
                     Transform::default(),
@@ -665,7 +665,7 @@ pub fn name_tag_system(
             }
 
             if let Some(rect) = healthbar_fg_rect.take() {
-                builder.spawn_bundle((
+                builder.spawn((
                     NameTagHealthbarForeground {
                         full_width: health_bar_size.x,
                         uv_min_x: health_bar_foreground_uv_x_bounds.0,

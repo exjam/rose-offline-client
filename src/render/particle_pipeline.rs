@@ -66,6 +66,7 @@ impl Plugin for ParticleRenderPlugin {
     }
 }
 
+#[derive(Resource)]
 struct ParticlePipeline {
     view_layout: BindGroupLayout,
     particle_layout: BindGroupLayout,
@@ -383,7 +384,7 @@ struct ExtractedParticleRenderData {
     textures: Vec<Vec4>,
 }
 
-#[derive(Default, Component)]
+#[derive(Default, Resource)]
 struct ExtractedParticles {
     particles: Vec<ExtractedParticleRenderData>,
 }
@@ -430,6 +431,7 @@ fn extract_particles(
     }
 }
 
+#[derive(Resource)]
 struct ParticleMeta {
     ranges: Vec<Range<u64>>,
     total_count: u64,
@@ -502,11 +504,11 @@ fn prepare_particles(
                     || current_batch_texture != &particle.texture
                 {
                     let (current_batch_key, current_batch_texture) = current_batch.take().unwrap();
-                    commands.spawn_bundle((ParticleBatch {
+                    commands.spawn(ParticleBatch {
                         range: start..end,
                         handle: current_batch_texture,
                         material_key: current_batch_key,
-                    },));
+                    });
                     current_batch = Some((particle.material_key, particle.texture.clone_weak()));
                     start = end;
                 }
@@ -524,11 +526,11 @@ fn prepare_particles(
 
     if start != end {
         if let Some((current_batch_key, current_batch_material)) = current_batch {
-            commands.spawn_bundle((ParticleBatch {
+            commands.spawn(ParticleBatch {
                 range: start..end,
                 handle: current_batch_material,
                 material_key: current_batch_key,
-            },));
+            });
         }
     }
 
@@ -567,7 +569,7 @@ struct ParticleBatch {
     material_key: ParticlePipelineKey,
 }
 
-#[derive(Default)]
+#[derive(Default, Resource)]
 struct MaterialBindGroups {
     values: HashMap<Handle<Image>, BindGroup>,
 }

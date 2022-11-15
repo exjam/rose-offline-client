@@ -680,7 +680,7 @@ pub fn command_system(
                 // If this move command has a different move mode, update move mode and move speed
                 if let Some(command_move_mode) = command_move_mode.as_ref() {
                     if command_move_mode != move_mode {
-                        entity_commands.insert_bundle((
+                        entity_commands.insert((
                             *command_move_mode,
                             MoveSpeed::new(ability_values.get_move_speed(command_move_mode)),
                         ));
