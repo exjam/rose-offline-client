@@ -2,12 +2,12 @@
 #![allow(clippy::too_many_arguments)]
 
 use bevy::{
-    core_pipeline::clear_color::ClearColor,
+    core_pipeline::{bloom::BloomSettings, clear_color::ClearColor},
     ecs::{event::Events, schedule::ShouldRun},
     log::Level,
     pbr::AmbientLight,
     prelude::{
-        AddAsset, App, AssetServer, Assets, Camera3dBundle, Color, Commands, CoreStage,
+        AddAsset, App, AssetServer, Assets, Camera, Camera3dBundle, Color, Commands, CoreStage,
         DirectionalLight, DirectionalLightBundle, EulerRot, IntoSystemDescriptor, Msaa, Quat, Res,
         ResMut, StageLabel, StartupStage, State, SystemSet, SystemStage, Transform, Vec3,
     },
@@ -1039,7 +1039,17 @@ fn load_common_game_data(
         .expect("Failed to create model loader"),
     );
 
-    commands.spawn(Camera3dBundle::default());
+    commands.spawn((
+        Camera3dBundle {
+            camera: Camera {
+                hdr: false,
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+        BloomSettings::default(),
+    ));
+
     commands.spawn(DirectionalLightBundle {
         transform: Transform::from_rotation(Quat::from_euler(
             EulerRot::ZYX,

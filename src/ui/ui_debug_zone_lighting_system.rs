@@ -1,4 +1,7 @@
-use bevy::prelude::ResMut;
+use bevy::{
+    core_pipeline::bloom::BloomSettings,
+    prelude::{Camera, Query, ResMut},
+};
 use bevy_egui::{egui, EguiContext};
 
 use crate::{render::ZoneLighting, ui::UiStateDebugWindows};
@@ -7,6 +10,7 @@ pub fn ui_debug_zone_lighting_system(
     mut egui_context: ResMut<EguiContext>,
     mut ui_state_debug_windows: ResMut<UiStateDebugWindows>,
     mut zone_lighting: ResMut<ZoneLighting>,
+    mut query_camera: Query<(&mut Camera, &mut BloomSettings)>,
 ) {
     if !ui_state_debug_windows.debug_ui_open {
         return;
@@ -130,5 +134,44 @@ pub fn ui_debug_zone_lighting_system(
                     );
                     ui.end_row();
                 });
+
+            ui.separator();
+
+            if let Ok((mut camera, mut bloom_settings)) = query_camera.get_single_mut() {
+                egui::Grid::new("bloom_settings")
+                    .num_columns(2)
+                    .show(ui, |ui| {
+                        ui.label("HDR Enabled:");
+                        ui.checkbox(&mut camera.hdr, "Enabled");
+                        ui.end_row();
+
+                        ui.label("Bloom Threshold:");
+                        ui.add(
+                            egui::Slider::new(&mut bloom_settings.threshold, 0.0..=2.0)
+                                .show_value(true),
+                        );
+                        ui.end_row();
+
+                        ui.label("Knee:");
+                        ui.add(
+                            egui::Slider::new(&mut bloom_settings.knee, 0.0..=1.0).show_value(true),
+                        );
+                        ui.end_row();
+
+                        ui.label("Scale:");
+                        ui.add(
+                            egui::Slider::new(&mut bloom_settings.scale, 0.0..=2.0)
+                                .show_value(true),
+                        );
+                        ui.end_row();
+
+                        ui.label("Intensity:");
+                        ui.add(
+                            egui::Slider::new(&mut bloom_settings.intensity, 0.0..=1.0)
+                                .show_value(true),
+                        );
+                        ui.end_row();
+                    });
+            }
         });
 }
