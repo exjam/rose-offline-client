@@ -328,7 +328,8 @@ pub fn queue_terrain_material_meshes(
             .unwrap();
 
         let rangefinder = view.rangefinder3d();
-        let msaa_key = MeshPipelineKey::from_msaa_samples(msaa.samples);
+        let view_key =
+            MeshPipelineKey::from_msaa_samples(msaa.samples) | MeshPipelineKey::from_hdr(view.hdr);
 
         for visible_entity in &visible_entities.entities {
             if let Ok((material_handle, mesh_handle, mesh_uniform)) =
@@ -338,7 +339,7 @@ pub fn queue_terrain_material_meshes(
                     if let Some(mesh) = render_meshes.get(mesh_handle) {
                         let mesh_key =
                             MeshPipelineKey::from_primitive_topology(mesh.primitive_topology)
-                                | msaa_key;
+                                | view_key;
 
                         let pipeline_id = pipelines.specialize(
                             &mut pipeline_cache,

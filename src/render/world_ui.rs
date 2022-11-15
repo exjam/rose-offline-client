@@ -35,7 +35,7 @@ use bevy::{
         },
         renderer::{RenderDevice, RenderQueue},
         texture::{BevyDefault, Image},
-        view::{ExtractedView, ViewUniform, ViewUniformOffset, ViewUniforms},
+        view::{ExtractedView, ViewTarget, ViewUniform, ViewUniformOffset, ViewUniforms},
         Extract, RenderApp, RenderStage,
     },
     utils::HashMap,
@@ -213,7 +213,10 @@ impl SpecializedRenderPipeline for WorldUiPipeline {
                 shader_defs: vec!["ZONE_LIGHTING_GROUP_2".into()],
                 entry_point: "fragment".into(),
                 targets: vec![Some(ColorTargetState {
-                    format: TextureFormat::bevy_default(),
+                    format: match key.contains(MeshPipelineKey::HDR) {
+                        true => ViewTarget::TEXTURE_FORMAT_HDR,
+                        false => TextureFormat::bevy_default(),
+                    },
                     blend: Some(BlendState {
                         color: BlendComponent {
                             src_factor: BlendFactor::SrcAlpha,
@@ -427,8 +430,6 @@ pub fn queue_world_ui_meshes(
         return;
     }
 
-    let msaa_key = MeshPipelineKey::from_msaa_samples(msaa.samples);
-    let pipeline = pipelines.specialize(&mut pipeline_cache, &world_ui_pipeline, msaa_key);
     let draw_alpha_mask = transparent_draw_functions
         .read()
         .get_id::<DrawWorldUi>()
@@ -448,6 +449,9 @@ pub fn queue_world_ui_meshes(
     }
 
     for (view, mut transparent_phase) in views.iter_mut() {
+        let view_key =
+            MeshPipelineKey::from_msaa_samples(msaa.samples) | MeshPipelineKey::from_hdr(view.hdr);
+        let pipeline = pipelines.specialize(&mut pipeline_cache, &world_ui_pipeline, view_key);
         let inverse_view_transform = view.transform.compute_matrix().inverse();
         let inverse_view_row_2 = inverse_view_transform.row(2);
         let view_proj = view.projection * inverse_view_transform;

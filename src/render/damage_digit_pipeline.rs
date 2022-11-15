@@ -18,7 +18,10 @@ use bevy::{
         render_resource::*,
         renderer::{RenderDevice, RenderQueue},
         texture::{BevyDefault, Image},
-        view::{ComputedVisibility, ViewUniform, ViewUniformOffset, ViewUniforms},
+        view::{
+            ComputedVisibility, ExtractedView, ViewTarget, ViewUniform, ViewUniformOffset,
+            ViewUniforms,
+        },
         Extract, RenderApp, RenderStage,
     },
 };
@@ -154,6 +157,7 @@ bitflags::bitflags! {
     #[repr(transparent)]
     pub struct DamageDigitPipelineKey: u32 {
         const NONE                        = 0;
+        const HDR                         = (1 << 1);
         const MSAA_RESERVED_BITS          = DamageDigitPipelineKey::MSAA_MASK_BITS << DamageDigitPipelineKey::MSAA_SHIFT_BITS;
     }
 }
@@ -165,6 +169,14 @@ impl DamageDigitPipelineKey {
     pub fn from_msaa_samples(msaa_samples: u32) -> Self {
         let msaa_bits = ((msaa_samples - 1) & Self::MSAA_MASK_BITS) << Self::MSAA_SHIFT_BITS;
         DamageDigitPipelineKey::from_bits(msaa_bits).unwrap()
+    }
+
+    pub fn from_hdr(hdr: bool) -> Self {
+        if hdr {
+            DamageDigitPipelineKey::HDR
+        } else {
+            DamageDigitPipelineKey::NONE
+        }
     }
 
     pub fn msaa_samples(&self) -> u32 {
@@ -188,7 +200,10 @@ impl SpecializedRenderPipeline for DamageDigitPipeline {
                 shader_defs: vec![],
                 entry_point: "fs_main".into(),
                 targets: vec![Some(ColorTargetState {
-                    format: TextureFormat::bevy_default(),
+                    format: match key.contains(DamageDigitPipelineKey::HDR) {
+                        true => ViewTarget::TEXTURE_FORMAT_HDR,
+                        false => TextureFormat::bevy_default(),
+                    },
                     blend: Some(BlendState::ALPHA_BLENDING),
                     write_mask: ColorWrites::ALL,
                 })],
@@ -413,7 +428,7 @@ struct MaterialBindGroups {
 #[allow(clippy::too_many_arguments)]
 fn queue_damage_digits(
     transparent_draw_functions: Res<DrawFunctions<Transparent3d>>,
-    mut views: Query<&mut RenderPhase<Transparent3d>>,
+    mut views: Query<(&ExtractedView, &mut RenderPhase<Transparent3d>)>,
     render_device: Res<RenderDevice>,
     mut material_bind_groups: ResMut<MaterialBindGroups>,
     mut damage_digit_meta: ResMut<DamageDigitMeta>,
@@ -429,7 +444,6 @@ fn queue_damage_digits(
     if view_uniforms.uniforms.is_empty() || damage_digit_meta.total_count == 0 {
         return;
     }
-    let msaa_key = DamageDigitPipelineKey::from_msaa_samples(msaa.samples);
 
     if let Some(view_bindings) = view_uniforms.uniforms.binding() {
         damage_digit_meta.view_bind_group.get_or_insert_with(|| {
@@ -471,7 +485,10 @@ fn queue_damage_digits(
         .read()
         .get_id::<DrawDamageDigit>()
         .unwrap();
-    for mut transparent_phase in views.iter_mut() {
+    for (view, mut transparent_phase) in views.iter_mut() {
+        let view_key = DamageDigitPipelineKey::from_msaa_samples(msaa.samples)
+            | DamageDigitPipelineKey::from_hdr(view.hdr);
+
         for (entity, batch) in damage_digit_batches.iter() {
             let gpu_material = render_materials
                 .get(&batch.handle)
@@ -502,7 +519,7 @@ fn queue_damage_digits(
                 pipeline: pipelines.specialize(
                     &mut pipeline_cache,
                     &damage_digit_pipeline,
-                    msaa_key,
+                    view_key,
                 ),
                 entity,
                 draw_function: draw_particle_function,

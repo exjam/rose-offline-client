@@ -410,7 +410,8 @@ fn queue_sky_material_meshes(
     for (view, visible_entities, mut opaque_phase) in views.iter_mut() {
         let inverse_view_matrix = view.transform.compute_matrix().inverse();
         let _inverse_view_row_2 = inverse_view_matrix.row(2);
-        let msaa_key = MeshPipelineKey::from_msaa_samples(msaa.samples);
+        let view_key =
+            MeshPipelineKey::from_msaa_samples(msaa.samples) | MeshPipelineKey::from_hdr(view.hdr);
 
         for visible_entity in &visible_entities.entities {
             if let Ok((material_handle, mesh_handle, _mesh_uniform)) =
@@ -420,7 +421,7 @@ fn queue_sky_material_meshes(
                     if let Some(mesh) = render_meshes.get(mesh_handle) {
                         let mesh_key =
                             MeshPipelineKey::from_primitive_topology(mesh.primitive_topology)
-                                | msaa_key;
+                                | view_key;
 
                         let pipeline_id = pipelines.specialize(
                             &mut pipeline_cache,

@@ -20,7 +20,8 @@ use bevy::{
         renderer::{RenderDevice, RenderQueue},
         texture::{BevyDefault, Image},
         view::{
-            ComputedVisibility, ViewUniform, ViewUniformOffset, ViewUniforms, VisibilitySystems,
+            ComputedVisibility, ExtractedView, ViewTarget, ViewUniform, ViewUniformOffset,
+            ViewUniforms, VisibilitySystems,
         },
         Extract, RenderApp, RenderStage,
     },
@@ -185,6 +186,7 @@ bitflags::bitflags! {
     #[repr(transparent)]
     pub struct ParticlePipelineKey: u32 {
         const NONE                        = 0;
+        const HDR                         = (1 << 1);
         const BLEND_OP_BITS               = ParticlePipelineKey::BLEND_OP_MASK_BITS << ParticlePipelineKey::BLEND_OP_SHIFT_BITS;
         const SRC_BLEND_FACTOR_BITS       = ParticlePipelineKey::BLEND_FACTOR_MASK_BITS << ParticlePipelineKey::SRC_BLEND_FACTOR_SHIFT_BITS;
         const DST_BLEND_FACTOR_BITS       = ParticlePipelineKey::BLEND_FACTOR_MASK_BITS << ParticlePipelineKey::DST_BLEND_FACTOR_SHIFT_BITS;
@@ -237,6 +239,14 @@ impl ParticlePipelineKey {
     pub fn from_msaa_samples(msaa_samples: u32) -> Self {
         let msaa_bits = ((msaa_samples - 1) & Self::MSAA_MASK_BITS) << Self::MSAA_SHIFT_BITS;
         ParticlePipelineKey::from_bits(msaa_bits).unwrap()
+    }
+
+    pub fn from_hdr(hdr: bool) -> Self {
+        if hdr {
+            ParticlePipelineKey::HDR
+        } else {
+            ParticlePipelineKey::NONE
+        }
     }
 
     pub fn from_blend(blend_op: u8, src_blend_factor: u8, dst_blend_factor: u8) -> Self {
@@ -310,7 +320,10 @@ impl SpecializedRenderPipeline for ParticlePipeline {
                 shader_defs: vec![],
                 entry_point: "fs_main".into(),
                 targets: vec![Some(ColorTargetState {
-                    format: TextureFormat::bevy_default(),
+                    format: match key.contains(ParticlePipelineKey::HDR) {
+                        true => ViewTarget::TEXTURE_FORMAT_HDR,
+                        false => TextureFormat::bevy_default(),
+                    },
                     blend: Some(BlendState {
                         color: BlendComponent {
                             src_factor,
@@ -577,7 +590,7 @@ struct MaterialBindGroups {
 #[allow(clippy::too_many_arguments)]
 fn queue_particles(
     transparent_draw_functions: Res<DrawFunctions<Transparent3d>>,
-    mut views: Query<&mut RenderPhase<Transparent3d>>,
+    mut views: Query<(&ExtractedView, &mut RenderPhase<Transparent3d>)>,
     render_device: Res<RenderDevice>,
     mut material_bind_groups: ResMut<MaterialBindGroups>,
     mut particle_meta: ResMut<ParticleMeta>,
@@ -592,7 +605,6 @@ fn queue_particles(
     if view_uniforms.uniforms.is_empty() || particle_meta.total_count == 0 {
         return;
     }
-    let msaa_key = ParticlePipelineKey::from_msaa_samples(msaa.samples);
 
     if let Some(view_bindings) = view_uniforms.uniforms.binding() {
         particle_meta.view_bind_group.get_or_insert_with(|| {
@@ -637,7 +649,10 @@ fn queue_particles(
         .get_id::<DrawParticle>()
         .unwrap();
 
-    for mut transparent_phase in views.iter_mut() {
+    for (view, mut transparent_phase) in views.iter_mut() {
+        let view_key = ParticlePipelineKey::from_msaa_samples(msaa.samples)
+            | ParticlePipelineKey::from_hdr(view.hdr);
+
         for (entity, batch) in particle_batches.iter() {
             if let Some(gpu_image) = gpu_images.get(&batch.handle) {
                 material_bind_groups.values.insert(
@@ -664,7 +679,7 @@ fn queue_particles(
                 pipeline: pipelines.specialize(
                     &mut pipeline_cache,
                     &particle_pipeline,
-                    msaa_key | batch.material_key,
+                    view_key | batch.material_key,
                 ),
                 entity,
                 draw_function: draw_particle_function,

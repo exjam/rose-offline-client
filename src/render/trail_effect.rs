@@ -21,7 +21,10 @@ use bevy::{
         render_resource::*,
         renderer::{RenderDevice, RenderQueue},
         texture::{BevyDefault, Image},
-        view::{ComputedVisibility, ViewUniform, ViewUniformOffset, ViewUniforms},
+        view::{
+            ComputedVisibility, ExtractedView, ViewTarget, ViewUniform, ViewUniformOffset,
+            ViewUniforms,
+        },
         Extract, RenderApp, RenderStage,
     },
     time::Time,
@@ -378,7 +381,10 @@ impl SpecializedRenderPipeline for TrailEffectPipeline {
                 shader_defs: vec![],
                 entry_point: "fs_main".into(),
                 targets: vec![Some(ColorTargetState {
-                    format: TextureFormat::bevy_default(),
+                    format: match key.contains(MeshPipelineKey::HDR) {
+                        true => ViewTarget::TEXTURE_FORMAT_HDR,
+                        false => TextureFormat::bevy_default(),
+                    },
                     blend: Some(BlendState {
                         color: BlendComponent {
                             src_factor: BlendFactor::One,
@@ -650,7 +656,7 @@ struct MaterialBindGroups {
 #[allow(clippy::too_many_arguments)]
 fn queue_trail_effects(
     transparent_draw_functions: Res<DrawFunctions<Transparent3d>>,
-    mut views: Query<&mut RenderPhase<Transparent3d>>,
+    mut views: Query<(&ExtractedView, &mut RenderPhase<Transparent3d>)>,
     render_device: Res<RenderDevice>,
     mut material_bind_groups: ResMut<MaterialBindGroups>,
     mut trail_effect_meta: ResMut<TrailEffectMeta>,
@@ -665,7 +671,6 @@ fn queue_trail_effects(
     if view_uniforms.uniforms.is_empty() || trail_effect_meta.vertex_count == 0 {
         return;
     }
-    let msaa_key = MeshPipelineKey::from_msaa_samples(msaa.samples);
 
     if let Some(view_bindings) = view_uniforms.uniforms.binding() {
         trail_effect_meta.view_bind_group.get_or_insert_with(|| {
@@ -685,7 +690,10 @@ fn queue_trail_effects(
         .get_id::<DrawTrailEffect>()
         .unwrap();
 
-    for mut transparent_phase in views.iter_mut() {
+    for (view, mut transparent_phase) in views.iter_mut() {
+        let view_key =
+            MeshPipelineKey::from_msaa_samples(msaa.samples) | MeshPipelineKey::from_hdr(view.hdr);
+
         for (entity, batch) in trail_effect_batches.iter() {
             if let Some(gpu_image) = gpu_images.get(&batch.handle) {
                 material_bind_groups.values.insert(
@@ -712,7 +720,7 @@ fn queue_trail_effects(
                 pipeline: pipelines.specialize(
                     &mut pipeline_cache,
                     &trail_effect_pipeline,
-                    msaa_key,
+                    view_key,
                 ),
                 entity,
                 draw_function: draw_trail_effect_function,
