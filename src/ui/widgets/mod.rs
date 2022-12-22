@@ -36,6 +36,7 @@ mod skill;
 mod tab;
 mod tab_button;
 mod tabbed_pane;
+mod table;
 mod zlistbox;
 
 pub use self::image::Image;
@@ -57,6 +58,7 @@ pub use skill::Skill;
 pub use tab::Tab;
 pub use tab_button::TabButton;
 pub use tabbed_pane::TabbedPane;
+pub use table::Table;
 pub use zlistbox::ZListbox;
 
 pub trait DrawWidget {
@@ -104,6 +106,8 @@ pub enum Widget {
     #[serde(alias = "IMAGEMIDDLE")]
     #[serde(alias = "IMAGEBOTTOM")]
     Image(Image),
+    #[serde(rename = "TABLE")]
+    Table(Table),
     #[serde(rename = "TABBUTTON")]
     TabButton(TabButton),
     #[serde(rename = "TABBEDPANE")]
@@ -129,6 +133,7 @@ impl Widget {
             Widget::Scrollbar(x) => x.id,
             Widget::Skill(x) => (x.id + x.level) as i32,
             Widget::Image(x) => x.id,
+            Widget::Table(x) => x.id,
             Widget::TabButton(x) => x.id,
             Widget::TabbedPane(x) => x.id,
             Widget::ZListbox(x) => x.id,
@@ -152,6 +157,7 @@ impl DrawWidget for Widget {
             Widget::Scrollbar(this) => this.draw_widget(ui, bindings),
             Widget::Skill(this) => this.draw_widget(ui, bindings),
             Widget::Image(this) => this.draw_widget(ui, bindings),
+            Widget::Table(this) => this.draw_widget(ui, bindings),
             Widget::TabButton(this) => this.draw_widget(ui, bindings),
             Widget::TabbedPane(this) => this.draw_widget(ui, bindings),
             Widget::ZListbox(this) => this.draw_widget(ui, bindings),
@@ -175,6 +181,7 @@ impl LoadWidget for Widget {
             Widget::Scrollbar(this) => this.load_widget(ui_resources),
             Widget::Skill(this) => this.load_widget(ui_resources),
             Widget::Image(this) => this.load_widget(ui_resources),
+            Widget::Table(this) => this.load_widget(ui_resources),
             Widget::TabButton(this) => this.load_widget(ui_resources),
             Widget::TabbedPane(this) => this.load_widget(ui_resources),
             Widget::ZListbox(this) => this.load_widget(ui_resources),
@@ -233,6 +240,7 @@ impl GetWidget for Vec<Widget> {
                 | Widget::RadioBox(_)
                 | Widget::RadioButton(_)
                 | Widget::Image(_)
+                | Widget::Table(_)
                 | Widget::TabButton(_)
                 | Widget::ZListbox(_)
                 | Widget::Scrollbar(_) => {
@@ -278,6 +286,7 @@ impl GetWidget for Vec<Widget> {
                 | Widget::RadioBox(_)
                 | Widget::RadioButton(_)
                 | Widget::Image(_)
+                | Widget::Table(_)
                 | Widget::TabButton(_)
                 | Widget::ZListbox(_)
                 | Widget::Scrollbar(_) => {

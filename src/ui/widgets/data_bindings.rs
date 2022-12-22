@@ -20,6 +20,18 @@ pub struct DataBindings<'a> {
             &'a dyn Fn(&mut egui::Ui, i32, bool) -> egui::Response,
         ),
     )],
+    pub table: &'a mut [(
+        i32,
+        (
+            &'a mut i32,
+            &'a dyn Fn(
+                &mut egui::Ui,
+                /* index */ i32,
+                /* colum */ i32,
+                /* row */ i32,
+            ) -> egui::Response,
+        ),
+    )],
     pub response: &'a mut [(i32, &'a mut Option<egui::Response>)],
 }
 
@@ -77,6 +89,19 @@ impl<'a> DataBindings<'a> {
             .iter()
             .find(|(x, _)| *x == id)
             .map_or(true, |(_, visible)| *visible)
+    }
+
+    pub fn get_table(
+        &mut self,
+        id: i32,
+    ) -> Option<(
+        &mut i32,
+        &dyn Fn(&mut egui::Ui, i32, i32, i32) -> egui::Response,
+    )> {
+        self.table
+            .iter_mut()
+            .find(|(x, _)| *x == id)
+            .map(|(_, (a, b))| (&mut **a, &**b))
     }
 
     pub fn get_zlist(
