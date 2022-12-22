@@ -47,7 +47,7 @@ impl StreamingAudioSource for WavAudioSource {
     }
 
     fn sample_rate(&self) -> u32 {
-        self.reader.spec().sample_rate as u32
+        self.reader.spec().sample_rate
     }
 
     fn rewind(&mut self) {

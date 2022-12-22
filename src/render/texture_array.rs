@@ -48,7 +48,7 @@ impl TextureArrayBuilder {
         let mut images = Vec::new();
 
         for path in self.image_paths.into_iter() {
-            images.push(asset_server.load(&(path + ".image_copy_src")));
+            images.push(asset_server.load(path + ".image_copy_src"));
         }
 
         TextureArray { images }

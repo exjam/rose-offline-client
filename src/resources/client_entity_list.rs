@@ -24,11 +24,11 @@ impl Default for ClientEntityList {
 
 impl ClientEntityList {
     pub fn add(&mut self, id: ClientEntityId, entity: Entity) {
-        self.client_entities[id.0 as usize] = Some(entity);
+        self.client_entities[id.0] = Some(entity);
     }
 
     pub fn remove(&mut self, id: ClientEntityId) {
-        self.client_entities[id.0 as usize] = None;
+        self.client_entities[id.0] = None;
     }
 
     pub fn clear(&mut self) {
@@ -36,6 +36,6 @@ impl ClientEntityList {
     }
 
     pub fn get(&self, id: ClientEntityId) -> Option<Entity> {
-        self.client_entities[id.0 as usize]
+        self.client_entities[id.0]
     }
 }

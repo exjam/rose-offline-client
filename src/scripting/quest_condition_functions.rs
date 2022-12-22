@@ -99,7 +99,7 @@ fn quest_condition_quest_item(
         script_resources
             .game_data
             .data_decoder
-            .decode_item_base1000(item_base1000.get() as usize)
+            .decode_item_base1000(item_base1000.get())
     });
 
     let equipment_index = equipment_index.and_then(|equipment_index| {

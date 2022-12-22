@@ -24,7 +24,7 @@ pub fn ray_from_screenspace(
 ) -> Option<(Vec3, Vec3)> {
     let view = camera_transform.compute_matrix();
     let window = get_window_for_camera(windows, camera)?;
-    let screen_size = Vec2::from([window.width() as f32, window.height() as f32]);
+    let screen_size = Vec2::from([window.width(), window.height()]);
     let projection = camera.projection_matrix();
 
     // 2D Normalized device coordinate cursor position from (-1, -1) to (1, 1)

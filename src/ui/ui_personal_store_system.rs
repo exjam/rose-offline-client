@@ -195,9 +195,7 @@ pub fn ui_personal_store_system(
             PersonalStoreEvent::UpdateBuyList { entity, item_list } => {
                 if ui_state.store_owner == Some(*entity) {
                     for (slot_index, item) in item_list.iter() {
-                        if let Some(store_slot) =
-                            ui_state.store_buy_items.get_mut(*slot_index as usize)
-                        {
+                        if let Some(store_slot) = ui_state.store_buy_items.get_mut(*slot_index) {
                             if item.is_none() {
                                 *store_slot = None;
                             } else if let Some((store_slot_item, _)) = store_slot.as_mut() {
@@ -210,9 +208,7 @@ pub fn ui_personal_store_system(
             PersonalStoreEvent::UpdateSellList { entity, item_list } => {
                 if ui_state.store_owner == Some(*entity) {
                     for (slot_index, item) in item_list.iter() {
-                        if let Some(store_slot) =
-                            ui_state.store_sell_items.get_mut(*slot_index as usize)
-                        {
+                        if let Some(store_slot) = ui_state.store_sell_items.get_mut(*slot_index) {
                             if item.is_none() {
                                 *store_slot = None;
                             } else if let Some((store_slot_item, _)) = store_slot.as_mut() {

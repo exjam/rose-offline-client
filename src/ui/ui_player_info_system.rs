@@ -183,7 +183,7 @@ pub fn ui_player_info_system(
 
                     ui.add_label_in(
                         egui::Rect::from_min_max(egui::pos2(180.0, 8.0), egui::pos2(230.0, 25.0)),
-                        egui::RichText::new(&format!("{}", player.level.level))
+                        egui::RichText::new(format!("{}", player.level.level))
                             .color(egui::Color32::YELLOW)
                             .font(egui::FontId::new(
                                 14.0,

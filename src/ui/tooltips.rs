@@ -529,7 +529,7 @@ pub fn ui_add_item_tooltip(
                 ItemType::Consumable => {
                     let use_item_data = game_data
                         .items
-                        .get_consumable_item(stackable_item.item.item_number as usize);
+                        .get_consumable_item(stackable_item.item.item_number);
 
                     ui.label(format!(
                         "{}:{} {}:{}",
@@ -568,7 +568,7 @@ pub fn ui_add_item_tooltip(
                 ItemType::Gem => {
                     let gem_item_data = game_data
                         .items
-                        .get_gem_item(stackable_item.item.item_number as usize);
+                        .get_gem_item(stackable_item.item.item_number);
 
                     ui.label(format!(
                         "{}:{} {}:{}",
@@ -761,7 +761,7 @@ fn add_skill_require_ability(
                 Some(player.team),
                 Some(player.union_membership),
             ) {
-                if current_value >= value as i32 {
+                if current_value >= value {
                     color = egui::Color32::GREEN;
                 }
             }
@@ -1125,7 +1125,7 @@ fn add_skill_use_ability_value(
                 Some(player.team),
                 Some(player.union_membership),
             ) {
-                if current_value >= value as i32 {
+                if current_value >= value {
                     color = egui::Color32::GREEN;
                 }
             }

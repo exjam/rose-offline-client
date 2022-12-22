@@ -94,7 +94,7 @@ fn extract_water_uniform_data(mut commands: Commands, time: Extract<Res<Time>>) 
     let time = time.elapsed_seconds() * 10.0;
     let current_index = (time as i32) % 25;
     let next_index = (current_index + 1) % 25;
-    let next_weight = time.fract() as f32;
+    let next_weight = time.fract();
 
     commands.insert_resource(WaterUniformData {
         current_index,

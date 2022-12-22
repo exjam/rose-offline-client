@@ -305,7 +305,7 @@ pub fn ui_skill_list_system(
                                                             ),
                                                         )
                                                     {
-                                                        if current_value >= value as i32 {
+                                                        if current_value >= value {
                                                             color = egui::Color32::GREEN;
                                                         }
                                                     }

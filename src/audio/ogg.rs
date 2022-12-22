@@ -49,7 +49,7 @@ impl StreamingAudioSource for OggAudioSource {
     }
 
     fn sample_rate(&self) -> u32 {
-        self.reader.ident_hdr.audio_sample_rate as u32
+        self.reader.ident_hdr.audio_sample_rate
     }
 
     fn rewind(&mut self) {

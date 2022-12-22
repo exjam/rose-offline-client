@@ -569,7 +569,7 @@ pub fn ui_npc_store_system(
                                         51.0 + row as f32 * 41.0,
                                     ),
                                     Some(current_store_tab),
-                                    current_tab_index as usize,
+                                    current_tab_index,
                                     column + row * 8,
                                     &mut ui_state.buy_list,
                                     player.as_ref(),

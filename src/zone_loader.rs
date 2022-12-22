@@ -87,7 +87,7 @@ impl ZoneLoaderAsset {
 
         if let Some(heightmap) = self
             .blocks
-            .get(block_x.max(0.0).min(64.0) as usize + block_y.max(0.0).min(64.0) as usize * 64)
+            .get(block_x.clamp(0.0, 64.0) as usize + block_y.clamp(0.0, 64.0) as usize * 64)
             .and_then(|block| block.as_ref())
             .map(|block| &block.him)
         {
@@ -120,7 +120,7 @@ impl ZoneLoaderAsset {
 
         if let Some(tilemap) = self
             .blocks
-            .get(block_x.max(0.0).min(64.0) as usize + block_y.max(0.0).min(64.0) as usize * 64)
+            .get(block_x.clamp(0.0, 64.0) as usize + block_y.clamp(0.0, 64.0) as usize * 64)
             .and_then(|block| block.as_ref())
             .and_then(|block| block.til.as_ref())
         {
@@ -221,7 +221,7 @@ async fn load_zone<'a, 'b>(
     let mut blocks = Vec::new();
     blocks.resize_with(64 * 64, || None);
     for block in zone_blocks_iterator {
-        let index = block.block_x as usize + block.block_y as usize * 64;
+        let index = block.block_x + block.block_y * 64;
         blocks[index] = Some(block);
     }
 
@@ -365,7 +365,7 @@ pub fn zone_loader_system(
             zone_loader_cache.cache[zone_index] = Some(CachedZone {
                 data_handle: spawn_zone_params
                     .asset_server
-                    .load(&format!("{}.zone_loader", zone_index)),
+                    .load(format!("{}.zone_loader", zone_index)),
                 spawned_entity: None,
             });
         } else if let Some(zone_entity) = zone_loader_cache.cache[zone_index]
@@ -811,7 +811,7 @@ fn spawn_terrain(
                     tile_ids.push([
                         tile_array_index1 as i32,
                         tile_array_index2 as i32,
-                        tile_rotation as i32,
+                        tile_rotation,
                     ]);
                 }
             }
@@ -868,7 +868,7 @@ fn spawn_terrain(
     }
 
     let material = terrain_materials.add(TerrainMaterial {
-        lightmap_texture: asset_server.load(&format!(
+        lightmap_texture: asset_server.load(format!(
             "{}/{1:}_{2:}/{1:}_{2:}_PLANELIGHTINGMAP.DDS.rgb_texture",
             zone_data.zone_path.to_str().unwrap(),
             block_data.block_x,
@@ -992,7 +992,7 @@ fn spawn_object(
     part_object_type: fn(ZoneObjectPart) -> ZoneObject,
     collision_group: u32,
 ) -> Entity {
-    let object = &zsc.objects[zsc_object_id as usize];
+    let object = &zsc.objects[zsc_object_id];
     let object_transform = Transform::default()
         .with_translation(
             Vec3::new(

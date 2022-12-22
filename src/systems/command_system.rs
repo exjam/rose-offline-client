@@ -1032,7 +1032,7 @@ pub fn command_system(
 
                     let in_range = target_position
                         .map(|target_position| {
-                            position.xy().distance(target_position.xy()) < cast_range as f32
+                            position.xy().distance(target_position.xy()) < cast_range
                         })
                         .unwrap_or(true);
                     if in_range {

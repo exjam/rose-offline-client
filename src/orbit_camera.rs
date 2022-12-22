@@ -196,8 +196,7 @@ fn orbit_camera_update(
 
     // Adjust zoom with mouse wheel
     orbit_camera.follow_distance = (orbit_camera.follow_distance * zoom_multiplier)
-        .max(orbit_camera.min_distance)
-        .min(orbit_camera.max_distance);
+        .clamp(orbit_camera.min_distance, orbit_camera.max_distance);
 
     let target_distance = orbit_camera.follow_distance;
     let arm_distance = orbit_camera.current_distance.exp_smooth_towards(

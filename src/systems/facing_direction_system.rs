@@ -25,9 +25,8 @@ pub fn facing_direction_system(
 
         let mut rotate_amount = time.delta_seconds() * ROTATE_ANGLE_PER_SECOND;
         let x = (diff.abs() - rotate_amount).abs();
-        let t = ((x * x) / (std::f32::consts::FRAC_PI_2 * std::f32::consts::FRAC_PI_2))
-            .min(1.0)
-            .max(0.3);
+        let t =
+            ((x * x) / (std::f32::consts::FRAC_PI_2 * std::f32::consts::FRAC_PI_2)).clamp(0.3, 1.0);
         rotate_amount *= t;
 
         if rotate_amount >= diff.abs() {

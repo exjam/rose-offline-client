@@ -212,16 +212,12 @@ impl Command {
     }
 }
 
-#[derive(Component, Debug)]
+#[derive(Component, Debug, Default)]
 pub struct NextCommand(Option<Command>);
 
 impl NextCommand {
     pub fn new(command: Option<Command>) -> Self {
         Self(command)
-    }
-
-    pub fn default() -> Self {
-        Self::new(None)
     }
 
     pub fn is_die(&self) -> bool {

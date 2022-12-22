@@ -529,7 +529,7 @@ impl ModelLoader {
         let effect_file = self.effect_database.get_effect_file(*effect_file_id)?;
 
         let zsc_object = model_list.objects.get(item_model_id)?;
-        let gem_effect_point = zsc_object.effects.get(gem_position as usize)?;
+        let gem_effect_point = zsc_object.effects.get(gem_position)?;
         let parent_part_entity = model_parts.get(gem_effect_point.parent.unwrap_or(0) as usize)?;
 
         let effect_entity = spawn_effect(
@@ -1222,7 +1222,7 @@ fn spawn_model(
         ));
 
         if load_clip_faces {
-            let zms_material_num_faces = asset_server.load::<ZmsMaterialNumFaces, _>(&format!(
+            let zms_material_num_faces = asset_server.load::<ZmsMaterialNumFaces, _>(format!(
                 "{}#material_num_faces",
                 model_list.meshes[mesh_id].path().to_string_lossy()
             ));
@@ -1246,10 +1246,7 @@ fn spawn_model(
                     .get(dummy_index as usize + dummy_bone_offset)
                     .cloned()
             } else if let Some(default_bone_index) = default_bone_index {
-                skinned_mesh
-                    .joints
-                    .get(default_bone_index as usize)
-                    .cloned()
+                skinned_mesh.joints.get(default_bone_index).cloned()
             } else {
                 None
             }
