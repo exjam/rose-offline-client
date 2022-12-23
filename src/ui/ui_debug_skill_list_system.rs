@@ -135,11 +135,11 @@ pub fn ui_debug_skill_list_system(
             egui_extras::TableBuilder::new(ui)
                 .striped(true)
                 .cell_layout(egui::Layout::left_to_right(egui::Align::Center))
-                .column(egui_extras::Size::exact(45.0))
-                .column(egui_extras::Size::initial(50.0).at_least(50.0))
-                .column(egui_extras::Size::remainder().at_least(80.0))
-                .column(egui_extras::Size::initial(100.0).at_least(100.0))
-                .column(egui_extras::Size::initial(100.0).at_least(100.0))
+                .column(egui_extras::Column::exact(45.0))
+                .column(egui_extras::Column::initial(50.0).at_least(50.0))
+                .column(egui_extras::Column::remainder().at_least(80.0))
+                .column(egui_extras::Column::initial(100.0).at_least(100.0))
+                .column(egui_extras::Column::initial(100.0).at_least(100.0))
                 .header(20.0, |mut header| {
                     header.col(|ui| {
                         ui.heading("Icon");

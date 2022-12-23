@@ -98,9 +98,9 @@ pub fn ui_debug_zone_list_system(
             egui_extras::TableBuilder::new(ui)
                 .striped(true)
                 .cell_layout(egui::Layout::left_to_right(egui::Align::Center))
-                .column(egui_extras::Size::initial(50.0).at_least(50.0))
-                .column(egui_extras::Size::remainder().at_least(80.0))
-                .column(egui_extras::Size::initial(60.0).at_least(60.0))
+                .column(egui_extras::Column::initial(50.0).at_least(50.0))
+                .column(egui_extras::Column::remainder().at_least(80.0))
+                .column(egui_extras::Column::initial(60.0).at_least(60.0))
                 .header(20.0, |mut header| {
                     header.col(|ui| {
                         ui.heading("ID");

@@ -63,8 +63,8 @@ fn generate_text_galley(
         color: egui::Color32::WHITE,
         background: egui::Color32::TRANSPARENT,
         italics: false,
-        underline: egui::Stroke::none(),
-        strikethrough: egui::Stroke::none(),
+        underline: egui::Stroke::NONE,
+        strikethrough: egui::Stroke::NONE,
         valign: egui::Align::Center,
     };
 

@@ -614,7 +614,7 @@ pub fn conversation_dialog_system(
                                     } else {
                                         None
                                     },
-                                    underline: egui::Stroke::none(),
+                                    underline: egui::Stroke::NONE,
                                     angle: 0.0,
                                 });
                             }

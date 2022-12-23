@@ -394,7 +394,7 @@ impl<'w> DragAndDropSlot<'w> {
                         ),
                         rounding: egui::Rounding::none(),
                         fill: Color32::from_rgba_unmultiplied(50, 50, 50, 200),
-                        stroke: Stroke::none(),
+                        stroke: Stroke::NONE,
                     }));
 
                     ui.painter().add(Shape::galley(

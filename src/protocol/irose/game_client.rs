@@ -234,6 +234,7 @@ impl GameClient {
                             move_speed: message.move_speed,
                             passive_attack_speed: message.passive_attack_speed,
                             personal_store_info: message.personal_store_info,
+                            clan_membership: message.clan_membership,
                         },
                     )))
                     .ok();
