@@ -8,6 +8,7 @@ mod character_model_add_collider_system;
 mod character_model_blink_system;
 mod character_model_system;
 mod character_select_system;
+mod clan_system;
 mod client_entity_event_system;
 mod collision_system;
 mod command_system;
@@ -74,6 +75,7 @@ pub use character_select_system::{
     character_select_enter_system, character_select_event_system, character_select_exit_system,
     character_select_input_system, character_select_models_system, character_select_system,
 };
+pub use clan_system::clan_system;
 pub use client_entity_event_system::client_entity_event_system;
 pub use collision_system::{
     collision_height_only_system, collision_player_system, collision_player_system_join_zoin,

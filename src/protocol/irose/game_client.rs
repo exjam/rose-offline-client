@@ -14,9 +14,9 @@ use rose_game_common::{
             self, AnnounceChat, ApplySkillEffect, AttackEntity, CastSkillSelf,
             CastSkillTargetEntity, CastSkillTargetPosition, CharacterData, CharacterDataItems,
             CharacterDataQuest, ConnectionRequestError, ConnectionResponse, DamageEntity,
-            JoinZoneResponse, LevelUpSkillResult, LocalChat, MoveEntity, PersonalStoreItemList,
-            PickupItemDropResult, QuestDeleteResult, QuestTriggerResult, RemoveEntities,
-            ServerMessage, ShoutChat, SpawnEntityCharacter, SpawnEntityItemDrop,
+            JoinZoneResponse, LevelUpSkillResult, LocalChat, MoveEntity, OpenPersonalStore,
+            PersonalStoreItemList, PickupItemDropResult, QuestDeleteResult, QuestTriggerResult,
+            RemoveEntities, ServerMessage, ShoutChat, SpawnEntityCharacter, SpawnEntityItemDrop,
             SpawnEntityMonster, SpawnEntityNpc, StopMoveEntity, Teleport, UpdateAbilityValue,
             UpdateBasicStat, UpdateEquipment, UpdateLevel, UpdateSpeed, UpdateStatusEffects,
             UpdateVehiclePart, UpdateXpStamina, UseEmote, UseInventoryItem, UseItem, Whisper,
@@ -29,15 +29,17 @@ use rose_network_irose::{
         PacketClientAttack, PacketClientBankMoveItem, PacketClientBankOpen,
         PacketClientCastSkillSelf, PacketClientCastSkillTargetEntity,
         PacketClientCastSkillTargetPosition, PacketClientChangeAmmo, PacketClientChangeEquipment,
-        PacketClientChangeVehiclePart, PacketClientChat, PacketClientConnectRequest,
-        PacketClientDropItemFromInventory, PacketClientEmote, PacketClientIncreaseBasicStat,
-        PacketClientJoinZone, PacketClientLevelUpSkill, PacketClientMove,
-        PacketClientMoveCollision, PacketClientMoveToggle, PacketClientMoveToggleType,
-        PacketClientNpcStoreTransaction, PacketClientPartyReply, PacketClientPartyRequest,
-        PacketClientPartyUpdateRules, PacketClientPersonalStoreBuyItem,
-        PacketClientPersonalStoreListItems, PacketClientPickupItemDrop, PacketClientQuestRequest,
-        PacketClientQuestRequestType, PacketClientReviveRequest, PacketClientSetHotbarSlot,
-        PacketClientUseItem, PacketClientWarpGateRequest,
+        PacketClientChangeVehiclePart, PacketClientChat, PacketClientClanCommand,
+        PacketClientConnectRequest, PacketClientCraftItem, PacketClientDropItemFromInventory,
+        PacketClientEmote, PacketClientIncreaseBasicStat, PacketClientJoinZone,
+        PacketClientLevelUpSkill, PacketClientMove, PacketClientMoveCollision,
+        PacketClientMoveToggle, PacketClientMoveToggleType, PacketClientNpcStoreTransaction,
+        PacketClientPartyReply, PacketClientPartyRequest, PacketClientPartyUpdateRules,
+        PacketClientPersonalStoreBuyItem, PacketClientPersonalStoreListItems,
+        PacketClientPickupItemDrop, PacketClientQuestRequest, PacketClientQuestRequestType,
+        PacketClientRepairItemUsingItem, PacketClientRepairItemUsingNpc, PacketClientReviveRequest,
+        PacketClientSetHotbarSlot, PacketClientSetReviveZone, PacketClientUseItem,
+        PacketClientWarpGateRequest,
     },
     game_server_packets::{
         ConnectResult, PacketConnectionReply, PacketServerAdjustPosition, PacketServerAnnounceChat,
@@ -45,26 +47,29 @@ use rose_network_irose::{
         PacketServerBankOpen, PacketServerBankTransaction, PacketServerCancelCastingSkill,
         PacketServerCastSkillSelf, PacketServerCastSkillTargetEntity,
         PacketServerCastSkillTargetPosition, PacketServerChangeNpcId,
-        PacketServerCharacterInventory, PacketServerCharacterQuestData, PacketServerDamageEntity,
+        PacketServerCharacterInventory, PacketServerCharacterQuestData, PacketServerClanCommand,
+        PacketServerClosePersonalStore, PacketServerCraftItem, PacketServerDamageEntity,
         PacketServerFinishCastingSkill, PacketServerJoinZone, PacketServerLearnSkillResult,
-        PacketServerLevelUpSkillResult, PacketServerLocalChat, PacketServerMoveEntity,
-        PacketServerMoveToggle, PacketServerMoveToggleType, PacketServerNpcStoreTransactionError,
+        PacketServerLevelUpSkillResult, PacketServerLocalChat, PacketServerLogoutResult,
+        PacketServerMoveEntity, PacketServerMoveToggle, PacketServerMoveToggleType,
+        PacketServerNpcStoreTransactionError, PacketServerOpenPersonalStore,
         PacketServerPartyMemberRewardItem, PacketServerPartyMemberUpdateInfo,
         PacketServerPartyMembers, PacketServerPartyReply, PacketServerPartyRequest,
         PacketServerPartyUpdateRules, PacketServerPersonalStoreItemList,
         PacketServerPersonalStoreTransactionResult,
         PacketServerPersonalStoreTransactionUpdateMoneyAndInventory,
         PacketServerPickupItemDropResult, PacketServerQuestResult, PacketServerQuestResultType,
-        PacketServerRemoveEntities, PacketServerRewardItems, PacketServerRewardMoney,
-        PacketServerRunNpcDeathTrigger, PacketServerSelectCharacter, PacketServerSetHotbarSlot,
-        PacketServerShoutChat, PacketServerSpawnEntityCharacter, PacketServerSpawnEntityItemDrop,
-        PacketServerSpawnEntityMonster, PacketServerSpawnEntityNpc, PacketServerStartCastingSkill,
-        PacketServerStopMoveEntity, PacketServerTeleport, PacketServerUpdateAbilityValue,
-        PacketServerUpdateAmmo, PacketServerUpdateBasicStat, PacketServerUpdateEquipment,
-        PacketServerUpdateInventory, PacketServerUpdateItemLife, PacketServerUpdateLevel,
-        PacketServerUpdateMoney, PacketServerUpdateSpeed, PacketServerUpdateStatusEffects,
-        PacketServerUpdateVehiclePart, PacketServerUpdateXpStamina, PacketServerUseEmote,
-        PacketServerUseItem, PacketServerWhisper, ServerPackets,
+        PacketServerRemoveEntities, PacketServerRepairedItemUsingNpc, PacketServerRewardItems,
+        PacketServerRewardMoney, PacketServerRunNpcDeathTrigger, PacketServerSelectCharacter,
+        PacketServerSetHotbarSlot, PacketServerShoutChat, PacketServerSpawnEntityCharacter,
+        PacketServerSpawnEntityItemDrop, PacketServerSpawnEntityMonster,
+        PacketServerSpawnEntityNpc, PacketServerStartCastingSkill, PacketServerStopMoveEntity,
+        PacketServerTeleport, PacketServerUpdateAbilityValue, PacketServerUpdateAmmo,
+        PacketServerUpdateBasicStat, PacketServerUpdateEquipment, PacketServerUpdateInventory,
+        PacketServerUpdateItemLife, PacketServerUpdateLevel, PacketServerUpdateMoney,
+        PacketServerUpdateSpeed, PacketServerUpdateStatusEffects, PacketServerUpdateVehiclePart,
+        PacketServerUpdateXpStamina, PacketServerUseEmote, PacketServerUseItem,
+        PacketServerWhisper, ServerPackets,
     },
     ClientPacketCodec, IROSE_112_TABLE,
 };
@@ -878,7 +883,138 @@ impl GameClient {
                     })
                     .ok();
             }
-            _ => log::info!("Unhandled GameClient packet {:?}", packet),
+            Some(ServerPackets::LogoutResult) => {
+                let packet = PacketServerLogoutResult::try_from(packet)?;
+                match packet.result {
+                    Ok(_) => {
+                        self.server_message_tx
+                            .send(ServerMessage::LogoutSuccess)
+                            .ok();
+                    }
+                    Err(wait_duration) => {
+                        self.server_message_tx
+                            .send(ServerMessage::LogoutFailed { wait_duration })
+                            .ok();
+                    }
+                }
+            }
+            Some(ServerPackets::OpenPersonalStore) => {
+                let packet = PacketServerOpenPersonalStore::try_from(packet)?;
+                self.server_message_tx
+                    .send(ServerMessage::OpenPersonalStore(OpenPersonalStore {
+                        entity_id: packet.entity_id,
+                        skin: packet.skin,
+                        title: packet.title.into(),
+                    }))
+                    .ok();
+            }
+            Some(ServerPackets::ClosePersonalStore) => {
+                let packet = PacketServerClosePersonalStore::try_from(packet)?;
+                self.server_message_tx
+                    .send(ServerMessage::ClosePersonalStore(packet.entity_id))
+                    .ok();
+            }
+            Some(ServerPackets::CraftItem) => {
+                let packet = PacketServerCraftItem::try_from(packet)?;
+                match packet {
+                    PacketServerCraftItem::InsertGemFailed { error } => {
+                        self.server_message_tx
+                            .send(ServerMessage::CraftInsertGem(Err(error)))
+                            .ok();
+                    }
+                    PacketServerCraftItem::InsertGemSuccess { items } => {
+                        self.server_message_tx
+                            .send(ServerMessage::CraftInsertGem(Ok(items)))
+                            .ok();
+                    }
+                }
+            }
+            Some(ServerPackets::RepairedItemUsingNpc) => {
+                let packet = PacketServerRepairedItemUsingNpc::try_from(packet)?;
+                self.server_message_tx
+                    .send(ServerMessage::RepairedItemUsingNpc {
+                        item_slot: packet.item_slot,
+                        item: packet.item,
+                        updated_money: packet.updated_money,
+                    })
+                    .ok();
+            }
+            Some(ServerPackets::ClanCommand) => {
+                let packet = PacketServerClanCommand::try_from(packet)?;
+                match packet {
+                    PacketServerClanCommand::ClanInfo {
+                        id,
+                        name,
+                        description,
+                        mark,
+                        level,
+                        points,
+                        money,
+                        position,
+                        contribution,
+                    } => {
+                        self.server_message_tx
+                            .send(ServerMessage::ClanInfo {
+                                id,
+                                mark,
+                                level,
+                                points,
+                                money,
+                                name,
+                                description,
+                                position,
+                                contribution,
+                            })
+                            .ok();
+                    }
+                    PacketServerClanCommand::CharacterUpdateClan {
+                        client_entity_id,
+                        id,
+                        name,
+                        mark,
+                        level,
+                        position,
+                    } => {
+                        self.server_message_tx
+                            .send(ServerMessage::CharacterUpdateClan {
+                                client_entity_id,
+                                id,
+                                name,
+                                mark,
+                                level,
+                                position,
+                            })
+                            .ok();
+                    }
+                    PacketServerClanCommand::ClanMemberConnected { name, channel_id } => {
+                        self.server_message_tx
+                            .send(ServerMessage::ClanMemberConnected { name, channel_id })
+                            .ok();
+                    }
+                    PacketServerClanCommand::ClanMemberDisconnected { name } => {
+                        self.server_message_tx
+                            .send(ServerMessage::ClanMemberDisconnected { name })
+                            .ok();
+                    }
+                    PacketServerClanCommand::ClanCreateError { error } => {
+                        self.server_message_tx
+                            .send(ServerMessage::ClanCreateError { error })
+                            .ok();
+                    }
+                    PacketServerClanCommand::ClanMemberList { members } => {
+                        self.server_message_tx
+                            .send(ServerMessage::ClanMemberList { members })
+                            .ok();
+                    }
+                }
+            }
+            Some(ServerPackets::RepairedItemUsingItem) => {
+                log::info!(
+                    "Unimplemented ServerPackets::RepairedItemUsingItem {:?}",
+                    packet
+                );
+            }
+            None => log::info!("Unhandled GameClient packet {:?}", packet),
         }
 
         Ok(())
@@ -1215,6 +1351,105 @@ impl GameClient {
                         is_premium,
                     }))
                     .await?
+            }
+            ClientMessage::SetReviveZone => {
+                connection
+                    .write_packet(Packet::from(&PacketClientSetReviveZone))
+                    .await?
+            }
+            ClientMessage::ClanCreate {
+                name,
+                description,
+                mark,
+            } => {
+                connection
+                    .write_packet(Packet::from(&PacketClientClanCommand::Create {
+                        name,
+                        description,
+                        mark,
+                    }))
+                    .await?;
+            }
+            ClientMessage::CraftInsertGem {
+                equipment_index,
+                item_slot,
+            } => {
+                connection
+                    .write_packet(Packet::from(&PacketClientCraftItem::InsertGem {
+                        equipment_index,
+                        item_slot,
+                    }))
+                    .await?;
+            }
+            ClientMessage::CraftSkillDisassemble {
+                skill_slot,
+                item_slot,
+            } => {
+                connection
+                    .write_packet(Packet::from(&PacketClientCraftItem::SkillDisassemble {
+                        skill_slot,
+                        item_slot,
+                    }))
+                    .await?;
+            }
+            ClientMessage::CraftNpcDisassemble {
+                npc_entity_id,
+                item_slot,
+            } => {
+                connection
+                    .write_packet(Packet::from(&PacketClientCraftItem::NpcDisassemble {
+                        npc_entity_id,
+                        item_slot,
+                    }))
+                    .await?;
+            }
+            ClientMessage::CraftSkillUpgradeItem {
+                skill_slot,
+                item_slot,
+                ingredients,
+            } => {
+                connection
+                    .write_packet(Packet::from(&PacketClientCraftItem::SkillUpgradeItem {
+                        skill_slot,
+                        item_slot,
+                        ingredients,
+                    }))
+                    .await?;
+            }
+            ClientMessage::CraftNpcUpgradeItem {
+                npc_entity_id,
+                item_slot,
+                ingredients,
+            } => {
+                connection
+                    .write_packet(Packet::from(&PacketClientCraftItem::NpcUpgradeItem {
+                        npc_entity_id,
+                        item_slot,
+                        ingredients,
+                    }))
+                    .await?;
+            }
+            ClientMessage::RepairItemUsingItem {
+                use_item_slot,
+                item_slot,
+            } => {
+                connection
+                    .write_packet(Packet::from(&PacketClientRepairItemUsingItem {
+                        use_item_slot,
+                        item_slot,
+                    }))
+                    .await?;
+            }
+            ClientMessage::RepairItemUsingNpc {
+                npc_entity_id,
+                item_slot,
+            } => {
+                connection
+                    .write_packet(Packet::from(&PacketClientRepairItemUsingNpc {
+                        npc_entity_id,
+                        item_slot,
+                    }))
+                    .await?;
             }
             unimplemented => {
                 log::info!("Unimplemented GameClient ClientMessage {:?}", unimplemented);

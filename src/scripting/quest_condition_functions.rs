@@ -1,7 +1,7 @@
 use rose_data::QuestTrigger;
 use rose_file_readers::{
-    QsdAbilityType, QsdCondition, QsdConditionOperator, QsdConditionQuestItem, QsdEquipmentIndex,
-    QsdItemBase1000, QsdVariableType,
+    QsdAbilityType, QsdClanPosition, QsdCondition, QsdConditionOperator, QsdConditionQuestItem,
+    QsdEquipmentIndex, QsdItemBase1000, QsdVariableType,
 };
 
 use crate::{
@@ -215,6 +215,36 @@ fn quest_condition_select_quest(
     false
 }
 
+fn quest_condition_clan_position(
+    script_resources: &ScriptFunctionResources,
+    script_context: &mut ScriptFunctionContext,
+    _quest_context: &mut QuestFunctionContext,
+    compare: QsdConditionOperator,
+    position: QsdClanPosition,
+) -> bool {
+    let character = script_context.query_player.single();
+    let value = character
+        .clan_membership
+        .and_then(|clan_membership| {
+            script_resources
+                .game_data
+                .data_decoder
+                .encode_clan_member_position(clan_membership.position)
+        })
+        .unwrap_or(0);
+    quest_condition_operator(compare, value, position)
+}
+
+fn quest_condition_in_clan(
+    _script_resources: &ScriptFunctionResources,
+    script_context: &mut ScriptFunctionContext,
+    _quest_context: &mut QuestFunctionContext,
+    in_clan: bool,
+) -> bool {
+    let character = script_context.query_player.single();
+    character.clan_membership.is_some() == in_clan
+}
+
 pub fn quest_trigger_check_conditions(
     script_resources: &ScriptFunctionResources,
     script_context: &mut ScriptFunctionContext,
@@ -258,6 +288,16 @@ pub fn quest_trigger_check_conditions(
                 quest_context,
                 quest_id,
             ),
+            QsdCondition::ClanPosition(compare, position) => quest_condition_clan_position(
+                script_resources,
+                script_context,
+                quest_context,
+                compare,
+                position,
+            ),
+            QsdCondition::InClan(in_clan) => {
+                quest_condition_in_clan(script_resources, script_context, quest_context, in_clan)
+            }
             // Server side only conditions:
             QsdCondition::RandomPercent(_)
             | QsdCondition::ObjectVariable(_)

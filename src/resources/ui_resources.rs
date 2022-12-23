@@ -47,6 +47,8 @@ pub enum UiSpriteSheetType {
     ItemSocketGem,
     ItemSocketEmpty,
     MinimapArrow,
+    ClanMarkBackground,
+    ClanMarkForeground,
     TargetMark,
 }
 
@@ -73,7 +75,9 @@ pub struct UiResources {
     pub dialog_bank: Handle<Dialog>,
     pub dialog_character_info: Handle<Dialog>,
     pub dialog_chatbox: Handle<Dialog>,
+    pub dialog_clan: Handle<Dialog>,
     pub dialog_create_avatar: Handle<Dialog>,
+    pub dialog_create_clan: Handle<Dialog>,
     pub dialog_game_menu: Handle<Dialog>,
     pub dialog_message_box: Handle<Dialog>,
     pub dialog_number_input: Handle<Dialog>,
@@ -102,6 +106,8 @@ impl UiResources {
             4 => UiSpriteSheetType::Skill,
             5 => UiSpriteSheetType::StateIcon,
             6 => UiSpriteSheetType::ItemSocketGem,
+            7 => UiSpriteSheetType::ClanMarkBackground,
+            8 => UiSpriteSheetType::ClanMarkForeground,
             9 => UiSpriteSheetType::TargetMark,
             _ => return None,
         };
@@ -229,7 +235,7 @@ fn load_ui_spritesheet(
 
     let mut loaded_textures = Vec::new();
     for tsi_texture in tsi_file.textures.iter() {
-        let handle = asset_server.load(&format!("3DDATA/CONTROL/RES/{}", tsi_texture.filename));
+        let handle = asset_server.load(format!("3DDATA/CONTROL/RES/{}", tsi_texture.filename));
         let texture_id = egui_context.add_image(handle.clone_weak());
         loaded_textures.push(UiTexture {
             handle,
@@ -298,7 +304,7 @@ pub fn update_ui_resources(
                         }
                     } else {
                         let handle = asset_server
-                            .load(&format!("3DDATA/CONTROL/RES/{}", &skill_widget.image));
+                            .load(format!("3DDATA/CONTROL/RES/{}", &skill_widget.image));
                         let texture_id = egui_context.add_image(handle.clone_weak());
                         skill_widget.ui_texture = Some(UiTexture {
                             handle,
@@ -391,7 +397,7 @@ pub fn load_ui_resources(
     for filename in dialog_filenames {
         dialog_files.insert(
             filename.to_string(),
-            asset_server.load(&format!("3DDATA/CONTROL/XML/{}", filename)),
+            asset_server.load(format!("3DDATA/CONTROL/XML/{}", filename)),
         );
     }
 
@@ -405,6 +411,8 @@ pub fn load_ui_resources(
             UiSpriteSheetType::Item => load_ui_spritesheet(vfs, &asset_server, &mut egui_context,  "3DDATA/CONTROL/RES/ITEM1.TSI", "").map_err(|e| { log::warn!("Error loading ui resource: {}", e); e }).ok(),
             UiSpriteSheetType::ItemSocketGem => load_ui_spritesheet(vfs, &asset_server, &mut egui_context,  "3DDATA/CONTROL/RES/SOKETJAM.TSI", "").map_err(|e| { log::warn!("Error loading ui resource: {}", e); e }).ok(),
             UiSpriteSheetType::TargetMark => load_ui_spritesheet(vfs, &asset_server, &mut egui_context,  "3DDATA/CONTROL/RES/TARGETMARK.TSI", "").map_err(|e| { log::warn!("Error loading ui resource: {}", e); e }).ok(),
+            UiSpriteSheetType::ClanMarkForeground => load_ui_spritesheet(vfs, &asset_server, &mut egui_context,  "3DDATA/CONTROL/RES/CLANCENTER.TSI", "").map_err(|e| { log::warn!("Error loading ui resource: {}", e); e }).ok(),
+            UiSpriteSheetType::ClanMarkBackground => load_ui_spritesheet(vfs, &asset_server, &mut egui_context,  "3DDATA/CONTROL/RES/CLANBACK.TSI", "").map_err(|e| { log::warn!("Error loading ui resource: {}", e); e }).ok(),
             UiSpriteSheetType::MinimapArrow => {
                 let handle = asset_server.load("3DDATA/CONTROL/RES/MINIMAP_ARROW.TGA");
                 let texture_id = egui_context.add_image(handle.clone_weak());
@@ -437,8 +445,11 @@ pub fn load_ui_resources(
         dialog_bank: dialog_files["DLGBANK.XML"].clone(),
         dialog_character_info: dialog_files["DLGAVATA.XML"].clone(),
         dialog_chatbox: dialog_files["DLGCHAT.XML"].clone(),
+        dialog_clan: dialog_files["DLGCLAN.XML"].clone(),
         dialog_create_avatar: dialog_files[
             "DLGCREATEAVATAR.XML"].clone(),
+            dialog_create_clan: dialog_files[
+                "DLGORGANIZECLAN.XML"].clone(),
         dialog_game_menu: dialog_files["DLGMENU.XML"].clone(),
         dialog_login: dialog_files["DLGLOGIN.XML"].clone(),
         dialog_message_box: dialog_files["MSGBOX.XML"].clone(),

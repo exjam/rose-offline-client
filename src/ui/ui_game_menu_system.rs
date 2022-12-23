@@ -125,7 +125,7 @@ pub fn ui_game_menu_system(
     }
 
     if response_button_clan.map_or(false, |r| r.clicked()) {
-        // TODO: Clan dialog
+        ui_state_windows.clan_open = !ui_state_windows.clan_open;
         ui_state_windows.menu_open = false;
     }
 
@@ -153,6 +153,10 @@ pub fn ui_game_menu_system(
 
         if input.consume_key(egui::Modifiers::ALT, egui::Key::I) {
             ui_state_windows.inventory_open = !ui_state_windows.inventory_open;
+        }
+
+        if input.consume_key(egui::Modifiers::ALT, egui::Key::N) {
+            ui_state_windows.clan_open = !ui_state_windows.clan_open;
         }
 
         if input.consume_key(egui::Modifiers::ALT, egui::Key::S) {

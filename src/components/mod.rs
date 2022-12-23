@@ -2,6 +2,8 @@ mod active_motion;
 mod bank;
 mod character_model;
 mod character_model_blink_timer;
+mod clan;
+mod clan_membership;
 mod client_entity;
 mod client_entity_name;
 mod collision;
@@ -40,6 +42,8 @@ pub use active_motion::ActiveMotion;
 pub use bank::Bank;
 pub use character_model::{CharacterModel, CharacterModelPart, CharacterModelPartIndex};
 pub use character_model_blink_timer::CharacterBlinkTimer;
+pub use clan::{Clan, ClanMember};
+pub use clan_membership::ClanMembership;
 pub use client_entity::{ClientEntity, ClientEntityId, ClientEntityType};
 pub use client_entity_name::ClientEntityName;
 pub use collision::{

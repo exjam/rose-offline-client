@@ -7,6 +7,8 @@ mod ui_character_info_system;
 mod ui_character_select_name_tag_system;
 mod ui_character_select_system;
 mod ui_chatbox_system;
+mod ui_clan_system;
+mod ui_create_clan;
 mod ui_debug_camera_info_system;
 mod ui_debug_client_entity_list_system;
 mod ui_debug_command_viewer_system;
@@ -48,6 +50,7 @@ pub mod widgets;
 #[derive(Default, Resource)]
 pub struct UiStateWindows {
     pub character_info_open: bool,
+    pub clan_open: bool,
     pub inventory_open: bool,
     pub skill_list_open: bool,
     pub skill_tree_open: bool,
@@ -68,6 +71,8 @@ pub use ui_character_info_system::ui_character_info_system;
 pub use ui_character_select_name_tag_system::ui_character_select_name_tag_system;
 pub use ui_character_select_system::ui_character_select_system;
 pub use ui_chatbox_system::ui_chatbox_system;
+pub use ui_clan_system::ui_clan_system;
+pub use ui_create_clan::ui_create_clan_system;
 pub use ui_debug_camera_info_system::ui_debug_camera_info_system;
 pub use ui_debug_client_entity_list_system::ui_debug_client_entity_list_system;
 pub use ui_debug_command_viewer_system::ui_debug_command_viewer_system;

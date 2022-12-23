@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use rose_game_common::{components::CharacterGender, messages::ClientEntityId};
 
 use crate::{
-    events::{BankEvent, NpcStoreEvent},
+    events::{BankEvent, ClanDialogEvent, NpcStoreEvent},
     scripting::{
         lua4::Lua4Value,
         lua_game_constants::{
@@ -37,6 +37,7 @@ impl Default for LuaGameFunctions {
         closures.insert("GF_getVariable".into(), GF_getVariable);
         closures.insert("GF_openBank".into(), GF_openBank);
         closures.insert("GF_openStore".into(), GF_openStore);
+        closures.insert("GF_organizeClan".into(), GF_organizeClan);
 
         /*
         GF_addUserMoney
@@ -73,7 +74,6 @@ impl Default for LuaGameFunctions {
         GF_openDeliveryStore
         GF_openSeparate
         GF_openUpgrade
-        GF_organizeClan
         GF_playEffect
         GF_playSound
         GF_putoffItem
@@ -169,5 +169,16 @@ fn GF_openStore(
             .send(NpcStoreEvent::OpenClientEntityStore(npc_client_entity_id));
         Some(())
     })();
+    vec![]
+}
+
+#[allow(non_snake_case)]
+fn GF_organizeClan(
+    _resources: &ScriptFunctionResources,
+    context: &mut ScriptFunctionContext,
+    _parameters: Vec<Lua4Value>,
+) -> Vec<Lua4Value> {
+    context.clan_dialog_events.send(ClanDialogEvent::Open);
+
     vec![]
 }

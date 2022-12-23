@@ -10,8 +10,8 @@ use rose_game_common::components::{
 };
 
 use crate::{
-    components::{ClientEntity, PlayerCharacter},
-    events::{BankEvent, ChatboxEvent, NpcStoreEvent, SystemFuncEvent},
+    components::{ClanMembership, ClientEntity, PlayerCharacter},
+    events::{BankEvent, ChatboxEvent, ClanDialogEvent, NpcStoreEvent, SystemFuncEvent},
 };
 
 #[derive(WorldQuery)]
@@ -33,6 +33,7 @@ pub struct ScriptCharacterQuery<'w> {
     pub stat_points: &'w StatPoints,
     pub team: &'w Team,
     pub union_membership: &'w UnionMembership,
+    pub clan_membership: Option<&'w ClanMembership>,
 }
 
 #[derive(SystemParam)]
@@ -43,6 +44,7 @@ pub struct ScriptFunctionContext<'w, 's> {
     pub query_npc: Query<'w, 's, &'static Npc>,
     pub bank_events: EventWriter<'w, 's, BankEvent>,
     pub chatbox_events: EventWriter<'w, 's, ChatboxEvent>,
+    pub clan_dialog_events: EventWriter<'w, 's, ClanDialogEvent>,
     pub npc_store_events: EventWriter<'w, 's, NpcStoreEvent>,
     pub script_system_events: EventWriter<'w, 's, SystemFuncEvent>,
 }

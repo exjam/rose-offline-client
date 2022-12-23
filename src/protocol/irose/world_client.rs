@@ -17,8 +17,8 @@ use rose_game_common::{
 use rose_network_common::{Connection, Packet, PacketCodec};
 use rose_network_irose::{
     world_client_packets::{
-        PacketClientCharacterList, PacketClientConnectRequest, PacketClientCreateCharacter,
-        PacketClientDeleteCharacter, PacketClientSelectCharacter,
+        PacketClientCharacterList, PacketClientClanCommand, PacketClientConnectRequest,
+        PacketClientCreateCharacter, PacketClientDeleteCharacter, PacketClientSelectCharacter,
     },
     world_server_packets::{
         ConnectResult, CreateCharacterResult, PacketConnectionReply, PacketServerCharacterList,
@@ -183,6 +183,19 @@ impl WorldClient {
                         slot,
                         name: &name,
                         is_delete,
+                    }))
+                    .await?
+            }
+            ClientMessage::ClanGetMemberList => {
+                connection
+                    .write_packet(Packet::from(&PacketClientClanCommand::GetMemberList))
+                    .await?
+            }
+            ClientMessage::ClanUpdateCharacterInfo { job, level } => {
+                connection
+                    .write_packet(Packet::from(&PacketClientClanCommand::UpdateLevelAndJob {
+                        level,
+                        job,
                     }))
                     .await?
             }

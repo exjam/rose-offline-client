@@ -13,17 +13,18 @@ use rose_data::{
 };
 use rose_game_common::{
     components::{
-        AbilityValues, BasicStatType, BasicStats, CharacterInfo, DroppedItem, Equipment,
-        ExperiencePoints, HealthPoints, Hotbar, Inventory, ItemDrop, ItemSlot, Level, ManaPoints,
-        Money, MoveMode, MoveSpeed, QuestState, SkillList, Stamina, StatPoints, StatusEffects,
-        StatusEffectsRegen,
+        AbilityValues, BasicStatType, BasicStats, CharacterInfo, ClanPoints, DroppedItem,
+        Equipment, ExperiencePoints, HealthPoints, Hotbar, Inventory, ItemDrop, ItemSlot, Level,
+        ManaPoints, Money, MoveMode, MoveSpeed, Npc, QuestState, SkillList, Stamina, StatPoints,
+        StatusEffects, StatusEffectsRegen,
     },
     messages::{
         server::{
-            CommandState, LearnSkillError, LevelUpSkillError, MoveToggle, OpenPersonalStore,
-            PartyMemberInfo, PartyMemberInfoOffline, PartyMemberLeave, PartyMemberList,
-            PersonalStoreTransactionStatus, PickupItemDropContent, PickupItemDropError,
-            QuestDeleteResult, QuestTriggerResult, ServerMessage, UpdateAbilityValue,
+            ClanCreateError, CommandState, LearnSkillError, LevelUpSkillError, MoveToggle,
+            OpenPersonalStore, PartyMemberInfo, PartyMemberInfoOffline, PartyMemberLeave,
+            PartyMemberList, PersonalStoreTransactionStatus, PickupItemDropContent,
+            PickupItemDropError, QuestDeleteResult, QuestTriggerResult, ServerMessage,
+            UpdateAbilityValue,
         },
         PartyItemSharing, PartyXpSharing,
     },
@@ -33,15 +34,15 @@ use rose_network_common::ConnectionError;
 use crate::{
     bundles::{ability_values_add_value_exclusive, ability_values_set_value_exclusive},
     components::{
-        Bank, ClientEntity, ClientEntityName, ClientEntityType, CollisionHeightOnly,
-        CollisionPlayer, Command, CommandCastSkillTarget, Cooldowns, FacingDirection, NextCommand,
-        PartyInfo, PartyOwner, PassiveRecoveryTime, PendingDamage, PendingDamageList,
-        PendingSkillEffect, PendingSkillEffectList, PendingSkillTarget, PendingSkillTargetList,
-        PersonalStore, PlayerCharacter, Position, VisibleStatusEffects,
+        Bank, Clan, ClanMember, ClanMembership, ClientEntity, ClientEntityName, ClientEntityType,
+        CollisionHeightOnly, CollisionPlayer, Command, CommandCastSkillTarget, Cooldowns,
+        FacingDirection, NextCommand, PartyInfo, PartyOwner, PassiveRecoveryTime, PendingDamage,
+        PendingDamageList, PendingSkillEffect, PendingSkillEffectList, PendingSkillTarget,
+        PendingSkillTargetList, PersonalStore, PlayerCharacter, Position, VisibleStatusEffects,
     },
     events::{
-        BankEvent, ChatboxEvent, ClientEntityEvent, GameConnectionEvent, LoadZoneEvent, PartyEvent,
-        PersonalStoreEvent, QuestTriggerEvent, UseItemEvent,
+        BankEvent, ChatboxEvent, ClientEntityEvent, GameConnectionEvent, LoadZoneEvent,
+        MessageBoxEvent, PartyEvent, PersonalStoreEvent, QuestTriggerEvent, UseItemEvent,
     },
     resources::{AppState, ClientEntityList, GameConnection, GameData, WorldRates, WorldTime},
 };
@@ -103,11 +104,9 @@ pub fn game_connection_system(
     mut party_events: EventWriter<PartyEvent>,
     mut personal_store_events: EventWriter<PersonalStoreEvent>,
     mut quest_trigger_events: EventWriter<QuestTriggerEvent>,
+    mut message_box_events: EventWriter<MessageBoxEvent>,
 ) {
-    if game_connection.is_none() {
-        return;
-    }
-    let game_connection = game_connection.unwrap();
+    let Some(game_connection) = game_connection else { return };
 
     let result: Result<(), anyhow::Error> = loop {
         match game_connection.server_message_rx.try_recv() {
@@ -310,6 +309,19 @@ pub fn game_connection_system(
                     commands
                         .entity(entity)
                         .insert(PersonalStore::new(title, skin as usize));
+                }
+
+                if let Some(clan_membership) = message.clan_membership {
+                    commands
+                        .entity(entity)
+                        .insert(ClanMembership {
+                            clan_unique_id: clan_membership.clan_unique_id,
+                            mark: clan_membership.mark,
+                            level: clan_membership.level,
+                            name: clan_membership.name,
+                            position: clan_membership.position,
+                            contribution: ClanPoints(0),
+                        });
                 }
 
                 client_entity_list.add(message.entity_id, entity);
@@ -2085,8 +2097,138 @@ pub fn game_connection_system(
                     commands.entity(entity).insert(move_mode);
                 }
             }
-            Ok(message) => {
-                log::warn!("Received unimplemented game server message: {:#?}", message);
+            Ok(ServerMessage::ChangeNpcId(entity_id, npc_id)) => {
+                if let Some(entity) = client_entity_list.get(entity_id) {
+                    commands.add(move |world: &mut World| {
+                        let mut entity_mut = world.entity_mut(entity);
+                        if let Some(mut npc) = entity_mut.get_mut::<Npc>() {
+                            npc.id = npc_id;
+                        }
+                    });
+                }
+            }
+            Ok(ServerMessage::ClanInfo { id, mark, level, points, money, name, description, position, contribution }) => {
+                if let Some(player_entity) = client_entity_list.player_entity {
+                    commands.entity(player_entity).insert((
+                        Clan {
+                            unique_id: id,
+                            name: name.clone(),
+                            description,
+                            mark,
+                            money,
+                            points,
+                            level,
+                            members: Vec::new(),
+                        },
+                        ClanMembership {
+                            clan_unique_id: id,
+                            mark,
+                            level,
+                            name,
+                            position,
+                            contribution,
+                        }));
+                }
+            }
+            Ok(ServerMessage::CharacterUpdateClan { client_entity_id, id, name, mark, level, position  }) => {
+                if let Some(entity) = client_entity_list.get(client_entity_id) {
+                    commands.entity(entity).insert(
+                        ClanMembership {
+                            clan_unique_id: id,
+                            mark,
+                            level,
+                            name,
+                            position,
+                            contribution: ClanPoints(0),
+                        });
+                }
+            }
+            Ok(ServerMessage::ClanMemberConnected { name, channel_id  }) =>  {
+                if let Some(player_entity) = client_entity_list.player_entity {
+                    commands.add(move |world: &mut World| {
+                        let mut entity_mut = world.entity_mut(player_entity);
+                        if let Some(mut clan) = entity_mut.get_mut::<Clan>() {
+                            if let Some(member) = clan.find_member_mut(&name) {
+                                member.channel_id = Some(channel_id);
+                            }
+                        }
+                    });
+                }
+            }
+            Ok(ServerMessage::ClanMemberDisconnected { name  }) =>  {
+                if let Some(player_entity) = client_entity_list.player_entity {
+                    commands.add(move |world: &mut World| {
+                        let mut entity_mut = world.entity_mut(player_entity);
+                        if let Some(mut clan) = entity_mut.get_mut::<Clan>() {
+                            if let Some(member) = clan.find_member_mut(&name) {
+                                member.channel_id = None;
+                            }
+                        }
+                    });
+                }
+            }
+            Ok(ServerMessage::ClanCreateError { error }) =>  {
+                match error {
+                    ClanCreateError::Failed => {
+                        message_box_events.send(MessageBoxEvent::Show { message: game_data.client_strings.clan_create_error.into(), modal: false, ok: None, cancel: None });
+                    },
+                    ClanCreateError::NameExists => {
+                        message_box_events.send(MessageBoxEvent::Show { message: game_data.client_strings.clan_create_error_name.into(), modal: false, ok: None, cancel: None });
+                    },
+                    ClanCreateError::NoPermission => {
+                        message_box_events.send(MessageBoxEvent::Show { message: game_data.client_strings.clan_create_error_permission.into(), modal: false, ok: None, cancel: None });
+                    },
+                    ClanCreateError::UnmetCondition => {
+                        message_box_events.send(MessageBoxEvent::Show { message: game_data.client_strings.clan_create_error_condition.into(), modal: false, ok: None, cancel: None });
+                    },
+                }
+            }
+            Ok(ServerMessage::ClanMemberList { members }) =>  {
+                if let Some(player_entity) = client_entity_list.player_entity {
+                    commands.add(move |world: &mut World| {
+                        let mut entity_mut = world.entity_mut(player_entity);
+                        if let Some(mut clan) = entity_mut.get_mut::<Clan>() {
+                            clan.members.clear();
+
+                            for member in members {
+                                clan.members.push(ClanMember {
+                                    name: member.name,
+                                    position: member.position,
+                                    contribution: member.contribution,
+                                    level: member.level,
+                                    job: member.job,
+                                    channel_id: member.channel_id,
+                                });
+                            }
+                        }
+                    });
+                }
+            }
+            Ok(ServerMessage::CraftInsertGem(_)) => {
+                log::warn!("Received unimplemented ServerMessage::CraftInsertGem");
+            }
+            Ok(ServerMessage::RepairedItemUsingNpc { .. }) => {
+                log::warn!("Received unimplemented ServerMessage::RepairedItemUsingNpc");
+            }
+            Ok(ServerMessage::LogoutSuccess) => {
+                log::warn!("Received unimplemented ServerMessage::LogoutSuccess");
+            }
+            Ok(ServerMessage::LogoutFailed { .. }) => {
+                log::warn!("Received unimplemented ServerMessage::LogoutFailed");
+            }
+            Ok(ServerMessage::ReturnToCharacterSelect) => {
+                log::warn!("Received unimplemented ServerMessage::ReturnToCharacterSelect");
+            }
+            Ok(ServerMessage::LoginResponse(_)) |
+            Ok(ServerMessage::ChannelList(_)) |
+            Ok(ServerMessage::JoinServer(_)) |
+            Ok(ServerMessage::CharacterList(_)) |
+            Ok(ServerMessage::CharacterListAppend(_)) |
+            Ok(ServerMessage::CreateCharacter(_)) |
+            Ok(ServerMessage::SelectCharacter(_)) |
+            Ok(ServerMessage::DeleteCharacter(_)) => {
+                // These should only be login / world server packets, not game server
+                log::warn!("Received unexpected game server message");
             }
             Err(crossbeam_channel::TryRecvError::Disconnected) => {
                 break Err(ConnectionError::ConnectionLost.into());
