@@ -20,7 +20,7 @@ pub struct ScriptCharacterQuery<'w> {
     pub ability_values: &'w AbilityValues,
     pub character_info: &'w CharacterInfo,
     pub basic_stats: &'w BasicStats,
-    pub client_entity: &'w ClientEntity,
+    pub client_entity: Option<&'w ClientEntity>,
     pub equipment: &'w Equipment,
     pub experience_points: &'w ExperiencePoints,
     pub health_points: &'w mut HealthPoints,

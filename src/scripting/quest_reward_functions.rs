@@ -326,8 +326,9 @@ fn quest_reward_call_lua_function(
             vec![script_context
                 .query_player
                 .get_single()
-                .map(|player| player.client_entity.id.0)
-                .unwrap_or(0)
+                .ok()
+                .and_then(|player| player.client_entity.cloned())
+                .map_or(0, |client_entity| client_entity.id.0)
                 .into()],
         ));
     true
@@ -445,10 +446,11 @@ pub fn quest_triggers_apply_rewards(
                 name.clone(),
             ),
             // Server side only rewards:
-            QsdReward::CalculatedItem(_, _)
-            | QsdReward::CalculatedMoney(_, _, _)
+            QsdReward::AbilityValue(_)
             | QsdReward::CalculatedExperiencePoints(_, _, _)
-            | QsdReward::AbilityValue(_) => true,
+            | QsdReward::CalculatedItem(_, _)
+            | QsdReward::CalculatedMoney(_, _, _)
+            | QsdReward::Teleport(_, _, _) => true,
             _ => {
                 log::warn!("Unimplemented quest reward: {:?}", reward);
                 true
