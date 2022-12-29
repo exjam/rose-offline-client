@@ -952,6 +952,7 @@ impl GameClient {
                         money,
                         position,
                         contribution,
+                        skills,
                     } => {
                         self.server_message_tx
                             .send(ServerMessage::ClanInfo {
@@ -964,6 +965,26 @@ impl GameClient {
                                 description,
                                 position,
                                 contribution,
+                                skills,
+                            })
+                            .ok();
+                    }
+                    PacketServerClanCommand::ClanUpdateInfo {
+                        id,
+                        mark,
+                        level,
+                        points,
+                        money,
+                        skills,
+                    } => {
+                        self.server_message_tx
+                            .send(ServerMessage::ClanUpdateInfo {
+                                id,
+                                mark,
+                                level,
+                                points,
+                                money,
+                                skills,
                             })
                             .ok();
                     }

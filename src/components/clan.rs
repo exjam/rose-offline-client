@@ -1,7 +1,7 @@
 use bevy::prelude::Component;
 use std::num::NonZeroUsize;
 
-use rose_data::ClanMemberPosition;
+use rose_data::{ClanMemberPosition, SkillId};
 use rose_game_common::components::{ClanLevel, ClanMark, ClanPoints, ClanUniqueId, Level, Money};
 
 #[derive(Clone)]
@@ -24,6 +24,7 @@ pub struct Clan {
     pub points: ClanPoints,
     pub level: ClanLevel,
     pub members: Vec<ClanMember>,
+    pub skills: Vec<SkillId>,
 }
 
 impl Clan {

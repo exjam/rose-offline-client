@@ -2107,7 +2107,7 @@ pub fn game_connection_system(
                     });
                 }
             }
-            Ok(ServerMessage::ClanInfo { id, mark, level, points, money, name, description, position, contribution }) => {
+            Ok(ServerMessage::ClanInfo { id, mark, level, points, money, name, description, position, contribution, skills }) => {
                 if let Some(player_entity) = client_entity_list.player_entity {
                     commands.entity(player_entity).insert((
                         Clan {
@@ -2119,6 +2119,7 @@ pub fn game_connection_system(
                             points,
                             level,
                             members: Vec::new(),
+                            skills,
                         },
                         ClanMembership {
                             clan_unique_id: id,
@@ -2128,6 +2129,21 @@ pub fn game_connection_system(
                             position,
                             contribution,
                         }));
+                }
+            }
+            Ok(ServerMessage::ClanUpdateInfo { id, mark, level, points, money, skills }) => {
+                if let Some(player_entity) = client_entity_list.player_entity {
+                    commands.add(move |world: &mut World| {
+                        let mut entity_mut = world.entity_mut(player_entity);
+                        if let Some(mut clan) = entity_mut.get_mut::<Clan>() {
+                            clan.unique_id = id;
+                            clan.mark = mark;
+                            clan.level = level;
+                            clan.points = points;
+                            clan.money = money;
+                            clan.skills = skills;
+                        }
+                    });
                 }
             }
             Ok(ServerMessage::CharacterUpdateClan { client_entity_id, id, name, mark, level, position  }) => {
