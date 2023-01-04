@@ -35,7 +35,7 @@ use crate::{
     bundles::{ability_values_add_value_exclusive, ability_values_set_value_exclusive},
     components::{
         Bank, Clan, ClanMember, ClanMembership, ClientEntity, ClientEntityName, ClientEntityType,
-        CollisionHeightOnly, CollisionPlayer, Command, CommandCastSkillTarget, Cooldowns,
+        CollisionHeightOnly, CollisionPlayer, Command, CommandCastSkillTarget, Cooldowns, Dead,
         FacingDirection, NextCommand, PartyInfo, PartyOwner, PassiveRecoveryTime, PendingDamage,
         PendingDamageList, PendingSkillEffect, PendingSkillEffectList, PendingSkillTarget,
         PendingSkillTargetList, PersonalStore, PlayerCharacter, Position, VisibleStatusEffects,
@@ -200,7 +200,8 @@ pub fn game_connection_system(
             }
             Ok(ServerMessage::JoinZone(message)) => {
                 if let Some(player_entity) = client_entity_list.player_entity {
-                    commands.entity(player_entity).insert((
+                    let mut entity_commands = commands.entity(player_entity);
+                    entity_commands.insert((
                         ClientEntity::new(message.entity_id, ClientEntityType::Character),
                         CollisionPlayer,
                         Command::with_stop(),
@@ -211,6 +212,12 @@ pub fn game_connection_system(
                         message.health_points,
                         message.mana_points,
                     ));
+
+                    if message.health_points.hp > 0 {
+                        entity_commands.remove::<Dead>();
+                    } else {
+                        entity_commands.insert((Dead, Command::with_die(), NextCommand::default()));
+                    }
 
                     commands.insert_resource(WorldRates {
                         craft_rate: message.craft_rate,
