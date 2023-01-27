@@ -151,7 +151,9 @@ pub fn ui_game_menu_system(
             ui_state_windows.character_info_open = !ui_state_windows.character_info_open;
         }
 
-        if input.consume_key(egui::Modifiers::ALT, egui::Key::I) {
+        if input.consume_key(egui::Modifiers::ALT, egui::Key::I)
+            || input.consume_key(egui::Modifiers::ALT, egui::Key::V)
+        {
             ui_state_windows.inventory_open = !ui_state_windows.inventory_open;
         }
 
