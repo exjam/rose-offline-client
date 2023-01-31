@@ -14,9 +14,8 @@ use rose_game_common::messages::client::{ClientMessage, JoinServer};
 use crate::{
     components::ActiveMotion,
     events::{LoadZoneEvent, LoginEvent, NetworkEvent},
-    free_camera::FreeCamera,
-    orbit_camera::OrbitCamera,
     resources::{Account, LoginConnection, LoginState, ServerConfiguration, ServerList},
+    systems::{FreeCamera, OrbitCamera},
 };
 
 pub fn login_state_enter_system(

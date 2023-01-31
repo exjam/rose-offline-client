@@ -2,7 +2,10 @@ use bevy::prelude::{Camera, Query, ResMut, Transform, With};
 use bevy_egui::{egui, EguiContext};
 use dolly::prelude::{Arm, YawPitch};
 
-use crate::{free_camera::FreeCamera, orbit_camera::OrbitCamera, ui::UiStateDebugWindows};
+use crate::{
+    systems::{FreeCamera, OrbitCamera},
+    ui::UiStateDebugWindows,
+};
 
 pub fn ui_debug_camera_info_system(
     mut egui_context: ResMut<EguiContext>,

@@ -5,8 +5,8 @@ use bevy::{
     },
     math::{Quat, Vec2, Vec3},
     prelude::{
-        App, Component, Entity, EventReader, GlobalTransform, Local, MouseButton, Plugin, Query,
-        Res, ResMut, Time, Transform,
+        Component, Entity, EventReader, GlobalTransform, Local, MouseButton, Query, Res, ResMut,
+        Time, Transform,
     },
     window::{CursorGrabMode, Windows},
 };
@@ -20,15 +20,6 @@ use dolly::prelude::{Arm, CameraRig, LeftHanded, Position, Smooth, YawPitch};
 use crate::components::{
     COLLISION_FILTER_COLLIDABLE, COLLISION_FILTER_MOVEABLE, COLLISION_GROUP_PHYSICS_TOY,
 };
-
-#[derive(Default)]
-pub struct OrbitCameraPlugin;
-
-impl Plugin for OrbitCameraPlugin {
-    fn build(&self, app: &mut App) {
-        app.add_system(orbit_camera_update);
-    }
-}
 
 #[derive(Component)]
 pub struct OrbitCamera {
@@ -68,7 +59,7 @@ pub struct CameraControlState {
     pub saved_cursor_position: Option<Vec2>,
 }
 
-fn orbit_camera_update(
+pub fn orbit_camera_system(
     mut control_state: Local<CameraControlState>,
     mut query: Query<(&mut OrbitCamera, &mut Transform)>,
     query_global_transform: Query<&GlobalTransform>,

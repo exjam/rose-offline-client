@@ -7,9 +7,8 @@ use rose_game_common::messages::client::ClientMessage;
 use crate::{
     components::{ActiveMotion, PlayerCharacter},
     events::ZoneEvent,
-    free_camera::FreeCamera,
-    orbit_camera::OrbitCamera,
     resources::GameConnection,
+    systems::{FreeCamera, OrbitCamera},
 };
 
 pub fn game_state_enter_system(

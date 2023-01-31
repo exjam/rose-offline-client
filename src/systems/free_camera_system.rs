@@ -5,22 +5,12 @@ use bevy::{
     },
     math::{Quat, Vec2, Vec3},
     prelude::{
-        App, Component, EventReader, KeyCode, Local, MouseButton, Plugin, Query, Res, ResMut, Time,
-        Transform,
+        Component, EventReader, KeyCode, Local, MouseButton, Query, Res, ResMut, Time, Transform,
     },
     window::{CursorGrabMode, Windows},
 };
 use bevy_egui::EguiContext;
 use dolly::prelude::{CameraRig, LeftHanded, Position, Smooth, YawPitch};
-
-#[derive(Default)]
-pub struct FreeCameraPlugin;
-
-impl Plugin for FreeCameraPlugin {
-    fn build(&self, app: &mut App) {
-        app.add_system(free_camera_update);
-    }
-}
 
 #[derive(Component)]
 pub struct FreeCamera {
@@ -51,7 +41,7 @@ pub struct CameraControlState {
     pub saved_cursor_position: Option<Vec2>,
 }
 
-fn free_camera_update(
+pub fn free_camera_system(
     mut control_state: Local<CameraControlState>,
     mut query: Query<(&mut FreeCamera, &mut Transform)>,
     time: Res<Time>,

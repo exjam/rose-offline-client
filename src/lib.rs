@@ -34,9 +34,7 @@ pub mod bundles;
 pub mod components;
 pub mod effect_loader;
 pub mod events;
-pub mod free_camera;
 pub mod model_loader;
-pub mod orbit_camera;
 pub mod protocol;
 pub mod ray_from_screenspace;
 pub mod render;
@@ -57,9 +55,7 @@ use events::{
     PersonalStoreEvent, PlayerCommandEvent, QuestTriggerEvent, SpawnEffectEvent,
     SpawnProjectileEvent, SystemFuncEvent, UseItemEvent, WorldConnectionEvent, ZoneEvent,
 };
-use free_camera::FreeCameraPlugin;
 use model_loader::ModelLoader;
-use orbit_camera::OrbitCameraPlugin;
 use render::{DamageDigitMaterial, RoseRenderPlugin};
 use resources::{
     load_ui_resources, run_network_thread, update_ui_resources, AppState, ClientEntityList,
@@ -79,20 +75,21 @@ use systems::{
     damage_digit_render_system, debug_render_collider_system,
     debug_render_directional_light_system, debug_render_polylines_setup_system,
     debug_render_polylines_update_system, debug_render_skeleton_system, directional_light_system,
-    effect_system, facing_direction_system, game_connection_system, game_mouse_input_system,
-    game_state_enter_system, game_zone_change_system, hit_event_system,
+    effect_system, facing_direction_system, free_camera_system, game_connection_system,
+    game_mouse_input_system, game_state_enter_system, game_zone_change_system, hit_event_system,
     item_drop_model_add_collider_system, item_drop_model_system, login_connection_system,
     login_event_system, login_state_enter_system, login_state_exit_system, login_system,
     model_viewer_enter_system, model_viewer_exit_system, model_viewer_system, name_tag_system,
     name_tag_update_color_system, name_tag_update_healthbar_system, name_tag_visibility_system,
     network_thread_system, npc_idle_sound_system, npc_model_add_collider_system,
-    npc_model_update_system, particle_sequence_system, passive_recovery_system,
-    pending_damage_system, pending_skill_effect_system, personal_store_model_add_collider_system,
-    personal_store_model_system, player_command_system, projectile_system, quest_trigger_system,
-    spawn_effect_system, spawn_projectile_system, status_effect_system, system_func_event_system,
-    update_position_system, use_item_event_system, vehicle_model_system, vehicle_sound_system,
-    visible_status_effects_system, world_connection_system, world_time_system, zone_time_system,
-    zone_viewer_enter_system, DebugInspectorPlugin,
+    npc_model_update_system, orbit_camera_system, particle_sequence_system,
+    passive_recovery_system, pending_damage_system, pending_skill_effect_system,
+    personal_store_model_add_collider_system, personal_store_model_system, player_command_system,
+    projectile_system, quest_trigger_system, spawn_effect_system, spawn_projectile_system,
+    status_effect_system, system_func_event_system, update_position_system, use_item_event_system,
+    vehicle_model_system, vehicle_sound_system, visible_status_effects_system,
+    world_connection_system, world_time_system, zone_time_system, zone_viewer_enter_system,
+    DebugInspectorPlugin,
 };
 use ui::{
     load_dialog_sprites_system, ui_bank_system, ui_character_create_system,
@@ -498,8 +495,6 @@ fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsC
     // Initialise 3rd party bevy plugins
     app.add_plugin(bevy_polyline::PolylinePlugin)
         .add_plugin(bevy_egui::EguiPlugin)
-        .add_plugin(FreeCameraPlugin)
-        .add_plugin(OrbitCameraPlugin)
         .add_plugin(bevy_rapier3d::prelude::RapierPhysicsPlugin::<
             bevy_rapier3d::prelude::NoUserData,
         >::default())
@@ -577,7 +572,9 @@ fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsC
         .init_resource::<Events<WorldConnectionEvent>>()
         .init_resource::<Events<ZoneEvent>>();
 
-    app.add_system(auto_login_system)
+    app.add_system(free_camera_system.label("update_camera"))
+        .add_system(orbit_camera_system.label("update_camera"))
+        .add_system(auto_login_system)
         .add_system(background_music_system)
         .add_system(character_model_update_system)
         .add_system(character_model_add_collider_system.after(character_model_update_system))

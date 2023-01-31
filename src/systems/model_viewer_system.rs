@@ -23,9 +23,8 @@ use crate::{
     components::{
         ActiveMotion, CharacterModel, ClientEntityName, ModelHeight, NameTagType, NpcModel,
     },
-    free_camera::FreeCamera,
-    orbit_camera::OrbitCamera,
     resources::{DamageDigitsSpawner, GameData, NameTagSettings},
+    systems::{FreeCamera, OrbitCamera},
     ui::UiStateDebugWindows,
 };
 

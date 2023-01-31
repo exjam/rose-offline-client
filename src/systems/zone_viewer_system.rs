@@ -4,7 +4,8 @@ use bevy::{
 };
 
 use crate::{
-    components::ActiveMotion, free_camera::FreeCamera, orbit_camera::OrbitCamera,
+    components::ActiveMotion,
+    systems::{FreeCamera, OrbitCamera},
     ui::UiStateDebugWindows,
 };
 
