@@ -101,12 +101,12 @@ use ui::{
     ui_debug_npc_list_system, ui_debug_physics_system, ui_debug_render_system,
     ui_debug_skill_list_system, ui_debug_zone_lighting_system, ui_debug_zone_list_system,
     ui_debug_zone_time_system, ui_drag_and_drop_system, ui_game_menu_system, ui_hotbar_system,
-    ui_inventory_system, ui_login_system, ui_message_box_system, ui_minimap_system,
-    ui_npc_store_system, ui_number_input_dialog_system, ui_party_option_system, ui_party_system,
-    ui_personal_store_system, ui_player_info_system, ui_quest_list_system, ui_respawn_system,
-    ui_selected_target_system, ui_server_select_system, ui_settings_system, ui_skill_list_system,
-    ui_skill_tree_system, ui_status_effects_system, widgets::Dialog, DialogLoader,
-    UiStateDebugWindows, UiStateDragAndDrop, UiStateWindows,
+    ui_inventory_system, ui_item_drop_name_system, ui_login_system, ui_message_box_system,
+    ui_minimap_system, ui_npc_store_system, ui_number_input_dialog_system, ui_party_option_system,
+    ui_party_system, ui_personal_store_system, ui_player_info_system, ui_quest_list_system,
+    ui_respawn_system, ui_selected_target_system, ui_server_select_system, ui_settings_system,
+    ui_skill_list_system, ui_skill_tree_system, ui_status_effects_system, widgets::Dialog,
+    DialogLoader, UiStateDebugWindows, UiStateDragAndDrop, UiStateWindows,
 };
 use vfs_asset_io::VfsAssetIo;
 use zmo_asset_loader::{ZmoAsset, ZmoAssetLoader};
@@ -664,7 +664,12 @@ fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsC
         .add_system(ui_debug_zone_list_system.label("ui_system"))
         .add_system(ui_debug_zone_time_system.label("ui_system"))
         .add_system(ui_debug_diagnostics_system.label("ui_system"))
-        .add_system(ui_debug_entity_inspector_system.label("ui_system"));
+        .add_system(ui_debug_entity_inspector_system.label("ui_system"))
+        .add_system(
+            ui_item_drop_name_system
+                .label("ui_system")
+                .after("update_camera"),
+        );
 
     // character_model_blink_system in PostUpdate to avoid any conflicts with model destruction
     // e.g. through the character select exit system.
