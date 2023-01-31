@@ -11,9 +11,8 @@ use rose_game_common::messages::client::ClientMessage;
 
 use crate::{
     components::PlayerCharacter,
-    free_camera::FreeCamera,
-    orbit_camera::OrbitCamera,
     resources::{AppState, DebugInspector, GameConnection, WorldConnection},
+    systems::{FreeCamera, OrbitCamera},
 };
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
