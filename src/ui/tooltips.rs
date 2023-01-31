@@ -36,7 +36,7 @@ pub struct PlayerTooltipQuery<'w> {
     pub union_membership: &'w UnionMembership,
 }
 
-fn get_item_name_color(item_type: ItemType, item_data: &BaseItemData) -> egui::Color32 {
+pub fn get_item_name_color(item_type: ItemType, item_data: &BaseItemData) -> egui::Color32 {
     match item_type {
         ItemType::Head
         | ItemType::Body
