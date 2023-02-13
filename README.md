@@ -1,32 +1,29 @@
 # rose-offline-client
-An open source client for ROSE Online, currently only compatible with irose_129_129en. For a matching open source server see [rose-offline](https://github.com/exjam/rose-offline/)
+An open source client for ROSE Online, compatible with the official 129_129en irose server or [rose-offline](https://github.com/exjam/rose-offline/).
 
 # Running
-## Required arguments:
+Run rose-offline-client from your installed official client directory (the folder containing data.idx), or you can use the `--data-idx` or `--data-path` arguments as described below.
+
+## Optional arguments:
 - `--data-idx=<path/to/data.idx>` Path to irose 129en data.idx
-
-## Game Mode
-Use `--game` to run in game mode, this is where we act as a full client which requires an irose 129en compatible server.
-- `--ip` Server IP for login server
+- `--data-aruavfs-idx=<path/to/data.idx>` Path to aruarose data.idx
+- `--data-titanvfs-idx=<path/to/data.idx>` Path to titanrose data.idx
+- `--ip` Server IP for login server (defaults to 127.0.0.1)
 - `--port` Server port for login server (defaults to 29000)
+- `--model-viewer` Start the client in model viewer mode
+- `--zone=<N>` Start the client in zone viewer mode in the given zone
 
-You can also use `--auto-login` for automatic login in game mode.
+## Auto login arguments:
+- `--auto-login` Automatic login.
 - `--username=<username>` Username for auto login
 - `--password=<password>` Password for auto login
 - `--server-id=<N>` Server ID for auto login (defaults to 0)
 - `--channel-id=<N>` Channel ID for auto login (defaults to 0)
 - `--character-name=<name>` Character name for auto login (optional, auto login can be username/password only)
 
-## Model Viewer Mode
-Use `--model-viewer` to run in model viewer mode, which allows you to view character and NPC models.
-
-## Zone Viewer Mode
-Use `--zone=<N>` to run in zone viewer mode, this allows you to view zones.
-
 # Screenshots
 
-<img alt="Game Mode"  src="https://user-images.githubusercontent.com/1302758/167260422-2cb29850-a049-4271-9e82-f45552c7e939.jpg">
+<img alt="Fighting Jellybeans"  src="https://user-images.githubusercontent.com/1302758/218569716-d7c131e0-bc5b-4474-b060-745755202c95.jpg">
 
-<img alt="Model Viewer" src="https://user-images.githubusercontent.com/1302758/159884786-772d7b53-a58e-4e16-a5c9-c8ab52536afa.jpg">
+<img alt="Castlegear" src="https://user-images.githubusercontent.com/1302758/218569729-11887740-2205-4730-a420-c21b2e8a83f2.jpg">
 
-<img alt="Zone Viewer - City of Junon Polis" src="https://user-images.githubusercontent.com/1302758/156855913-942e122a-c847-464b-a4be-5c41057f9265.jpg">
