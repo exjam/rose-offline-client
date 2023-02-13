@@ -12,7 +12,7 @@ use bevy::{
     window::{CursorGrabMode, Windows},
 };
 use bevy_egui::{egui, EguiContext};
-use bevy_rapier3d::prelude::{InteractionGroups, QueryFilter, RapierContext};
+use bevy_rapier3d::prelude::{CollisionGroups, QueryFilter, RapierContext};
 
 use rose_data::{CharacterMotionAction, ZoneId};
 use rose_game_common::messages::{
@@ -419,13 +419,9 @@ pub fn character_select_input_system(
                     ray_direction,
                     10000000.0,
                     false,
-                    QueryFilter::new().groups(InteractionGroups::new(
-                        bevy_rapier3d::rapier::geometry::Group::from_bits_truncate(
-                            COLLISION_FILTER_CLICKABLE,
-                        ),
-                        bevy_rapier3d::rapier::geometry::Group::from_bits_truncate(
-                            COLLISION_GROUP_CHARACTER | COLLISION_GROUP_PLAYER,
-                        ),
+                    QueryFilter::new().groups(CollisionGroups::new(
+                        COLLISION_FILTER_CLICKABLE,
+                        COLLISION_GROUP_CHARACTER | COLLISION_GROUP_PLAYER,
                     )),
                 ) {
                     let hit_entity = query_collider_parent

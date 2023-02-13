@@ -1,9 +1,11 @@
-use bevy::prelude::Component;
+use bevy::{
+    prelude::Component,
+    reflect::{FromReflect, Reflect},
+};
 
-use bevy_inspector_egui::Inspectable;
 use rose_file_readers::ZscCollisionShape;
 
-#[derive(Clone, Inspectable)]
+#[derive(Clone, Reflect, FromReflect)]
 pub enum ZoneObjectPartCollisionShape {
     None,
     Sphere,
@@ -30,13 +32,13 @@ impl From<&Option<ZscCollisionShape>> for ZoneObjectPartCollisionShape {
     }
 }
 
-#[derive(Clone, Default, Inspectable)]
+#[derive(Clone, Default, Reflect, FromReflect)]
 pub struct ZoneObjectId {
     pub ifo_object_id: usize,
     pub zsc_object_id: usize,
 }
 
-#[derive(Clone, Default, Inspectable)]
+#[derive(Clone, Default, Reflect, FromReflect)]
 pub struct ZoneObjectPart {
     pub ifo_object_id: usize,
     pub zsc_object_id: usize,
@@ -49,20 +51,20 @@ pub struct ZoneObjectPart {
     pub collision_no_camera: bool,
 }
 
-#[derive(Clone, Default, Inspectable)]
+#[derive(Clone, Default, Reflect, FromReflect)]
 pub struct ZoneObjectAnimatedObject {
     pub mesh_path: String,
     pub motion_path: String,
     pub texture_path: String,
 }
 
-#[derive(Clone, Default, Inspectable)]
+#[derive(Clone, Default, Reflect, FromReflect)]
 pub struct ZoneObjectTerrain {
     pub block_x: u32,
     pub block_y: u32,
 }
 
-#[derive(Clone, Component, Inspectable)]
+#[derive(Clone, Component, Reflect, FromReflect)]
 pub enum ZoneObject {
     AnimatedObject(ZoneObjectAnimatedObject),
     WarpObject(ZoneObjectId),

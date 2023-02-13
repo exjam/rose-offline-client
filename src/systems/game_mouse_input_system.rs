@@ -10,7 +10,7 @@ use bevy::{
     window::Windows,
 };
 use bevy_egui::EguiContext;
-use bevy_rapier3d::prelude::{InteractionGroups, QueryFilter, RapierContext};
+use bevy_rapier3d::prelude::{CollisionGroups, QueryFilter, RapierContext};
 
 use rose_game_common::components::{ItemDrop, Team};
 
@@ -81,13 +81,9 @@ pub fn game_mouse_input_system(
                 ray_direction,
                 10000000.0,
                 false,
-                QueryFilter::new().groups(InteractionGroups::new(
-                    bevy_rapier3d::rapier::geometry::Group::from_bits_truncate(
-                        COLLISION_FILTER_CLICKABLE,
-                    ),
-                    bevy_rapier3d::rapier::geometry::Group::from_bits_truncate(
-                        u32::MAX & !COLLISION_GROUP_PLAYER & !COLLISION_GROUP_PHYSICS_TOY,
-                    ),
+                QueryFilter::new().groups(CollisionGroups::new(
+                    COLLISION_FILTER_CLICKABLE,
+                    !COLLISION_GROUP_PLAYER & !COLLISION_GROUP_PHYSICS_TOY,
                 )),
             ) {
                 let hit_position = ray_origin + ray_direction * distance;

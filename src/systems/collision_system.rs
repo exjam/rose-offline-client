@@ -4,7 +4,7 @@ use bevy::{
         Assets, Changed, Commands, Entity, EventWriter, Or, Query, Res, Time, Transform, With,
     },
 };
-use bevy_rapier3d::prelude::{Collider, InteractionGroups, QueryFilter, RapierContext};
+use bevy_rapier3d::prelude::{Collider, CollisionGroups, Group, QueryFilter, RapierContext};
 
 use rose_game_common::{components::Destination, messages::client::ClientMessage};
 
@@ -55,13 +55,9 @@ pub fn collision_height_only_system(
             ray_direction,
             100000000.0,
             false,
-            QueryFilter::new().groups(InteractionGroups::new(
-                bevy_rapier3d::rapier::geometry::Group::from_bits_truncate(
-                    COLLISION_FILTER_MOVEABLE,
-                ),
-                bevy_rapier3d::rapier::geometry::Group::from_bits_truncate(
-                    u32::MAX & !COLLISION_GROUP_PHYSICS_TOY,
-                ),
+            QueryFilter::new().groups(CollisionGroups::new(
+                COLLISION_FILTER_MOVEABLE,
+                !COLLISION_GROUP_PHYSICS_TOY,
             )),
         ) {
             Some((ray_origin + ray_direction * distance).y)
@@ -113,13 +109,9 @@ pub fn collision_player_system_join_zoin(
             ray_direction,
             100000000.0,
             false,
-            QueryFilter::new().groups(InteractionGroups::new(
-                bevy_rapier3d::rapier::geometry::Group::from_bits_truncate(
-                    COLLISION_FILTER_MOVEABLE,
-                ),
-                bevy_rapier3d::rapier::geometry::Group::from_bits_truncate(
-                    u32::MAX & !COLLISION_GROUP_PHYSICS_TOY,
-                ),
+            QueryFilter::new().groups(CollisionGroups::new(
+                COLLISION_FILTER_MOVEABLE,
+                !COLLISION_GROUP_PHYSICS_TOY,
             )),
         ) {
             Some((ray_origin + ray_direction * distance).y)
@@ -190,13 +182,9 @@ pub fn collision_player_system(
                 cast_direction,
                 &Collider::ball(collider_radius),
                 translation_delta.length(),
-                QueryFilter::new().groups(InteractionGroups::new(
-                    bevy_rapier3d::rapier::geometry::Group::from_bits_truncate(
-                        COLLISION_FILTER_COLLIDABLE,
-                    ),
-                    bevy_rapier3d::rapier::geometry::Group::from_bits_truncate(
-                        u32::MAX & !COLLISION_GROUP_ZONE_TERRAIN & !COLLISION_GROUP_PHYSICS_TOY,
-                    ),
+                QueryFilter::new().groups(CollisionGroups::new(
+                    COLLISION_FILTER_COLLIDABLE,
+                    !COLLISION_GROUP_ZONE_TERRAIN & !COLLISION_GROUP_PHYSICS_TOY,
                 )),
             ) {
                 let collision_translation =
@@ -232,13 +220,9 @@ pub fn collision_player_system(
             ray_direction,
             1.35 + fall_distance,
             false,
-            QueryFilter::new().groups(InteractionGroups::new(
-                bevy_rapier3d::rapier::geometry::Group::from_bits_truncate(
-                    COLLISION_FILTER_MOVEABLE,
-                ),
-                bevy_rapier3d::rapier::geometry::Group::from_bits_truncate(
-                    u32::MAX & !COLLISION_GROUP_PHYSICS_TOY,
-                ),
+            QueryFilter::new().groups(CollisionGroups::new(
+                COLLISION_FILTER_MOVEABLE,
+                !COLLISION_GROUP_PHYSICS_TOY,
             )),
         ) {
             Some((ray_origin + ray_direction * distance).y)
@@ -276,10 +260,9 @@ pub fn collision_player_system(
             ),
             Quat::default(),
             &Collider::ball(1.0),
-            QueryFilter::new().groups(InteractionGroups::all().with_filter(
-                bevy_rapier3d::rapier::geometry::Group::from_bits_truncate(
-                    COLLISION_GROUP_ZONE_EVENT_OBJECT | COLLISION_GROUP_ZONE_WARP_OBJECT,
-                ),
+            QueryFilter::new().groups(CollisionGroups::new(
+                Group::all(),
+                COLLISION_GROUP_ZONE_EVENT_OBJECT | COLLISION_GROUP_ZONE_WARP_OBJECT,
             )),
             |hit_entity| {
                 let hit_entity = query_collider_parent

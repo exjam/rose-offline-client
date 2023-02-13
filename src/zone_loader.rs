@@ -893,14 +893,12 @@ fn spawn_terrain(
             RigidBody::Fixed,
             Collider::trimesh(collider_verts, collider_indices),
             CollisionGroups::new(
-                bevy_rapier3d::geometry::Group::from_bits_truncate(COLLISION_GROUP_ZONE_TERRAIN),
-                bevy_rapier3d::geometry::Group::from_bits_truncate(
-                    COLLISION_FILTER_INSPECTABLE
-                        | COLLISION_FILTER_COLLIDABLE
-                        | COLLISION_GROUP_PHYSICS_TOY
-                        | COLLISION_FILTER_MOVEABLE
-                        | COLLISION_FILTER_CLICKABLE,
-                ),
+                COLLISION_GROUP_ZONE_TERRAIN,
+                COLLISION_FILTER_INSPECTABLE
+                    | COLLISION_FILTER_COLLIDABLE
+                    | COLLISION_GROUP_PHYSICS_TOY
+                    | COLLISION_FILTER_MOVEABLE
+                    | COLLISION_FILTER_CLICKABLE,
             ),
         ))
         .id()
@@ -966,10 +964,7 @@ fn spawn_water(
             NotShadowReceiver,
             RigidBody::Fixed,
             Collider::trimesh(collider_verts, collider_indices),
-            CollisionGroups::new(
-                bevy_rapier3d::geometry::Group::from_bits_truncate(COLLISION_GROUP_ZONE_WATER),
-                bevy_rapier3d::geometry::Group::from_bits_truncate(COLLISION_FILTER_INSPECTABLE),
-            ),
+            CollisionGroups::new(COLLISION_GROUP_ZONE_WATER, COLLISION_FILTER_INSPECTABLE),
         ))
         .id()
 }
@@ -990,7 +985,7 @@ fn spawn_object(
     zsc_object_id: usize,
     object_type: fn(ZoneObjectId) -> ZoneObject,
     part_object_type: fn(ZoneObjectPart) -> ZoneObject,
-    collision_group: u32,
+    collision_group: bevy_rapier3d::prelude::Group,
 ) -> Entity {
     let object = &zsc.objects[zsc_object_id];
     let object_transform = Transform::default()
@@ -1185,10 +1180,7 @@ fn spawn_object(
                     handle: mesh,
                     shape: ComputedColliderShape::TriMesh,
                 },
-                CollisionGroups::new(
-                    bevy_rapier3d::geometry::Group::from_bits_truncate(collision_group),
-                    bevy_rapier3d::geometry::Group::from_bits_truncate(collision_filter),
-                ),
+                CollisionGroups::new(collision_group, collision_filter),
             ));
 
             let active_motion = object_part.animation_path.as_ref().map(|animation_path| {
@@ -1340,10 +1332,7 @@ fn spawn_animated_object(
                 handle: mesh,
                 shape: ComputedColliderShape::TriMesh,
             },
-            CollisionGroups::new(
-                bevy_rapier3d::geometry::Group::from_bits_truncate(COLLISION_GROUP_ZONE_OBJECT),
-                bevy_rapier3d::geometry::Group::from_bits_truncate(COLLISION_FILTER_INSPECTABLE),
-            ),
+            CollisionGroups::new(COLLISION_GROUP_ZONE_OBJECT, COLLISION_FILTER_INSPECTABLE),
         ))
         .id()
 }

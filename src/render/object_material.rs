@@ -19,7 +19,7 @@ use bevy::{
         error, AddAsset, App, AssetServer, Assets, Component, Entity, FromWorld, HandleUntyped,
         Mesh, Msaa, Plugin, Query, Res, ResMut, Resource, Vec3, With, World,
     },
-    reflect::TypeUuid,
+    reflect::{FromReflect, Reflect, TypeUuid},
     render::{
         extract_component::{ExtractComponent, ExtractComponentPlugin},
         mesh::{GpuBufferInfo, MeshVertexBufferLayout},
@@ -45,7 +45,7 @@ use bevy::{
         RenderApp, RenderStage,
     },
 };
-use bevy_inspector_egui::Inspectable;
+
 use rose_file_readers::{ZscMaterialBlend, ZscMaterialGlow};
 
 use crate::render::{
@@ -399,7 +399,7 @@ pub struct ObjectMaterialUniformData {
     pub lightmap_uv_scale: f32,
 }
 
-#[derive(Copy, Clone, Debug, Default, Inspectable)]
+#[derive(Copy, Clone, Debug, Default, Reflect)]
 pub enum ObjectMaterialBlend {
     #[default]
     Normal,
@@ -415,7 +415,7 @@ impl From<ZscMaterialBlend> for ObjectMaterialBlend {
     }
 }
 
-#[derive(Copy, Clone, Debug, Inspectable)]
+#[derive(Copy, Clone, Debug, Reflect, FromReflect)]
 pub enum ObjectMaterialGlow {
     Simple(Vec3),
     Light(Vec3),
@@ -446,7 +446,7 @@ impl From<ZscMaterialGlow> for ObjectMaterialGlow {
     }
 }
 
-#[derive(Debug, Clone, TypeUuid, Inspectable)]
+#[derive(Debug, Clone, TypeUuid, Reflect)]
 #[uuid = "62a496fa-33e8-41a8-9a44-237d70214227"]
 pub struct ObjectMaterial {
     pub base_texture: Option<Handle<Image>>,

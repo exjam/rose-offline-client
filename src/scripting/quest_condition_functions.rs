@@ -1,7 +1,7 @@
 use rose_data::QuestTrigger;
 use rose_file_readers::{
-    QsdAbilityType, QsdClanPosition, QsdCondition, QsdConditionOperator, QsdConditionQuestItem,
-    QsdEquipmentIndex, QsdItemBase1000, QsdVariableType,
+    QsdAbilityType, QsdClanPosition, QsdCondition, QsdConditionOperator, QsdEquipmentIndex,
+    QsdItem, QsdVariableType,
 };
 
 use crate::{
@@ -27,47 +27,43 @@ fn quest_condition_operator<T: PartialEq + PartialOrd>(
     }
 }
 
-fn quest_condition_ability_values(
+fn quest_condition_ability_value(
     script_resources: &ScriptFunctionResources,
     script_context: &mut ScriptFunctionContext,
     _quest_context: &mut QuestFunctionContext,
-    check_values: &[(QsdAbilityType, QsdConditionOperator, i32)],
+    ability_type: QsdAbilityType,
+    operator: QsdConditionOperator,
+    compare_value: i32,
 ) -> bool {
     let character = script_context.query_player.single();
 
-    for &(ability_type, operator, compare_value) in check_values {
-        let ability_type = script_resources
-            .game_data
-            .data_decoder
-            .decode_ability_type(ability_type.get());
-        if ability_type.is_none() {
-            return false;
-        }
-
-        let current_value = ability_values_get_value(
-            ability_type.unwrap(),
-            character.ability_values,
-            Some(character.character_info),
-            Some(character.experience_points),
-            Some(character.health_points),
-            Some(character.inventory),
-            Some(character.level),
-            Some(character.mana_points),
-            Some(character.move_speed),
-            Some(character.skill_points),
-            Some(character.stamina),
-            Some(character.stat_points),
-            Some(character.team),
-            Some(character.union_membership),
-        )
-        .unwrap_or(0);
-
-        if !quest_condition_operator(operator, current_value, compare_value) {
-            return false;
-        }
+    let ability_type = script_resources
+        .game_data
+        .data_decoder
+        .decode_ability_type(ability_type.get());
+    if ability_type.is_none() {
+        return false;
     }
 
-    true
+    let current_value = ability_values_get_value(
+        ability_type.unwrap(),
+        character.ability_values,
+        Some(character.character_info),
+        Some(character.experience_points),
+        Some(character.health_points),
+        Some(character.inventory),
+        Some(character.level),
+        Some(character.mana_points),
+        Some(character.move_speed),
+        Some(character.skill_points),
+        Some(character.stamina),
+        Some(character.stat_points),
+        Some(character.team),
+        Some(character.union_membership),
+    )
+    .unwrap_or(0);
+
+    quest_condition_operator(operator, current_value, compare_value)
 }
 
 fn quest_condition_check_switch(
@@ -90,16 +86,16 @@ fn quest_condition_quest_item(
     script_resources: &ScriptFunctionResources,
     script_context: &mut ScriptFunctionContext,
     quest_context: &mut QuestFunctionContext,
-    item_base1000: Option<QsdItemBase1000>,
+    item: Option<QsdItem>,
     equipment_index: Option<QsdEquipmentIndex>,
     required_count: u32,
     operator: QsdConditionOperator,
 ) -> bool {
-    let item_reference = item_base1000.and_then(|item_base1000| {
+    let item_reference = item.and_then(|item| {
         script_resources
             .game_data
             .data_decoder
-            .decode_item_base1000(item_base1000.get())
+            .decode_item_reference(item.item_number, item.item_type)
     });
 
     let equipment_index = equipment_index.and_then(|equipment_index| {
@@ -148,35 +144,6 @@ fn quest_condition_quest_item(
     }
 }
 
-fn quest_condition_quest_items(
-    script_resources: &ScriptFunctionResources,
-    script_context: &mut ScriptFunctionContext,
-    quest_context: &mut QuestFunctionContext,
-    items: &[QsdConditionQuestItem],
-) -> bool {
-    for &QsdConditionQuestItem {
-        item,
-        equipment_index,
-        required_count,
-        operator,
-    } in items
-    {
-        if !quest_condition_quest_item(
-            script_resources,
-            script_context,
-            quest_context,
-            item,
-            equipment_index,
-            required_count,
-            operator,
-        ) {
-            return false;
-        }
-    }
-
-    true
-}
-
 fn quest_condition_quest_variable(
     script_resources: &ScriptFunctionResources,
     script_context: &mut ScriptFunctionContext,
@@ -219,8 +186,8 @@ fn quest_condition_clan_position(
     script_resources: &ScriptFunctionResources,
     script_context: &mut ScriptFunctionContext,
     _quest_context: &mut QuestFunctionContext,
-    compare: QsdConditionOperator,
-    position: QsdClanPosition,
+    operator: QsdConditionOperator,
+    compare_value: QsdClanPosition,
 ) -> bool {
     let character = script_context.query_player.single();
     let value = character
@@ -232,7 +199,7 @@ fn quest_condition_clan_position(
                 .encode_clan_member_position(clan_membership.position)
         })
         .unwrap_or(0);
-    quest_condition_operator(compare, value, position)
+    quest_condition_operator(operator, value, compare_value)
 }
 
 fn quest_condition_in_clan(
@@ -253,56 +220,71 @@ pub fn quest_trigger_check_conditions(
 ) -> bool {
     for condition in quest_trigger.conditions.iter() {
         let result = match *condition {
-            QsdCondition::AbilityValue(ref ability_values) => quest_condition_ability_values(
+            QsdCondition::AbilityValue {
+                ability_type,
+                operator,
+                value,
+            } => quest_condition_ability_value(
                 script_resources,
                 script_context,
                 quest_context,
-                ability_values,
-            ),
-            QsdCondition::QuestItems(ref items) => {
-                quest_condition_quest_items(script_resources, script_context, quest_context, items)
-            }
-            QsdCondition::QuestVariable(ref quest_variables) => {
-                quest_variables.iter().all(|quest_variable| {
-                    quest_condition_quest_variable(
-                        script_resources,
-                        script_context,
-                        quest_context,
-                        quest_variable.variable_type,
-                        quest_variable.variable_id,
-                        quest_variable.operator,
-                        quest_variable.value,
-                    )
-                })
-            }
-            QsdCondition::QuestSwitch(switch_id, value) => quest_condition_check_switch(
-                script_resources,
-                script_context,
-                quest_context,
-                switch_id,
+                ability_type,
+                operator,
                 value,
             ),
-            QsdCondition::SelectQuest(quest_id) => quest_condition_select_quest(
+            QsdCondition::QuestItem {
+                item,
+                equipment_index,
+                required_count,
+                operator,
+            } => quest_condition_quest_item(
                 script_resources,
                 script_context,
                 quest_context,
-                quest_id,
+                item,
+                equipment_index,
+                required_count,
+                operator,
             ),
-            QsdCondition::ClanPosition(compare, position) => quest_condition_clan_position(
+            QsdCondition::QuestVariable {
+                variable_type,
+                variable_id,
+                operator,
+                value,
+            } => quest_condition_quest_variable(
                 script_resources,
                 script_context,
                 quest_context,
-                compare,
-                position,
+                variable_type,
+                variable_id,
+                operator,
+                value,
             ),
-            QsdCondition::InClan(in_clan) => {
-                quest_condition_in_clan(script_resources, script_context, quest_context, in_clan)
+            QsdCondition::QuestSwitch { id, value } => quest_condition_check_switch(
+                script_resources,
+                script_context,
+                quest_context,
+                id,
+                value,
+            ),
+            QsdCondition::SelectQuest { id } => {
+                quest_condition_select_quest(script_resources, script_context, quest_context, id)
+            }
+            QsdCondition::ClanPosition { operator, value } => quest_condition_clan_position(
+                script_resources,
+                script_context,
+                quest_context,
+                operator,
+                value,
+            ),
+            QsdCondition::HasClan { has_clan } => {
+                quest_condition_in_clan(script_resources, script_context, quest_context, has_clan)
             }
             // Server side only conditions:
-            QsdCondition::RandomPercent(_)
-            | QsdCondition::ObjectVariable(_)
-            | QsdCondition::SelectEventObject(_)
-            | QsdCondition::SelectNpc(_) => true,
+            QsdCondition::RandomPercent { .. }
+            | QsdCondition::ObjectVariable { .. }
+            | QsdCondition::SelectEventObject { .. }
+            | QsdCondition::SelectNpc { .. } => true,
             _ => {
                 log::warn!("Unimplemented quest condition: {:?}", condition);
                 false

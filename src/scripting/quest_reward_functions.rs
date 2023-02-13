@@ -1,7 +1,5 @@
 use rose_data::{QuestTrigger, StackableItem, WorldTicks};
-use rose_file_readers::{
-    QsdItemBase1000, QsdReward, QsdRewardOperator, QsdRewardQuestAction, QsdVariableType,
-};
+use rose_file_readers::{QsdItem, QsdReward, QsdRewardOperator, QsdVariableType};
 use rose_game_common::components::ActiveQuest;
 
 use crate::{
@@ -38,13 +36,13 @@ fn quest_reward_add_item(
     script_resources: &ScriptFunctionResources,
     script_context: &mut ScriptFunctionContext,
     quest_context: &mut QuestFunctionContext,
-    item_base1000: QsdItemBase1000,
+    item: QsdItem,
     quantity: usize,
 ) -> bool {
     let item_reference = script_resources
         .game_data
         .data_decoder
-        .decode_item_base1000(item_base1000.get());
+        .decode_item_reference(item.item_number, item.item_type);
     if item_reference.is_none() {
         return false;
     }
@@ -91,13 +89,13 @@ fn quest_reward_remove_item(
     script_resources: &ScriptFunctionResources,
     script_context: &mut ScriptFunctionContext,
     quest_context: &mut QuestFunctionContext,
-    item_base1000: QsdItemBase1000,
+    item: QsdItem,
     quantity: usize,
 ) -> bool {
     let item_reference = script_resources
         .game_data
         .data_decoder
-        .decode_item_base1000(item_base1000.get());
+        .decode_item_reference(item.item_number, item.item_type);
     if item_reference.is_none() {
         return false;
     }
@@ -342,7 +340,7 @@ pub fn quest_triggers_skip_rewards(
 ) -> bool {
     // When we are skipping rewards, we only need to process QsdReward::Trigger
     for reward in quest_trigger.rewards.iter() {
-        if let QsdReward::Trigger(name) = reward {
+        if let QsdReward::Trigger { name } = reward {
             quest_reward_set_next_trigger(
                 script_resources,
                 script_context,
@@ -363,94 +361,87 @@ pub fn quest_triggers_apply_rewards(
 ) -> bool {
     for reward in quest_trigger.rewards.iter() {
         let result = match *reward {
-            QsdReward::AddItem(_, item_base1000, quantity) => quest_reward_add_item(
+            QsdReward::AddItem { item, quantity } => quest_reward_add_item(
                 script_resources,
                 script_context,
                 quest_context,
-                item_base1000,
+                item,
                 quantity,
             ),
-            QsdReward::RemoveItem(_, item_base1000, quantity) => quest_reward_remove_item(
+            QsdReward::RemoveItem { item, quantity } => quest_reward_remove_item(
                 script_resources,
                 script_context,
                 quest_context,
-                item_base1000,
+                item,
                 quantity,
             ),
-            QsdReward::Quest(QsdRewardQuestAction::Select(quest_id)) => {
-                quest_reward_select_quest(script_resources, script_context, quest_context, quest_id)
+            QsdReward::SelectQuest { id } => {
+                quest_reward_select_quest(script_resources, script_context, quest_context, id)
             }
-            QsdReward::Quest(QsdRewardQuestAction::RemoveSelected) => {
+            QsdReward::RemoveSelectedQuest => {
                 quest_reward_remove_selected_quest(script_resources, script_context, quest_context)
             }
-            QsdReward::Quest(QsdRewardQuestAction::Add(quest_id)) => {
-                quest_reward_add_quest(script_resources, script_context, quest_context, quest_id)
+            QsdReward::AddQuest { id } => {
+                quest_reward_add_quest(script_resources, script_context, quest_context, id)
             }
-            QsdReward::Quest(QsdRewardQuestAction::ChangeSelectedIdKeepData(quest_id)) => {
+            QsdReward::ChangeSelectedQuest { id, keep_data } => {
                 quest_reward_change_selected_quest_id(
                     script_resources,
                     script_context,
                     quest_context,
-                    quest_id,
-                    true,
+                    id,
+                    keep_data,
                 )
             }
-            QsdReward::Quest(QsdRewardQuestAction::ChangeSelectedIdResetData(quest_id)) => {
-                quest_reward_change_selected_quest_id(
-                    script_resources,
-                    script_context,
-                    quest_context,
-                    quest_id,
-                    false,
-                )
-            }
-            QsdReward::QuestVariable(ref quest_variables) => {
-                quest_variables.iter().all(|quest_variable| {
-                    quest_reward_quest_variable(
-                        script_resources,
-                        script_context,
-                        quest_context,
-                        quest_variable.variable_type,
-                        quest_variable.variable_id,
-                        quest_variable.operator,
-                        quest_variable.value,
-                    )
-                })
-            }
-            QsdReward::SetHealthManaPercent(_target, health_percent, mana_percent) => {
-                quest_reward_set_health_mana_percent(
-                    script_resources,
-                    script_context,
-                    quest_context,
-                    health_percent as i32,
-                    mana_percent as i32,
-                )
-            }
-            QsdReward::SetQuestSwitch(switch_id, value) => quest_reward_set_quest_switch(
+            QsdReward::QuestVariable {
+                variable_type,
+                variable_id,
+                operator,
+                value,
+            } => quest_reward_quest_variable(
                 script_resources,
                 script_context,
                 quest_context,
-                switch_id,
+                variable_type,
+                variable_id,
+                operator,
                 value,
             ),
-            QsdReward::Trigger(ref name) => quest_reward_set_next_trigger(
+            QsdReward::SetHealthManaPercent {
+                health_percent,
+                mana_percent,
+            } => quest_reward_set_health_mana_percent(
+                script_resources,
+                script_context,
+                quest_context,
+                health_percent as i32,
+                mana_percent as i32,
+            ),
+            QsdReward::SetQuestSwitch { id, value } => quest_reward_set_quest_switch(
+                script_resources,
+                script_context,
+                quest_context,
+                id,
+                value,
+            ),
+            QsdReward::Trigger { ref name } => quest_reward_set_next_trigger(
                 script_resources,
                 script_context,
                 quest_context,
                 name.clone(),
             ),
-            QsdReward::CallLuaFunction(ref name) => quest_reward_call_lua_function(
+            QsdReward::CallLuaFunction { ref name } => quest_reward_call_lua_function(
                 script_resources,
                 script_context,
                 quest_context,
                 name.clone(),
             ),
             // Server side only rewards:
-            QsdReward::AbilityValue(_)
-            | QsdReward::CalculatedExperiencePoints(_, _, _)
-            | QsdReward::CalculatedItem(_, _)
-            | QsdReward::CalculatedMoney(_, _, _)
-            | QsdReward::Teleport(_, _, _) => true,
+            QsdReward::AbilityValue { .. }
+            | QsdReward::CalculatedExperiencePoints { .. }
+            | QsdReward::CalculatedItem { .. }
+            | QsdReward::CalculatedMoney { .. }
+            | QsdReward::Teleport { .. } => true,
             _ => {
                 log::warn!("Unimplemented quest reward: {:?}", reward);
                 true

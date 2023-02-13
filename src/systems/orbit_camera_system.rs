@@ -13,7 +13,7 @@ use bevy::{
 use bevy_egui::EguiContext;
 use bevy_rapier3d::{
     plugin::RapierContext,
-    prelude::{Collider, InteractionGroups, QueryFilter},
+    prelude::{Collider, CollisionGroups, QueryFilter},
 };
 use dolly::prelude::{Arm, CameraRig, LeftHanded, Position, Smooth, YawPitch};
 
@@ -163,13 +163,9 @@ pub fn orbit_camera_system(
             ray_direction,
             &Collider::ball(ball_radius),
             orbit_camera.max_distance,
-            QueryFilter::new().groups(InteractionGroups::new(
-                bevy_rapier3d::rapier::geometry::Group::from_bits_truncate(
-                    COLLISION_FILTER_MOVEABLE | COLLISION_FILTER_COLLIDABLE,
-                ),
-                bevy_rapier3d::rapier::geometry::Group::from_bits_truncate(
-                    u32::MAX & !COLLISION_GROUP_PHYSICS_TOY,
-                ),
+            QueryFilter::new().groups(CollisionGroups::new(
+                COLLISION_FILTER_MOVEABLE | COLLISION_FILTER_COLLIDABLE,
+                !COLLISION_GROUP_PHYSICS_TOY,
             )),
         ) {
             camera_collide_distance = distance.toi;

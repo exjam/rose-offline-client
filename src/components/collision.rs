@@ -1,10 +1,11 @@
 use bevy::{
     ecs::system::EntityCommands,
     prelude::{Component, Entity, World},
+    reflect::Reflect,
 };
-use bevy_inspector_egui::Inspectable;
+use bevy_rapier3d::prelude::Group;
 
-#[derive(Component, Inspectable)]
+#[derive(Component, Reflect)]
 pub struct ColliderEntity {
     pub entity: Entity,
 }
@@ -36,7 +37,7 @@ impl<'w, 's, 'a> RemoveColliderCommand for EntityCommands<'w, 's, 'a> {
     }
 }
 
-#[derive(Component, Inspectable)]
+#[derive(Component, Reflect)]
 pub struct ColliderParent {
     pub entity: Entity,
 }
@@ -53,19 +54,19 @@ pub struct CollisionPlayer;
 #[derive(Component)]
 pub struct CollisionHeightOnly;
 
-pub const COLLISION_GROUP_ZONE_OBJECT: u32 = 1 << 0;
-pub const COLLISION_GROUP_ZONE_TERRAIN: u32 = 1 << 1;
-pub const COLLISION_GROUP_ZONE_WATER: u32 = 1 << 2;
-pub const COLLISION_GROUP_ZONE_EVENT_OBJECT: u32 = 1 << 3;
-pub const COLLISION_GROUP_ZONE_WARP_OBJECT: u32 = 1 << 4;
-pub const COLLISION_GROUP_PHYSICS_TOY: u32 = 1 << 5;
+pub const COLLISION_GROUP_ZONE_OBJECT: Group = Group::from_bits_truncate(1 << 0);
+pub const COLLISION_GROUP_ZONE_TERRAIN: Group = Group::from_bits_truncate(1 << 1);
+pub const COLLISION_GROUP_ZONE_WATER: Group = Group::from_bits_truncate(1 << 2);
+pub const COLLISION_GROUP_ZONE_EVENT_OBJECT: Group = Group::from_bits_truncate(1 << 3);
+pub const COLLISION_GROUP_ZONE_WARP_OBJECT: Group = Group::from_bits_truncate(1 << 4);
+pub const COLLISION_GROUP_PHYSICS_TOY: Group = Group::from_bits_truncate(1 << 5);
 
-pub const COLLISION_GROUP_PLAYER: u32 = 1 << 9;
-pub const COLLISION_GROUP_CHARACTER: u32 = 1 << 10;
-pub const COLLISION_GROUP_NPC: u32 = 1 << 11;
-pub const COLLISION_GROUP_ITEM_DROP: u32 = 1 << 12;
+pub const COLLISION_GROUP_PLAYER: Group = Group::from_bits_truncate(1 << 9);
+pub const COLLISION_GROUP_CHARACTER: Group = Group::from_bits_truncate(1 << 10);
+pub const COLLISION_GROUP_NPC: Group = Group::from_bits_truncate(1 << 11);
+pub const COLLISION_GROUP_ITEM_DROP: Group = Group::from_bits_truncate(1 << 12);
 
-pub const COLLISION_FILTER_INSPECTABLE: u32 = 1 << 16;
-pub const COLLISION_FILTER_COLLIDABLE: u32 = 1 << 17;
-pub const COLLISION_FILTER_CLICKABLE: u32 = 1 << 18;
-pub const COLLISION_FILTER_MOVEABLE: u32 = 1 << 19;
+pub const COLLISION_FILTER_INSPECTABLE: Group = Group::from_bits_truncate(1 << 16);
+pub const COLLISION_FILTER_COLLIDABLE: Group = Group::from_bits_truncate(1 << 17);
+pub const COLLISION_FILTER_CLICKABLE: Group = Group::from_bits_truncate(1 << 18);
+pub const COLLISION_FILTER_MOVEABLE: Group = Group::from_bits_truncate(1 << 19);

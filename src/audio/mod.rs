@@ -93,6 +93,7 @@ impl Plugin for OddioPlugin {
                 move |err| {
                     eprintln!("{}", err);
                 },
+                None,
             )
             .unwrap();
         stream.play().unwrap();

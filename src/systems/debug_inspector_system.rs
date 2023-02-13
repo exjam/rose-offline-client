@@ -8,8 +8,7 @@ use bevy::{
     window::Windows,
 };
 use bevy_egui::EguiContext;
-use bevy_inspector_egui::{InspectableRegistry, WorldInspectorParams};
-use bevy_rapier3d::prelude::{InteractionGroups, QueryFilter, RapierContext};
+use bevy_rapier3d::prelude::{CollisionGroups, Group, QueryFilter, RapierContext};
 
 use crate::{
     components::{
@@ -29,26 +28,20 @@ impl Plugin for DebugInspectorPlugin {
         app.insert_resource(DebugInspector::default())
             .add_system(debug_inspector_picking_system);
 
-        let mut inspectable_registry = app
-            .world
-            .get_resource_or_insert_with(InspectableRegistry::default);
-        inspectable_registry.register::<ColliderEntity>();
-        inspectable_registry.register::<ColliderParent>();
-        inspectable_registry.register::<ZoneObject>();
-        inspectable_registry.register::<ZoneObjectTerrain>();
-        inspectable_registry.register::<ZoneObjectAnimatedObject>();
-        inspectable_registry.register::<ZoneObjectPart>();
-        inspectable_registry.register::<ZoneObjectPartCollisionShape>();
-        inspectable_registry.register::<ZoneObjectId>();
-        inspectable_registry.register::<ObjectMaterial>();
-        inspectable_registry.register::<ObjectMaterialBlend>();
-        inspectable_registry.register::<ObjectMaterialGlow>();
-        inspectable_registry.register::<Handle<ObjectMaterial>>();
+        app.register_type::<ColliderEntity>()
+            .register_type::<ColliderParent>()
+            .register_type::<ZoneObject>()
+            .register_type::<ZoneObjectTerrain>()
+            .register_type::<ZoneObjectAnimatedObject>()
+            .register_type::<ZoneObjectPart>()
+            .register_type::<ZoneObjectPartCollisionShape>()
+            .register_type::<ZoneObjectId>()
+            .register_type::<ObjectMaterial>()
+            .register_type::<ObjectMaterialBlend>()
+            .register_type::<ObjectMaterialGlow>()
+            .register_type::<Handle<ObjectMaterial>>();
 
-        let mut world_inspector_params = app
-            .world
-            .get_resource_or_insert_with(WorldInspectorParams::default);
-        world_inspector_params.ignore_component::<bevy::render::primitives::Aabb>();
+        app.add_plugin(bevy_inspector_egui::DefaultInspectorConfigPlugin);
     }
 }
 
@@ -87,10 +80,9 @@ fn debug_inspector_picking_system(
                     ray_direction,
                     10000000.0,
                     false,
-                    QueryFilter::new().groups(InteractionGroups::all().with_memberships(
-                        bevy_rapier3d::rapier::geometry::Group::from_bits_truncate(
-                            COLLISION_FILTER_INSPECTABLE,
-                        ),
+                    QueryFilter::new().groups(CollisionGroups::new(
+                        COLLISION_FILTER_INSPECTABLE,
+                        Group::all(),
                     )),
                 ) {
                     debug_inspector_state.entity = Some(collider_entity);

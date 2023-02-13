@@ -94,12 +94,10 @@ pub fn npc_model_add_collider_system(
                 ColliderParent::new(entity),
                 Collider::cuboid(half_extents.x, half_extents.y, half_extents.z),
                 CollisionGroups::new(
-                    bevy_rapier3d::geometry::Group::from_bits_truncate(COLLISION_GROUP_NPC),
-                    bevy_rapier3d::geometry::Group::from_bits_truncate(
-                        COLLISION_FILTER_INSPECTABLE
-                            | COLLISION_FILTER_CLICKABLE
-                            | COLLISION_GROUP_PHYSICS_TOY,
-                    ),
+                    COLLISION_GROUP_NPC,
+                    COLLISION_FILTER_INSPECTABLE
+                        | COLLISION_FILTER_CLICKABLE
+                        | COLLISION_GROUP_PHYSICS_TOY,
                 ),
                 Transform::from_translation(root_bone_offset)
                     .with_rotation(Quat::from_axis_angle(Vec3::Z, std::f32::consts::PI / 2.0)),

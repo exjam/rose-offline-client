@@ -97,12 +97,10 @@ pub fn item_drop_model_add_collider_system(
                 ColliderParent::new(entity),
                 Collider::cuboid(half_extents.x, half_extents.y, half_extents.z),
                 CollisionGroups::new(
-                    bevy_rapier3d::geometry::Group::from_bits_truncate(COLLISION_GROUP_ITEM_DROP),
-                    bevy_rapier3d::geometry::Group::from_bits_truncate(
-                        COLLISION_FILTER_INSPECTABLE
-                            | COLLISION_FILTER_CLICKABLE
-                            | COLLISION_GROUP_PHYSICS_TOY,
-                    ),
+                    COLLISION_GROUP_ITEM_DROP,
+                    COLLISION_FILTER_INSPECTABLE
+                        | COLLISION_FILTER_CLICKABLE
+                        | COLLISION_GROUP_PHYSICS_TOY,
                 ),
                 Transform::from_translation(local_bound_center),
                 GlobalTransform::default(),

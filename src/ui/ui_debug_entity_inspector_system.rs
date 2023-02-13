@@ -1,6 +1,5 @@
-use bevy::prelude::{Entity, Mut, World};
+use bevy::prelude::{Mut, World};
 use bevy_egui::{egui, EguiContext};
-use bevy_inspector_egui::{Context, Inspectable};
 
 use crate::{resources::DebugInspector, ui::UiStateDebugWindows};
 
@@ -15,17 +14,6 @@ pub fn ui_debug_entity_inspector_system(world: &mut World) {
                 let mut egui_context = world.get_resource_mut::<EguiContext>().unwrap();
                 let ctx = egui_context.ctx_mut().clone();
 
-                let mut context = Context::new_world_access(Some(&ctx), world);
-
-                // This manually circumvents bevy's change detection and probably isn't sound.
-                // Todo: add bevy API to allow this safely
-                #[allow(clippy::cast_ref_to_mut)]
-                let value = unsafe {
-                    &mut *(debug_inspector_state.as_ref() as *const DebugInspector
-                        as *mut DebugInspector)
-                };
-
-                let mut changed = false;
                 egui::Window::new("Entity Inspector")
                     .open(&mut ui_state_debug_windows.object_inspector_open)
                     .resizable(true)
@@ -33,23 +21,20 @@ pub fn ui_debug_entity_inspector_system(world: &mut World) {
                     .show(&ctx, |ui| {
                         ui.style_mut().wrap = Some(false);
 
+                        let mut enable_picking = debug_inspector_state.enable_picking;
                         ui.checkbox(
-                            &mut value.enable_picking,
+                            &mut enable_picking,
                             "Enable Picking (with middle mouse button)",
                         );
+                        if enable_picking != debug_inspector_state.enable_picking {
+                            debug_inspector_state.enable_picking = enable_picking;
+                        }
                         ui.separator();
 
-                        changed = value.entity.ui(
-                            ui,
-                            <Option<Entity> as Inspectable>::Attributes::default(),
-                            &mut context,
-                        );
+                        if let Some(entity) = debug_inspector_state.entity {
+                            bevy_inspector_egui::bevy_inspector::ui_for_entity(world, entity, ui);
+                        }
                     });
-
-                if changed {
-                    // trigger change detection
-                    debug_inspector_state.as_mut();
-                }
             });
         },
     );

@@ -55,18 +55,14 @@ pub fn personal_store_model_add_collider_system(
                 Collider::cuboid(half_extents.x, half_extents.y, half_extents.z),
                 ColliderParent::new(entity),
                 CollisionGroups::new(
-                    bevy_rapier3d::geometry::Group::from_bits_truncate(
-                        if player_character.is_some() {
-                            COLLISION_GROUP_PLAYER
-                        } else {
-                            COLLISION_GROUP_CHARACTER
-                        },
-                    ),
-                    bevy_rapier3d::geometry::Group::from_bits_truncate(
-                        COLLISION_FILTER_INSPECTABLE
-                            | COLLISION_FILTER_CLICKABLE
-                            | COLLISION_GROUP_PHYSICS_TOY,
-                    ),
+                    if player_character.is_some() {
+                        COLLISION_GROUP_PLAYER
+                    } else {
+                        COLLISION_GROUP_CHARACTER
+                    },
+                    COLLISION_FILTER_INSPECTABLE
+                        | COLLISION_FILTER_CLICKABLE
+                        | COLLISION_GROUP_PHYSICS_TOY,
                 ),
                 Transform::from_translation(Vec3::new(0.0, half_extents.y - min.y, 0.0)),
                 GlobalTransform::default(),

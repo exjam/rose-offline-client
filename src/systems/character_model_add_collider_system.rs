@@ -84,18 +84,14 @@ pub fn character_model_add_collider_system(
                 Collider::cuboid(half_extents.x, half_extents.y, half_extents.z),
                 ColliderParent::new(entity),
                 CollisionGroups::new(
-                    bevy_rapier3d::geometry::Group::from_bits_truncate(
-                        if player_character.is_some() {
-                            COLLISION_GROUP_PLAYER
-                        } else {
-                            COLLISION_GROUP_CHARACTER
-                        },
-                    ),
-                    bevy_rapier3d::geometry::Group::from_bits_truncate(
-                        COLLISION_FILTER_INSPECTABLE
-                            | COLLISION_FILTER_CLICKABLE
-                            | COLLISION_GROUP_PHYSICS_TOY,
-                    ),
+                    if player_character.is_some() {
+                        COLLISION_GROUP_PLAYER
+                    } else {
+                        COLLISION_GROUP_CHARACTER
+                    },
+                    COLLISION_FILTER_INSPECTABLE
+                        | COLLISION_FILTER_CLICKABLE
+                        | COLLISION_GROUP_PHYSICS_TOY,
                 ),
                 Transform::from_translation(root_bone_offset)
                     .with_rotation(Quat::from_axis_angle(Vec3::Z, std::f32::consts::PI / 2.0)),
