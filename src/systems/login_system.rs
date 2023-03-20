@@ -6,7 +6,7 @@ use bevy::{
     },
     window::{CursorGrabMode, PrimaryWindow, Window},
 };
-use bevy_egui::{egui, EguiContext};
+use bevy_egui::{egui, EguiContexts};
 
 use rose_data::ZoneId;
 use rose_game_common::messages::client::{ClientMessage, JoinServer};
@@ -26,9 +26,9 @@ pub fn login_state_enter_system(
     asset_server: Res<AssetServer>,
 ) {
     // Ensure cursor is not locked
-    if let Ok(window) = query_window.get_single_mut() {
-        window.set_cursor_grab_mode(CursorGrabMode::None);
-        window.set_cursor_visibility(true);
+    if let Ok(mut window) = query_window.get_single_mut() {
+        window.cursor.grab_mode = CursorGrabMode::None;
+        window.cursor.visible = true;
     }
 
     // Reset camera
@@ -58,7 +58,7 @@ pub fn login_state_exit_system(mut commands: Commands) {
 }
 
 pub fn login_system(
-    mut egui_context: ResMut<EguiContext>,
+    mut egui_context: EguiContexts,
     login_connection: Option<Res<LoginConnection>>,
     mut login_state: ResMut<LoginState>,
     server_list: Option<Res<ServerList>>,

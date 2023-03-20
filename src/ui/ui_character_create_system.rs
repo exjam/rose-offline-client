@@ -2,7 +2,7 @@ use bevy::prelude::{
     AssetServer, Assets, Camera3d, Commands, ComputedVisibility, DespawnRecursiveExt, Entity,
     GlobalTransform, Local, Quat, Query, Res, ResMut, Transform, Vec3, Visibility, With,
 };
-use bevy_egui::{egui, EguiContext};
+use bevy_egui::{egui, EguiContexts};
 use rose_data::ZoneId;
 use rose_game_common::{
     components::{CharacterGender, CharacterInfo, Equipment},
@@ -82,7 +82,7 @@ pub fn ui_character_create_system(
     mut commands: Commands,
     mut ui_state: Local<UiCharacterCreateState>,
     mut character_select_state: ResMut<CharacterSelectState>,
-    mut egui_context: ResMut<EguiContext>,
+    mut egui_context: EguiContexts,
     query_camera: Query<Entity, With<Camera3d>>,
     mut query_create_character_info: Query<&mut CharacterInfo>,
     asset_server: Res<AssetServer>,
@@ -129,7 +129,9 @@ pub fn ui_character_create_system(
     let mut response_next_startpos = None;
     let mut response_next_birthstone = None;
 
-    let screen_size = egui_context.ctx_mut().input().screen_rect().size();
+    let screen_size = egui_context
+        .ctx_mut()
+        .input(|input| input.screen_rect().size());
 
     egui::Window::new("Character Create")
         .frame(egui::Frame::none())

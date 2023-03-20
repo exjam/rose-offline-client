@@ -2,7 +2,7 @@ use bevy::{
     asset::HandleId,
     prelude::{AssetServer, Assets, Handle, Local, Res, ResMut},
 };
-use bevy_egui::{egui, EguiContext};
+use bevy_egui::{egui, EguiContexts};
 use regex::Regex;
 
 use crate::ui::{
@@ -18,7 +18,7 @@ pub struct UiStateDebugDialogs {
 }
 
 pub fn ui_debug_dialog_list_system(
-    mut egui_context: ResMut<EguiContext>,
+    mut egui_context: EguiContexts,
     mut ui_state_debug_windows: ResMut<UiStateDebugWindows>,
     mut ui_state: Local<UiStateDebugDialogs>,
     asset_server: Res<AssetServer>,

@@ -3,7 +3,7 @@ use bevy::{
     math::Vec3Swizzles,
     prelude::{Assets, Entity, EventReader, EventWriter, Local, Query, Res, ResMut, With},
 };
-use bevy_egui::{egui, EguiContext};
+use bevy_egui::{egui, EguiContexts};
 
 use rose_game_common::{
     components::{CharacterInfo, ItemSlot},
@@ -112,7 +112,7 @@ fn ui_add_bank_slot(
 }
 
 pub fn ui_bank_system(
-    mut egui_context: ResMut<EguiContext>,
+    mut egui_context: EguiContexts,
     mut ui_state: Local<UiStateBank>,
     mut ui_state_dnd: ResMut<UiStateDragAndDrop>,
     mut ui_state_windows: ResMut<UiStateWindows>,

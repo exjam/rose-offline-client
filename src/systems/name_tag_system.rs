@@ -16,7 +16,7 @@ use bevy::{
     utils::HashMap,
     window::PrimaryWindow,
 };
-use bevy_egui::{egui, EguiContext};
+use bevy_egui::{egui, EguiContexts};
 
 use rose_game_common::components::{Level, Npc, Team};
 
@@ -104,7 +104,7 @@ pub fn get_monster_name_tag_color(
 
 fn create_pending_nametag(
     name_tag_settings: &NameTagSettings,
-    egui_context: &mut EguiContext,
+    egui_context: &mut EguiContexts,
     object: &NameTagObjectQueryItem,
     player: Option<&PlayerQueryItem>,
     name_tag_type: NameTagType,
@@ -178,7 +178,9 @@ fn create_pending_nametag(
             Color::rgb_linear(r, g, b)
         })
         .collect();
-    let galley = egui_context.ctx_mut().fonts().layout_job(layout_job);
+    let galley = egui_context
+        .ctx_mut()
+        .fonts(|fonts| fonts.layout_job(layout_job));
 
     NameTagPendingData {
         galley,
@@ -189,7 +191,7 @@ fn create_pending_nametag(
 
 fn create_nametag_data(
     window_entity: Entity,
-    egui_context: &mut EguiContext,
+    egui_context: &mut EguiContexts,
     egui_managed_textures: &bevy_egui::EguiManagedTextures,
     images: &mut Assets<Image>,
     pending_data: NameTagPendingData,
@@ -389,7 +391,7 @@ pub fn name_tag_system(
     query_nametags: Query<(Entity, &NameTagEntity)>,
     query_window: Query<Entity, With<PrimaryWindow>>,
     egui_managed_textures: Res<bevy_egui::EguiManagedTextures>,
-    mut egui_context: ResMut<EguiContext>,
+    mut egui_context: EguiContexts,
     mut images: ResMut<Assets<Image>>,
     game_data: Res<GameData>,
     ui_resources: Res<UiResources>,
@@ -635,9 +637,9 @@ pub fn name_tag_system(
             });
         }
 
-        commands.entity(name_tag_entity).add_children(|builder| {
-            for rect in name_tag_data.rects.iter() {
-                builder.spawn((
+        for rect in name_tag_data.rects.iter() {
+            commands
+                .spawn((
                     NameTagName,
                     rect.clone(),
                     Transform::default(),
@@ -645,11 +647,13 @@ pub fn name_tag_system(
                     Visibility::default(),
                     ComputedVisibility::default(),
                     NoFrustumCulling,
-                ));
-            }
+                ))
+                .set_parent(name_tag_entity);
+        }
 
-            for rect in target_marks.drain(..) {
-                builder.spawn((
+        for rect in target_marks.drain(..) {
+            commands
+                .spawn((
                     NameTagTargetMark,
                     rect,
                     Transform::default(),
@@ -657,11 +661,13 @@ pub fn name_tag_system(
                     Visibility::Hidden,
                     ComputedVisibility::default(),
                     NoFrustumCulling,
-                ));
-            }
+                ))
+                .set_parent(name_tag_entity);
+        }
 
-            if let Some(rect) = healthbar_bg_rect.take() {
-                builder.spawn((
+        if let Some(rect) = healthbar_bg_rect.take() {
+            commands
+                .spawn((
                     NameTagHealthbarBackground,
                     rect,
                     Transform::default(),
@@ -669,11 +675,13 @@ pub fn name_tag_system(
                     Visibility::Hidden,
                     ComputedVisibility::default(),
                     NoFrustumCulling,
-                ));
-            }
+                ))
+                .set_parent(name_tag_entity);
+        }
 
-            if let Some(rect) = healthbar_fg_rect.take() {
-                builder.spawn((
+        if let Some(rect) = healthbar_fg_rect.take() {
+            commands
+                .spawn((
                     NameTagHealthbarForeground {
                         full_width: health_bar_size.x,
                         uv_min_x: health_bar_foreground_uv_x_bounds.0,
@@ -685,9 +693,9 @@ pub fn name_tag_system(
                     Visibility::Hidden,
                     ComputedVisibility::default(),
                     NoFrustumCulling,
-                ));
-            }
-        });
+                ))
+                .set_parent(name_tag_entity);
+        }
 
         commands
             .entity(object.entity)

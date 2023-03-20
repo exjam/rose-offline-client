@@ -1,4 +1,4 @@
-use bevy::prelude::{Commands, EventWriter, Res, ResMut, State};
+use bevy::prelude::{Commands, EventWriter, NextState, Res, ResMut, State};
 
 use rose_game_common::messages::{
     client::ClientMessage,
@@ -15,7 +15,8 @@ pub fn world_connection_system(
     mut commands: Commands,
     world_connection: Option<Res<WorldConnection>>,
     account: Option<Res<Account>>,
-    mut app_state: ResMut<State<AppState>>,
+    app_state_current: Res<State<AppState>>,
+    mut app_state_next: ResMut<NextState<AppState>>,
     mut network_events: EventWriter<NetworkEvent>,
     mut world_connection_events: EventWriter<WorldConnectionEvent>,
 ) {
@@ -45,8 +46,8 @@ pub fn world_connection_system(
                 }
             },
             Ok(ServerMessage::CharacterList(characters)) => {
-                if !matches!(app_state.current(), AppState::GameCharacterSelect) {
-                    app_state.set(AppState::GameCharacterSelect).ok();
+                if !matches!(app_state_current.0, AppState::GameCharacterSelect) {
+                    app_state_next.set(AppState::GameCharacterSelect);
                 }
 
                 commands.insert_resource(CharacterList { characters });

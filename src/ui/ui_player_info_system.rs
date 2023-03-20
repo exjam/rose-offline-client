@@ -2,7 +2,7 @@ use bevy::{
     ecs::query::WorldQuery,
     prelude::{Assets, Entity, Query, Res, ResMut, With},
 };
-use bevy_egui::{egui, EguiContext};
+use bevy_egui::{egui, EguiContexts};
 use rose_data::{AmmoIndex, EquipmentIndex, Item, ItemClass};
 use rose_game_common::components::{
     AbilityValues, CharacterInfo, Equipment, ExperiencePoints, HealthPoints, Level, ManaPoints,
@@ -104,7 +104,7 @@ fn add_equipped_weapon_slot(
 }
 
 pub fn ui_player_info_system(
-    mut egui_context: ResMut<EguiContext>,
+    mut egui_context: EguiContexts,
     mut ui_state_windows: ResMut<UiStateWindows>,
     query_player: Query<PlayerQuery, With<PlayerCharacter>>,
     query_player_tooltip: Query<PlayerTooltipQuery, With<PlayerCharacter>>,

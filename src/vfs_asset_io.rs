@@ -53,7 +53,11 @@ impl AssetIo for VfsAssetIo {
         Err(AssetIoError::NotFound(path.to_path_buf()))
     }
 
-    fn watch_path_for_changes(&self, _path: &Path) -> Result<(), AssetIoError> {
+    fn watch_path_for_changes(
+        &self,
+        _to_watch: &Path,
+        _to_reload: Option<PathBuf>,
+    ) -> Result<(), AssetIoError> {
         Ok(())
     }
 

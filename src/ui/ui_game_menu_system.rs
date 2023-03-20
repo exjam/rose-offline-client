@@ -1,5 +1,5 @@
 use bevy::prelude::{Assets, Local, Res, ResMut};
-use bevy_egui::{egui, EguiContext};
+use bevy_egui::{egui, EguiContexts};
 
 use crate::{
     resources::UiResources,
@@ -26,7 +26,7 @@ pub struct UiGameMenuState {
 }
 
 pub fn ui_game_menu_system(
-    mut egui_context: ResMut<EguiContext>,
+    mut egui_context: EguiContexts,
     mut ui_state_windows: ResMut<UiStateWindows>,
     mut ui_state_game_menu: Local<UiGameMenuState>,
     ui_resources: Res<UiResources>,
@@ -87,7 +87,11 @@ pub fn ui_game_menu_system(
             if response.response.clicked_elsewhere() {
                 ui_state_windows.menu_open = false;
             }
-        } else if !response.response.ctx.input().pointer.any_down() {
+        } else if !response
+            .response
+            .ctx
+            .input(|input| input.pointer.any_down())
+        {
             ui_state_game_menu.mouse_up_after_open = true;
         }
     } else {
@@ -145,32 +149,32 @@ pub fn ui_game_menu_system(
     }
 
     if !egui_context.ctx_mut().wants_keyboard_input() {
-        let mut input = egui_context.ctx_mut().input_mut();
+        egui_context.ctx_mut().input_mut(|input| {
+            if input.consume_key(egui::Modifiers::ALT, egui::Key::A) {
+                ui_state_windows.character_info_open = !ui_state_windows.character_info_open;
+            }
 
-        if input.consume_key(egui::Modifiers::ALT, egui::Key::A) {
-            ui_state_windows.character_info_open = !ui_state_windows.character_info_open;
-        }
+            if input.consume_key(egui::Modifiers::ALT, egui::Key::I)
+                || input.consume_key(egui::Modifiers::ALT, egui::Key::V)
+            {
+                ui_state_windows.inventory_open = !ui_state_windows.inventory_open;
+            }
 
-        if input.consume_key(egui::Modifiers::ALT, egui::Key::I)
-            || input.consume_key(egui::Modifiers::ALT, egui::Key::V)
-        {
-            ui_state_windows.inventory_open = !ui_state_windows.inventory_open;
-        }
+            if input.consume_key(egui::Modifiers::ALT, egui::Key::N) {
+                ui_state_windows.clan_open = !ui_state_windows.clan_open;
+            }
 
-        if input.consume_key(egui::Modifiers::ALT, egui::Key::N) {
-            ui_state_windows.clan_open = !ui_state_windows.clan_open;
-        }
+            if input.consume_key(egui::Modifiers::ALT, egui::Key::S) {
+                ui_state_windows.skill_list_open = !ui_state_windows.skill_list_open;
+            }
 
-        if input.consume_key(egui::Modifiers::ALT, egui::Key::S) {
-            ui_state_windows.skill_list_open = !ui_state_windows.skill_list_open;
-        }
+            if input.consume_key(egui::Modifiers::ALT, egui::Key::Q) {
+                ui_state_windows.quest_list_open = !ui_state_windows.quest_list_open;
+            }
 
-        if input.consume_key(egui::Modifiers::ALT, egui::Key::Q) {
-            ui_state_windows.quest_list_open = !ui_state_windows.quest_list_open;
-        }
-
-        if input.consume_key(egui::Modifiers::ALT, egui::Key::O) {
-            ui_state_windows.settings_open = !ui_state_windows.settings_open;
-        }
+            if input.consume_key(egui::Modifiers::ALT, egui::Key::O) {
+                ui_state_windows.settings_open = !ui_state_windows.settings_open;
+            }
+        });
     }
 }

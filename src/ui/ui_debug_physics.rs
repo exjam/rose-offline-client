@@ -10,7 +10,7 @@ use bevy::{
     render::camera::Projection,
     window::{PrimaryWindow, Window},
 };
-use bevy_egui::{egui, EguiContext};
+use bevy_egui::{egui, EguiContexts};
 use bevy_rapier3d::{
     plugin::{RapierConfiguration, RapierContext},
     prelude::{Collider, CollisionGroups, Group, QueryFilter, Restitution, RigidBody},
@@ -94,7 +94,7 @@ impl Default for UiDebugPhysicsState {
 
 pub fn ui_debug_physics_system(
     mut commands: Commands,
-    mut egui_context: ResMut<EguiContext>,
+    mut egui_context: EguiContexts,
     mut ui_state_debug_windows: ResMut<UiStateDebugWindows>,
     mut ui_state_debug_physics: Local<UiDebugPhysicsState>,
     mut rapier_configuration: ResMut<RapierConfiguration>,
@@ -221,7 +221,8 @@ pub fn ui_debug_physics_system(
                                         radius: ball_radius,
                                         ..Default::default()
                                     }
-                                    .into(),
+                                    .try_into()
+                                    .unwrap(),
                                 ),
                             ));
                             ui_state_debug_physics.ball_meshes.last().unwrap().1.clone()

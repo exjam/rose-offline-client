@@ -4,7 +4,7 @@ use bevy::{
     math::{Quat, Vec3},
     prelude::{
         Commands, ComputedVisibility, DespawnRecursiveExt, Entity, EventWriter, GlobalTransform,
-        Mut, Res, ResMut, State, Transform, Visibility, World,
+        Mut, NextState, Res, ResMut, State, Transform, Visibility, World,
     },
 };
 
@@ -94,7 +94,8 @@ pub fn game_connection_system(
     mut commands: Commands,
     game_connection: Option<Res<GameConnection>>,
     game_data: Res<GameData>,
-    mut app_state: ResMut<State<AppState>>,
+    app_state_current: Res<State<AppState>>,
+    mut app_state_next: ResMut<NextState<AppState>>,
     mut client_entity_list: ResMut<ClientEntityList>,
     mut chatbox_events: EventWriter<ChatboxEvent>,
     mut game_connection_events: EventWriter<GameConnectionEvent>,
@@ -232,8 +233,8 @@ pub fn game_connection_system(
                     client_entity_list.player_entity_id = Some(message.entity_id);
 
                     // Transition to in game state if we are not already
-                    if !matches!(app_state.current(), AppState::Game) {
-                        app_state.set(AppState::Game).ok();
+                    if !matches!(app_state_current.0, AppState::Game) {
+                        app_state_next.set(AppState::Game);
                     }
                 }
             }

@@ -1,8 +1,8 @@
 use bevy::{
     ecs::query::WorldQuery,
-    prelude::{Assets, Entity, Local, Query, Res, ResMut, With},
+    prelude::{Assets, Local, Query, Res, ResMut, With},
 };
-use bevy_egui::{egui, EguiContext};
+use bevy_egui::{egui, EguiContexts};
 
 use rose_data::SkillId;
 use rose_game_common::components::{CharacterInfo, SkillList, SkillPoints};
@@ -165,7 +165,7 @@ pub struct PlayerQuery<'w> {
 }
 
 pub fn ui_skill_tree_system(
-    mut egui_context: ResMut<EguiContext>,
+    mut egui_context: EguiContexts,
     mut ui_state: Local<UiStateSkillTree>,
     mut ui_state_windows: ResMut<UiStateWindows>,
     query_player: Query<PlayerQuery, With<PlayerCharacter>>,

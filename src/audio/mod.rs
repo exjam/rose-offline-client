@@ -1,4 +1,6 @@
-use bevy::prelude::{AddAsset, App, Component, CoreSet, Plugin, Resource, SystemSet, Vec3};
+use bevy::prelude::{
+    AddAsset, App, Component, CoreSet, IntoSystemConfig, IntoSystemConfigs, Plugin, Resource, Vec3,
+};
 
 mod audio_source;
 mod global_sound;

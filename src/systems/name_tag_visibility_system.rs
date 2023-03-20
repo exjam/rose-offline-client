@@ -74,8 +74,11 @@ pub fn name_tag_visibility_system(
             if let Ok(name_tag) = query_name_tag.get(previous_entity) {
                 // Restore unselected visibility
                 if let Ok(mut visibility) = query_visibility.get_mut(previous_entity) {
-                    visibility.is_visible =
-                        name_tag_settings.show_all[name_tag.name_tag.name_tag_type];
+                    if name_tag_settings.show_all[name_tag.name_tag.name_tag_type] {
+                        *visibility = Visibility::Inherited;
+                    } else {
+                        *visibility = Visibility::Hidden;
+                    }
                 }
             }
         }
@@ -86,7 +89,7 @@ pub fn name_tag_visibility_system(
     if let Some(entity) = hover_name_tag_entity {
         // Name tag is always visible when hovered
         if let Ok(mut visibility) = query_visibility.get_mut(entity) {
-            visibility.is_visible = true;
+            *visibility = Visibility::Inherited;
         }
     }
 
@@ -95,15 +98,18 @@ pub fn name_tag_visibility_system(
             if let Ok(name_tag) = query_name_tag.get(previous_entity) {
                 // Restore unselected visibility
                 if let Ok(mut visibility) = query_visibility.get_mut(previous_entity) {
-                    visibility.is_visible =
-                        name_tag_settings.show_all[name_tag.name_tag.name_tag_type];
+                    if name_tag_settings.show_all[name_tag.name_tag.name_tag_type] {
+                        *visibility = Visibility::Inherited;
+                    } else {
+                        *visibility = Visibility::Hidden;
+                    }
                 }
 
                 // Hide the name tag elements which should only be visible when selected
                 for &child in name_tag.children.iter() {
                     if query_name_tag_selected.contains(child) {
                         if let Ok(mut visibility) = query_visibility.get_mut(child) {
-                            visibility.is_visible = false;
+                            *visibility = Visibility::Hidden;
                         }
                     }
                 }
@@ -117,13 +123,13 @@ pub fn name_tag_visibility_system(
         if let Ok(name_tag) = query_name_tag.get(entity) {
             // Name tag is always visible when selected
             if let Ok(mut visibility) = query_visibility.get_mut(entity) {
-                visibility.is_visible = true;
+                *visibility = Visibility::Inherited;
             }
 
             // All name tag children are visible when selected
             for &child in name_tag.children.iter() {
                 if let Ok(mut visibility) = query_visibility.get_mut(child) {
-                    visibility.is_visible = true;
+                    *visibility = Visibility::Inherited;
                 }
             }
         }

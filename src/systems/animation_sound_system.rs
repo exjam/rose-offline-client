@@ -1,9 +1,7 @@
 use bevy::{
     ecs::query::WorldQuery,
     math::Vec3,
-    prelude::{
-        AssetServer, Assets, Commands, Entity, EventReader, GlobalTransform, Query, Res, Transform,
-    },
+    prelude::{AssetServer, Assets, Commands, EventReader, GlobalTransform, Query, Res, Transform},
     render::mesh::skinning::SkinnedMesh,
 };
 

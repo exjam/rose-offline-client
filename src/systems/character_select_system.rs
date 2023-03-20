@@ -6,12 +6,12 @@ use bevy::{
     prelude::{
         AssetServer, Camera, Camera3d, Commands, Component, ComputedVisibility,
         DespawnRecursiveExt, Entity, EventReader, EventWriter, GlobalTransform, Handle, Local,
-        MouseButton, Query, Res, ResMut, Resource, State, Transform, Visibility, With,
+        MouseButton, NextState, Query, Res, ResMut, Resource, Transform, Visibility, With,
     },
     render::{camera::Projection, mesh::skinning::SkinnedMesh},
     window::{CursorGrabMode, PrimaryWindow, Window},
 };
-use bevy_egui::{egui, EguiContext};
+use bevy_egui::{egui, EguiContexts};
 use bevy_rapier3d::prelude::{CollisionGroups, QueryFilter, RapierContext};
 
 use rose_data::{CharacterMotionAction, ZoneId};
@@ -53,9 +53,9 @@ pub fn character_select_enter_system(
     asset_server: Res<AssetServer>,
     game_data: Res<GameData>,
 ) {
-    if let Ok(window) = query_window.get_single_mut() {
-        window.set_cursor_grab_mode(CursorGrabMode::None);
-        window.set_cursor_visibility(true);
+    if let Ok(mut window) = query_window.get_single_mut() {
+        window.cursor.grab_mode = CursorGrabMode::None;
+        window.cursor.visible = true;
     }
 
     // Reset camera
@@ -161,9 +161,9 @@ pub fn character_select_models_system(
 #[allow(clippy::too_many_arguments)]
 pub fn character_select_system(
     mut commands: Commands,
-    mut app_state: ResMut<State<AppState>>,
+    mut app_state: ResMut<NextState<AppState>>,
     mut character_select_state: ResMut<CharacterSelectState>,
-    mut egui_context: ResMut<EguiContext>,
+    mut egui_context: EguiContexts,
     mut game_connection_events: EventReader<GameConnectionEvent>,
     mut world_connection_events: EventReader<WorldConnectionEvent>,
     mut load_zone_events: EventWriter<LoadZoneEvent>,
@@ -179,7 +179,7 @@ pub fn character_select_system(
         world_connection
     } else {
         // Disconnected, return to login
-        app_state.set(AppState::GameLogin).ok();
+        app_state.set(AppState::GameLogin);
         return;
     };
 
@@ -373,7 +373,7 @@ pub fn character_select_event_system(
 #[allow(clippy::too_many_arguments)]
 pub fn character_select_input_system(
     mut character_select_state: ResMut<CharacterSelectState>,
-    mut egui_ctx: ResMut<EguiContext>,
+    mut egui_ctx: EguiContexts,
     mouse_button_input: Res<Input<MouseButton>>,
     rapier_context: Res<RapierContext>,
     mut last_selected_time: Local<Option<Instant>>,
@@ -398,7 +398,7 @@ pub fn character_select_input_system(
             return;
         };
 
-    let Ok(window) = query_window.get_single_mut() else {
+    let Ok(window) = query_window.get_single() else {
     return;
 };
     let Some(cursor_position) = window.cursor_position() else {

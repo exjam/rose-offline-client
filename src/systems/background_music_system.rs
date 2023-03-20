@@ -7,16 +7,12 @@ use crate::{
     resources::{CurrentZone, GameData, SoundSettings, ZoneTime, ZoneTimeState},
 };
 
+#[derive(Default)]
 pub enum BackgroundMusicState {
+    #[default]
     None,
     PlayingDay,
     PlayingNight,
-}
-
-impl Default for BackgroundMusicState {
-    fn default() -> Self {
-        BackgroundMusicState::None
-    }
 }
 
 #[derive(Default)]

@@ -4,6 +4,7 @@ use bevy::{
     core_pipeline::core_3d::Transparent3d,
     ecs::{
         prelude::*,
+        query::ROQueryItem,
         system::{lifetimeless::*, SystemParamItem},
     },
     math::prelude::*,
@@ -208,11 +209,11 @@ impl SpecializedRenderPipeline for DamageDigitPipeline {
                     write_mask: ColorWrites::ALL,
                 })],
             }),
-            layout: Some(vec![
+            layout: vec![
                 self.view_layout.clone(),
                 self.particle_layout.clone(),
                 self.material_layout.clone(),
-            ]),
+            ],
             primitive: PrimitiveState {
                 front_face: FrontFace::Ccw,
                 cull_mode: None,
@@ -436,7 +437,7 @@ fn queue_damage_digits(
     view_uniforms: Res<ViewUniforms>,
     damage_digit_pipeline: Res<DamageDigitPipeline>,
     mut pipelines: ResMut<SpecializedRenderPipelines<DamageDigitPipeline>>,
-    mut pipeline_cache: ResMut<PipelineCache>,
+    pipeline_cache: Res<PipelineCache>,
     damage_digit_batches: Query<(Entity, &DamageDigitBatch)>,
     render_materials: Res<RenderAssets<DamageDigitMaterial>>,
     gpu_images: Res<RenderAssets<Image>>,
@@ -487,7 +488,7 @@ fn queue_damage_digits(
         .get_id::<DrawDamageDigit>()
         .unwrap();
     for (view, mut transparent_phase) in views.iter_mut() {
-        let view_key = DamageDigitPipelineKey::from_msaa_samples(msaa.samples)
+        let view_key = DamageDigitPipelineKey::from_msaa_samples(msaa.samples())
             | DamageDigitPipelineKey::from_hdr(view.hdr);
 
         for (entity, batch) in damage_digit_batches.iter() {
@@ -517,11 +518,7 @@ fn queue_damage_digits(
 
             transparent_phase.add(Transparent3d {
                 distance: 10.0,
-                pipeline: pipelines.specialize(
-                    &mut pipeline_cache,
-                    &damage_digit_pipeline,
-                    view_key,
-                ),
+                pipeline: pipelines.specialize(&pipeline_cache, &damage_digit_pipeline, view_key),
                 entity,
                 draw_function: draw_particle_function,
             });
@@ -544,8 +541,9 @@ impl<P: PhaseItem, const I: usize> RenderCommand<P> for SetDamageDigitViewBindGr
     type ItemWorldQuery = ();
 
     fn render<'w>(
-        _item: &P,
-        view_uniform: &'_ ViewUniformOffset,
+        _: &P,
+        view_uniform: ROQueryItem<'w, Self::ViewWorldQuery>,
+        _: ROQueryItem<'w, Self::ItemWorldQuery>,
         damage_digit_meta: SystemParamItem<'w, '_, Self::Param>,
         pass: &mut TrackedRenderPass<'w>,
     ) -> RenderCommandResult {
@@ -569,9 +567,9 @@ impl<P: PhaseItem, const I: usize> RenderCommand<P> for SetDamageDigitBindGroup<
     type ItemWorldQuery = ();
 
     fn render<'w>(
-        item: &P,
-        _view: (),
-        _entity: (),
+        _: &P,
+        _: ROQueryItem<'w, Self::ViewWorldQuery>,
+        _: ROQueryItem<'w, Self::ItemWorldQuery>,
         damage_digit_meta: SystemParamItem<'w, '_, Self::Param>,
         pass: &mut TrackedRenderPass<'w>,
     ) -> RenderCommandResult {
@@ -595,9 +593,9 @@ impl<P: PhaseItem, const I: usize> RenderCommand<P> for SetDamageDigitMaterialBi
     type ItemWorldQuery = Read<DamageDigitBatch>;
 
     fn render<'w>(
-        item: &P,
-        _view: (),
-        batch: &'_ DamageDigitBatch,
+        _: &P,
+        _: ROQueryItem<'w, Self::ViewWorldQuery>,
+        batch: ROQueryItem<'w, Self::ItemWorldQuery>,
         material_bind_groups: SystemParamItem<'w, '_, Self::Param>,
         pass: &mut TrackedRenderPass<'w>,
     ) -> RenderCommandResult {
@@ -622,9 +620,10 @@ impl<P: PhaseItem> RenderCommand<P> for DrawDamageDigitBatch {
 
     #[inline]
     fn render<'w>(
-        item: &P,
-        _view: (),
-        batch: &'_ DamageDigitBatch,
+        _: &P,
+        _: ROQueryItem<'w, Self::ViewWorldQuery>,
+        batch: ROQueryItem<'w, Self::ItemWorldQuery>,
+        _: SystemParamItem<'w, '_, Self::Param>,
         pass: &mut TrackedRenderPass<'w>,
     ) -> RenderCommandResult {
         let vertex_range = (batch.range.start * 6)..(batch.range.end * 6);

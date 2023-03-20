@@ -4,9 +4,9 @@ use bevy::{
     asset::Handle,
     core_pipeline::core_3d::{AlphaMask3d, Opaque3d, Transparent3d},
     ecs::{
-        query::QueryItem,
+        query::{QueryItem, ROQueryItem},
         system::{
-            lifetimeless::{Read, SQuery, SRes},
+            lifetimeless::{Read, SRes},
             SystemParamItem,
         },
     },
@@ -16,8 +16,8 @@ use bevy::{
         SetMeshViewBindGroup,
     },
     prelude::{
-        error, AddAsset, App, AssetServer, Assets, Component, Entity, FromWorld, HandleUntyped,
-        Mesh, Msaa, Plugin, Query, Res, ResMut, Resource, Vec3, With, World,
+        error, AddAsset, App, AssetServer, Assets, Component, FromWorld, HandleUntyped,
+        IntoSystemConfig, Mesh, Msaa, Plugin, Query, Res, ResMut, Resource, Vec3, With, World,
     },
     reflect::{FromReflect, Reflect, TypeUuid},
     render::{
@@ -35,7 +35,7 @@ use bevy::{
             BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingResource, BindingType,
             BlendComponent, BlendFactor, BlendOperation, BlendState, Buffer, BufferBindingType,
             BufferInitDescriptor, BufferUsages, CompareFunction, PipelineCache,
-            RenderPipelineDescriptor, SamplerBindingType, ShaderSize, ShaderStages,
+            RenderPipelineDescriptor, SamplerBindingType, ShaderDefVal, ShaderSize, ShaderStages,
             SpecializedMeshPipeline, SpecializedMeshPipelineError, SpecializedMeshPipelines,
             TextureSampleType, TextureViewDimension,
         },
@@ -92,9 +92,10 @@ pub enum ObjectMaterialClipFace {
 impl ExtractComponent for ObjectMaterialClipFace {
     type Query = &'static Self;
     type Filter = With<Handle<ObjectMaterial>>;
+    type Out = ObjectMaterialClipFace;
 
-    fn extract_component(item: QueryItem<Self::Query>) -> Self {
-        *item
+    fn extract_component(item: QueryItem<Self::Query>) -> Option<Self> {
+        Some(*item)
     }
 }
 
@@ -122,9 +123,10 @@ impl SpecializedMeshPipeline for ObjectMaterialPipeline {
 
         // MeshPipeline::specialize's current implementation guarantees that the returned
         // specialized descriptor has a populated layout
-        let descriptor_layout = descriptor.layout.as_mut().unwrap();
-        descriptor_layout.insert(1, self.material_layout.clone());
-        descriptor_layout.insert(3, self.zone_lighting_layout.clone());
+        descriptor.layout.insert(1, self.material_layout.clone());
+        descriptor
+            .layout
+            .insert(3, self.zone_lighting_layout.clone());
 
         let mut vertex_attributes = vec![
             Mesh::ATTRIBUTE_POSITION.at_shader_location(0),
@@ -136,13 +138,13 @@ impl SpecializedMeshPipeline for ObjectMaterialPipeline {
             descriptor
                 .vertex
                 .shader_defs
-                .push(String::from("HAS_OBJECT_LIGHTMAP"));
+                .push(ShaderDefVal::Bool("HAS_OBJECT_LIGHTMAP".into(), true));
             descriptor
                 .fragment
                 .as_mut()
                 .unwrap()
                 .shader_defs
-                .push(String::from("HAS_OBJECT_LIGHTMAP"));
+                .push(ShaderDefVal::Bool("HAS_OBJECT_LIGHTMAP".into(), true));
 
             vertex_attributes.push(MESH_ATTRIBUTE_UV_1.at_shader_location(3));
         } else {
@@ -151,19 +153,22 @@ impl SpecializedMeshPipeline for ObjectMaterialPipeline {
                 .as_mut()
                 .unwrap()
                 .shader_defs
-                .push(String::from("ZONE_LIGHTING_CHARACTER"));
+                .push(ShaderDefVal::Bool("ZONE_LIGHTING_CHARACTER".into(), true));
         }
 
         if layout.contains(Mesh::ATTRIBUTE_JOINT_INDEX)
             && layout.contains(Mesh::ATTRIBUTE_JOINT_WEIGHT)
         {
-            descriptor.vertex.shader_defs.push(String::from("SKINNED"));
+            descriptor
+                .vertex
+                .shader_defs
+                .push(ShaderDefVal::Bool("SKINNED".into(), true));
             descriptor
                 .fragment
                 .as_mut()
                 .unwrap()
                 .shader_defs
-                .push(String::from("SKINNED"));
+                .push(ShaderDefVal::Bool("SKINNED".into(), true));
 
             vertex_attributes.push(Mesh::ATTRIBUTE_JOINT_INDEX.at_shader_location(4));
             vertex_attributes.push(Mesh::ATTRIBUTE_JOINT_WEIGHT.at_shader_location(5));
@@ -302,13 +307,13 @@ impl FromWorld for ObjectMaterialPipeline {
 pub struct SetObjectMaterialBindGroup<const I: usize>(PhantomData<ObjectMaterial>);
 impl<P: PhaseItem, const I: usize> RenderCommand<P> for SetObjectMaterialBindGroup<I> {
     type Param = SRes<RenderAssets<ObjectMaterial>>;
-    type ItemWorldQuery = SQuery<Read<Handle<ObjectMaterial>>>;
+    type ItemWorldQuery = Read<Handle<ObjectMaterial>>;
     type ViewWorldQuery = ();
 
     fn render<'w>(
-        item: &P,
-        _view: (),
-        material_handle: &'_ Handle<ObjectMaterial>,
+        _: &P,
+        _: ROQueryItem<'_, Self::ViewWorldQuery>,
+        material_handle: ROQueryItem<'_, Self::ItemWorldQuery>,
         materials: SystemParamItem<'w, '_, Self::Param>,
         pass: &mut TrackedRenderPass<'w>,
     ) -> RenderCommandResult {
@@ -319,20 +324,19 @@ impl<P: PhaseItem, const I: usize> RenderCommand<P> for SetObjectMaterialBindGro
 }
 
 pub struct DrawObjectMesh;
-impl EntityRenderCommand for DrawObjectMesh {
-    type Param = (
-        SRes<RenderAssets<Mesh>>,
-        SQuery<(Read<Handle<Mesh>>, Option<&'static ObjectMaterialClipFace>)>,
-    );
+impl<P: PhaseItem> RenderCommand<P> for DrawObjectMesh {
+    type Param = SRes<RenderAssets<Mesh>>;
+    type ItemWorldQuery = (Read<Handle<Mesh>>, Option<Read<ObjectMaterialClipFace>>);
+    type ViewWorldQuery = ();
+
     #[inline]
     fn render<'w>(
-        _view: Entity,
-        item: Entity,
-        (meshes, mesh_query): SystemParamItem<'w, '_, Self::Param>,
+        _: &P,
+        _: ROQueryItem<'_, Self::ViewWorldQuery>,
+        (mesh_handle, clip_face): ROQueryItem<'_, Self::ItemWorldQuery>,
+        meshes: SystemParamItem<'w, '_, Self::Param>,
         pass: &mut TrackedRenderPass<'w>,
     ) -> RenderCommandResult {
-        let (mesh_handle, clip_face) = mesh_query.get(item).unwrap();
-
         let (start_index_offset, end_index_offset) = if let Some(clip_face) = clip_face {
             match clip_face {
                 ObjectMaterialClipFace::First(num_faces) => (num_faces * 3, 0),
@@ -683,7 +687,7 @@ pub fn queue_object_material_meshes(
     transparent_draw_functions: Res<DrawFunctions<Transparent3d>>,
     material_pipeline: Res<ObjectMaterialPipeline>,
     mut pipelines: ResMut<SpecializedMeshPipelines<ObjectMaterialPipeline>>,
-    mut pipeline_cache: ResMut<PipelineCache>,
+    pipeline_cache: Res<PipelineCache>,
     msaa: Res<Msaa>,
     render_meshes: Res<RenderAssets<Mesh>>,
     render_materials: Res<RenderAssets<ObjectMaterial>>,
@@ -713,8 +717,8 @@ pub fn queue_object_material_meshes(
             .unwrap();
 
         let rangefinder = view.rangefinder3d();
-        let view_key =
-            MeshPipelineKey::from_msaa_samples(msaa.samples) | MeshPipelineKey::from_hdr(view.hdr);
+        let view_key = MeshPipelineKey::from_msaa_samples(msaa.samples())
+            | MeshPipelineKey::from_hdr(view.hdr);
 
         for visible_entity in &visible_entities.entities {
             if let Ok((material_handle, mesh_handle, mesh_uniform)) =
@@ -727,11 +731,11 @@ pub fn queue_object_material_meshes(
                                 | view_key;
                         let alpha_mode = material.alpha_mode;
                         if let AlphaMode::Blend = alpha_mode {
-                            mesh_key |= MeshPipelineKey::TRANSPARENT_MAIN_PASS;
+                            mesh_key |= MeshPipelineKey::BLEND_ALPHA;
                         }
 
                         let pipeline_id = pipelines.specialize(
-                            &mut pipeline_cache,
+                            &pipeline_cache,
                             &material_pipeline,
                             (mesh_key, material.into()),
                             &mesh.layout,
@@ -762,7 +766,10 @@ pub fn queue_object_material_meshes(
                                     distance,
                                 });
                             }
-                            AlphaMode::Blend => {
+                            AlphaMode::Blend
+                            | AlphaMode::Premultiplied
+                            | AlphaMode::Add
+                            | AlphaMode::Multiply => {
                                 transparent_phase.add(Transparent3d {
                                     entity: *visible_entity,
                                     draw_function: draw_transparent_pbr,

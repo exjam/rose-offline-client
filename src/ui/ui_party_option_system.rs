@@ -1,5 +1,5 @@
 use bevy::prelude::{Assets, Local, Query, Res, ResMut, With};
-use bevy_egui::{egui, EguiContext};
+use bevy_egui::{egui, EguiContexts};
 
 use rose_game_common::messages::{client::ClientMessage, PartyItemSharing, PartyXpSharing};
 
@@ -43,7 +43,7 @@ impl Default for UiStatePartyOptionSystem {
 pub fn ui_party_option_system(
     mut ui_state: Local<UiStatePartyOptionSystem>,
     mut ui_state_windows: ResMut<UiStateWindows>,
-    mut egui_context: ResMut<EguiContext>,
+    mut egui_context: EguiContexts,
     mut query_party_info: Query<&PartyInfo, With<PlayerCharacter>>,
     ui_resources: Res<UiResources>,
     dialog_assets: Res<Assets<Dialog>>,

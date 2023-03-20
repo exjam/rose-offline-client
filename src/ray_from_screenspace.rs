@@ -1,7 +1,7 @@
 use bevy::{
     math::{Mat4, Vec2, Vec3},
-    prelude::{Camera, GlobalTransform, Res},
-    render::camera::{Projection, RenderTarget},
+    prelude::{Camera, GlobalTransform},
+    render::camera::Projection,
     window::Window,
 };
 

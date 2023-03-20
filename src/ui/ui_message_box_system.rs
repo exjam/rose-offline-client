@@ -1,5 +1,5 @@
 use bevy::prelude::{Assets, Commands, Events, Local, Res, ResMut};
-use bevy_egui::{egui, EguiContext};
+use bevy_egui::{egui, EguiContexts};
 use bevy_inspector_egui::egui::text::LayoutJob;
 
 use crate::{
@@ -37,7 +37,7 @@ pub struct UiStateMessageBox {
 pub fn ui_message_box_system(
     mut commands: Commands,
     mut ui_state: Local<UiStateMessageBox>,
-    mut egui_context: ResMut<EguiContext>,
+    mut egui_context: EguiContexts,
     mut message_box_events: ResMut<Events<MessageBoxEvent>>,
     dialog_assets: Res<Assets<Dialog>>,
     ui_resources: Res<UiResources>,
@@ -137,18 +137,20 @@ pub fn ui_message_box_system(
             continue;
         };
 
-        let fonts = egui_context.ctx_mut().fonts();
-        let message_galley = fonts.layout_job(active_message_box.message_layout_job.clone());
-        let message_size = message_galley.size();
-
-        let num_image_middle = 1 + (message_size.y / image_middle_height) as usize;
-        std::mem::drop(fonts);
+        let (message_galley, num_image_middle) = egui_context.ctx_mut().fonts(|fonts| {
+            let message_galley = fonts.layout_job(active_message_box.message_layout_job.clone());
+            let message_size = message_galley.size();
+            let num_image_middle = 1 + (message_size.y / image_middle_height) as usize;
+            (message_galley, num_image_middle)
+        });
 
         let dialog_width = dialog.width;
         let dialog_height =
             image_top_height + image_middle_height * num_image_middle as f32 + image_bottom_height;
 
-        let screen_size = egui_context.ctx_mut().input().screen_rect().size();
+        let screen_size = egui_context
+            .ctx_mut()
+            .input(|input| input.screen_rect().size());
         let default_x = (screen_size.x / 2.0 - dialog.width / 2.0) + (i * 20) as f32;
         let default_y = (screen_size.y / 2.0 - dialog_height / 2.0) + (i * 20) as f32;
 

@@ -1,8 +1,8 @@
 use bevy::{
     app::AppExit,
-    prelude::{Assets, EventWriter, Local, Res, ResMut},
+    prelude::{Assets, EventWriter, Local, Res},
 };
-use bevy_egui::{egui, EguiContext};
+use bevy_egui::{egui, EguiContexts};
 
 use crate::{
     events::LoginEvent,
@@ -27,7 +27,7 @@ pub struct UiStateLogin {
 #[allow(clippy::too_many_arguments)]
 pub fn ui_login_system(
     mut ui_state: Local<UiStateLogin>,
-    mut egui_context: ResMut<EguiContext>,
+    mut egui_context: EguiContexts,
     dialog_assets: Res<Assets<Dialog>>,
     login_state: Res<LoginState>,
     server_configuration: Res<ServerConfiguration>,
@@ -53,7 +53,9 @@ pub fn ui_login_system(
     let mut response_cancel = None;
     let mut enter_pressed = false;
 
-    let screen_size = egui_context.ctx_mut().input().screen_rect().size();
+    let screen_size = egui_context
+        .ctx_mut()
+        .input(|input| input.screen_rect().size());
     let position = egui::pos2(screen_size.x - dialog.width - 100.0, 100.0);
 
     if !ui_state.initial_focus_set {
@@ -94,7 +96,7 @@ pub fn ui_login_system(
                     ..Default::default()
                 },
                 |ui, _| {
-                    enter_pressed = ui.input().key_pressed(egui::Key::Enter);
+                    enter_pressed = ui.input(|input| input.key_pressed(egui::Key::Enter));
                 },
             )
         });

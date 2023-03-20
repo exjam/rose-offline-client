@@ -1318,7 +1318,7 @@ fn spawn_animated_object(
                 motion_path: motion_path.to_string(),
                 texture_path: texture_path.to_string(),
             }),
-            mesh.clone(),
+            mesh,
             material,
             object_transform,
             NotShadowCaster,

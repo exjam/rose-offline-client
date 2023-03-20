@@ -4,7 +4,7 @@ use bevy::{
         Assets, Entity, EventReader, EventWriter, Events, Local, Query, Res, ResMut, With, World,
     },
 };
-use bevy_egui::{egui, EguiContext};
+use bevy_egui::{egui, EguiContexts};
 use rose_data::Item;
 use rose_game_common::{
     components::Money,
@@ -123,7 +123,7 @@ fn ui_add_store_item_slot(
 }
 
 pub fn ui_personal_store_system(
-    mut egui_context: ResMut<EguiContext>,
+    mut egui_context: EguiContexts,
     mut ui_state: Local<UiPersonalStoreState>,
     mut ui_state_dnd: ResMut<UiStateDragAndDrop>,
     mut personal_store_events: EventReader<PersonalStoreEvent>,

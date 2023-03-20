@@ -5,7 +5,7 @@ use bevy::{
         Assets, Entity, EventReader, EventWriter, Events, Local, Query, Res, ResMut, With, World,
     },
 };
-use bevy_egui::{egui, EguiContext};
+use bevy_egui::{egui, EguiContexts};
 
 use rose_data::{Item, NpcData, NpcStoreTabData, NpcStoreTabId};
 use rose_game_common::{
@@ -399,7 +399,7 @@ pub struct NpcStoreNpcWorldQuery<'w> {
 }
 
 pub fn ui_npc_store_system(
-    mut egui_context: ResMut<EguiContext>,
+    mut egui_context: EguiContexts,
     mut ui_state: Local<UiNpcStoreState>,
     mut ui_state_dnd: ResMut<UiStateDragAndDrop>,
     mut npc_store_events: EventReader<NpcStoreEvent>,
@@ -499,7 +499,9 @@ pub fn ui_npc_store_system(
     }
     let npc_data = npc_data.unwrap();
 
-    let screen_size = egui_context.ctx_mut().input().screen_rect().size();
+    let screen_size = egui_context
+        .ctx_mut()
+        .input(|input| input.screen_rect().size());
 
     let mut response_close = None;
     let mut response_cancel = None;

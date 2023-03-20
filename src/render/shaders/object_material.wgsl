@@ -5,6 +5,7 @@
 @group(2) @binding(0)
 var<uniform> mesh: Mesh;
 
+#import bevy_pbr::utils
 #import bevy_pbr::mesh_functions
 #import bevy_pbr::shadows
 
@@ -70,11 +71,11 @@ struct StaticMeshMaterialData {
     lightmap_uv_scale: f32,
 };
 
-let OBJECT_MATERIAL_FLAGS_ALPHA_MODE_OPAQUE: u32              = 1u;
-let OBJECT_MATERIAL_FLAGS_ALPHA_MODE_MASK: u32                = 2u;
-let OBJECT_MATERIAL_FLAGS_ALPHA_MODE_BLEND: u32               = 4u;
-let OBJECT_MATERIAL_FLAGS_HAS_ALPHA_VALUE: u32                = 8u;
-let OBJECT_MATERIAL_FLAGS_SPECULAR: u32                       = 16u;
+const OBJECT_MATERIAL_FLAGS_ALPHA_MODE_OPAQUE: u32              = 1u;
+const OBJECT_MATERIAL_FLAGS_ALPHA_MODE_MASK: u32                = 2u;
+const OBJECT_MATERIAL_FLAGS_ALPHA_MODE_BLEND: u32               = 4u;
+const OBJECT_MATERIAL_FLAGS_HAS_ALPHA_VALUE: u32                = 8u;
+const OBJECT_MATERIAL_FLAGS_SPECULAR: u32                       = 16u;
 
 @group(1) @binding(0)
 var<uniform> material: StaticMeshMaterialData;
@@ -104,10 +105,16 @@ struct FragmentInput {
 @fragment
 fn fragment(in: FragmentInput) -> @location(0) vec4<f32> {
     var output_color: vec4<f32> = textureSample(base_texture, base_sampler, in.uv);
+    let view_z = dot(vec4<f32>(
+        view.inverse_view[0].z,
+        view.inverse_view[1].z,
+        view.inverse_view[2].z,
+        view.inverse_view[3].z
+    ), in.world_position);
 
 #ifdef HAS_OBJECT_LIGHTMAP
     var lightmap = textureSample(lightmap_texture, lightmap_sampler, (in.lightmap_uv + material.lightmap_uv_offset) * material.lightmap_uv_scale);
-    let shadow = fetch_directional_shadow(0u, in.world_position, in.world_normal);
+    let shadow = fetch_directional_shadow(0u, in.world_position, in.world_normal, view_z);
     lightmap = vec4<f32>(lightmap.xyz * (shadow * 0.2 + 0.8), lightmap.w);
     output_color = output_color * lightmap * 2.0;
 #endif
@@ -135,7 +142,7 @@ fn fragment(in: FragmentInput) -> @location(0) vec4<f32> {
         }
     }
 
-    output_color = apply_zone_lighting(in.world_position, output_color);
+    output_color = apply_zone_lighting(in.world_position, output_color, view_z);
     output_color = pow(output_color, vec4<f32>(2.2));
     return output_color;
 }

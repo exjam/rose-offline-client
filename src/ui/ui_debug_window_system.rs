@@ -2,11 +2,11 @@ use bevy::{
     input::Input,
     math::{EulerRot, Vec3},
     prelude::{
-        Camera3d, Commands, Entity, KeyCode, Local, Query, Res, ResMut, Resource, State, Transform,
-        With,
+        Camera3d, Commands, Entity, KeyCode, Local, NextState, Query, Res, ResMut, Resource,
+        Transform, With,
     },
 };
-use bevy_egui::{egui, EguiContext};
+use bevy_egui::{egui, EguiContexts};
 use rose_game_common::messages::client::ClientMessage;
 
 use crate::{
@@ -55,7 +55,7 @@ pub struct UiStateDebugMenu {
 #[allow(clippy::too_many_arguments)]
 pub fn ui_debug_menu_system(
     mut commands: Commands,
-    mut egui_context: ResMut<EguiContext>,
+    mut egui_context: EguiContexts,
     mut ui_state_debug_windows: ResMut<UiStateDebugWindows>,
     mut ui_state_debug_menu: Local<UiStateDebugMenu>,
     query_cameras: Query<(Entity, &Transform), With<Camera3d>>,
@@ -64,7 +64,7 @@ pub fn ui_debug_menu_system(
     world_connection: Option<Res<WorldConnection>>,
     keyboard: Res<Input<KeyCode>>,
     mut debug_inspector: ResMut<DebugInspector>,
-    mut app_state: ResMut<State<AppState>>,
+    mut app_state_next: ResMut<NextState<AppState>>,
 ) {
     if keyboard.pressed(KeyCode::LControl) && keyboard.just_pressed(KeyCode::D) {
         ui_state_debug_windows.debug_ui_open = !ui_state_debug_windows.debug_ui_open;
@@ -81,11 +81,11 @@ pub fn ui_debug_menu_system(
 
             ui.menu_button("App", |ui| {
                 if ui.button("Model Viewer").clicked() {
-                    app_state.set(AppState::ModelViewer).ok();
+                    app_state_next.set(AppState::ModelViewer);
                 }
 
                 if ui.button("Zone Viewer").clicked() {
-                    app_state.set(AppState::ZoneViewer).ok();
+                    app_state_next.set(AppState::ZoneViewer);
                 }
 
                 ui.separator();
@@ -94,7 +94,7 @@ pub fn ui_debug_menu_system(
                     world_connection.is_none() && game_connection.is_none(),
                     |ui| {
                         if ui.button("Game Login").clicked() {
-                            app_state.set(AppState::GameLogin).ok();
+                            app_state_next.set(AppState::GameLogin);
                         }
                     },
                 );
@@ -103,14 +103,14 @@ pub fn ui_debug_menu_system(
                     world_connection.is_some() && game_connection.is_none(),
                     |ui| {
                         if ui.button("Game Character Select").clicked() {
-                            app_state.set(AppState::GameCharacterSelect).ok();
+                            app_state_next.set(AppState::GameCharacterSelect);
                         }
                     },
                 );
 
                 ui.add_enabled_ui(game_connection.is_some(), |ui| {
                     if ui.button("Game").clicked() {
-                        app_state.set(AppState::Game).ok();
+                        app_state_next.set(AppState::Game);
                     }
                 });
 

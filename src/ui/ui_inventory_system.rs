@@ -1,8 +1,8 @@
 use bevy::{
     ecs::query::WorldQuery,
-    prelude::{Assets, Entity, EventWriter, Events, Local, Query, Res, ResMut, With, World},
+    prelude::{Assets, EventWriter, Events, Local, Query, Res, ResMut, With, World},
 };
-use bevy_egui::{egui, EguiContext};
+use bevy_egui::{egui, EguiContexts};
 use enum_map::{enum_map, EnumMap};
 
 use rose_data::{AmmoIndex, EquipmentIndex, Item, VehiclePartIndex};
@@ -455,7 +455,7 @@ pub struct PlayerQuery<'w> {
 }
 
 pub fn ui_inventory_system(
-    mut egui_context: ResMut<EguiContext>,
+    mut egui_context: EguiContexts,
     mut ui_state_inventory: Local<UiStateInventory>,
     mut ui_state_dnd: ResMut<UiStateDragAndDrop>,
     mut ui_state_windows: ResMut<UiStateWindows>,

@@ -2,7 +2,7 @@ use bevy::{
     hierarchy::Children,
     prelude::{Assets, Handle, Local, Query, ResMut, With},
 };
-use bevy_egui::{egui, EguiContext};
+use bevy_egui::{egui, EguiContexts};
 
 use crate::{
     components::{EventObject, WarpObject},
@@ -18,7 +18,7 @@ pub struct UiStateDebugRender {
 }
 
 pub fn ui_debug_render_system(
-    mut egui_context: ResMut<EguiContext>,
+    mut egui_context: EguiContexts,
     mut ui_state_debug_windows: ResMut<UiStateDebugWindows>,
     mut ui_state_debug_render: Local<UiStateDebugRender>,
     mut debug_render_config: ResMut<DebugRenderConfig>,

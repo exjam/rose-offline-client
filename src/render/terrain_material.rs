@@ -3,17 +3,20 @@ use std::marker::PhantomData;
 use bevy::{
     asset::Handle,
     core_pipeline::core_3d::Opaque3d,
-    ecs::system::{
-        lifetimeless::{Read, SQuery, SRes},
-        SystemParamItem,
+    ecs::{
+        query::ROQueryItem,
+        system::{
+            lifetimeless::{Read, SRes},
+            SystemParamItem,
+        },
     },
     pbr::{
         DrawMesh, MeshPipeline, MeshPipelineKey, MeshUniform, SetMeshBindGroup,
         SetMeshViewBindGroup,
     },
     prelude::{
-        error, AddAsset, App, Assets, Entity, FromWorld, HandleUntyped, Mesh, Msaa, Plugin, Query,
-        Res, ResMut, Resource, World,
+        error, AddAsset, App, Assets, FromWorld, HandleUntyped, IntoSystemConfig, Mesh, Msaa,
+        Plugin, Query, Res, ResMut, Resource, World,
     },
     reflect::TypeUuid,
     render::{
@@ -36,7 +39,7 @@ use bevy::{
         renderer::RenderDevice,
         texture::Image,
         view::{ExtractedView, VisibleEntities},
-        RenderApp,
+        RenderApp, RenderSet,
     },
 };
 
@@ -174,12 +177,10 @@ impl SpecializedMeshPipeline for TerrainMaterialPipeline {
             },
         });
 
-        descriptor.layout = Some(vec![
-            self.mesh_pipeline.view_layout.clone(),
-            self.material_layout.clone(),
-            self.mesh_pipeline.mesh_layout.clone(),
-            self.zone_lighting_layout.clone(),
-        ]);
+        descriptor.layout.insert(1, self.material_layout.clone());
+        descriptor
+            .layout
+            .insert(3, self.zone_lighting_layout.clone());
 
         let vertex_layout = layout.get_layout(&[
             Mesh::ATTRIBUTE_POSITION.at_shader_location(0),
@@ -283,17 +284,17 @@ impl RenderAsset for TerrainMaterial {
 
 pub struct SetTerrainMaterialBindGroup<const I: usize>(PhantomData<TerrainMaterial>);
 impl<P: PhaseItem, const I: usize> RenderCommand<P> for SetTerrainMaterialBindGroup<I> {
-    type Param = (
-        SRes<RenderAssets<TerrainMaterial>>,
-        SQuery<Read<Handle<TerrainMaterial>>>,
-    );
+    type Param = SRes<RenderAssets<TerrainMaterial>>;
+    type ViewWorldQuery = ();
+    type ItemWorldQuery = Read<Handle<TerrainMaterial>>;
+
     fn render<'w>(
-        _view: Entity,
-        item: Entity,
-        (materials, query): SystemParamItem<'w, '_, Self::Param>,
+        _: &P,
+        _: ROQueryItem<'w, Self::ViewWorldQuery>,
+        material_handle: ROQueryItem<'w, Self::ItemWorldQuery>,
+        materials: SystemParamItem<'w, '_, Self::Param>,
         pass: &mut TrackedRenderPass<'w>,
     ) -> RenderCommandResult {
-        let material_handle = query.get(item).unwrap();
         let material = materials.into_inner().get(material_handle).unwrap();
         pass.set_bind_group(I, &material.bind_group, &[]);
         RenderCommandResult::Success
@@ -314,7 +315,7 @@ pub fn queue_terrain_material_meshes(
     opaque_draw_functions: Res<DrawFunctions<Opaque3d>>,
     material_pipeline: Res<TerrainMaterialPipeline>,
     mut pipelines: ResMut<SpecializedMeshPipelines<TerrainMaterialPipeline>>,
-    mut pipeline_cache: ResMut<PipelineCache>,
+    pipeline_cache: Res<PipelineCache>,
     msaa: Res<Msaa>,
     render_meshes: Res<RenderAssets<Mesh>>,
     render_materials: Res<RenderAssets<TerrainMaterial>>,
@@ -328,8 +329,8 @@ pub fn queue_terrain_material_meshes(
             .unwrap();
 
         let rangefinder = view.rangefinder3d();
-        let view_key =
-            MeshPipelineKey::from_msaa_samples(msaa.samples) | MeshPipelineKey::from_hdr(view.hdr);
+        let view_key = MeshPipelineKey::from_msaa_samples(msaa.samples())
+            | MeshPipelineKey::from_hdr(view.hdr);
 
         for visible_entity in &visible_entities.entities {
             if let Ok((material_handle, mesh_handle, mesh_uniform)) =
@@ -342,7 +343,7 @@ pub fn queue_terrain_material_meshes(
                                 | view_key;
 
                         let pipeline_id = pipelines.specialize(
-                            &mut pipeline_cache,
+                            &pipeline_cache,
                             &material_pipeline,
                             mesh_key,
                             &mesh.layout,

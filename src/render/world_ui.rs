@@ -3,15 +3,18 @@ use std::{cmp::Ordering, ops::Range};
 use bevy::{
     asset::{Handle, HandleId},
     core_pipeline::core_3d::Transparent3d,
-    ecs::system::{
-        lifetimeless::{Read, SQuery, SRes},
-        SystemParamItem,
+    ecs::{
+        query::ROQueryItem,
+        system::{
+            lifetimeless::{Read, SRes},
+            SystemParamItem,
+        },
     },
     pbr::MeshPipelineKey,
     prelude::{
-        App, Assets, Color, Commands, Component, ComputedVisibility, Entity, FromWorld,
-        GlobalTransform, HandleUntyped, Msaa, Plugin, Query, Res, ResMut, Resource, Vec2, Vec3,
-        World,
+        App, Assets, Color, Commands, Component, ComputedVisibility, FromWorld, GlobalTransform,
+        HandleUntyped, IntoSystemAppConfig, IntoSystemConfig, Msaa, Plugin, Query, Res, ResMut,
+        Resource, Vec2, Vec3, World,
     },
     reflect::TypeUuid,
     render::{
@@ -36,7 +39,7 @@ use bevy::{
         renderer::{RenderDevice, RenderQueue},
         texture::{BevyDefault, Image},
         view::{ExtractedView, ViewTarget, ViewUniform, ViewUniformOffset, ViewUniforms},
-        Extract, RenderApp,
+        Extract, ExtractSchedule, RenderApp, RenderSet,
     },
     utils::HashMap,
 };
@@ -232,11 +235,11 @@ impl SpecializedRenderPipeline for WorldUiPipeline {
                     write_mask: ColorWrites::ALL,
                 })],
             }),
-            layout: Some(vec![
+            layout: vec![
                 self.view_layout.clone(),
                 self.material_layout.clone(),
                 self.zone_lighting_layout.clone(),
-            ]),
+            ],
             primitive: PrimitiveState {
                 front_face: FrontFace::Ccw,
                 cull_mode: None,
@@ -268,6 +271,7 @@ impl SpecializedRenderPipeline for WorldUiPipeline {
                 alpha_to_coverage_enabled: false,
             },
             label: Some("world_ui_pipeline".into()),
+            push_constant_ranges: Vec::default(),
         }
     }
 }
@@ -328,15 +332,17 @@ impl FromWorld for WorldUiPipeline {
 
 pub struct SetWorldUiMaterialBindGroup<const I: usize>;
 impl<P: PhaseItem, const I: usize> RenderCommand<P> for SetWorldUiMaterialBindGroup<I> {
-    type Param = (SRes<ImageBindGroups>, SQuery<Read<WorldUiBatch>>);
+    type Param = SRes<ImageBindGroups>;
+    type ViewWorldQuery = ();
+    type ItemWorldQuery = Read<WorldUiBatch>;
 
     fn render<'w>(
-        _view: Entity,
-        item: Entity,
-        (image_bind_groups, query_batch): SystemParamItem<'w, '_, Self::Param>,
+        _: &P,
+        _: ROQueryItem<'w, Self::ViewWorldQuery>,
+        sprite_batch: ROQueryItem<'w, Self::ItemWorldQuery>,
+        image_bind_groups: SystemParamItem<'w, '_, Self::Param>,
         pass: &mut TrackedRenderPass<'w>,
     ) -> RenderCommandResult {
-        let sprite_batch = query_batch.get(item).unwrap();
         let image_bind_groups = image_bind_groups.into_inner();
 
         pass.set_bind_group(
@@ -360,17 +366,19 @@ type DrawWorldUi = (
 );
 
 struct DrawWorldUiBatch;
-impl EntityRenderCommand for DrawWorldUiBatch {
-    type Param = (SRes<WorldUiMeta>, SQuery<Read<WorldUiBatch>>);
+impl<P: PhaseItem> RenderCommand<P> for DrawWorldUiBatch {
+    type Param = SRes<WorldUiMeta>;
+    type ViewWorldQuery = ();
+    type ItemWorldQuery = Read<WorldUiBatch>;
 
     #[inline]
     fn render<'w>(
-        _view: Entity,
-        item: Entity,
-        (sprite_meta, query_batch): SystemParamItem<'w, '_, Self::Param>,
+        _: &P,
+        _: ROQueryItem<'w, Self::ViewWorldQuery>,
+        batch: ROQueryItem<'w, Self::ItemWorldQuery>,
+        sprite_meta: SystemParamItem<'w, '_, Self::Param>,
         pass: &mut TrackedRenderPass<'w>,
     ) -> RenderCommandResult {
-        let batch = query_batch.get(item).unwrap();
         let sprite_meta = sprite_meta.into_inner();
         pass.set_vertex_buffer(0, sprite_meta.vertices.buffer().unwrap().slice(..));
         pass.draw(batch.vertex_range.clone(), 0..1);
@@ -380,15 +388,17 @@ impl EntityRenderCommand for DrawWorldUiBatch {
 
 struct SetWorldUiViewBindGroup<const I: usize>;
 impl<P: PhaseItem, const I: usize> RenderCommand<P> for SetWorldUiViewBindGroup<I> {
-    type Param = (SRes<WorldUiMeta>, SQuery<Read<ViewUniformOffset>>);
+    type Param = SRes<WorldUiMeta>;
+    type ViewWorldQuery = Read<ViewUniformOffset>;
+    type ItemWorldQuery = ();
 
     fn render<'w>(
-        view: Entity,
-        _item: Entity,
-        (world_ui_meta, view_query): SystemParamItem<'w, '_, Self::Param>,
+        _: &P,
+        view_uniform: ROQueryItem<'w, Self::ViewWorldQuery>,
+        _: ROQueryItem<'w, Self::ItemWorldQuery>,
+        world_ui_meta: SystemParamItem<'w, '_, Self::Param>,
         pass: &mut TrackedRenderPass<'w>,
     ) -> RenderCommandResult {
-        let view_uniform = view_query.get(view).unwrap();
         pass.set_bind_group(
             I,
             world_ui_meta.into_inner().view_bind_group.as_ref().unwrap(),
@@ -414,7 +424,7 @@ pub fn queue_world_ui_meshes(
     transparent_draw_functions: Res<DrawFunctions<Transparent3d>>,
     world_ui_pipeline: Res<WorldUiPipeline>,
     mut pipelines: ResMut<SpecializedRenderPipelines<WorldUiPipeline>>,
-    mut pipeline_cache: ResMut<PipelineCache>,
+    pipeline_cache: Res<PipelineCache>,
     msaa: Res<Msaa>,
     mut views: Query<(&ExtractedView, &mut RenderPhase<Transparent3d>)>,
     mut extracted_world_ui: ResMut<ExtractedWorldUi>,
@@ -449,9 +459,9 @@ pub fn queue_world_ui_meshes(
     }
 
     for (view, mut transparent_phase) in views.iter_mut() {
-        let view_key =
-            MeshPipelineKey::from_msaa_samples(msaa.samples) | MeshPipelineKey::from_hdr(view.hdr);
-        let pipeline = pipelines.specialize(&mut pipeline_cache, &world_ui_pipeline, view_key);
+        let view_key = MeshPipelineKey::from_msaa_samples(msaa.samples())
+            | MeshPipelineKey::from_hdr(view.hdr);
+        let pipeline = pipelines.specialize(&pipeline_cache, &world_ui_pipeline, view_key);
         let inverse_view_transform = view.transform.compute_matrix().inverse();
         let inverse_view_row_2 = inverse_view_transform.row(2);
         let view_proj = view.projection * inverse_view_transform;

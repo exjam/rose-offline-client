@@ -1,5 +1,5 @@
 use bevy::prelude::{Local, Query, Res, ResMut, State};
-use bevy_egui::{egui, EguiContext};
+use bevy_egui::{egui, EguiContexts};
 use rand::Rng;
 use regex::Regex;
 
@@ -42,7 +42,7 @@ impl Default for UiStateDebugNpcList {
 }
 
 pub fn ui_debug_npc_list_system(
-    mut egui_context: ResMut<EguiContext>,
+    mut egui_context: EguiContexts,
     mut ui_state_debug_npc_list: Local<UiStateDebugNpcList>,
     mut ui_state_debug_windows: ResMut<UiStateDebugWindows>,
     app_state: Res<State<AppState>>,
@@ -73,7 +73,7 @@ pub fn ui_debug_npc_list_system(
                     }
                     ui.end_row();
 
-                    if matches!(app_state.current(), AppState::Game) {
+                    if matches!(app_state.0, AppState::Game) {
                         ui.label("Spawn Count:");
                         ui.add(
                             egui::DragValue::new(&mut ui_state_debug_npc_list.spawn_count)
@@ -179,7 +179,7 @@ pub fn ui_debug_npc_list_system(
                                     ui.label(npc_data.name);
                                 });
 
-                                row.col(|ui| match app_state.current() {
+                                row.col(|ui| match app_state.0 {
                                     AppState::Game => {
                                         if ui
                                             .add_enabled(

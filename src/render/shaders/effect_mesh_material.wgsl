@@ -20,7 +20,7 @@ fn vertex(vertex: Vertex) -> VertexOutput {
     var out: VertexOutput;
     out.uv = vertex.uv;
     out.world_position = mesh.model * vec4<f32>(vertex.position, 1.0);
-    out.clip_position = view.view_proj * out.world_position;
+    out.clip_position = 1.0 * view.view_proj * out.world_position;
     return out;
 }
 
@@ -29,8 +29,8 @@ struct EffectMeshMaterialData {
     alpha_cutoff: f32,
 };
 
-let EFFECT_MESH_MATERIAL_FLAGS_ALPHA_MODE_OPAQUE: u32              = 1u;
-let EFFECT_MESH_MATERIAL_FLAGS_ALPHA_MODE_MASK: u32                = 2u;
+const EFFECT_MESH_MATERIAL_FLAGS_ALPHA_MODE_OPAQUE: u32              = 1u;
+const EFFECT_MESH_MATERIAL_FLAGS_ALPHA_MODE_MASK: u32                = 2u;
 
 @group(1) @binding(0)
 var<uniform> material: EffectMeshMaterialData;

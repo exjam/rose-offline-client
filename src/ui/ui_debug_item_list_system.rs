@@ -1,5 +1,5 @@
 use bevy::prelude::{Local, ParamSet, Query, Res, ResMut, State, With};
-use bevy_egui::{egui, EguiContext};
+use bevy_egui::{egui, EguiContexts};
 use regex::Regex;
 
 use rose_data::{EquipmentIndex, EquipmentItem, Item, ItemReference, ItemType};
@@ -39,7 +39,7 @@ impl Default for UiStateDebugItemList {
 }
 
 pub fn ui_debug_item_list_system(
-    mut egui_context: ResMut<EguiContext>,
+    mut egui_context: EguiContexts,
     mut ui_state_debug_item_list: Local<UiStateDebugItemList>,
     mut ui_state_debug_windows: ResMut<UiStateDebugWindows>,
     mut query_set: ParamSet<(
@@ -74,7 +74,7 @@ pub fn ui_debug_item_list_system(
                     }
                     ui.end_row();
 
-                    if matches!(app_state.current(), AppState::Game) {
+                    if matches!(app_state.0, AppState::Game) {
                         ui.label("Spawn Quantity:");
                         ui.add(
                             egui::DragValue::new(&mut ui_state_debug_item_list.spawn_quantity)
@@ -313,7 +313,7 @@ pub fn ui_debug_item_list_system(
                                 });
 
                                 row.col(|ui| {
-                                    if matches!(app_state.current(), AppState::ModelViewer)
+                                    if matches!(app_state.0, AppState::ModelViewer)
                                         && ui.button("Equip").clicked()
                                     {
                                         if let Some(equipment_index) = equipment_index {
@@ -400,7 +400,7 @@ pub fn ui_debug_item_list_system(
                                     ui.label(item_data.name);
                                 });
 
-                                row.col(|ui| match app_state.current() {
+                                row.col(|ui| match app_state.0 {
                                     AppState::Game => {
                                         if ui.button("Spawn").clicked() {
                                             if let Some(game_connection) = game_connection.as_ref()

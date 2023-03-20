@@ -1,5 +1,5 @@
 use bevy::prelude::{Local, Res, ResMut};
-use bevy_egui::{egui, EguiContext};
+use bevy_egui::{egui, EguiContexts};
 use rose_data::WORLD_TICK_DURATION;
 
 use crate::{
@@ -14,7 +14,7 @@ pub struct UiStateDebugZoneTime {
 }
 
 pub fn ui_debug_zone_time_system(
-    mut egui_context: ResMut<EguiContext>,
+    mut egui_context: EguiContexts,
     mut ui_state_debug_windows: ResMut<UiStateDebugWindows>,
     mut ui_state_debug_zone_time: Local<UiStateDebugZoneTime>,
     current_zone: Option<Res<CurrentZone>>,

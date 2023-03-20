@@ -1,7 +1,7 @@
 use bevy::prelude::{
     AssetServer, Assets, Camera3d, Commands, Entity, EventWriter, Local, Query, Res, ResMut, With,
 };
-use bevy_egui::{egui, EguiContext};
+use bevy_egui::{egui, EguiContexts};
 
 use crate::{
     components::ActiveMotion,
@@ -34,7 +34,7 @@ pub fn ui_character_select_system(
     mut commands: Commands,
     mut ui_state: Local<UiCharacterSelectState>,
     mut character_select_state: ResMut<CharacterSelectState>,
-    mut egui_context: ResMut<EguiContext>,
+    mut egui_context: EguiContexts,
     query_camera: Query<Entity, With<Camera3d>>,
     character_list: Option<Res<CharacterList>>,
     asset_server: Res<AssetServer>,
@@ -60,7 +60,9 @@ pub fn ui_character_select_system(
         return;
     };
 
-    let screen_size = egui_context.ctx_mut().input().screen_rect().size();
+    let screen_size = egui_context
+        .ctx_mut()
+        .input(|input| input.screen_rect().size());
 
     if let Some(Widget::Button(button)) = dialog.get_widget_mut(IID_BTN_CANCEL) {
         button.x = screen_size.x / 5.0 - button.width / 2.0;

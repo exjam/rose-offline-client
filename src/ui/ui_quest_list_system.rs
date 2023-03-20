@@ -1,5 +1,5 @@
 use bevy::prelude::{Assets, Local, Query, Res, ResMut, With};
-use bevy_egui::{egui, EguiContext};
+use bevy_egui::{egui, EguiContexts};
 
 use rose_data::Item;
 use rose_game_common::components::QuestState;
@@ -88,7 +88,7 @@ impl Default for UiQuestListState {
 
 pub fn ui_quest_list_system(
     mut ui_state: Local<UiQuestListState>,
-    mut egui_context: ResMut<EguiContext>,
+    mut egui_context: EguiContexts,
     mut ui_state_windows: ResMut<UiStateWindows>,
     query_player: Query<&QuestState, With<PlayerCharacter>>,
     query_player_tooltip: Query<PlayerTooltipQuery, With<PlayerCharacter>>,

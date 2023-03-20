@@ -2,11 +2,9 @@ use std::sync::Arc;
 
 use bevy::{
     math::{Vec2, Vec3Swizzles},
-    prelude::{
-        AssetServer, Assets, Camera3d, Handle, Image, Local, Query, Res, ResMut, Transform, With,
-    },
+    prelude::{AssetServer, Assets, Camera3d, Handle, Image, Local, Query, Res, Transform, With},
 };
-use bevy_egui::{egui, EguiContext};
+use bevy_egui::{egui, EguiContexts};
 
 use rose_data::ZoneId;
 
@@ -74,11 +72,11 @@ fn generate_text_galley(
     text_job.wrap.max_rows = 1;
     text_job.wrap.break_anywhere = true;
 
-    ctx.fonts().layout_job(text_job)
+    ctx.fonts(|fonts| fonts.layout_job(text_job))
 }
 
 pub fn ui_minimap_system(
-    mut egui_context: ResMut<EguiContext>,
+    mut egui_context: EguiContexts,
     mut ui_state: Local<UiStateMinimap>,
     player_position: Query<&Position, With<PlayerCharacter>>,
     asset_server: Res<AssetServer>,
@@ -235,7 +233,7 @@ pub fn ui_minimap_system(
                 let response = ui.allocate_rect(minimap_rect, egui::Sense::click_and_drag());
 
                 if response.dragged() {
-                    let delta = ui.input().pointer.delta();
+                    let delta = ui.input(|input| input.pointer.delta());
                     ui_state.scroll.x -= delta.x;
                     ui_state.scroll.y -= delta.y;
                 } else if player_position_changed {

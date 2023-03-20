@@ -7,7 +7,7 @@ use bevy::{
     render::camera::Projection,
     window::{PrimaryWindow, Window},
 };
-use bevy_egui::EguiContext;
+use bevy_egui::EguiContexts;
 use bevy_rapier3d::prelude::{CollisionGroups, Group, QueryFilter, RapierContext};
 
 use crate::{
@@ -48,7 +48,7 @@ impl Plugin for DebugInspectorPlugin {
 #[allow(clippy::too_many_arguments)]
 fn debug_inspector_picking_system(
     mut debug_inspector_state: ResMut<DebugInspector>,
-    mut egui_ctx: ResMut<EguiContext>,
+    mut egui_ctx: EguiContexts,
     mouse_button_input: Res<Input<MouseButton>>,
     rapier_context: Res<RapierContext>,
     query_window: Query<&Window, With<PrimaryWindow>>,
@@ -59,7 +59,7 @@ fn debug_inspector_picking_system(
         return;
     }
 
-    let window = query_window.get_single() else {
+    let Ok(window) = query_window.get_single() else {
         return;
     };
 

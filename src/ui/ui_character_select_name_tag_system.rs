@@ -1,10 +1,10 @@
-use bevy::prelude::{Camera, Camera3d, GlobalTransform, Query, Res, ResMut, Vec3, With};
-use bevy_egui::{egui, EguiContext};
+use bevy::prelude::{Camera, Camera3d, GlobalTransform, Query, Res, Vec3, With};
+use bevy_egui::{egui, EguiContexts};
 
 use crate::resources::{CharacterList, CharacterSelectState, GameData};
 
 pub fn ui_character_select_name_tag_system(
-    mut egui_context: ResMut<EguiContext>,
+    mut egui_context: EguiContexts,
     query_camera: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
     character_list: Option<Res<CharacterList>>,
     character_select_state: Res<CharacterSelectState>,
@@ -21,7 +21,9 @@ pub fn ui_character_select_name_tag_system(
                     game_data.character_select_positions[index].translation
                         + Vec3::new(0.0, 4.0, 0.0),
                 ) {
-                    let screen_size = egui_context.ctx_mut().input().screen_rect().size();
+                    let screen_size = egui_context
+                        .ctx_mut()
+                        .input(|input| input.screen_rect().size());
 
                     egui::containers::popup::show_tooltip_at(
                         egui_context.ctx_mut(),

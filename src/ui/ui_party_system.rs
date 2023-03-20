@@ -2,7 +2,7 @@ use bevy::{
     ecs::query::WorldQuery,
     prelude::{Assets, Entity, EventReader, Local, Query, Res, ResMut, With},
 };
-use bevy_egui::{egui, EguiContext};
+use bevy_egui::{egui, EguiContexts};
 
 use rose_game_common::{
     components::{AbilityValues, CharacterInfo, HealthPoints, Level},
@@ -94,7 +94,7 @@ impl Default for UiStatePartySystem {
 pub fn ui_party_system(
     mut ui_state: Local<UiStatePartySystem>,
     mut ui_state_windows: ResMut<UiStateWindows>,
-    mut egui_context: ResMut<EguiContext>,
+    mut egui_context: EguiContexts,
     query_player: Query<PlayerQuery>,
     query_party_member: Query<PartyMemberQuery>,
     query_invite: Query<(&ClientEntity, &ClientEntityName)>,

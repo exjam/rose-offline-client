@@ -9,7 +9,7 @@ use bevy::{
     render::camera::Projection,
     window::{PrimaryWindow, Window},
 };
-use bevy_egui::EguiContext;
+use bevy_egui::EguiContexts;
 use bevy_rapier3d::prelude::{CollisionGroups, QueryFilter, RapierContext};
 
 use rose_game_common::components::{ItemDrop, Team};
@@ -36,7 +36,7 @@ pub fn game_mouse_input_system(
     query_window: Query<&Window, With<PrimaryWindow>>,
     query_camera: Query<(&Camera, &Projection, &GlobalTransform), With<Camera3d>>,
     rapier_context: Res<RapierContext>,
-    mut egui_ctx: ResMut<EguiContext>,
+    mut egui_ctx: EguiContexts,
     query_collider_parent: Query<&ColliderParent>,
     query_hit_entity: Query<(
         Option<&Team>,
@@ -55,7 +55,7 @@ pub fn game_mouse_input_system(
         return;
     }
 
-    let Ok(window) = query_window.get_single_mut() else {
+    let Ok(window) = query_window.get_single() else {
         return;
     };
 

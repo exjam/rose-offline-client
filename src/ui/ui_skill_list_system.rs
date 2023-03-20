@@ -1,8 +1,8 @@
 use bevy::{
     ecs::query::WorldQuery,
-    prelude::{Assets, Entity, EventWriter, Local, Query, Res, ResMut, With},
+    prelude::{Assets, EventWriter, Local, Query, Res, ResMut, With},
 };
-use bevy_egui::{egui, EguiContext};
+use bevy_egui::{egui, EguiContexts};
 
 use rose_data::AbilityType;
 use rose_data_irose::{IroseSkillPageType, SKILL_PAGE_SIZE};
@@ -125,7 +125,7 @@ pub struct PlayerQuery<'w> {
 }
 
 pub fn ui_skill_list_system(
-    mut egui_context: ResMut<EguiContext>,
+    mut egui_context: EguiContexts,
     mut ui_state_skill_list: Local<UiStateSkillList>,
     mut ui_state_dnd: ResMut<UiStateDragAndDrop>,
     mut ui_state_windows: ResMut<UiStateWindows>,

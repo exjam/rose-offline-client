@@ -22,14 +22,7 @@ var<uniform> zone_lighting: ZoneLighting;
 var<uniform> zone_lighting: ZoneLighting;
 #endif
 
-fn apply_zone_lighting_fog(world_position: vec4<f32>, fragment_color: vec4<f32>) -> vec4<f32> {
-    let view_z = dot(vec4<f32>(
-        view.inverse_view[0].z,
-        view.inverse_view[1].z,
-        view.inverse_view[2].z,
-        view.inverse_view[3].z
-    ), world_position);
-
+fn apply_zone_lighting_fog(world_position: vec4<f32>, fragment_color: vec4<f32>, view_z: f32) -> vec4<f32> {
     var fog_amount: f32 = clamp(1.0 - exp2(-zone_lighting.fog_density * zone_lighting.fog_density * view_z * view_z * 1.442695), 0.0, 1.0);
 
     if (world_position.y >= zone_lighting.fog_height_offset) {
@@ -47,14 +40,7 @@ fn apply_zone_lighting_fog(world_position: vec4<f32>, fragment_color: vec4<f32>)
     return fog_color;
 }
 
-fn apply_zone_lighting(world_position: vec4<f32>, fragment_color: vec4<f32>) -> vec4<f32> {
-    let view_z = dot(vec4<f32>(
-        view.inverse_view[0].z,
-        view.inverse_view[1].z,
-        view.inverse_view[2].z,
-        view.inverse_view[3].z
-    ), world_position);
-
+fn apply_zone_lighting(world_position: vec4<f32>, fragment_color: vec4<f32>, view_z: f32) -> vec4<f32> {
     var fog_amount: f32 = clamp(1.0 - exp2(-zone_lighting.fog_density * zone_lighting.fog_density * view_z * view_z * 1.442695), 0.0, 1.0);
 
     if (world_position.y >= zone_lighting.fog_height_offset) {
@@ -67,5 +53,5 @@ fn apply_zone_lighting(world_position: vec4<f32>, fragment_color: vec4<f32>) -> 
     let lit_color = vec4<f32>(fragment_color.rgb * zone_lighting.map_ambient_color.rgb, fragment_color.a);
 #endif
 
-    return apply_zone_lighting_fog(world_position, lit_color);
+    return apply_zone_lighting_fog(world_position, lit_color, view_z);
 }

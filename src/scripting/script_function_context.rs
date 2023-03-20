@@ -1,6 +1,6 @@
 use bevy::{
     ecs::{query::WorldQuery, system::SystemParam},
-    prelude::{Entity, EventWriter, Query, With},
+    prelude::{EventWriter, Query, With},
 };
 
 use rose_game_common::components::{

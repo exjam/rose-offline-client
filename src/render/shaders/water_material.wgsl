@@ -48,10 +48,17 @@ struct FragmentInput {
 
 @fragment
 fn fragment(in: FragmentInput) -> @location(0) vec4<f32> {
+    let view_z = dot(vec4<f32>(
+        view.inverse_view[0].z,
+        view.inverse_view[1].z,
+        view.inverse_view[2].z,
+        view.inverse_view[3].z
+    ), in.world_position);
+
     let color1 = textureSample(water_array_texture, water_array_sampler, in.uv0, water_texture_index.current_index);
     let color2 = textureSample(water_array_texture, water_array_sampler, in.uv0, water_texture_index.next_index);
     let water_color = mix(color1, color2, water_texture_index.next_weight);
-    let lit_color = apply_zone_lighting(in.world_position, water_color);
+    let lit_color = apply_zone_lighting(in.world_position, water_color, view_z);
     let srgb_color = pow(lit_color, vec4<f32>(2.2));
     return vec4<f32>(srgb_color.rgb, 1.0);
 }

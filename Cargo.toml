@@ -19,7 +19,7 @@ clap = "3.2"
 cpal = "0.15"
 crossbeam-channel = "0.5"
 directories = "4.0"
-dolly = "=0.4.0"
+dolly = "0.4.1"
 egui = "0.21"
 egui_extras = "0.21"
 enum-map = { version = "2.0", features = ["serde"] }

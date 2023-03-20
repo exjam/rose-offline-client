@@ -2,9 +2,9 @@ use std::sync::Arc;
 
 use bevy::{
     math::Vec3Swizzles,
-    prelude::{Assets, Entity, EventReader, Local, Query, Res, ResMut, With},
+    prelude::{Assets, Entity, EventReader, Local, Query, Res, With},
 };
-use bevy_egui::{egui, EguiContext};
+use bevy_egui::{egui, EguiContexts};
 use rose_file_readers::{ConFile, ConMessageType};
 
 use crate::{
@@ -364,7 +364,7 @@ impl Default for UiConversationDialogState {
 
 pub fn conversation_dialog_system(
     mut current_dialog_state: Local<Option<ConversationDialogState>>,
-    mut egui_context: ResMut<EguiContext>,
+    mut egui_context: EguiContexts,
     mut conversation_dialog_events: EventReader<ConversationDialogEvent>,
     mut lua_function_context: ScriptFunctionContext,
     mut ui_state: Local<UiConversationDialogState>,
@@ -497,24 +497,29 @@ pub fn conversation_dialog_system(
             }
         }
 
-        let fonts = egui_context.ctx_mut().fonts();
-        let message_galley = fonts.layout_job(dialog_state.generated_dialog.message.clone());
+        let (message_galley, num_message_middle, num_response_middles) =
+            egui_context.ctx_mut().fonts(|fonts| {
+                let message_galley =
+                    fonts.layout_job(dialog_state.generated_dialog.message.clone());
 
-        let message_size = message_galley.size();
-        let num_message_middle = ((message_size.y + dialog_sprites.message_middle.height - 1.0)
-            / dialog_sprites.message_middle.height) as usize;
+                let message_size = message_galley.size();
+                let num_message_middle =
+                    ((message_size.y + dialog_sprites.message_middle.height - 1.0)
+                        / dialog_sprites.message_middle.height) as usize;
 
-        let mut response_size_y =
-            (dialog_state.generated_dialog.responses.len().max(1) - 1) as f32 * 5.0;
-        for response in dialog_state.generated_dialog.responses.iter_mut() {
-            let galley = fonts.layout_job(response.text.clone());
-            response_size_y += galley.size().y;
-            response.galley = Some(galley);
-        }
-        let num_response_middles = ((response_size_y + dialog_sprites.answer_middle.height - 1.0)
-            / dialog_sprites.answer_middle.height) as usize;
+                let mut response_size_y =
+                    (dialog_state.generated_dialog.responses.len().max(1) - 1) as f32 * 5.0;
+                for response in dialog_state.generated_dialog.responses.iter_mut() {
+                    let galley = fonts.layout_job(response.text.clone());
+                    response_size_y += galley.size().y;
+                    response.galley = Some(galley);
+                }
+                let num_response_middles =
+                    ((response_size_y + dialog_sprites.answer_middle.height - 1.0)
+                        / dialog_sprites.answer_middle.height) as usize;
 
-        std::mem::drop(fonts);
+                (message_galley, num_message_middle, num_response_middles)
+            });
 
         let dialog_height = dialog.height
             + dialog_sprites.message_top.height
@@ -531,7 +536,9 @@ pub fn conversation_dialog_system(
             .unwrap_or("Event Dialog");
 
         let mut response_close_button = None;
-        let screen_size = egui_context.ctx_mut().input().screen_rect().size();
+        let screen_size = egui_context
+            .ctx_mut()
+            .input(|input| input.screen_rect().size());
         let default_x = screen_size.x / 2.0 - dialog.width / 2.0;
         let default_y = screen_size.y / 2.0 - dialog_height / 2.0;
 
@@ -640,26 +647,26 @@ pub fn conversation_dialog_system(
         }
 
         if selected_response.is_none() {
-            let input = egui_context.ctx_mut().input();
-
-            for (index, &key) in [
-                egui::Key::Num1,
-                egui::Key::Num2,
-                egui::Key::Num3,
-                egui::Key::Num4,
-                egui::Key::Num5,
-                egui::Key::Num6,
-                egui::Key::Num7,
-                egui::Key::Num8,
-                egui::Key::Num9,
-            ]
-            .iter()
-            .enumerate()
-            {
-                if input.key_pressed(key) {
-                    selected_response = Some(index);
+            egui_context.ctx_mut().input(|input| {
+                for (index, &key) in [
+                    egui::Key::Num1,
+                    egui::Key::Num2,
+                    egui::Key::Num3,
+                    egui::Key::Num4,
+                    egui::Key::Num5,
+                    egui::Key::Num6,
+                    egui::Key::Num7,
+                    egui::Key::Num8,
+                    egui::Key::Num9,
+                ]
+                .iter()
+                .enumerate()
+                {
+                    if input.key_pressed(key) {
+                        selected_response = Some(index);
+                    }
                 }
-            }
+            });
         }
 
         if let Some(selected_response) = selected_response {

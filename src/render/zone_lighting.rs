@@ -1,9 +1,12 @@
 use bevy::{
-    ecs::system::{lifetimeless::SRes, SystemParamItem},
+    ecs::{
+        query::ROQueryItem,
+        system::{lifetimeless::SRes, SystemParamItem},
+    },
     math::{Vec3, Vec4},
     prelude::{
-        App, Assets, Commands, Entity, FromWorld, HandleUntyped, Plugin, Res, ResMut, Resource,
-        Shader, World,
+        App, Assets, Commands, FromWorld, HandleUntyped, IntoSystemAppConfig, IntoSystemConfig,
+        Plugin, Res, ResMut, Resource, Shader, World,
     },
     reflect::TypeUuid,
     render::{
@@ -15,7 +18,7 @@ use bevy::{
             ShaderType,
         },
         renderer::{RenderDevice, RenderQueue},
-        Extract, RenderApp,
+        Extract, ExtractSchedule, RenderApp, RenderSet,
     },
 };
 
@@ -209,10 +212,13 @@ fn prepare_uniform_data(
 pub struct SetZoneLightingBindGroup<const I: usize>;
 impl<P: PhaseItem, const I: usize> RenderCommand<P> for SetZoneLightingBindGroup<I> {
     type Param = SRes<ZoneLightingUniformMeta>;
+    type ItemWorldQuery = ();
+    type ViewWorldQuery = ();
 
     fn render<'w>(
-        _view: Entity,
-        _item: Entity,
+        _: &P,
+        _: ROQueryItem<'w, Self::ViewWorldQuery>,
+        _: ROQueryItem<'w, Self::ItemWorldQuery>,
         meta: SystemParamItem<'w, '_, Self::Param>,
         pass: &mut TrackedRenderPass<'w>,
     ) -> RenderCommandResult {
