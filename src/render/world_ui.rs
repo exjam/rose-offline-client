@@ -18,8 +18,8 @@ use bevy::{
         prelude::Shader,
         render_asset::RenderAssets,
         render_phase::{
-            AddRenderCommand, DrawFunctions, EntityRenderCommand, RenderCommandResult, RenderPhase,
-            SetItemPipeline, TrackedRenderPass,
+            AddRenderCommand, DrawFunctions, PhaseItem, RenderCommand, RenderCommandResult,
+            RenderPhase, SetItemPipeline, TrackedRenderPass,
         },
         render_resource::{
             BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout,
@@ -36,7 +36,7 @@ use bevy::{
         renderer::{RenderDevice, RenderQueue},
         texture::{BevyDefault, Image},
         view::{ExtractedView, ViewTarget, ViewUniform, ViewUniformOffset, ViewUniforms},
-        Extract, RenderApp, RenderStage,
+        Extract, RenderApp,
     },
     utils::HashMap,
 };
@@ -60,14 +60,14 @@ impl Plugin for WorldUiRenderPlugin {
 
         if let Ok(render_app) = app.get_sub_app_mut(RenderApp) {
             render_app
-                .add_system_to_stage(RenderStage::Extract, extract_world_ui_rects)
                 .init_resource::<ExtractedWorldUi>()
                 .init_resource::<WorldUiMeta>()
                 .init_resource::<ImageBindGroups>()
                 .add_render_command::<Transparent3d, DrawWorldUi>()
                 .init_resource::<WorldUiPipeline>()
                 .init_resource::<SpecializedRenderPipelines<WorldUiPipeline>>()
-                .add_system_to_stage(RenderStage::Queue, queue_world_ui_meshes);
+                .add_system(extract_world_ui_rects.in_schedule(ExtractSchedule))
+                .add_system(queue_world_ui_meshes.in_set(RenderSet::Queue));
         }
     }
 }
@@ -327,7 +327,7 @@ impl FromWorld for WorldUiPipeline {
 }
 
 pub struct SetWorldUiMaterialBindGroup<const I: usize>;
-impl<const I: usize> EntityRenderCommand for SetWorldUiMaterialBindGroup<I> {
+impl<P: PhaseItem, const I: usize> RenderCommand<P> for SetWorldUiMaterialBindGroup<I> {
     type Param = (SRes<ImageBindGroups>, SQuery<Read<WorldUiBatch>>);
 
     fn render<'w>(
@@ -379,7 +379,7 @@ impl EntityRenderCommand for DrawWorldUiBatch {
 }
 
 struct SetWorldUiViewBindGroup<const I: usize>;
-impl<const I: usize> EntityRenderCommand for SetWorldUiViewBindGroup<I> {
+impl<P: PhaseItem, const I: usize> RenderCommand<P> for SetWorldUiViewBindGroup<I> {
     type Param = (SRes<WorldUiMeta>, SQuery<Read<ViewUniformOffset>>);
 
     fn render<'w>(

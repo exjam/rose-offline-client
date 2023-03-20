@@ -7,7 +7,7 @@ use bevy::{
     },
     reflect::TypeUuid,
     render::{
-        render_phase::{EntityRenderCommand, RenderCommandResult, TrackedRenderPass},
+        render_phase::{PhaseItem, RenderCommand, RenderCommandResult, TrackedRenderPass},
         render_resource::{
             encase, BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout,
             BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType, Buffer,
@@ -15,7 +15,7 @@ use bevy::{
             ShaderType,
         },
         renderer::{RenderDevice, RenderQueue},
-        Extract, RenderApp, RenderStage,
+        Extract, RenderApp,
     },
 };
 
@@ -53,8 +53,8 @@ impl Plugin for ZoneLightingPlugin {
         if let Ok(render_app) = app.get_sub_app_mut(RenderApp) {
             render_app
                 .init_resource::<ZoneLightingUniformMeta>()
-                .add_system_to_stage(RenderStage::Extract, extract_uniform_data)
-                .add_system_to_stage(RenderStage::Prepare, prepare_uniform_data);
+                .add_system(extract_uniform_data.in_schedule(ExtractSchedule))
+                .add_system(prepare_uniform_data.in_set(RenderSet::Prepare));
         }
     }
 }
@@ -207,7 +207,7 @@ fn prepare_uniform_data(
 }
 
 pub struct SetZoneLightingBindGroup<const I: usize>;
-impl<const I: usize> EntityRenderCommand for SetZoneLightingBindGroup<I> {
+impl<P: PhaseItem, const I: usize> RenderCommand<P> for SetZoneLightingBindGroup<I> {
     type Param = SRes<ZoneLightingUniformMeta>;
 
     fn render<'w>(

@@ -26,8 +26,8 @@ use bevy::{
         prelude::Shader,
         render_asset::{PrepareAssetError, RenderAsset, RenderAssetPlugin, RenderAssets},
         render_phase::{
-            AddRenderCommand, DrawFunctions, EntityRenderCommand, RenderCommandResult, RenderPhase,
-            SetItemPipeline, TrackedRenderPass,
+            AddRenderCommand, DrawFunctions, PhaseItem, RenderCommand, RenderCommandResult,
+            RenderPhase, SetItemPipeline, TrackedRenderPass,
         },
         render_resource::{
             encase::{self, ShaderType},
@@ -42,7 +42,7 @@ use bevy::{
         renderer::RenderDevice,
         texture::Image,
         view::{ExtractedView, VisibleEntities},
-        RenderApp, RenderStage,
+        RenderApp, RenderSet,
     },
 };
 
@@ -78,7 +78,7 @@ impl Plugin for ObjectMaterialPlugin {
                 .add_render_command::<AlphaMask3d, DrawObjectMaterial>()
                 .init_resource::<ObjectMaterialPipeline>()
                 .init_resource::<SpecializedMeshPipelines<ObjectMaterialPipeline>>()
-                .add_system_to_stage(RenderStage::Queue, queue_object_material_meshes);
+                .add_system(queue_object_material_meshes.in_set(RenderSet::Queue));
         }
     }
 }
@@ -300,18 +300,18 @@ impl FromWorld for ObjectMaterialPipeline {
 }
 
 pub struct SetObjectMaterialBindGroup<const I: usize>(PhantomData<ObjectMaterial>);
-impl<const I: usize> EntityRenderCommand for SetObjectMaterialBindGroup<I> {
-    type Param = (
-        SRes<RenderAssets<ObjectMaterial>>,
-        SQuery<Read<Handle<ObjectMaterial>>>,
-    );
+impl<P: PhaseItem, const I: usize> RenderCommand<P> for SetObjectMaterialBindGroup<I> {
+    type Param = SRes<RenderAssets<ObjectMaterial>>;
+    type ItemWorldQuery = SQuery<Read<Handle<ObjectMaterial>>>;
+    type ViewWorldQuery = ();
+
     fn render<'w>(
-        _view: Entity,
-        item: Entity,
-        (materials, query): SystemParamItem<'w, '_, Self::Param>,
+        item: &P,
+        _view: (),
+        material_handle: &'_ Handle<ObjectMaterial>,
+        materials: SystemParamItem<'w, '_, Self::Param>,
         pass: &mut TrackedRenderPass<'w>,
     ) -> RenderCommandResult {
-        let material_handle = query.get(item).unwrap();
         let material = materials.into_inner().get(material_handle).unwrap();
         pass.set_bind_group(I, &material.bind_group, &[]);
         RenderCommandResult::Success

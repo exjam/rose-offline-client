@@ -100,7 +100,7 @@ fn ui_add_skill_list_slot(
 
     if let Some(skill_id) = skill {
         response.on_hover_ui(|ui| {
-            let extra = ui.input().pointer.secondary_down();
+            let extra = ui.input(|input| input.pointer.secondary_down());
             ui_add_skill_tooltip(
                 ui,
                 if extra {

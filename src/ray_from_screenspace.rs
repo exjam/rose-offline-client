@@ -2,28 +2,17 @@ use bevy::{
     math::{Mat4, Vec2, Vec3},
     prelude::{Camera, GlobalTransform, Res},
     render::camera::{Projection, RenderTarget},
-    window::{Window, Windows},
+    window::Window,
 };
-
-fn get_window_for_camera<'a>(windows: &'a Windows, camera: &Camera) -> Option<&'a Window> {
-    match camera.target {
-        RenderTarget::Window(window_id) => match windows.get(window_id) {
-            None => None,
-            window => window,
-        },
-        _ => None,
-    }
-}
 
 pub fn ray_from_screenspace(
     cursor_pos_screen: Vec2,
-    windows: &Res<Windows>,
+    window: &Window,
     camera: &Camera,
     camera_projection: &Projection,
     camera_transform: &GlobalTransform,
 ) -> Option<(Vec3, Vec3)> {
     let view = camera_transform.compute_matrix();
-    let window = get_window_for_camera(windows, camera)?;
     let screen_size = Vec2::from([window.width(), window.height()]);
     let projection = camera.projection_matrix();
 

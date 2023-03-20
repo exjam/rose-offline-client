@@ -22,8 +22,8 @@ use bevy::{
         prelude::Shader,
         render_asset::{PrepareAssetError, RenderAsset, RenderAssetPlugin, RenderAssets},
         render_phase::{
-            AddRenderCommand, DrawFunctions, EntityRenderCommand, RenderCommandResult, RenderPhase,
-            SetItemPipeline, TrackedRenderPass,
+            AddRenderCommand, DrawFunctions, PhaseItem, RenderCommand, RenderCommandResult,
+            RenderPhase, SetItemPipeline, TrackedRenderPass,
         },
         render_resource::{
             BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout,
@@ -36,7 +36,7 @@ use bevy::{
         renderer::RenderDevice,
         texture::Image,
         view::{ExtractedView, VisibleEntities},
-        RenderApp, RenderStage,
+        RenderApp,
     },
 };
 
@@ -70,7 +70,7 @@ impl Plugin for TerrainMaterialPlugin {
                 .add_render_command::<Opaque3d, DrawTerrainMaterial>()
                 .init_resource::<TerrainMaterialPipeline>()
                 .init_resource::<SpecializedMeshPipelines<TerrainMaterialPipeline>>()
-                .add_system_to_stage(RenderStage::Queue, queue_terrain_material_meshes);
+                .add_system(queue_terrain_material_meshes.in_set(RenderSet::Queue));
         }
     }
 }
@@ -282,7 +282,7 @@ impl RenderAsset for TerrainMaterial {
 }
 
 pub struct SetTerrainMaterialBindGroup<const I: usize>(PhantomData<TerrainMaterial>);
-impl<const I: usize> EntityRenderCommand for SetTerrainMaterialBindGroup<I> {
+impl<P: PhaseItem, const I: usize> RenderCommand<P> for SetTerrainMaterialBindGroup<I> {
     type Param = (
         SRes<RenderAssets<TerrainMaterial>>,
         SQuery<Read<Handle<TerrainMaterial>>>,

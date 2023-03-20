@@ -12,8 +12,8 @@ use bevy::{
     render::{
         render_asset::RenderAssets,
         render_phase::{
-            AddRenderCommand, DrawFunctions, EntityRenderCommand, RenderCommandResult, RenderPhase,
-            SetItemPipeline, TrackedRenderPass,
+            AddRenderCommand, DrawFunctions, PhaseItem, RenderCommand, RenderCommandResult,
+            RenderPhase, SetItemPipeline, TrackedRenderPass,
         },
         render_resource::*,
         renderer::{RenderDevice, RenderQueue},
@@ -22,7 +22,7 @@ use bevy::{
             ComputedVisibility, ExtractedView, ViewTarget, ViewUniform, ViewUniformOffset,
             ViewUniforms,
         },
-        Extract, RenderApp, RenderStage,
+        Extract, ExtractSchedule, RenderApp, RenderSet,
     },
 };
 use bytemuck::Pod;
@@ -45,9 +45,9 @@ impl Plugin for DamageDigitRenderPlugin {
 
         let render_app = app.sub_app_mut(RenderApp);
         render_app
-            .add_system_to_stage(RenderStage::Extract, extract_damage_digits)
-            .add_system_to_stage(RenderStage::Prepare, prepare_damage_digits)
-            .add_system_to_stage(RenderStage::Queue, queue_damage_digits)
+            .add_system(extract_damage_digits.in_schedule(ExtractSchedule))
+            .add_system(prepare_damage_digits.in_set(RenderSet::Prepare))
+            .add_system(queue_damage_digits.in_set(RenderSet::Queue))
             .init_resource::<DamageDigitPipeline>()
             .init_resource::<DamageDigitMeta>()
             .init_resource::<ExtractedDamageDigits>()
@@ -243,6 +243,7 @@ impl SpecializedRenderPipeline for DamageDigitPipeline {
                 mask: !0,
                 alpha_to_coverage_enabled: false,
             },
+            push_constant_ranges: Vec::default(),
             label: Some("damage_digit_render_pipeline".into()),
         }
     }
@@ -537,19 +538,24 @@ type DrawDamageDigit = (
 );
 
 struct SetDamageDigitViewBindGroup<const I: usize>;
-impl<const I: usize> EntityRenderCommand for SetDamageDigitViewBindGroup<I> {
-    type Param = (SRes<DamageDigitMeta>, SQuery<Read<ViewUniformOffset>>);
+impl<P: PhaseItem, const I: usize> RenderCommand<P> for SetDamageDigitViewBindGroup<I> {
+    type Param = SRes<DamageDigitMeta>;
+    type ViewWorldQuery = Read<ViewUniformOffset>;
+    type ItemWorldQuery = ();
 
     fn render<'w>(
-        view: Entity,
-        _item: Entity,
-        (particle_meta, view_query): SystemParamItem<'w, '_, Self::Param>,
+        _item: &P,
+        view_uniform: &'_ ViewUniformOffset,
+        damage_digit_meta: SystemParamItem<'w, '_, Self::Param>,
         pass: &mut TrackedRenderPass<'w>,
     ) -> RenderCommandResult {
-        let view_uniform = view_query.get(view).unwrap();
         pass.set_bind_group(
             I,
-            particle_meta.into_inner().view_bind_group.as_ref().unwrap(),
+            damage_digit_meta
+                .into_inner()
+                .view_bind_group
+                .as_ref()
+                .unwrap(),
             &[view_uniform.offset],
         );
         RenderCommandResult::Success
@@ -557,18 +563,21 @@ impl<const I: usize> EntityRenderCommand for SetDamageDigitViewBindGroup<I> {
 }
 
 struct SetDamageDigitBindGroup<const I: usize>;
-impl<const I: usize> EntityRenderCommand for SetDamageDigitBindGroup<I> {
+impl<P: PhaseItem, const I: usize> RenderCommand<P> for SetDamageDigitBindGroup<I> {
     type Param = SRes<DamageDigitMeta>;
+    type ViewWorldQuery = ();
+    type ItemWorldQuery = ();
 
     fn render<'w>(
-        _view: Entity,
-        _item: Entity,
-        particle_meta: SystemParamItem<'w, '_, Self::Param>,
+        item: &P,
+        _view: (),
+        _entity: (),
+        damage_digit_meta: SystemParamItem<'w, '_, Self::Param>,
         pass: &mut TrackedRenderPass<'w>,
     ) -> RenderCommandResult {
         pass.set_bind_group(
             I,
-            particle_meta
+            damage_digit_meta
                 .into_inner()
                 .particle_bind_group
                 .as_ref()
@@ -580,16 +589,18 @@ impl<const I: usize> EntityRenderCommand for SetDamageDigitBindGroup<I> {
 }
 
 struct SetDamageDigitMaterialBindGroup<const I: usize>;
-impl<const I: usize> EntityRenderCommand for SetDamageDigitMaterialBindGroup<I> {
-    type Param = (SRes<MaterialBindGroups>, SQuery<Read<DamageDigitBatch>>);
+impl<P: PhaseItem, const I: usize> RenderCommand<P> for SetDamageDigitMaterialBindGroup<I> {
+    type Param = SRes<MaterialBindGroups>;
+    type ViewWorldQuery = ();
+    type ItemWorldQuery = Read<DamageDigitBatch>;
 
     fn render<'w>(
-        _view: Entity,
-        item: Entity,
-        (material_bind_groups, query_batch): SystemParamItem<'w, '_, Self::Param>,
+        item: &P,
+        _view: (),
+        batch: &'_ DamageDigitBatch,
+        material_bind_groups: SystemParamItem<'w, '_, Self::Param>,
         pass: &mut TrackedRenderPass<'w>,
     ) -> RenderCommandResult {
-        let batch = query_batch.get(item).unwrap();
         pass.set_bind_group(
             I,
             material_bind_groups
@@ -604,17 +615,18 @@ impl<const I: usize> EntityRenderCommand for SetDamageDigitMaterialBindGroup<I> 
 }
 
 struct DrawDamageDigitBatch;
-impl EntityRenderCommand for DrawDamageDigitBatch {
-    type Param = SQuery<Read<DamageDigitBatch>>;
+impl<P: PhaseItem> RenderCommand<P> for DrawDamageDigitBatch {
+    type Param = ();
+    type ViewWorldQuery = ();
+    type ItemWorldQuery = Read<DamageDigitBatch>;
 
     #[inline]
     fn render<'w>(
-        _view: Entity,
-        item: Entity,
-        query_batch: SystemParamItem<'w, '_, Self::Param>,
+        item: &P,
+        _view: (),
+        batch: &'_ DamageDigitBatch,
         pass: &mut TrackedRenderPass<'w>,
     ) -> RenderCommandResult {
-        let batch = query_batch.get(item).unwrap();
         let vertex_range = (batch.range.start * 6)..(batch.range.end * 6);
         pass.draw(vertex_range, 0..1);
         RenderCommandResult::Success

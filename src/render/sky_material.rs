@@ -22,8 +22,8 @@ use bevy::{
         prelude::Shader,
         render_asset::{PrepareAssetError, RenderAsset, RenderAssetPlugin, RenderAssets},
         render_phase::{
-            AddRenderCommand, DrawFunctions, EntityRenderCommand, RenderCommandResult, RenderPhase,
-            SetItemPipeline, TrackedRenderPass,
+            AddRenderCommand, DrawFunctions, PhaseItem, RenderCommand, RenderCommandResult,
+            RenderPhase, SetItemPipeline, TrackedRenderPass,
         },
         render_resource::{
             encase::{self, ShaderType},
@@ -37,7 +37,7 @@ use bevy::{
         },
         renderer::{RenderDevice, RenderQueue},
         view::{ExtractedView, VisibleEntities},
-        Extract, RenderApp, RenderStage,
+        Extract, RenderApp,
     },
 };
 
@@ -66,9 +66,9 @@ impl Plugin for SkyMaterialPlugin {
                 .init_resource::<SkyUniformMeta>()
                 .init_resource::<SkyMaterialPipeline>()
                 .init_resource::<SpecializedMeshPipelines<SkyMaterialPipeline>>()
-                .add_system_to_stage(RenderStage::Extract, extract_sky_uniform_data)
-                .add_system_to_stage(RenderStage::Prepare, prepare_sky_uniform_data)
-                .add_system_to_stage(RenderStage::Queue, queue_sky_material_meshes);
+                .add_system(extract_sky_uniform_data.in_schedule(ExtractSchedule))
+                .add_system(prepare_sky_uniform_data.in_set(RenderSet::Prepare))
+                .add_system(queue_sky_material_meshes.in_set(RenderSet::Queue));
         }
     }
 }
@@ -348,7 +348,7 @@ impl RenderAsset for SkyMaterial {
 }
 
 pub struct SetSkyMaterialBindGroup<const I: usize>(PhantomData<SkyMaterial>);
-impl<const I: usize> EntityRenderCommand for SetSkyMaterialBindGroup<I> {
+impl<P: PhaseItem, const I: usize> RenderCommand<P> for SetSkyMaterialBindGroup<I> {
     type Param = (
         SRes<RenderAssets<SkyMaterial>>,
         SQuery<Read<Handle<SkyMaterial>>>,
@@ -367,7 +367,7 @@ impl<const I: usize> EntityRenderCommand for SetSkyMaterialBindGroup<I> {
 }
 
 struct SetTimeBindGroup<const I: usize>;
-impl<const I: usize> EntityRenderCommand for SetTimeBindGroup<I> {
+impl<P: PhaseItem, const I: usize> RenderCommand<P> for SetTimeBindGroup<I> {
     type Param = SRes<SkyUniformMeta>;
 
     fn render<'w>(

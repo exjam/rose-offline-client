@@ -9,7 +9,7 @@ use bevy::{
         MouseButton, Query, Res, ResMut, Resource, State, Transform, Visibility, With,
     },
     render::{camera::Projection, mesh::skinning::SkinnedMesh},
-    window::{CursorGrabMode, Windows},
+    window::{CursorGrabMode, PrimaryWindow, Window},
 };
 use bevy_egui::{egui, EguiContext};
 use bevy_rapier3d::prelude::{CollisionGroups, QueryFilter, RapierContext};
@@ -48,12 +48,12 @@ pub struct CharacterSelectModelList {
 
 pub fn character_select_enter_system(
     mut commands: Commands,
-    mut windows: ResMut<Windows>,
+    mut query_window: Query<&mut Window, With<PrimaryWindow>>,
     query_cameras: Query<Entity, With<Camera3d>>,
     asset_server: Res<AssetServer>,
     game_data: Res<GameData>,
 ) {
-    if let Some(window) = windows.get_primary_mut() {
+    if let Ok(window) = query_window.get_single_mut() {
         window.set_cursor_grab_mode(CursorGrabMode::None);
         window.set_cursor_visibility(true);
     }
@@ -376,11 +376,11 @@ pub fn character_select_input_system(
     mut egui_ctx: ResMut<EguiContext>,
     mouse_button_input: Res<Input<MouseButton>>,
     rapier_context: Res<RapierContext>,
-    windows: Res<Windows>,
     mut last_selected_time: Local<Option<Instant>>,
     query_camera: Query<(&Camera, &Projection, &GlobalTransform), With<Camera3d>>,
     query_collider_parent: Query<&ColliderParent>,
     query_select_character: Query<&CharacterSelectCharacter>,
+    query_window: Query<&Window, With<PrimaryWindow>>,
     mut character_select_events: EventWriter<CharacterSelectEvent>,
 ) {
     if egui_ctx.ctx_mut().wants_pointer_input() {
@@ -398,10 +398,10 @@ pub fn character_select_input_system(
             return;
         };
 
-    let cursor_position =
-        if let Some(cursor_position) = windows.get_primary().and_then(|w| w.cursor_position()) {
-            cursor_position
-        } else {
+    let Ok(window) = query_window.get_single_mut() else {
+    return;
+};
+    let Some(cursor_position) = window.cursor_position() else {
             return;
         };
 
@@ -409,7 +409,7 @@ pub fn character_select_input_system(
         for (camera, camera_projection, camera_transform) in query_camera.iter() {
             if let Some((ray_origin, ray_direction)) = ray_from_screenspace(
                 cursor_position,
-                &windows,
+                window,
                 camera,
                 camera_projection,
                 camera_transform,

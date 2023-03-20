@@ -3,19 +3,19 @@
 
 use bevy::{
     core_pipeline::{bloom::BloomSettings, clear_color::ClearColor},
-    ecs::{event::Events, schedule::ShouldRun},
+    ecs::event::Events,
     log::Level,
     pbr::AmbientLight,
     prelude::{
-        AddAsset, App, AssetServer, Assets, Camera, Camera3dBundle, Color, Commands, CoreStage,
-        DirectionalLight, DirectionalLightBundle, EulerRot, IntoSystemDescriptor, Msaa, Quat, Res,
-        ResMut, StageLabel, StartupStage, State, SystemSet, SystemStage, Transform, Vec3,
+        apply_system_buffers, AddAsset, App, AssetServer, Assets, Camera, Camera3dBundle, Color,
+        Commands, CoreSet, DirectionalLight, DirectionalLightBundle, EulerRot, Msaa, OnEnter,
+        OnExit, Quat, Res, ResMut, StartupSet, State, SystemSet, Transform, Vec3,
     },
     render::{render_resource::WgpuFeatures, settings::WgpuSettings},
-    window::{WindowDescriptor, WindowMode},
+    window::{Window, WindowMode},
 };
 use bevy_egui::{egui, EguiContext};
-use bevy_rapier3d::plugin::PhysicsStages;
+use bevy_rapier3d::plugin::PhysicsSet;
 use enum_map::enum_map;
 use serde::Deserialize;
 use std::{
@@ -409,14 +409,16 @@ pub fn run_zone_viewer(config: &Config, zone_id: Option<ZoneId>) {
     );
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, StageLabel)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
+#[system_set(base)]
 enum GameStages {
-    Network,
     ZoneChange,
+    ZoneChangeFlush,
+    DebugRenderPreFlush,
     DebugRender,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, StageLabel)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
 enum ModelViewerStages {
     Input,
 }
@@ -446,51 +448,44 @@ fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsC
     .insert_resource(AssetServer::new(VfsAssetIo::new(virtual_filesystem)));
 
     // Initialise bevy engine
-    app.insert_resource(Msaa { samples: 4 })
+    app.insert_resource(Msaa::default())
         .insert_resource(ClearColor(Color::rgb(0.70, 0.90, 1.0)))
         .insert_resource(WgpuSettings {
             features: WgpuFeatures::TEXTURE_COMPRESSION_BC,
             ..Default::default()
         })
-        .add_plugin(bevy::log::LogPlugin {
-            level: Level::INFO,
-            filter: "wgpu=error,packets=debug,quest=trace,lua=debug,con=trace,animation=info"
-                .to_string(),
-        })
-        .add_plugin(bevy::core::CorePlugin::default())
-        .add_plugin(bevy::time::TimePlugin::default())
-        .add_plugin(bevy::diagnostic::EntityCountDiagnosticsPlugin::default())
-        .add_plugin(bevy::diagnostic::FrameTimeDiagnosticsPlugin::default())
-        .add_plugin(bevy::transform::TransformPlugin::default())
-        .add_plugin(bevy::hierarchy::HierarchyPlugin::default())
-        .add_plugin(bevy::diagnostic::DiagnosticsPlugin::default())
-        .add_plugin(bevy::input::InputPlugin::default())
-        .add_plugin(bevy::window::WindowPlugin {
-            window: WindowDescriptor {
-                title: "rose-offline-client".to_string(),
-                present_mode: if config.graphics.disable_vsync {
-                    bevy::window::PresentMode::Immediate
-                } else {
-                    bevy::window::PresentMode::Fifo
-                },
-                width: window_width,
-                height: window_height,
-                mode: if matches!(config.graphics.mode, GraphicsModeConfig::Fullscreen) {
-                    WindowMode::BorderlessFullscreen
-                } else {
-                    WindowMode::Windowed
-                },
-                ..Default::default()
-            },
-            ..Default::default()
-        })
-        .add_plugin(bevy::asset::AssetPlugin::default())
-        .add_plugin(bevy::scene::ScenePlugin::default())
-        .add_plugin(bevy::winit::WinitPlugin::default())
-        .add_plugin(bevy::render::RenderPlugin::default())
-        .add_plugin(bevy::render::texture::ImagePlugin::default_linear())
-        .add_plugin(bevy::core_pipeline::CorePipelinePlugin::default())
-        .add_plugin(bevy::pbr::PbrPlugin::default());
+        .add_plugins(
+            bevy::prelude::DefaultPlugins
+                .set(bevy::window::WindowPlugin {
+                    primary_window: Some(Window {
+                        title: "rose-offline-client".to_string(),
+                        present_mode: if config.graphics.disable_vsync {
+                            bevy::window::PresentMode::Immediate
+                        } else {
+                            bevy::window::PresentMode::Fifo
+                        },
+                        resolution: bevy::window::WindowResolution {
+                            physical_width: window_width,
+                            physical_height: window_height,
+                            scale_factor_override: None,
+                            scale_factor: 1.0,
+                        },
+                        mode: if matches!(config.graphics.mode, GraphicsModeConfig::Fullscreen) {
+                            WindowMode::BorderlessFullscreen
+                        } else {
+                            WindowMode::Windowed
+                        },
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                })
+                .set(bevy::log::LogPlugin {
+                    level: Level::INFO,
+                    filter:
+                        "wgpu=error,packets=debug,quest=trace,lua=debug,con=trace,animation=info"
+                            .to_string(),
+                }),
+        );
 
     // Initialise 3rd party bevy plugins
     app.add_plugin(bevy_polyline::PolylinePlugin)
@@ -544,33 +539,51 @@ fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsC
         .add_plugin(DebugInspectorPlugin);
 
     // Setup state
-    app.add_state(app_state);
+    app.add_state::<AppState>()
+        .insert_resource(State::<AppState>(app_state));
 
-    app.init_resource::<Events<AnimationFrameEvent>>()
-        .init_resource::<Events<BankEvent>>()
-        .init_resource::<Events<ChatboxEvent>>()
-        .init_resource::<Events<CharacterSelectEvent>>()
-        .init_resource::<Events<ClanDialogEvent>>()
-        .init_resource::<Events<ClientEntityEvent>>()
-        .init_resource::<Events<ConversationDialogEvent>>()
-        .init_resource::<Events<GameConnectionEvent>>()
-        .init_resource::<Events<HitEvent>>()
-        .init_resource::<Events<LoginEvent>>()
-        .init_resource::<Events<LoadZoneEvent>>()
-        .init_resource::<Events<MessageBoxEvent>>()
-        .init_resource::<Events<NetworkEvent>>()
-        .init_resource::<Events<NumberInputDialogEvent>>()
-        .init_resource::<Events<NpcStoreEvent>>()
-        .init_resource::<Events<PartyEvent>>()
-        .init_resource::<Events<PersonalStoreEvent>>()
-        .init_resource::<Events<PlayerCommandEvent>>()
-        .init_resource::<Events<QuestTriggerEvent>>()
-        .init_resource::<Events<SystemFuncEvent>>()
-        .init_resource::<Events<SpawnEffectEvent>>()
-        .init_resource::<Events<SpawnProjectileEvent>>()
-        .init_resource::<Events<UseItemEvent>>()
-        .init_resource::<Events<WorldConnectionEvent>>()
-        .init_resource::<Events<ZoneEvent>>();
+    app.add_event::<AnimationFrameEvent>()
+        .add_event::<BankEvent>()
+        .add_event::<ChatboxEvent>()
+        .add_event::<CharacterSelectEvent>()
+        .add_event::<ClanDialogEvent>()
+        .add_event::<ClientEntityEvent>()
+        .add_event::<ConversationDialogEvent>()
+        .add_event::<GameConnectionEvent>()
+        .add_event::<HitEvent>()
+        .add_event::<LoginEvent>()
+        .add_event::<LoadZoneEvent>()
+        .add_event::<MessageBoxEvent>()
+        .add_event::<NetworkEvent>()
+        .add_event::<NumberInputDialogEvent>()
+        .add_event::<NpcStoreEvent>()
+        .add_event::<PartyEvent>()
+        .add_event::<PersonalStoreEvent>()
+        .add_event::<PlayerCommandEvent>()
+        .add_event::<QuestTriggerEvent>()
+        .add_event::<SystemFuncEvent>()
+        .add_event::<SpawnEffectEvent>()
+        .add_event::<SpawnProjectileEvent>()
+        .add_event::<UseItemEvent>()
+        .add_event::<WorldConnectionEvent>()
+        .add_event::<ZoneEvent>();
+
+    app.configure_sets(
+        (GameStages::ZoneChange, GameStages::ZoneChangeFlush)
+            .chain()
+            .after(CoreSet::UpdateFlush)
+            .before(PhysicsSet::SyncBackend),
+    );
+
+    app.configure_sets(
+        (GameStages::DebugRenderPreFlush, GameStages::DebugRender)
+            .chain()
+            .after(PhysicsSet::Writeback)
+            .before(CoreSet::PostUpdate),
+    );
+
+    app.add_system(apply_system_buffers.in_base_set(GameStages::ZoneChangeFlush));
+    app.add_system(apply_system_buffers.in_base_set(GameStages::DebugRenderPreFlush));
 
     app.add_system(free_camera_system.label("update_camera"))
         .add_system(orbit_camera_system.label("update_camera"))
@@ -673,29 +686,27 @@ fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsC
 
     // character_model_blink_system in PostUpdate to avoid any conflicts with model destruction
     // e.g. through the character select exit system.
-    app.add_system_to_stage(CoreStage::PostUpdate, character_model_blink_system);
+    app.add_system(character_model_blink_system.after(CoreSet::PostUpdateFlush));
 
     // Run zone change system just before physics sync which is after Update
-    app.add_stage_before(
-        PhysicsStages::SyncBackend,
-        GameStages::ZoneChange,
-        SystemStage::parallel()
-            .with_system(zone_loader_system)
-            .with_system(game_zone_change_system.after(zone_loader_system)),
+    app.add_systems(
+        (
+            zone_loader_system,
+            game_zone_change_system.after(zone_loader_system),
+        )
+            .in_base_set(GameStages::ZoneChange),
     );
 
     // Run debug render stage last after physics update so it has accurate data
     app.add_startup_system(debug_render_polylines_setup_system);
-    app.add_stage_after(
-        PhysicsStages::Writeback,
-        GameStages::DebugRender,
-        SystemStage::parallel()
-            .with_system(debug_render_collider_system.before(debug_render_polylines_update_system))
-            .with_system(debug_render_skeleton_system.before(debug_render_polylines_update_system))
-            .with_system(
-                debug_render_directional_light_system.before(debug_render_polylines_update_system),
-            )
-            .with_system(debug_render_polylines_update_system),
+    app.add_systems(
+        (
+            debug_render_collider_system.before(debug_render_polylines_update_system),
+            debug_render_skeleton_system.before(debug_render_polylines_update_system),
+            debug_render_directional_light_system.before(debug_render_polylines_update_system),
+            debug_render_polylines_update_system,
+        )
+            .in_base_set(GameStages::DebugRender),
     );
 
     // Zone Viewer
@@ -712,18 +723,12 @@ fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsC
     app.add_system_set(
         SystemSet::on_exit(AppState::ModelViewer).with_system(model_viewer_exit_system),
     );
-    app.add_stage_after(
-        CoreStage::Update,
-        ModelViewerStages::Input,
-        SystemStage::parallel()
-            .with_system(model_viewer_system)
-            .with_run_criteria(|state: Res<State<AppState>>| -> ShouldRun {
-                if matches!(state.current(), AppState::ModelViewer) {
-                    ShouldRun::Yes
-                } else {
-                    ShouldRun::No
-                }
-            }),
+    app.add_system(model_viewer_enter_system.in_schedule(OnEnter(AppState::ModelViewer)))
+        .add_system(model_viewer_exit_system.in_schedule(OnExit(AppState::ModelViewer)));
+    app.add_system(
+        model_viewer_system
+            .in_state(AppState::ModelViewer)
+            .in_base_set(GameStages::ZoneChange),
     );
 
     // Game Login
@@ -860,7 +865,7 @@ fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsC
         );
     }
 
-    app.add_system_to_stage(CoreStage::PostUpdate, ui_drag_and_drop_system);
+    app.add_system(ui_drag_and_drop_system.in_base_set(CoreSet::PostUpdate));
 
     // Setup network
     let (network_thread_tx, network_thread_rx) =
@@ -869,16 +874,16 @@ fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsC
     app.insert_resource(NetworkThread::new(network_thread_tx.clone()));
 
     // Run network systems before Update, so we can add/remove entities
-    app.add_stage_before(
-        CoreStage::Update,
-        GameStages::Network,
-        SystemStage::parallel()
-            .with_system(login_connection_system)
-            .with_system(world_connection_system)
-            .with_system(game_connection_system),
+    app.add_systems(
+        (
+            login_connection_system,
+            world_connection_system,
+            game_connection_system,
+        )
+            .in_base_set(CoreSet::PreUpdate),
     );
 
-    app.add_startup_system_to_stage(StartupStage::PostStartup, load_common_game_data);
+    app.add_system(load_common_game_data.in_base_set(StartupSet::PostStartup));
 
     if let Some(app_builder) = systems_config.add_custom_systems.take() {
         app_builder(&mut app);
@@ -886,7 +891,7 @@ fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsC
 
     match config.game.network_version.as_str() {
         "irose" => {
-            app.add_system_to_stage(CoreStage::PostUpdate, network_thread_system);
+            app.add_system(network_thread_system.in_base_set(CoreSet::PostUpdate));
         }
         "custom" => {}
         unknown => panic!("Unknown game network version {}", unknown),

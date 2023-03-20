@@ -4,7 +4,7 @@ use bevy::{
         AssetServer, Camera3d, Commands, Entity, EventReader, EventWriter, Query, Res, ResMut,
         Transform, With,
     },
-    window::{CursorGrabMode, Windows},
+    window::{CursorGrabMode, PrimaryWindow, Window},
 };
 use bevy_egui::{egui, EguiContext};
 
@@ -21,12 +21,12 @@ use crate::{
 pub fn login_state_enter_system(
     mut commands: Commands,
     mut loaded_zone: EventWriter<LoadZoneEvent>,
-    mut windows: ResMut<Windows>,
+    mut query_window: Query<&mut Window, With<PrimaryWindow>>,
     query_cameras: Query<Entity, With<Camera3d>>,
     asset_server: Res<AssetServer>,
 ) {
     // Ensure cursor is not locked
-    if let Some(window) = windows.get_primary_mut() {
+    if let Ok(window) = query_window.get_single_mut() {
         window.set_cursor_grab_mode(CursorGrabMode::None);
         window.set_cursor_visibility(true);
     }

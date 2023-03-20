@@ -22,8 +22,8 @@ use bevy::{
         prelude::Shader,
         render_asset::{PrepareAssetError, RenderAsset, RenderAssetPlugin, RenderAssets},
         render_phase::{
-            AddRenderCommand, DrawFunctions, EntityRenderCommand, RenderCommandResult, RenderPhase,
-            SetItemPipeline, TrackedRenderPass,
+            AddRenderCommand, DrawFunctions, PhaseItem, RenderCommand, RenderCommandResult,
+            RenderPhase, SetItemPipeline, TrackedRenderPass,
         },
         render_resource::{
             encase, AddressMode, BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout,
@@ -36,7 +36,7 @@ use bevy::{
         },
         renderer::{RenderDevice, RenderQueue},
         view::{ExtractedView, VisibleEntities},
-        Extract, RenderApp, RenderStage,
+        Extract, RenderApp,
     },
 };
 
@@ -76,9 +76,9 @@ impl Plugin for WaterMaterialPlugin {
                 .init_resource::<WaterMaterialPipeline>()
                 .insert_resource(WaterUniformMeta { buffer })
                 .init_resource::<SpecializedMeshPipelines<WaterMaterialPipeline>>()
-                .add_system_to_stage(RenderStage::Extract, extract_water_uniform_data)
-                .add_system_to_stage(RenderStage::Prepare, prepare_water_texture_index)
-                .add_system_to_stage(RenderStage::Queue, queue_water_material_meshes);
+                .add_system(extract_water_uniform_data.in_schedule(ExtractSchedule))
+                .add_system(prepare_water_texture_index.in_set(RenderSet::Prepare))
+                .add_system(queue_water_material_meshes.in_set(RenderSet::Queue));
         }
     }
 }
@@ -316,7 +316,7 @@ impl RenderAsset for WaterMaterial {
 }
 
 pub struct SetWaterMaterialBindGroup<const I: usize>(PhantomData<WaterMaterial>);
-impl<const I: usize> EntityRenderCommand for SetWaterMaterialBindGroup<I> {
+impl<P: PhaseItem, const I: usize> RenderCommand<P> for SetWaterMaterialBindGroup<I> {
     type Param = (
         SRes<RenderAssets<WaterMaterial>>,
         SQuery<Read<Handle<WaterMaterial>>>,

@@ -8,7 +8,7 @@ use bevy::{
         Handle, KeyCode, Local, Mesh, Query, Res, ResMut, Time, Transform, Visibility, With,
     },
     render::camera::Projection,
-    window::Windows,
+    window::{PrimaryWindow, Window},
 };
 use bevy_egui::{egui, EguiContext};
 use bevy_rapier3d::{
@@ -103,12 +103,13 @@ pub fn ui_debug_physics_system(
     key_code_input: Res<Input<KeyCode>>,
     rapier_context: Res<RapierContext>,
     time: Res<Time>,
-    windows: Res<Windows>,
+    query_primary_window: Query<&Window, With<PrimaryWindow>>,
     query_camera: Query<(&Camera, &Projection, &GlobalTransform), With<Camera3d>>,
 ) {
     if !ui_state_debug_windows.debug_ui_open {
         return;
     }
+    let window = query_primary_window.single();
 
     egui::Window::new("Physics")
         .open(&mut ui_state_debug_windows.physics_open)
@@ -180,13 +181,13 @@ pub fn ui_debug_physics_system(
 
         ui_state_debug_physics.spawn_timer += time.delta_seconds();
 
-        let cursor_position = windows.primary().cursor_position();
+        let cursor_position = window.cursor_position();
         if let Some(cursor_position) = cursor_position {
             let (camera, camera_projection, camera_transform) = query_camera.single();
 
             if let Some((ray_origin, ray_direction)) = ray_from_screenspace(
                 cursor_position,
-                &windows,
+                window,
                 camera,
                 camera_projection,
                 camera_transform,

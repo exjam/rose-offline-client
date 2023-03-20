@@ -13,8 +13,8 @@ use bevy::{
         primitives::Aabb,
         render_asset::RenderAssets,
         render_phase::{
-            AddRenderCommand, DrawFunctions, EntityRenderCommand, RenderCommandResult, RenderPhase,
-            SetItemPipeline, TrackedRenderPass,
+            AddRenderCommand, DrawFunctions, PhaseItem, RenderCommand, RenderCommandResult,
+            RenderPhase, SetItemPipeline, TrackedRenderPass,
         },
         render_resource::*,
         renderer::{RenderDevice, RenderQueue},
@@ -23,7 +23,7 @@ use bevy::{
             ComputedVisibility, ExtractedView, ViewTarget, ViewUniform, ViewUniformOffset,
             ViewUniforms, VisibilitySystems,
         },
-        Extract, RenderApp, RenderStage,
+        Extract, RenderApp,
     },
 };
 use bytemuck::Pod;
@@ -55,9 +55,9 @@ impl Plugin for ParticleRenderPlugin {
 
         let render_app = app.sub_app_mut(RenderApp);
         render_app
-            .add_system_to_stage(RenderStage::Extract, extract_particles)
-            .add_system_to_stage(RenderStage::Prepare, prepare_particles)
-            .add_system_to_stage(RenderStage::Queue, queue_particles)
+            .add_system(extract_particles.in_schedule(ExtractSchedule))
+            .add_system(prepare_particles.in_set(RenderSet::Prepare))
+            .add_system(queue_particles.in_set(RenderSet::Queue))
             .init_resource::<ParticlePipeline>()
             .init_resource::<ParticleMeta>()
             .init_resource::<ExtractedParticles>()
@@ -697,7 +697,7 @@ type DrawParticle = (
 );
 
 struct SetParticleViewBindGroup<const I: usize>;
-impl<const I: usize> EntityRenderCommand for SetParticleViewBindGroup<I> {
+impl<P: PhaseItem, const I: usize> RenderCommand<P> for SetParticleViewBindGroup<I> {
     type Param = (SRes<ParticleMeta>, SQuery<Read<ViewUniformOffset>>);
 
     fn render<'w>(
@@ -717,7 +717,7 @@ impl<const I: usize> EntityRenderCommand for SetParticleViewBindGroup<I> {
 }
 
 struct SetParticleBindGroup<const I: usize>;
-impl<const I: usize> EntityRenderCommand for SetParticleBindGroup<I> {
+impl<P: PhaseItem, const I: usize> RenderCommand<P> for SetParticleBindGroup<I> {
     type Param = SRes<ParticleMeta>;
 
     fn render<'w>(
@@ -740,7 +740,7 @@ impl<const I: usize> EntityRenderCommand for SetParticleBindGroup<I> {
 }
 
 struct SetParticleMaterialBindGroup<const I: usize>;
-impl<const I: usize> EntityRenderCommand for SetParticleMaterialBindGroup<I> {
+impl<P: PhaseItem, const I: usize> RenderCommand<P> for SetParticleMaterialBindGroup<I> {
     type Param = (SRes<MaterialBindGroups>, SQuery<Read<ParticleBatch>>);
 
     fn render<'w>(

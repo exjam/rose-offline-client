@@ -15,8 +15,8 @@ use bevy::{
     render::{
         render_asset::RenderAssets,
         render_phase::{
-            AddRenderCommand, DrawFunctions, EntityRenderCommand, RenderCommandResult, RenderPhase,
-            SetItemPipeline, TrackedRenderPass,
+            AddRenderCommand, DrawFunctions, PhaseItem, RenderCommand, RenderCommandResult,
+            RenderPhase, SetItemPipeline, TrackedRenderPass,
         },
         render_resource::*,
         renderer::{RenderDevice, RenderQueue},
@@ -25,7 +25,7 @@ use bevy::{
             ComputedVisibility, ExtractedView, ViewTarget, ViewUniform, ViewUniformOffset,
             ViewUniforms,
         },
-        Extract, RenderApp, RenderStage,
+        Extract, RenderApp,
     },
     time::Time,
 };
@@ -47,14 +47,15 @@ impl Plugin for TrailEffectRenderPlugin {
             Shader::from_wgsl(include_str!("shaders/trail_effect.wgsl")),
         );
 
-        app.add_system_to_stage(CoreStage::PostUpdate, initialise_trail_effects)
-            .add_system_to_stage(CoreStage::PostUpdate, update_trail_effects);
+        app.add_systems(
+            (initialise_trail_effects, update_trail_effects).in_base_set(CoreSet::PostUpdate),
+        );
 
         let render_app = app.sub_app_mut(RenderApp);
         render_app
-            .add_system_to_stage(RenderStage::Extract, extract_trail_effects)
-            .add_system_to_stage(RenderStage::Prepare, prepare_trail_effects)
-            .add_system_to_stage(RenderStage::Queue, queue_trail_effects)
+            .add_system(extract_trail_effects.in_schedule(ExtractSchedule))
+            .add_system(prepare_trail_effects.in_set(RenderSet::Prepare))
+            .add_system(queue_trail_effects.in_set(RenderSet::Queue))
             .init_resource::<TrailEffectPipeline>()
             .init_resource::<TrailEffectMeta>()
             .init_resource::<ExtractedTrailEffects>()
@@ -737,7 +738,7 @@ type DrawTrailEffect = (
 );
 
 struct SetTrailEffectViewBindGroup<const I: usize>;
-impl<const I: usize> EntityRenderCommand for SetTrailEffectViewBindGroup<I> {
+impl<P: PhaseItem, const I: usize> RenderCommand<P> for SetTrailEffectViewBindGroup<I> {
     type Param = (SRes<TrailEffectMeta>, SQuery<Read<ViewUniformOffset>>);
 
     fn render<'w>(
@@ -761,7 +762,7 @@ impl<const I: usize> EntityRenderCommand for SetTrailEffectViewBindGroup<I> {
 }
 
 struct SetTrailEffectMaterialBindGroup<const I: usize>;
-impl<const I: usize> EntityRenderCommand for SetTrailEffectMaterialBindGroup<I> {
+impl<P: PhaseItem, const I: usize> RenderCommand<P> for SetTrailEffectMaterialBindGroup<I> {
     type Param = (SRes<MaterialBindGroups>, SQuery<Read<TrailEffectBatch>>);
 
     fn render<'w>(

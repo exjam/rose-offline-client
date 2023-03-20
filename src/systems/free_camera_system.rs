@@ -6,8 +6,9 @@ use bevy::{
     math::{Quat, Vec2, Vec3},
     prelude::{
         Component, EventReader, KeyCode, Local, MouseButton, Query, Res, ResMut, Time, Transform,
+        With,
     },
-    window::{CursorGrabMode, Windows},
+    window::{CursorGrabMode, PrimaryWindow, Window},
 };
 use bevy_egui::EguiContext;
 use dolly::prelude::{CameraRig, LeftHanded, Position, Smooth, YawPitch};
@@ -49,12 +50,10 @@ pub fn free_camera_system(
     mut mouse_wheel_reader: EventReader<MouseWheel>,
     keyboard: Res<Input<KeyCode>>,
     mouse_buttons: Res<Input<MouseButton>>,
-    mut windows: ResMut<Windows>,
+    mut query_window: Query<&mut Window, With<PrimaryWindow>>,
     mut egui_ctx: ResMut<EguiContext>,
 ) {
-    let window = if let Some(window) = windows.get_primary_mut() {
-        window
-    } else {
+    let Some(window) = query_window.get_single_mut() else {
         return;
     };
 

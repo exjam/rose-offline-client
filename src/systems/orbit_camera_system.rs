@@ -6,9 +6,9 @@ use bevy::{
     math::{Quat, Vec2, Vec3},
     prelude::{
         Component, Entity, EventReader, GlobalTransform, Local, MouseButton, Query, Res, ResMut,
-        Time, Transform,
+        Time, Transform, With,
     },
-    window::{CursorGrabMode, Windows},
+    window::{CursorGrabMode, PrimaryWindow, Window},
 };
 use bevy_egui::EguiContext;
 use bevy_rapier3d::{
@@ -65,15 +65,13 @@ pub fn orbit_camera_system(
     query_global_transform: Query<&GlobalTransform>,
     mut mouse_motion_events: EventReader<MouseMotion>,
     mut mouse_wheel_reader: EventReader<MouseWheel>,
-    mut windows: ResMut<Windows>,
+    mut query_window: Query<&mut Window, With<PrimaryWindow>>,
     mut egui_ctx: ResMut<EguiContext>,
     mouse_buttons: Res<Input<MouseButton>>,
     time: Res<Time>,
     rapier_context: Res<RapierContext>,
 ) {
-    let window = if let Some(window) = windows.get_primary_mut() {
-        window
-    } else {
+    let Ok(window) = query_window.get_single_mut() else {
         return;
     };
 
@@ -83,7 +81,7 @@ pub fn orbit_camera_system(
         if control_state.is_dragging {
             // Restore cursor state
             if let Some(saved_cursor_position) = control_state.saved_cursor_position.take() {
-                window.set_cursor_position(saved_cursor_position);
+                window.set_cursor_position(Some(saved_cursor_position));
             }
 
             window.set_cursor_grab_mode(CursorGrabMode::None);
@@ -131,7 +129,7 @@ pub fn orbit_camera_system(
     } else {
         if control_state.is_dragging {
             if let Some(saved_cursor_position) = control_state.saved_cursor_position.take() {
-                window.set_cursor_position(saved_cursor_position);
+                window.set_cursor_position(Some(saved_cursor_position));
             }
 
             window.set_cursor_grab_mode(CursorGrabMode::None);

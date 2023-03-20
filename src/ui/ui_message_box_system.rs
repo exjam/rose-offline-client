@@ -111,7 +111,7 @@ pub fn ui_message_box_system(
             .interactable(true)
             .fixed_pos(egui::Pos2::ZERO)
             .show(egui_context.ctx_mut(), |ui| {
-                let interceptor_rect = ui.ctx().input().screen_rect();
+                let interceptor_rect = ui.ctx().input(|input| input.screen_rect());
 
                 ui.allocate_response(interceptor_rect.size(), egui::Sense::click_and_drag());
                 ui.allocate_ui_at_rect(interceptor_rect, |ui| {
