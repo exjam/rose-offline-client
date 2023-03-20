@@ -2,7 +2,7 @@ use bevy::prelude::{
     Commands, ComputedVisibility, DespawnRecursiveExt, Entity, EventWriter, GlobalTransform, Local,
     Query, Res, ResMut, Transform, Visibility, With,
 };
-use bevy_egui::{egui, EguiContext};
+use bevy_egui::{egui, EguiContexts};
 use regex::Regex;
 
 use rose_data::EffectFileId;
@@ -23,7 +23,7 @@ pub struct UiStateDebugEffectList {
 
 pub fn ui_debug_effect_list_system(
     mut commands: Commands,
-    mut egui_context: ResMut<EguiContext>,
+    mut egui_context: EguiContexts,
     mut ui_state: Local<UiStateDebugEffectList>,
     mut ui_state_debug_windows: ResMut<UiStateDebugWindows>,
     game_data: Res<GameData>,

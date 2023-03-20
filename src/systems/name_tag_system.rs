@@ -14,9 +14,9 @@ use bevy::{
         view::NoFrustumCulling,
     },
     utils::HashMap,
-    window::WindowId,
+    window::PrimaryWindow,
 };
-use bevy_egui::{egui, EguiContext};
+use bevy_egui::{egui, EguiContexts};
 
 use rose_game_common::components::{Level, Npc, Team};
 
@@ -104,7 +104,7 @@ pub fn get_monster_name_tag_color(
 
 fn create_pending_nametag(
     name_tag_settings: &NameTagSettings,
-    egui_context: &mut EguiContext,
+    egui_context: &mut EguiContexts,
     object: &NameTagObjectQueryItem,
     player: Option<&PlayerQueryItem>,
     name_tag_type: NameTagType,
@@ -178,7 +178,9 @@ fn create_pending_nametag(
             Color::rgb_linear(r, g, b)
         })
         .collect();
-    let galley = egui_context.ctx_mut().fonts().layout_job(layout_job);
+    let galley = egui_context
+        .ctx_mut()
+        .fonts(|fonts| fonts.layout_job(layout_job));
 
     NameTagPendingData {
         galley,
@@ -188,7 +190,8 @@ fn create_pending_nametag(
 }
 
 fn create_nametag_data(
-    egui_context: &mut EguiContext,
+    window_entity: Entity,
+    egui_context: &mut EguiContexts,
     egui_managed_textures: &bevy_egui::EguiManagedTextures,
     images: &mut Assets<Image>,
     pending_data: NameTagPendingData,
@@ -234,7 +237,7 @@ fn create_nametag_data(
         };
         if let Some(managed_texture) = egui_managed_textures
             .0
-            .get(&(WindowId::primary(), font_texture_id))
+            .get(&(window_entity, font_texture_id))
         {
             font_source_textures.push(&managed_texture.color_image);
         } else {
@@ -386,8 +389,9 @@ pub fn name_tag_system(
     query_changed: Query<(Entity, Option<&NameTagEntity>), Changed<ClientEntityName>>,
     query_player: Query<PlayerQuery, With<PlayerCharacter>>,
     query_nametags: Query<(Entity, &NameTagEntity)>,
+    query_window: Query<Entity, With<PrimaryWindow>>,
     egui_managed_textures: Res<bevy_egui::EguiManagedTextures>,
-    mut egui_context: ResMut<EguiContext>,
+    mut egui_context: EguiContexts,
     mut images: ResMut<Assets<Image>>,
     game_data: Res<GameData>,
     ui_resources: Res<UiResources>,
@@ -396,6 +400,9 @@ pub fn name_tag_system(
 ) {
     let player = query_player.get_single().ok();
     let pixels_per_point = egui_context.ctx_mut().pixels_per_point();
+    let Ok(window_entity) = query_window.get_single() else {
+        return;
+    };
 
     if load_zone_events.iter().last().is_some()
         || pixels_per_point != name_tag_cache.pixels_per_point
@@ -447,6 +454,7 @@ pub fn name_tag_system(
             name_tag_data
         } else if let Some(pending_name_tag_data) = name_tag_cache.pending.remove(&object.entity) {
             if let Some(name_tag_data) = create_nametag_data(
+                window_entity,
                 &mut egui_context,
                 &egui_managed_textures,
                 &mut images,
@@ -480,8 +488,10 @@ pub fn name_tag_system(
         let name_tag_entity = commands
             .spawn((
                 NameTag { name_tag_type },
-                Visibility {
-                    is_visible: name_tag_settings.show_all[name_tag_type],
+                if name_tag_settings.show_all[name_tag_type] {
+                    Visibility::Inherited
+                } else {
+                    Visibility::Hidden
                 },
                 ComputedVisibility::default(),
                 Transform::from_translation(Vec3::new(0.0, object.model_height.height, 0.0)),
@@ -627,9 +637,9 @@ pub fn name_tag_system(
             });
         }
 
-        commands.entity(name_tag_entity).add_children(|builder| {
-            for rect in name_tag_data.rects.iter() {
-                builder.spawn((
+        for rect in name_tag_data.rects.iter() {
+            commands
+                .spawn((
                     NameTagName,
                     rect.clone(),
                     Transform::default(),
@@ -637,35 +647,41 @@ pub fn name_tag_system(
                     Visibility::default(),
                     ComputedVisibility::default(),
                     NoFrustumCulling,
-                ));
-            }
+                ))
+                .set_parent(name_tag_entity);
+        }
 
-            for rect in target_marks.drain(..) {
-                builder.spawn((
+        for rect in target_marks.drain(..) {
+            commands
+                .spawn((
                     NameTagTargetMark,
                     rect,
                     Transform::default(),
                     GlobalTransform::default(),
-                    Visibility { is_visible: false },
+                    Visibility::Hidden,
                     ComputedVisibility::default(),
                     NoFrustumCulling,
-                ));
-            }
+                ))
+                .set_parent(name_tag_entity);
+        }
 
-            if let Some(rect) = healthbar_bg_rect.take() {
-                builder.spawn((
+        if let Some(rect) = healthbar_bg_rect.take() {
+            commands
+                .spawn((
                     NameTagHealthbarBackground,
                     rect,
                     Transform::default(),
                     GlobalTransform::default(),
-                    Visibility { is_visible: false },
+                    Visibility::Hidden,
                     ComputedVisibility::default(),
                     NoFrustumCulling,
-                ));
-            }
+                ))
+                .set_parent(name_tag_entity);
+        }
 
-            if let Some(rect) = healthbar_fg_rect.take() {
-                builder.spawn((
+        if let Some(rect) = healthbar_fg_rect.take() {
+            commands
+                .spawn((
                     NameTagHealthbarForeground {
                         full_width: health_bar_size.x,
                         uv_min_x: health_bar_foreground_uv_x_bounds.0,
@@ -674,12 +690,12 @@ pub fn name_tag_system(
                     rect,
                     Transform::default(),
                     GlobalTransform::default(),
-                    Visibility { is_visible: false },
+                    Visibility::Hidden,
                     ComputedVisibility::default(),
                     NoFrustumCulling,
-                ));
-            }
-        });
+                ))
+                .set_parent(name_tag_entity);
+        }
 
         commands
             .entity(object.entity)

@@ -1176,10 +1176,7 @@ fn spawn_object(
                 ComputedVisibility::default(),
                 NotShadowCaster,
                 ColliderParent::new(object_entity),
-                AsyncCollider {
-                    handle: mesh,
-                    shape: ComputedColliderShape::TriMesh,
-                },
+                AsyncCollider(ComputedColliderShape::TriMesh),
                 CollisionGroups::new(collision_group, collision_filter),
             ));
 
@@ -1321,17 +1318,14 @@ fn spawn_animated_object(
                 motion_path: motion_path.to_string(),
                 texture_path: texture_path.to_string(),
             }),
-            mesh.clone(),
+            mesh,
             material,
             object_transform,
             NotShadowCaster,
             GlobalTransform::default(),
             Visibility::default(),
             ComputedVisibility::default(),
-            AsyncCollider {
-                handle: mesh,
-                shape: ComputedColliderShape::TriMesh,
-            },
+            AsyncCollider(ComputedColliderShape::TriMesh),
             CollisionGroups::new(COLLISION_GROUP_ZONE_OBJECT, COLLISION_FILTER_INSPECTABLE),
         ))
         .id()

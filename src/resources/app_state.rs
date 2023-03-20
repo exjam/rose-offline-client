@@ -1,7 +1,8 @@
-use bevy::prelude::Resource;
+use bevy::prelude::States;
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Resource)]
+#[derive(Debug, Default, Copy, Clone, Eq, PartialEq, Hash, States)]
 pub enum AppState {
+    #[default]
     GameLogin,
     GameCharacterSelect,
     Game,

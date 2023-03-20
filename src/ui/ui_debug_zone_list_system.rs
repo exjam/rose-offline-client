@@ -1,5 +1,5 @@
 use bevy::prelude::{EventWriter, Local, Res, ResMut, State};
-use bevy_egui::{egui, EguiContext};
+use bevy_egui::{egui, EguiContexts};
 use regex::Regex;
 
 use rose_data::ZoneId;
@@ -29,7 +29,7 @@ impl Default for UiDebugZoneListState {
 
 #[allow(clippy::too_many_arguments)]
 pub fn ui_debug_zone_list_system(
-    mut egui_context: ResMut<EguiContext>,
+    mut egui_context: EguiContexts,
     mut ui_state: Local<UiDebugZoneListState>,
     mut ui_state_debug_windows: ResMut<UiStateDebugWindows>,
     mut load_zone_events: EventWriter<LoadZoneEvent>,
@@ -58,7 +58,7 @@ pub fn ui_debug_zone_list_system(
                     }
                     ui.end_row();
 
-                    if matches!(app_state.current(), AppState::ZoneViewer) {
+                    if matches!(app_state.0, AppState::ZoneViewer) {
                         ui.label("Despawn other zones:");
                         ui.checkbox(&mut ui_state.despawn_other_zones, "Despawn");
                         ui.end_row();
@@ -127,7 +127,7 @@ pub fn ui_debug_zone_list_system(
                                 ui.label(zone_data.name);
                             });
 
-                            row.col(|ui| match app_state.current() {
+                            row.col(|ui| match app_state.0 {
                                 AppState::Game => {
                                     if ui.button("Teleport").clicked() {
                                         if let Some(game_connection) = game_connection.as_ref() {

@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
-use bevy::prelude::{Camera, Camera3d, GlobalTransform, Local, Query, Res, ResMut, Vec2, With};
-use bevy_egui::{egui, EguiContext};
+use bevy::prelude::{Camera, Camera3d, GlobalTransform, Local, Query, Res, Vec2, With};
+use bevy_egui::{egui, EguiContexts};
 
 use rose_data::Item;
 use rose_game_common::components::{DroppedItem, ItemDrop};
@@ -16,7 +16,7 @@ pub struct ItemDropName {
 }
 
 pub fn ui_item_drop_name_system(
-    mut egui_context: ResMut<EguiContext>,
+    mut egui_context: EguiContexts,
     query_camera: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
     query_item_drop: Query<(&ItemDrop, &GlobalTransform)>,
     game_data: Res<GameData>,
@@ -24,7 +24,7 @@ pub fn ui_item_drop_name_system(
 ) {
     let ctx = egui_context.ctx_mut();
     let style = ctx.style();
-    let screen_size = ctx.input().screen_rect().size();
+    let screen_size = ctx.input(|input| input.screen_rect().size());
     let tooltip_painter = ctx.layer_painter(egui::LayerId::new(
         egui::Order::Background,
         egui::Id::new("item_drop_tooltips"),
@@ -69,9 +69,9 @@ pub fn ui_item_drop_name_system(
             DroppedItem::Money(money) => (format!("{} Zuly", money.0), egui::Color32::YELLOW),
         };
 
-        let galley =
-            ctx.fonts()
-                .layout_no_wrap(text, egui::FontSelection::Default.resolve(&style), colour);
+        let galley = ctx.fonts(|fonts| {
+            fonts.layout_no_wrap(text, egui::FontSelection::Default.resolve(&style), colour)
+        });
         let pos = egui::pos2(
             screen_pos.x - galley.rect.width() / 2.0,
             screen_size.y - screen_pos.y,

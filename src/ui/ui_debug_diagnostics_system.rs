@@ -2,12 +2,12 @@ use bevy::{
     diagnostic::Diagnostics,
     prelude::{Res, ResMut},
 };
-use bevy_egui::{egui, EguiContext};
+use bevy_egui::{egui, EguiContexts};
 
 use crate::ui::UiStateDebugWindows;
 
 pub fn ui_debug_diagnostics_system(
-    mut egui_context: ResMut<EguiContext>,
+    mut egui_context: EguiContexts,
     ui_state_debug_windows: ResMut<UiStateDebugWindows>,
     diagnostics: Res<Diagnostics>,
 ) {

@@ -64,7 +64,7 @@ pub struct ZoneObjectTerrain {
     pub block_y: u32,
 }
 
-#[derive(Clone, Component, Reflect, FromReflect)]
+#[derive(Clone, Component, Default, Reflect, FromReflect)]
 pub enum ZoneObject {
     AnimatedObject(ZoneObjectAnimatedObject),
     WarpObject(ZoneObjectId),
@@ -76,11 +76,6 @@ pub enum ZoneObject {
     DecoObject(ZoneObjectId),
     DecoObjectPart(ZoneObjectPart),
     Terrain(ZoneObjectTerrain),
+    #[default]
     Water,
-}
-
-impl Default for ZoneObject {
-    fn default() -> Self {
-        ZoneObject::Water
-    }
 }

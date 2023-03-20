@@ -25,6 +25,7 @@ const EVENING_FOG_DENSITY: f32 = 0.0022;
 const NIGHT_FOG_COLOR: Vec3 = Vec3::new(10.0 / 255.0, 10.0 / 255.0, 10.0 / 255.0);
 const NIGHT_FOG_DENSITY: f32 = 0.0020;
 
+// TODO: Now that we have Visibility::Inherited, this probably does not need to be recursive ?
 fn set_visible_recursive(
     is_visible: bool,
     entity: Entity,
@@ -32,7 +33,11 @@ fn set_visible_recursive(
     query_children: &Query<&Children>,
 ) {
     if let Ok(mut visibility) = query_visibility.get_mut(entity) {
-        visibility.is_visible = is_visible;
+        if is_visible {
+            *visibility = Visibility::Inherited;
+        } else {
+            *visibility = Visibility::Hidden;
+        }
     }
 
     if let Ok(children) = query_children.get(entity) {

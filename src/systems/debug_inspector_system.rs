@@ -5,9 +5,9 @@ use bevy::{
         With,
     },
     render::camera::Projection,
-    window::Windows,
+    window::{PrimaryWindow, Window},
 };
-use bevy_egui::EguiContext;
+use bevy_egui::EguiContexts;
 use bevy_rapier3d::prelude::{CollisionGroups, Group, QueryFilter, RapierContext};
 
 use crate::{
@@ -48,10 +48,10 @@ impl Plugin for DebugInspectorPlugin {
 #[allow(clippy::too_many_arguments)]
 fn debug_inspector_picking_system(
     mut debug_inspector_state: ResMut<DebugInspector>,
-    mut egui_ctx: ResMut<EguiContext>,
+    mut egui_ctx: EguiContexts,
     mouse_button_input: Res<Input<MouseButton>>,
     rapier_context: Res<RapierContext>,
-    windows: Res<Windows>,
+    query_window: Query<&Window, With<PrimaryWindow>>,
     query_camera: Query<(&Camera, &Projection, &GlobalTransform), With<Camera3d>>,
 ) {
     if !debug_inspector_state.enable_picking {
@@ -59,7 +59,11 @@ fn debug_inspector_picking_system(
         return;
     }
 
-    let cursor_position = windows.primary().cursor_position();
+    let Ok(window) = query_window.get_single() else {
+        return;
+    };
+
+    let cursor_position = window.cursor_position();
     if cursor_position.is_none() || egui_ctx.ctx_mut().wants_pointer_input() {
         // Mouse not in window, or is over UI
         return;
@@ -70,7 +74,7 @@ fn debug_inspector_picking_system(
         for (camera, camera_projection, camera_transform) in query_camera.iter() {
             if let Some((ray_origin, ray_direction)) = ray_from_screenspace(
                 cursor_position,
-                &windows,
+                window,
                 camera,
                 camera_projection,
                 camera_transform,

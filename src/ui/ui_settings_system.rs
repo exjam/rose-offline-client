@@ -1,5 +1,5 @@
 use bevy::prelude::{Local, Query, ResMut};
-use bevy_egui::{egui, EguiContext};
+use bevy_egui::{egui, EguiContexts};
 
 use crate::{
     audio::SoundGain, components::SoundCategory, resources::SoundSettings, ui::UiStateWindows,
@@ -23,7 +23,7 @@ impl Default for UiStateSettings {
 }
 
 pub fn ui_settings_system(
-    mut egui_context: ResMut<EguiContext>,
+    mut egui_context: EguiContexts,
     mut ui_state_windows: ResMut<UiStateWindows>,
     mut ui_state_settings: Local<UiStateSettings>,
     mut sound_settings: ResMut<SoundSettings>,

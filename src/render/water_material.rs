@@ -3,17 +3,20 @@ use std::marker::PhantomData;
 use bevy::{
     asset::Handle,
     core_pipeline::core_3d::Transparent3d,
-    ecs::system::{
-        lifetimeless::{Read, SQuery, SRes},
-        SystemParamItem,
+    ecs::{
+        query::ROQueryItem,
+        system::{
+            lifetimeless::{Read, SRes},
+            SystemParamItem,
+        },
     },
     pbr::{
         DrawMesh, MeshPipeline, MeshPipelineKey, MeshUniform, SetMeshBindGroup,
         SetMeshViewBindGroup,
     },
     prelude::{
-        error, AddAsset, App, Assets, Commands, Entity, FromWorld, HandleUntyped, Mesh, Msaa,
-        Plugin, Query, Res, ResMut, Resource, Time, World,
+        error, AddAsset, App, Assets, Commands, FromWorld, HandleUntyped, IntoSystemAppConfig,
+        IntoSystemConfig, Mesh, Msaa, Plugin, Query, Res, ResMut, Resource, Time, World,
     },
     reflect::TypeUuid,
     render::{
@@ -22,8 +25,8 @@ use bevy::{
         prelude::Shader,
         render_asset::{PrepareAssetError, RenderAsset, RenderAssetPlugin, RenderAssets},
         render_phase::{
-            AddRenderCommand, DrawFunctions, EntityRenderCommand, RenderCommandResult, RenderPhase,
-            SetItemPipeline, TrackedRenderPass,
+            AddRenderCommand, DrawFunctions, PhaseItem, RenderCommand, RenderCommandResult,
+            RenderPhase, SetItemPipeline, TrackedRenderPass,
         },
         render_resource::{
             encase, AddressMode, BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout,
@@ -36,7 +39,7 @@ use bevy::{
         },
         renderer::{RenderDevice, RenderQueue},
         view::{ExtractedView, VisibleEntities},
-        Extract, RenderApp, RenderStage,
+        Extract, ExtractSchedule, RenderApp, RenderSet,
     },
 };
 
@@ -76,9 +79,9 @@ impl Plugin for WaterMaterialPlugin {
                 .init_resource::<WaterMaterialPipeline>()
                 .insert_resource(WaterUniformMeta { buffer })
                 .init_resource::<SpecializedMeshPipelines<WaterMaterialPipeline>>()
-                .add_system_to_stage(RenderStage::Extract, extract_water_uniform_data)
-                .add_system_to_stage(RenderStage::Prepare, prepare_water_texture_index)
-                .add_system_to_stage(RenderStage::Queue, queue_water_material_meshes);
+                .add_system(extract_water_uniform_data.in_schedule(ExtractSchedule))
+                .add_system(prepare_water_texture_index.in_set(RenderSet::Prepare))
+                .add_system(queue_water_material_meshes.in_set(RenderSet::Queue));
         }
     }
 }
@@ -169,12 +172,10 @@ impl SpecializedMeshPipeline for WaterMaterialPipeline {
             .unwrap()
             .depth_write_enabled = false;
 
-        descriptor.layout = Some(vec![
-            self.mesh_pipeline.view_layout.clone(),
-            self.material_layout.clone(),
-            self.mesh_pipeline.mesh_layout.clone(),
-            self.zone_lighting_layout.clone(),
-        ]);
+        descriptor.layout.insert(1, self.material_layout.clone());
+        descriptor
+            .layout
+            .insert(3, self.zone_lighting_layout.clone());
 
         let vertex_layout = layout.get_layout(&[
             Mesh::ATTRIBUTE_POSITION.at_shader_location(0),
@@ -316,18 +317,18 @@ impl RenderAsset for WaterMaterial {
 }
 
 pub struct SetWaterMaterialBindGroup<const I: usize>(PhantomData<WaterMaterial>);
-impl<const I: usize> EntityRenderCommand for SetWaterMaterialBindGroup<I> {
-    type Param = (
-        SRes<RenderAssets<WaterMaterial>>,
-        SQuery<Read<Handle<WaterMaterial>>>,
-    );
+impl<P: PhaseItem, const I: usize> RenderCommand<P> for SetWaterMaterialBindGroup<I> {
+    type Param = SRes<RenderAssets<WaterMaterial>>;
+    type ViewWorldQuery = ();
+    type ItemWorldQuery = Read<Handle<WaterMaterial>>;
+
     fn render<'w>(
-        _view: Entity,
-        item: Entity,
-        (materials, query): SystemParamItem<'w, '_, Self::Param>,
+        _: &P,
+        _: ROQueryItem<'w, Self::ViewWorldQuery>,
+        material_handle: ROQueryItem<'w, Self::ItemWorldQuery>,
+        materials: SystemParamItem<'w, '_, Self::Param>,
         pass: &mut TrackedRenderPass<'w>,
     ) -> RenderCommandResult {
-        let material_handle = query.get(item).unwrap();
         let material = materials.into_inner().get(material_handle).unwrap();
         pass.set_bind_group(I, &material.bind_group, &[]);
         RenderCommandResult::Success
@@ -348,7 +349,7 @@ pub fn queue_water_material_meshes(
     transparent_draw_functions: Res<DrawFunctions<Transparent3d>>,
     material_pipeline: Res<WaterMaterialPipeline>,
     mut pipelines: ResMut<SpecializedMeshPipelines<WaterMaterialPipeline>>,
-    mut pipeline_cache: ResMut<PipelineCache>,
+    pipeline_cache: Res<PipelineCache>,
     msaa: Res<Msaa>,
     render_meshes: Res<RenderAssets<Mesh>>,
     render_materials: Res<RenderAssets<WaterMaterial>>,
@@ -366,8 +367,8 @@ pub fn queue_water_material_meshes(
             .unwrap();
 
         let rangefinder = view.rangefinder3d();
-        let view_key =
-            MeshPipelineKey::from_msaa_samples(msaa.samples) | MeshPipelineKey::from_hdr(view.hdr);
+        let view_key = MeshPipelineKey::from_msaa_samples(msaa.samples())
+            | MeshPipelineKey::from_hdr(view.hdr);
 
         for visible_entity in &visible_entities.entities {
             if let Ok((material_handle, mesh_handle, mesh_uniform)) =
@@ -377,11 +378,11 @@ pub fn queue_water_material_meshes(
                     if let Some(mesh) = render_meshes.get(mesh_handle) {
                         let mesh_key =
                             MeshPipelineKey::from_primitive_topology(mesh.primitive_topology)
-                                | MeshPipelineKey::TRANSPARENT_MAIN_PASS
+                                | MeshPipelineKey::BLEND_ALPHA
                                 | view_key;
 
                         let pipeline_id = pipelines.specialize(
-                            &mut pipeline_cache,
+                            &pipeline_cache,
                             &material_pipeline,
                             mesh_key,
                             &mesh.layout,

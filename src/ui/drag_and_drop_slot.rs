@@ -317,8 +317,7 @@ impl<'w> DragAndDropSlot<'w> {
             use egui::epaint::*;
 
             // For some reason, we must do manual implementation of response.hovered
-            let is_active = {
-                let input = ui.ctx().input();
+            let is_active = ui.ctx().input(|input| {
                 let hovered = input
                     .pointer
                     .interact_pos()
@@ -334,7 +333,7 @@ impl<'w> DragAndDropSlot<'w> {
                 } else {
                     false
                 }
-            };
+            });
 
             if let Some(sprite) = self.sprite.as_ref() {
                 let content_rect = rect;
@@ -371,11 +370,13 @@ impl<'w> DragAndDropSlot<'w> {
                 }
 
                 if let Some(quantity) = self.quantity {
-                    let text_galley = ui.fonts().layout_no_wrap(
-                        format!("{}", quantity),
-                        FontId::monospace(12.0),
-                        Color32::WHITE,
-                    );
+                    let text_galley = ui.fonts(|fonts| {
+                        fonts.layout_no_wrap(
+                            format!("{}", quantity),
+                            FontId::monospace(12.0),
+                            Color32::WHITE,
+                        )
+                    });
 
                     ui.painter().add(egui::Shape::Rect(egui::epaint::RectShape {
                         rect: Rect::from_min_max(

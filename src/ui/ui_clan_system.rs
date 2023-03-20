@@ -1,5 +1,5 @@
 use bevy::prelude::{Assets, Local, Query, Res, ResMut, With};
-use bevy_egui::{egui, EguiContext};
+use bevy_egui::{egui, EguiContexts};
 use rose_data::ClanMemberPosition;
 
 use crate::{
@@ -58,7 +58,7 @@ impl Default for UiStateClan {
 }
 
 pub fn ui_clan_system(
-    mut egui_context: ResMut<EguiContext>,
+    mut egui_context: EguiContexts,
     query_clan: Query<(&Clan, &ClanMembership), With<PlayerCharacter>>,
     mut ui_state: Local<UiStateClan>,
     mut ui_state_windows: ResMut<UiStateWindows>,

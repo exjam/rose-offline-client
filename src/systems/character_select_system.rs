@@ -6,12 +6,12 @@ use bevy::{
     prelude::{
         AssetServer, Camera, Camera3d, Commands, Component, ComputedVisibility,
         DespawnRecursiveExt, Entity, EventReader, EventWriter, GlobalTransform, Handle, Local,
-        MouseButton, Query, Res, ResMut, Resource, State, Transform, Visibility, With,
+        MouseButton, NextState, Query, Res, ResMut, Resource, Transform, Visibility, With,
     },
     render::{camera::Projection, mesh::skinning::SkinnedMesh},
-    window::{CursorGrabMode, Windows},
+    window::{CursorGrabMode, PrimaryWindow, Window},
 };
-use bevy_egui::{egui, EguiContext};
+use bevy_egui::{egui, EguiContexts};
 use bevy_rapier3d::prelude::{CollisionGroups, QueryFilter, RapierContext};
 
 use rose_data::{CharacterMotionAction, ZoneId};
@@ -48,14 +48,14 @@ pub struct CharacterSelectModelList {
 
 pub fn character_select_enter_system(
     mut commands: Commands,
-    mut windows: ResMut<Windows>,
+    mut query_window: Query<&mut Window, With<PrimaryWindow>>,
     query_cameras: Query<Entity, With<Camera3d>>,
     asset_server: Res<AssetServer>,
     game_data: Res<GameData>,
 ) {
-    if let Some(window) = windows.get_primary_mut() {
-        window.set_cursor_grab_mode(CursorGrabMode::None);
-        window.set_cursor_visibility(true);
+    if let Ok(mut window) = query_window.get_single_mut() {
+        window.cursor.grab_mode = CursorGrabMode::None;
+        window.cursor.visible = true;
     }
 
     // Reset camera
@@ -161,9 +161,9 @@ pub fn character_select_models_system(
 #[allow(clippy::too_many_arguments)]
 pub fn character_select_system(
     mut commands: Commands,
-    mut app_state: ResMut<State<AppState>>,
+    mut app_state: ResMut<NextState<AppState>>,
     mut character_select_state: ResMut<CharacterSelectState>,
-    mut egui_context: ResMut<EguiContext>,
+    mut egui_context: EguiContexts,
     mut game_connection_events: EventReader<GameConnectionEvent>,
     mut world_connection_events: EventReader<WorldConnectionEvent>,
     mut load_zone_events: EventWriter<LoadZoneEvent>,
@@ -179,7 +179,7 @@ pub fn character_select_system(
         world_connection
     } else {
         // Disconnected, return to login
-        app_state.set(AppState::GameLogin).ok();
+        app_state.set(AppState::GameLogin);
         return;
     };
 
@@ -373,14 +373,14 @@ pub fn character_select_event_system(
 #[allow(clippy::too_many_arguments)]
 pub fn character_select_input_system(
     mut character_select_state: ResMut<CharacterSelectState>,
-    mut egui_ctx: ResMut<EguiContext>,
+    mut egui_ctx: EguiContexts,
     mouse_button_input: Res<Input<MouseButton>>,
     rapier_context: Res<RapierContext>,
-    windows: Res<Windows>,
     mut last_selected_time: Local<Option<Instant>>,
     query_camera: Query<(&Camera, &Projection, &GlobalTransform), With<Camera3d>>,
     query_collider_parent: Query<&ColliderParent>,
     query_select_character: Query<&CharacterSelectCharacter>,
+    query_window: Query<&Window, With<PrimaryWindow>>,
     mut character_select_events: EventWriter<CharacterSelectEvent>,
 ) {
     if egui_ctx.ctx_mut().wants_pointer_input() {
@@ -398,10 +398,10 @@ pub fn character_select_input_system(
             return;
         };
 
-    let cursor_position =
-        if let Some(cursor_position) = windows.get_primary().and_then(|w| w.cursor_position()) {
-            cursor_position
-        } else {
+    let Ok(window) = query_window.get_single() else {
+    return;
+};
+    let Some(cursor_position) = window.cursor_position() else {
             return;
         };
 
@@ -409,7 +409,7 @@ pub fn character_select_input_system(
         for (camera, camera_projection, camera_transform) in query_camera.iter() {
             if let Some((ray_origin, ray_direction)) = ray_from_screenspace(
                 cursor_position,
-                &windows,
+                window,
                 camera,
                 camera_projection,
                 camera_transform,

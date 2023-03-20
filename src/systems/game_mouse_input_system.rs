@@ -7,9 +7,9 @@ use bevy::{
         With,
     },
     render::camera::Projection,
-    window::Windows,
+    window::{PrimaryWindow, Window},
 };
-use bevy_egui::EguiContext;
+use bevy_egui::EguiContexts;
 use bevy_rapier3d::prelude::{CollisionGroups, QueryFilter, RapierContext};
 
 use rose_game_common::components::{ItemDrop, Team};
@@ -33,10 +33,10 @@ pub struct PlayerQuery<'w> {
 #[allow(clippy::too_many_arguments)]
 pub fn game_mouse_input_system(
     mouse_button_input: Res<Input<MouseButton>>,
-    windows: Res<Windows>,
+    query_window: Query<&Window, With<PrimaryWindow>>,
     query_camera: Query<(&Camera, &Projection, &GlobalTransform), With<Camera3d>>,
     rapier_context: Res<RapierContext>,
-    mut egui_ctx: ResMut<EguiContext>,
+    mut egui_ctx: EguiContexts,
     query_collider_parent: Query<&ColliderParent>,
     query_hit_entity: Query<(
         Option<&Team>,
@@ -55,10 +55,11 @@ pub fn game_mouse_input_system(
         return;
     }
 
-    let cursor_position =
-        if let Some(cursor_position) = windows.get_primary().and_then(|w| w.cursor_position()) {
-            cursor_position
-        } else {
+    let Ok(window) = query_window.get_single() else {
+        return;
+    };
+
+    let Some(cursor_position) = window.cursor_position() else {
             return;
         };
 
@@ -71,7 +72,7 @@ pub fn game_mouse_input_system(
     for (camera, camera_projection, camera_transform) in query_camera.iter() {
         if let Some((ray_origin, ray_direction)) = ray_from_screenspace(
             cursor_position,
-            &windows,
+            window,
             camera,
             camera_projection,
             camera_transform,

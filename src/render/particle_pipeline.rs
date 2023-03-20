@@ -4,6 +4,7 @@ use bevy::{
     core_pipeline::core_3d::Transparent3d,
     ecs::{
         prelude::*,
+        query::ROQueryItem,
         system::{lifetimeless::*, SystemParamItem},
     },
     math::prelude::*,
@@ -13,8 +14,8 @@ use bevy::{
         primitives::Aabb,
         render_asset::RenderAssets,
         render_phase::{
-            AddRenderCommand, DrawFunctions, EntityRenderCommand, RenderCommandResult, RenderPhase,
-            SetItemPipeline, TrackedRenderPass,
+            AddRenderCommand, DrawFunctions, PhaseItem, RenderCommand, RenderCommandResult,
+            RenderPhase, SetItemPipeline, TrackedRenderPass,
         },
         render_resource::*,
         renderer::{RenderDevice, RenderQueue},
@@ -23,7 +24,7 @@ use bevy::{
             ComputedVisibility, ExtractedView, ViewTarget, ViewUniform, ViewUniformOffset,
             ViewUniforms, VisibilitySystems,
         },
-        Extract, RenderApp, RenderStage,
+        Extract, ExtractSchedule, RenderApp, RenderSet,
     },
 };
 use bytemuck::Pod;
@@ -48,16 +49,13 @@ impl Plugin for ParticleRenderPlugin {
             Shader::from_wgsl(include_str!("shaders/particle.wgsl")),
         );
 
-        app.add_system_to_stage(
-            CoreStage::PostUpdate,
-            compute_particles_aabb.label(VisibilitySystems::CalculateBounds),
-        );
+        app.add_system(compute_particles_aabb.in_set(VisibilitySystems::CalculateBounds));
 
         let render_app = app.sub_app_mut(RenderApp);
         render_app
-            .add_system_to_stage(RenderStage::Extract, extract_particles)
-            .add_system_to_stage(RenderStage::Prepare, prepare_particles)
-            .add_system_to_stage(RenderStage::Queue, queue_particles)
+            .add_system(extract_particles.in_schedule(ExtractSchedule))
+            .add_system(prepare_particles.in_set(RenderSet::Prepare))
+            .add_system(queue_particles.in_set(RenderSet::Queue))
             .init_resource::<ParticlePipeline>()
             .init_resource::<ParticleMeta>()
             .init_resource::<ExtractedParticles>()
@@ -300,12 +298,14 @@ impl SpecializedRenderPipeline for ParticlePipeline {
         let mut vs_shader_defs = Vec::new();
         match key.billboard_type() {
             ParticleRenderBillboardType::None => {}
-            ParticleRenderBillboardType::YAxis => {
-                vs_shader_defs.push("PARTICLE_BILLBOARD_Y_AXIS".to_string())
-            }
-            ParticleRenderBillboardType::Full => {
-                vs_shader_defs.push("PARTICLE_BILLBOARD_FULL".to_string())
-            }
+            ParticleRenderBillboardType::YAxis => vs_shader_defs.push(ShaderDefVal::Bool(
+                "PARTICLE_BILLBOARD_Y_AXIS".to_string(),
+                true,
+            )),
+            ParticleRenderBillboardType::Full => vs_shader_defs.push(ShaderDefVal::Bool(
+                "PARTICLE_BILLBOARD_FULL".to_string(),
+                true,
+            )),
         }
 
         RenderPipelineDescriptor {
@@ -339,11 +339,11 @@ impl SpecializedRenderPipeline for ParticlePipeline {
                     write_mask: ColorWrites::ALL,
                 })],
             }),
-            layout: Some(vec![
+            layout: vec![
                 self.view_layout.clone(),
                 self.particle_layout.clone(),
                 self.material_layout.clone(),
-            ]),
+            ],
             primitive: PrimitiveState {
                 front_face: FrontFace::Ccw,
                 cull_mode: None,
@@ -375,12 +375,13 @@ impl SpecializedRenderPipeline for ParticlePipeline {
                 alpha_to_coverage_enabled: false,
             },
             label: Some("particle_render_pipeline".into()),
+            push_constant_ranges: Vec::default(),
         }
     }
 }
 
 fn compute_particles_aabb(mut query: Query<(&mut Aabb, &ParticleRenderData)>) {
-    query.par_for_each_mut(8, |(mut aabb, particles)| {
+    query.par_iter_mut().for_each_mut(|(mut aabb, particles)| {
         if let Some(bounding_box) = particles.compute_aabb() {
             *aabb = bounding_box;
         }
@@ -597,7 +598,7 @@ fn queue_particles(
     view_uniforms: Res<ViewUniforms>,
     particle_pipeline: Res<ParticlePipeline>,
     mut pipelines: ResMut<SpecializedRenderPipelines<ParticlePipeline>>,
-    mut pipeline_cache: ResMut<PipelineCache>,
+    pipeline_cache: Res<PipelineCache>,
     particle_batches: Query<(Entity, &ParticleBatch)>,
     gpu_images: Res<RenderAssets<Image>>,
     msaa: Res<Msaa>,
@@ -650,7 +651,7 @@ fn queue_particles(
         .unwrap();
 
     for (view, mut transparent_phase) in views.iter_mut() {
-        let view_key = ParticlePipelineKey::from_msaa_samples(msaa.samples)
+        let view_key = ParticlePipelineKey::from_msaa_samples(msaa.samples())
             | ParticlePipelineKey::from_hdr(view.hdr);
 
         for (entity, batch) in particle_batches.iter() {
@@ -677,7 +678,7 @@ fn queue_particles(
             transparent_phase.add(Transparent3d {
                 distance: 10.0, // TODO: Do we need to fix this ?
                 pipeline: pipelines.specialize(
-                    &mut pipeline_cache,
+                    &pipeline_cache,
                     &particle_pipeline,
                     view_key | batch.material_key,
                 ),
@@ -697,16 +698,18 @@ type DrawParticle = (
 );
 
 struct SetParticleViewBindGroup<const I: usize>;
-impl<const I: usize> EntityRenderCommand for SetParticleViewBindGroup<I> {
-    type Param = (SRes<ParticleMeta>, SQuery<Read<ViewUniformOffset>>);
+impl<P: PhaseItem, const I: usize> RenderCommand<P> for SetParticleViewBindGroup<I> {
+    type Param = SRes<ParticleMeta>;
+    type ViewWorldQuery = Read<ViewUniformOffset>;
+    type ItemWorldQuery = ();
 
     fn render<'w>(
-        view: Entity,
-        _item: Entity,
-        (particle_meta, view_query): SystemParamItem<'w, '_, Self::Param>,
+        _: &P,
+        view_uniform: ROQueryItem<'w, Self::ViewWorldQuery>,
+        _: ROQueryItem<'w, Self::ItemWorldQuery>,
+        particle_meta: SystemParamItem<'w, '_, Self::Param>,
         pass: &mut TrackedRenderPass<'w>,
     ) -> RenderCommandResult {
-        let view_uniform = view_query.get(view).unwrap();
         pass.set_bind_group(
             I,
             particle_meta.into_inner().view_bind_group.as_ref().unwrap(),
@@ -717,12 +720,15 @@ impl<const I: usize> EntityRenderCommand for SetParticleViewBindGroup<I> {
 }
 
 struct SetParticleBindGroup<const I: usize>;
-impl<const I: usize> EntityRenderCommand for SetParticleBindGroup<I> {
+impl<P: PhaseItem, const I: usize> RenderCommand<P> for SetParticleBindGroup<I> {
     type Param = SRes<ParticleMeta>;
+    type ViewWorldQuery = ();
+    type ItemWorldQuery = ();
 
     fn render<'w>(
-        _view: Entity,
-        _item: Entity,
+        _: &P,
+        _: ROQueryItem<'w, Self::ViewWorldQuery>,
+        _: ROQueryItem<'w, Self::ItemWorldQuery>,
         particle_meta: SystemParamItem<'w, '_, Self::Param>,
         pass: &mut TrackedRenderPass<'w>,
     ) -> RenderCommandResult {
@@ -740,16 +746,18 @@ impl<const I: usize> EntityRenderCommand for SetParticleBindGroup<I> {
 }
 
 struct SetParticleMaterialBindGroup<const I: usize>;
-impl<const I: usize> EntityRenderCommand for SetParticleMaterialBindGroup<I> {
-    type Param = (SRes<MaterialBindGroups>, SQuery<Read<ParticleBatch>>);
+impl<P: PhaseItem, const I: usize> RenderCommand<P> for SetParticleMaterialBindGroup<I> {
+    type Param = SRes<MaterialBindGroups>;
+    type ViewWorldQuery = ();
+    type ItemWorldQuery = Read<ParticleBatch>;
 
     fn render<'w>(
-        _view: Entity,
-        item: Entity,
-        (material_bind_groups, query_batch): SystemParamItem<'w, '_, Self::Param>,
+        _: &P,
+        _: ROQueryItem<'w, Self::ViewWorldQuery>,
+        batch: ROQueryItem<'w, Self::ItemWorldQuery>,
+        material_bind_groups: SystemParamItem<'w, '_, Self::Param>,
         pass: &mut TrackedRenderPass<'w>,
     ) -> RenderCommandResult {
-        let batch = query_batch.get(item).unwrap();
         pass.set_bind_group(
             I,
             material_bind_groups
@@ -764,17 +772,19 @@ impl<const I: usize> EntityRenderCommand for SetParticleMaterialBindGroup<I> {
 }
 
 struct DrawParticleBatch;
-impl EntityRenderCommand for DrawParticleBatch {
-    type Param = SQuery<Read<ParticleBatch>>;
+impl<P: PhaseItem> RenderCommand<P> for DrawParticleBatch {
+    type Param = ();
+    type ViewWorldQuery = ();
+    type ItemWorldQuery = Read<ParticleBatch>;
 
     #[inline]
     fn render<'w>(
-        _view: Entity,
-        item: Entity,
-        query_batch: SystemParamItem<'w, '_, Self::Param>,
+        _: &P,
+        _: ROQueryItem<'w, Self::ViewWorldQuery>,
+        batch: ROQueryItem<'w, Self::ItemWorldQuery>,
+        _: SystemParamItem<'w, '_, Self::Param>,
         pass: &mut TrackedRenderPass<'w>,
     ) -> RenderCommandResult {
-        let batch = query_batch.get(item).unwrap();
         let vertex_range = (batch.range.start * 6)..(batch.range.end * 6);
         pass.draw(vertex_range, 0..1);
         RenderCommandResult::Success

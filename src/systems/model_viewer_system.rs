@@ -9,7 +9,7 @@ use bevy::{
         Resource, Transform, Visibility, With,
     },
 };
-use bevy_egui::{egui, EguiContext};
+use bevy_egui::{egui, EguiContexts};
 use enum_map::{enum_map, EnumMap};
 use rand::{prelude::SliceRandom, Rng};
 
@@ -134,7 +134,7 @@ pub fn model_viewer_system(
     query_character_model: Query<(Entity, &CharacterModel)>,
     query_npc_model: Query<(Entity, &NpcModel)>,
     game_data: Res<GameData>,
-    mut egui_context: ResMut<EguiContext>,
+    mut egui_context: EguiContexts,
     damage_digits_spawner: Res<DamageDigitsSpawner>,
     query_damage_character_model: Query<(&GlobalTransform, &ModelHeight), With<CharacterModel>>,
     query_damage_npc_model: Query<(&GlobalTransform, &ModelHeight), With<NpcModel>>,

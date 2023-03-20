@@ -1,9 +1,9 @@
-use bevy::prelude::{Mut, World};
-use bevy_egui::{egui, EguiContext};
-
-use crate::{resources::DebugInspector, ui::UiStateDebugWindows};
+use bevy::prelude::World;
 
 pub fn ui_debug_entity_inspector_system(world: &mut World) {
+    /*
+    TODO: Fix ui_debug_entity_inspector_system
+
     world.resource_scope(
         |world, mut ui_state_debug_windows: Mut<UiStateDebugWindows>| {
             world.resource_scope(|world, mut debug_inspector_state: Mut<DebugInspector>| {
@@ -11,7 +11,7 @@ pub fn ui_debug_entity_inspector_system(world: &mut World) {
                     return;
                 }
 
-                let mut egui_context = world.get_resource_mut::<EguiContext>().unwrap();
+                let mut egui_context = world.get_resource_mut::<EguiContexts>().unwrap();
                 let ctx = egui_context.ctx_mut().clone();
 
                 egui::Window::new("Entity Inspector")
@@ -38,4 +38,5 @@ pub fn ui_debug_entity_inspector_system(world: &mut World) {
             });
         },
     );
+    */
 }

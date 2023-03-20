@@ -1,9 +1,9 @@
 use bevy::{
     ecs::query::WorldQuery,
     input::Input,
-    prelude::{Assets, Entity, EventWriter, KeyCode, Local, Query, Res, ResMut, With},
+    prelude::{Assets, EventWriter, KeyCode, Local, Query, Res, ResMut, With},
 };
-use bevy_egui::{egui, EguiContext};
+use bevy_egui::{egui, EguiContexts};
 
 use rose_game_common::components::{
     Equipment, Hotbar, HotbarSlot, Inventory, SkillList, HOTBAR_NUM_PAGES, HOTBAR_PAGE_SIZE,
@@ -146,7 +146,7 @@ fn ui_add_hotbar_slot(
             }
             Some(HotbarSlot::Skill(skill_slot)) => {
                 if let Some(skill) = player.skill_list.get_skill(*skill_slot) {
-                    let detailed = ui.input().pointer.secondary_down();
+                    let detailed = ui.input(|input| input.pointer.secondary_down());
                     ui_add_skill_tooltip(
                         ui,
                         if detailed {
@@ -197,7 +197,7 @@ fn ui_add_hotbar_slot(
 }
 
 pub fn ui_hotbar_system(
-    mut egui_context: ResMut<EguiContext>,
+    mut egui_context: EguiContexts,
     mut ui_state_hot_bar: Local<UiStateHotBar>,
     mut ui_state_dnd: ResMut<UiStateDragAndDrop>,
     mut query_player: Query<PlayerQuery, With<PlayerCharacter>>,
@@ -256,7 +256,9 @@ pub fn ui_hotbar_system(
     let mut response_vnext_button = None;
     let is_vertical = ui_state_hot_bar.is_vertical;
 
-    let screen_size = egui_context.ctx_mut().input().screen_rect().size();
+    let screen_size = egui_context
+        .ctx_mut()
+        .input(|input| input.screen_rect().size());
     let default_position = egui::pos2(
         screen_size.x / 2.0 - dialog.width / 2.0,
         screen_size.y - dialog.height,

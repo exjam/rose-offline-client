@@ -1,5 +1,5 @@
 use bevy::prelude::{Local, Query, Res, ResMut};
-use bevy_egui::{egui, EguiContext};
+use bevy_egui::{egui, EguiContexts};
 use rose_game_common::{
     components::{CharacterInfo, DroppedItem, ItemDrop, Npc},
     messages::ClientEntityId,
@@ -38,7 +38,7 @@ impl Default for UiStateDebugClientEntityList {
 }
 
 pub fn ui_debug_client_entity_list_system(
-    mut egui_context: ResMut<EguiContext>,
+    mut egui_context: EguiContexts,
     mut ui_state_debug_client_entity_list: Local<UiStateDebugClientEntityList>,
     mut ui_state_debug_windows: ResMut<UiStateDebugWindows>,
     client_entity_list: Res<ClientEntityList>,

@@ -1,5 +1,5 @@
-use bevy::prelude::{Assets, EventReader, Local, Res, ResMut};
-use bevy_egui::{egui, EguiContext};
+use bevy::prelude::{Assets, EventReader, Local, Res};
+use bevy_egui::{egui, EguiContexts};
 
 use rose_game_common::messages::client::ClientMessage;
 
@@ -73,7 +73,7 @@ impl Default for UiStateChatbox {
 }
 
 pub fn ui_chatbox_system(
-    mut egui_context: ResMut<EguiContext>,
+    mut egui_context: EguiContexts,
     mut ui_state_chatbox: Local<UiStateChatbox>,
     mut chatbox_events: EventReader<ChatboxEvent>,
     game_connection: Option<Res<GameConnection>>,
@@ -284,7 +284,10 @@ pub fn ui_chatbox_system(
         });
 
     if let Some(response) = response_editbox {
-        if response.ctx.input().key_pressed(egui::Key::Enter) {
+        if response
+            .ctx
+            .input(|input| input.key_pressed(egui::Key::Enter))
+        {
             if response.lost_focus() {
                 if !ui_state_chatbox.textbox_text.is_empty() {
                     // TODO: Parse text line to decide whether its chat, shout, etc

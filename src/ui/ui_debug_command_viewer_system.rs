@@ -1,5 +1,5 @@
 use bevy::prelude::{Local, Query, Res, ResMut, Time, With};
-use bevy_egui::{egui, EguiContext};
+use bevy_egui::{egui, EguiContexts};
 use std::collections::VecDeque;
 use std::fmt::Write;
 
@@ -106,7 +106,7 @@ pub fn format_command(ui: &mut egui::Ui, command: &Command) {
 }
 
 pub fn ui_debug_command_viewer_system(
-    mut egui_context: ResMut<EguiContext>,
+    mut egui_context: EguiContexts,
     mut ui_state_debug_windows: ResMut<UiStateDebugWindows>,
     mut ui_state_debug_command_viewer: Local<UiStateDebugCommandViewer>,
     query_player: Query<&Command, With<PlayerCharacter>>,

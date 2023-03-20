@@ -4,7 +4,7 @@ use bevy::{
     asset::LoadState,
     prelude::{AssetServer, Assets, Commands, Handle, Image, Res, ResMut, Resource, Vec2},
 };
-use bevy_egui::{egui, EguiContext};
+use bevy_egui::{egui, EguiContexts};
 use enum_map::{enum_map, Enum, EnumMap};
 
 use rose_file_readers::{IdFile, TsiFile, TsiSprite, VirtualFilesystem};
@@ -223,7 +223,7 @@ impl UiResources {
 fn load_ui_spritesheet(
     vfs: &VirtualFilesystem,
     asset_server: &AssetServer,
-    egui_context: &mut EguiContext,
+    egui_context: &mut EguiContexts,
     tsi_path: &str,
     id_path: &str,
 ) -> Result<UiSpriteSheet, anyhow::Error> {
@@ -257,7 +257,7 @@ pub fn update_ui_resources(
     images: Res<Assets<Image>>,
     asset_server: Res<AssetServer>,
     mut dialog_assets: ResMut<Assets<Dialog>>,
-    mut egui_context: ResMut<EguiContext>,
+    mut egui_context: EguiContexts,
 ) {
     if ui_resources.loaded_all_textures {
         return;
@@ -333,7 +333,7 @@ pub fn load_ui_resources(
     mut commands: Commands,
     vfs_resource: Res<VfsResource>,
     asset_server: Res<AssetServer>,
-    mut egui_context: ResMut<EguiContext>,
+    mut egui_context: EguiContexts,
 ) {
     let vfs = &vfs_resource.vfs;
 

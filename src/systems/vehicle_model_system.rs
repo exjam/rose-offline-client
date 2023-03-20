@@ -59,10 +59,9 @@ pub fn vehicle_model_system(
             let driver_model_entity = vehicle_model.driver_model_entity;
             commands.add(move |world: &mut World| {
                 let mut driver_model_entity_mut = world.entity_mut(driver_model_entity);
-                let character_active_motion = driver_model_entity_mut.remove::<ActiveMotion>();
-                let character_dummy_bone_offset =
-                    driver_model_entity_mut.remove::<DummyBoneOffset>();
-                let character_skinned_mesh = driver_model_entity_mut.remove::<SkinnedMesh>();
+                let character_active_motion = driver_model_entity_mut.take::<ActiveMotion>();
+                let character_dummy_bone_offset = driver_model_entity_mut.take::<DummyBoneOffset>();
+                let character_skinned_mesh = driver_model_entity_mut.take::<SkinnedMesh>();
 
                 let mut root_entity_mut = world.entity_mut(entity);
                 if let Some(character_active_motion) = character_active_motion {
@@ -85,7 +84,7 @@ pub fn vehicle_model_system(
             let driver_model_entity = skinned_mesh.joints[0];
             let vehicle_model_entity = commands
                 .spawn((
-                    Visibility::VISIBLE,
+                    Visibility::Inherited,
                     ComputedVisibility::default(),
                     Transform::default(),
                     GlobalTransform::default(),
@@ -126,9 +125,9 @@ pub fn vehicle_model_system(
             commands.add(move |world: &mut World| {
                 // Move character ActiveMotion, DummyBoneOffset, SkinnedMesh to character model
                 let mut root_entity_mut = world.entity_mut(entity);
-                let character_active_motion = root_entity_mut.remove::<ActiveMotion>();
-                let character_dummy_bone_offset = root_entity_mut.remove::<DummyBoneOffset>();
-                let character_skinned_mesh = root_entity_mut.remove::<SkinnedMesh>();
+                let character_active_motion = root_entity_mut.take::<ActiveMotion>();
+                let character_dummy_bone_offset = root_entity_mut.take::<DummyBoneOffset>();
+                let character_skinned_mesh = root_entity_mut.take::<SkinnedMesh>();
 
                 let mut driver_model_entity_mut =
                     world.entity_mut(vehicle_model.driver_model_entity);

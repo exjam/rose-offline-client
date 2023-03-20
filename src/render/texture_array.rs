@@ -113,6 +113,7 @@ impl RenderAsset for TextureArray {
             dimension: TextureDimension::D2,
             format: texture_format,
             usage: TextureUsages::COPY_DST | TextureUsages::TEXTURE_BINDING,
+            view_formats: &[],
         });
 
         let mut command_encoder = render_device.create_command_encoder(&CommandEncoderDescriptor {

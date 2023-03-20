@@ -5,7 +5,7 @@ use bevy_egui::{
         epaint::text::cursor::{CCursor, Cursor, PCursor, RCursor},
         text_edit::CursorRange,
     },
-    EguiContext,
+    EguiContexts,
 };
 
 use crate::{
@@ -47,7 +47,7 @@ pub struct UiStateMessageBox {
 pub fn ui_number_input_dialog_system(
     mut commands: Commands,
     mut ui_state: Local<UiStateMessageBox>,
-    mut egui_context: ResMut<EguiContext>,
+    mut egui_context: EguiContexts,
     mut number_input_dialog_events: ResMut<Events<NumberInputDialogEvent>>,
     dialog_assets: Res<Assets<Dialog>>,
     ui_resources: Res<UiResources>,
@@ -87,7 +87,7 @@ pub fn ui_number_input_dialog_system(
             .interactable(true)
             .fixed_pos(egui::Pos2::ZERO)
             .show(egui_context.ctx_mut(), |ui| {
-                let interceptor_rect = ui.ctx().input().screen_rect();
+                let interceptor_rect = ui.ctx().input(|input| input.screen_rect());
 
                 ui.allocate_response(interceptor_rect.size(), egui::Sense::click_and_drag());
                 ui.allocate_ui_at_rect(interceptor_rect, |ui| {
@@ -106,7 +106,9 @@ pub fn ui_number_input_dialog_system(
         return;
     };
 
-    let screen_size = egui_context.ctx_mut().input().screen_rect().size();
+    let screen_size = egui_context
+        .ctx_mut()
+        .input(|input| input.screen_rect().size());
     let default_x = screen_size.x / 2.0 - dialog.width / 2.0;
     let default_y = screen_size.y / 2.0 - dialog.height / 2.0;
 

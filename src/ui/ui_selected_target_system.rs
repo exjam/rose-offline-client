@@ -1,5 +1,5 @@
 use bevy::prelude::{Local, Query, Res, ResMut};
-use bevy_egui::{egui, EguiContext};
+use bevy_egui::{egui, EguiContexts};
 
 use rose_game_common::components::{AbilityValues, HealthPoints, Npc};
 
@@ -19,7 +19,7 @@ pub struct UiSelectedTargetState {
 }
 
 pub fn ui_selected_target_system(
-    mut egui_context: ResMut<EguiContext>,
+    mut egui_context: EguiContexts,
     mut ui_state: Local<UiSelectedTargetState>,
     ui_state_windows: Res<UiStateWindows>,
     query_target: Query<(

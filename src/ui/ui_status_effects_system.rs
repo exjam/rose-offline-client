@@ -2,10 +2,10 @@ use std::time::Duration;
 
 use bevy::{
     ecs::query::WorldQuery,
-    prelude::{Entity, Query, Res, ResMut, With},
+    prelude::{Entity, Query, Res, With},
     time::Time,
 };
-use bevy_egui::{egui, EguiContext};
+use bevy_egui::{egui, EguiContexts};
 
 use rose_game_common::components::StatusEffects;
 
@@ -21,7 +21,7 @@ pub struct PlayerQuery<'w> {
 }
 
 pub fn ui_status_effects_system(
-    mut egui_context: ResMut<EguiContext>,
+    mut egui_context: EguiContexts,
     query_player: Query<PlayerQuery, With<PlayerCharacter>>,
     game_data: Res<GameData>,
     ui_resources: Res<UiResources>,

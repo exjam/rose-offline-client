@@ -1,5 +1,5 @@
-use bevy::prelude::{Assets, Commands, EventWriter, Local, Res, ResMut};
-use bevy_egui::{egui, EguiContext};
+use bevy::prelude::{Assets, Commands, EventWriter, Local, Res};
+use bevy_egui::{egui, EguiContexts};
 
 use crate::{
     events::LoginEvent,
@@ -17,7 +17,7 @@ pub struct UiStateServerSelect {
 pub fn ui_server_select_system(
     mut commands: Commands,
     mut ui_state: Local<UiStateServerSelect>,
-    mut egui_context: ResMut<EguiContext>,
+    mut egui_context: EguiContexts,
     login_state: Res<LoginState>,
     dialog_assets: Res<Assets<Dialog>>,
     server_list: Option<Res<ServerList>>,
@@ -39,7 +39,9 @@ pub fn ui_server_select_system(
     let mut response_cancel_button = None;
     let mut try_select_server = false;
 
-    let screen_size = egui_context.ctx_mut().input().screen_rect().size();
+    let screen_size = egui_context
+        .ctx_mut()
+        .input(|input| input.screen_rect().size());
     let position = egui::pos2(screen_size.x - dialog.width - 60.0, 100.0);
 
     egui::Window::new("Select Server")
@@ -77,7 +79,7 @@ pub fn ui_server_select_system(
                     let mut selected_game_server_id = ui_state.selected_game_server_id;
 
                     try_select_server =
-                        try_select_server || ui.input().key_pressed(egui::Key::Enter);
+                        try_select_server || ui.input(|input| input.key_pressed(egui::Key::Enter));
 
                     if let Some(Widget::Listbox(listbox)) = dialog.get_widget(2) {
                         let listbox_rect = listbox.widget_rect(ui.min_rect().min);

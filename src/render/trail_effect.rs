@@ -6,6 +6,7 @@ use bevy::{
     core_pipeline::core_3d::Transparent3d,
     ecs::{
         prelude::*,
+        query::ROQueryItem,
         system::{lifetimeless::*, SystemParamItem},
     },
     math::prelude::*,
@@ -15,8 +16,8 @@ use bevy::{
     render::{
         render_asset::RenderAssets,
         render_phase::{
-            AddRenderCommand, DrawFunctions, EntityRenderCommand, RenderCommandResult, RenderPhase,
-            SetItemPipeline, TrackedRenderPass,
+            AddRenderCommand, DrawFunctions, PhaseItem, RenderCommand, RenderCommandResult,
+            RenderPhase, SetItemPipeline, TrackedRenderPass,
         },
         render_resource::*,
         renderer::{RenderDevice, RenderQueue},
@@ -25,7 +26,7 @@ use bevy::{
             ComputedVisibility, ExtractedView, ViewTarget, ViewUniform, ViewUniformOffset,
             ViewUniforms,
         },
-        Extract, RenderApp, RenderStage,
+        Extract, ExtractSchedule, RenderApp, RenderSet,
     },
     time::Time,
 };
@@ -47,14 +48,15 @@ impl Plugin for TrailEffectRenderPlugin {
             Shader::from_wgsl(include_str!("shaders/trail_effect.wgsl")),
         );
 
-        app.add_system_to_stage(CoreStage::PostUpdate, initialise_trail_effects)
-            .add_system_to_stage(CoreStage::PostUpdate, update_trail_effects);
+        app.add_systems(
+            (initialise_trail_effects, update_trail_effects).in_base_set(CoreSet::PostUpdate),
+        );
 
         let render_app = app.sub_app_mut(RenderApp);
         render_app
-            .add_system_to_stage(RenderStage::Extract, extract_trail_effects)
-            .add_system_to_stage(RenderStage::Prepare, prepare_trail_effects)
-            .add_system_to_stage(RenderStage::Queue, queue_trail_effects)
+            .add_system(extract_trail_effects.in_schedule(ExtractSchedule))
+            .add_system(prepare_trail_effects.in_set(RenderSet::Prepare))
+            .add_system(queue_trail_effects.in_set(RenderSet::Queue))
             .init_resource::<TrailEffectPipeline>()
             .init_resource::<TrailEffectMeta>()
             .init_resource::<ExtractedTrailEffects>()
@@ -400,7 +402,7 @@ impl SpecializedRenderPipeline for TrailEffectPipeline {
                     write_mask: ColorWrites::ALL,
                 })],
             }),
-            layout: Some(vec![self.view_layout.clone(), self.material_layout.clone()]),
+            layout: vec![self.view_layout.clone(), self.material_layout.clone()],
             primitive: PrimitiveState {
                 front_face: FrontFace::Ccw,
                 cull_mode: None,
@@ -432,6 +434,7 @@ impl SpecializedRenderPipeline for TrailEffectPipeline {
                 alpha_to_coverage_enabled: false,
             },
             label: Some("trail_effect_render_pipeline".into()),
+            push_constant_ranges: Vec::default(),
         }
     }
 }
@@ -663,7 +666,7 @@ fn queue_trail_effects(
     view_uniforms: Res<ViewUniforms>,
     trail_effect_pipeline: Res<TrailEffectPipeline>,
     mut pipelines: ResMut<SpecializedRenderPipelines<TrailEffectPipeline>>,
-    mut pipeline_cache: ResMut<PipelineCache>,
+    pipeline_cache: Res<PipelineCache>,
     trail_effect_batches: Query<(Entity, &TrailEffectBatch)>,
     gpu_images: Res<RenderAssets<Image>>,
     msaa: Res<Msaa>,
@@ -691,8 +694,8 @@ fn queue_trail_effects(
         .unwrap();
 
     for (view, mut transparent_phase) in views.iter_mut() {
-        let view_key =
-            MeshPipelineKey::from_msaa_samples(msaa.samples) | MeshPipelineKey::from_hdr(view.hdr);
+        let view_key = MeshPipelineKey::from_msaa_samples(msaa.samples())
+            | MeshPipelineKey::from_hdr(view.hdr);
 
         for (entity, batch) in trail_effect_batches.iter() {
             if let Some(gpu_image) = gpu_images.get(&batch.handle) {
@@ -717,11 +720,7 @@ fn queue_trail_effects(
 
             transparent_phase.add(Transparent3d {
                 distance: 10.0, // TODO: Do we need to fix this ?
-                pipeline: pipelines.specialize(
-                    &mut pipeline_cache,
-                    &trail_effect_pipeline,
-                    view_key,
-                ),
+                pipeline: pipelines.specialize(&pipeline_cache, &trail_effect_pipeline, view_key),
                 entity,
                 draw_function: draw_trail_effect_function,
             });
@@ -737,16 +736,18 @@ type DrawTrailEffect = (
 );
 
 struct SetTrailEffectViewBindGroup<const I: usize>;
-impl<const I: usize> EntityRenderCommand for SetTrailEffectViewBindGroup<I> {
-    type Param = (SRes<TrailEffectMeta>, SQuery<Read<ViewUniformOffset>>);
+impl<P: PhaseItem, const I: usize> RenderCommand<P> for SetTrailEffectViewBindGroup<I> {
+    type Param = SRes<TrailEffectMeta>;
+    type ViewWorldQuery = Read<ViewUniformOffset>;
+    type ItemWorldQuery = ();
 
     fn render<'w>(
-        view: Entity,
-        _item: Entity,
-        (trail_effect_meta, view_query): SystemParamItem<'w, '_, Self::Param>,
+        _: &P,
+        view_uniform: ROQueryItem<'w, Self::ViewWorldQuery>,
+        _: ROQueryItem<'w, Self::ItemWorldQuery>,
+        trail_effect_meta: SystemParamItem<'w, '_, Self::Param>,
         pass: &mut TrackedRenderPass<'w>,
     ) -> RenderCommandResult {
-        let view_uniform = view_query.get(view).unwrap();
         pass.set_bind_group(
             I,
             trail_effect_meta
@@ -761,16 +762,18 @@ impl<const I: usize> EntityRenderCommand for SetTrailEffectViewBindGroup<I> {
 }
 
 struct SetTrailEffectMaterialBindGroup<const I: usize>;
-impl<const I: usize> EntityRenderCommand for SetTrailEffectMaterialBindGroup<I> {
-    type Param = (SRes<MaterialBindGroups>, SQuery<Read<TrailEffectBatch>>);
+impl<P: PhaseItem, const I: usize> RenderCommand<P> for SetTrailEffectMaterialBindGroup<I> {
+    type Param = SRes<MaterialBindGroups>;
+    type ViewWorldQuery = ();
+    type ItemWorldQuery = Read<TrailEffectBatch>;
 
     fn render<'w>(
-        _view: Entity,
-        item: Entity,
-        (material_bind_groups, query_batch): SystemParamItem<'w, '_, Self::Param>,
+        _: &P,
+        _: ROQueryItem<'w, Self::ViewWorldQuery>,
+        batch: ROQueryItem<'w, Self::ItemWorldQuery>,
+        material_bind_groups: SystemParamItem<'w, '_, Self::Param>,
         pass: &mut TrackedRenderPass<'w>,
     ) -> RenderCommandResult {
-        let batch = query_batch.get(item).unwrap();
         pass.set_bind_group(
             I,
             material_bind_groups
@@ -785,18 +788,19 @@ impl<const I: usize> EntityRenderCommand for SetTrailEffectMaterialBindGroup<I> 
 }
 
 struct DrawTrailEffectBatch;
-impl EntityRenderCommand for DrawTrailEffectBatch {
-    type Param = (SRes<TrailEffectMeta>, SQuery<Read<TrailEffectBatch>>);
+impl<P: PhaseItem> RenderCommand<P> for DrawTrailEffectBatch {
+    type Param = SRes<TrailEffectMeta>;
+    type ViewWorldQuery = ();
+    type ItemWorldQuery = Read<TrailEffectBatch>;
 
     #[inline]
     fn render<'w>(
-        _view: Entity,
-        item: Entity,
-        (trail_effect_meta, query_batch): SystemParamItem<'w, '_, Self::Param>,
+        _: &P,
+        _: ROQueryItem<'w, Self::ViewWorldQuery>,
+        batch: ROQueryItem<'w, Self::ItemWorldQuery>,
+        trail_effect_meta: SystemParamItem<'w, '_, Self::Param>,
         pass: &mut TrackedRenderPass<'w>,
     ) -> RenderCommandResult {
-        let batch = query_batch.get(item).unwrap();
-
         pass.set_vertex_buffer(
             0,
             trail_effect_meta

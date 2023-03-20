@@ -2,7 +2,7 @@ use bevy::{
     ecs::query::WorldQuery,
     prelude::{AssetServer, Commands, Entity, Local, Query, Res, ResMut, State, With},
 };
-use bevy_egui::{egui, EguiContext};
+use bevy_egui::{egui, EguiContexts};
 use regex::Regex;
 
 use rose_data::{EquipmentIndex, SkillId};
@@ -48,7 +48,7 @@ pub struct UiStateDebugSkillList {
 
 pub fn ui_debug_skill_list_system(
     mut commands: Commands,
-    mut egui_context: ResMut<EguiContext>,
+    mut egui_context: EguiContexts,
     mut ui_state_debug_skill_list: Local<UiStateDebugSkillList>,
     mut ui_state_debug_windows: ResMut<UiStateDebugWindows>,
     app_state: Res<State<AppState>>,
@@ -203,7 +203,7 @@ pub fn ui_debug_skill_list_system(
                                 });
 
                                 row.col(|ui| {
-                                    if matches!(app_state.current(), AppState::Game)
+                                    if matches!(app_state.0, AppState::Game)
                                         && ui.button("Learn").clicked()
                                     {
                                         if let Some(game_connection) = game_connection.as_ref() {
@@ -220,7 +220,7 @@ pub fn ui_debug_skill_list_system(
                                     if skill_data.casting_motion_id.is_some() {
                                         let player = query_player_command.get_single_mut().ok();
 
-                                        if matches!(app_state.current(), AppState::Game) {
+                                        if matches!(app_state.0, AppState::Game) {
                                             if let Some(mut player) = player {
                                                 if let Command::CastSkill(command_cast_skill) =
                                                     player.command.as_mut()
@@ -253,7 +253,7 @@ pub fn ui_debug_skill_list_system(
                                                 }
                                             }
                                         } else if matches!(
-                                            app_state.current(),
+                                            app_state.0,
                                             AppState::ModelViewer
                                         ) {
                                             if ui.button("Cast").clicked() {

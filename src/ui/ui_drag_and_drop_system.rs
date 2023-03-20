@@ -1,5 +1,5 @@
 use bevy::prelude::{EventWriter, Local, ResMut, Resource};
-use bevy_egui::{egui, EguiContext};
+use bevy_egui::{egui, EguiContexts};
 
 use rose_game_common::components::ItemSlot;
 
@@ -14,7 +14,7 @@ pub struct UiStateDragAndDrop {
 }
 
 pub fn ui_drag_and_drop_system(
-    mut egui_context: ResMut<EguiContext>,
+    mut egui_context: EguiContexts,
     mut ui_state_dnd: ResMut<UiStateDragAndDrop>,
     mut last_dropped_item: Local<Option<DragAndDropId>>,
     mut player_command_events: EventWriter<PlayerCommandEvent>,
@@ -56,11 +56,12 @@ pub fn ui_drag_and_drop_system(
         }
     }
 
-    let input = ctx.input();
-    if ui_state_dnd.dragged_item.is_some()
-        && input.pointer.any_released()
-        && !input.pointer.button_down(egui::PointerButton::Primary)
-    {
-        *last_dropped_item = ui_state_dnd.dragged_item.take();
-    }
+    ctx.input(|input| {
+        if ui_state_dnd.dragged_item.is_some()
+            && input.pointer.any_released()
+            && !input.pointer.button_down(egui::PointerButton::Primary)
+        {
+            *last_dropped_item = ui_state_dnd.dragged_item.take();
+        }
+    });
 }

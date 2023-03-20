@@ -29,7 +29,7 @@ pub fn auto_login_system(
 
     match *auto_login_state {
         AutoLoginState::Login => {
-            if matches!(app_state.current(), AppState::GameLogin) {
+            if matches!(app_state.0, AppState::GameLogin) {
                 if let (Some(username), Some(password)) = (
                     &server_configuration.preset_username,
                     &server_configuration.preset_password,
@@ -77,12 +77,12 @@ pub fn auto_login_system(
                 }
             }
 
-            if matches!(app_state.current(), AppState::GameCharacterSelect) {
+            if matches!(app_state.0, AppState::GameCharacterSelect) {
                 *auto_login_state = AutoLoginState::WaitCharacterList;
             }
         }
         AutoLoginState::WaitCharacterList => {
-            if matches!(app_state.current(), AppState::GameCharacterSelect) {
+            if matches!(app_state.0, AppState::GameCharacterSelect) {
                 if let Some(preset_character_name) =
                     server_configuration.preset_character_name.as_ref()
                 {

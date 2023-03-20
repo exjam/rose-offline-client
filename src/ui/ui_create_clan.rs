@@ -1,7 +1,7 @@
 use std::num::NonZeroU16;
 
-use bevy::prelude::{Assets, EventReader, EventWriter, Local, Res, ResMut};
-use bevy_egui::{egui, EguiContext};
+use bevy::prelude::{Assets, EventReader, EventWriter, Local, Res};
+use bevy_egui::{egui, EguiContexts};
 use rose_game_common::{components::ClanMark, messages::client::ClientMessage};
 
 use crate::{
@@ -44,7 +44,7 @@ impl Default for UiCreateClanState {
 
 pub fn ui_create_clan_system(
     mut ui_state: Local<UiCreateClanState>,
-    mut egui_context: ResMut<EguiContext>,
+    mut egui_context: EguiContexts,
     ui_resources: Res<UiResources>,
     dialog_assets: Res<Assets<Dialog>>,
     mut clan_dialog_events: EventReader<ClanDialogEvent>,

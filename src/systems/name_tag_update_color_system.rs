@@ -1,6 +1,6 @@
 use bevy::{
     ecs::query::WorldQuery,
-    prelude::{Changed, Children, Color, Entity, Or, Parent, Query, With},
+    prelude::{Changed, Children, Color, Or, Parent, Query, With},
 };
 
 use rose_game_common::components::{Level, Team};

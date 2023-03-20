@@ -1,8 +1,8 @@
 use bevy::{
     ecs::query::WorldQuery,
-    prelude::{Assets, Entity, Local, Query, Res, ResMut, With},
+    prelude::{Assets, Local, Query, Res, ResMut, With},
 };
-use bevy_egui::{egui, EguiContext};
+use bevy_egui::{egui, EguiContexts};
 
 use rose_game_common::{
     components::{
@@ -66,7 +66,7 @@ pub struct PlayerQuery<'w> {
 }
 
 pub fn ui_character_info_system(
-    mut egui_context: ResMut<EguiContext>,
+    mut egui_context: EguiContexts,
     query_player: Query<PlayerQuery, With<PlayerCharacter>>,
     mut ui_state: Local<UiStateCharacterInfo>,
     mut ui_state_windows: ResMut<UiStateWindows>,

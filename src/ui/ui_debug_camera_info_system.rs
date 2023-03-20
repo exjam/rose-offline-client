@@ -1,5 +1,5 @@
 use bevy::prelude::{Camera, Query, ResMut, Transform, With};
-use bevy_egui::{egui, EguiContext};
+use bevy_egui::{egui, EguiContexts};
 use dolly::prelude::{Arm, YawPitch};
 
 use crate::{
@@ -8,7 +8,7 @@ use crate::{
 };
 
 pub fn ui_debug_camera_info_system(
-    mut egui_context: ResMut<EguiContext>,
+    mut egui_context: EguiContexts,
     mut camera_query: Query<
         (
             &Transform,
