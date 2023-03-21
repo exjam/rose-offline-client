@@ -41,6 +41,10 @@ pub fn ui_debug_render_system(
                 &mut debug_render_config.directional_light_frustum,
                 "Show Directional Light Frustum",
             );
+            ui.checkbox(
+                &mut debug_render_config.directional_light_frustum_freeze,
+                "Freeze Render Directional Light Frustum",
+            );
 
             if ui
                 .checkbox(
