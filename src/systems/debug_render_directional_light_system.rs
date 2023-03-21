@@ -1,6 +1,6 @@
 use bevy::{
     prelude::{DirectionalLight, Query, Res, ResMut, Vec3, With},
-    render::primitives::{Frustum, Plane},
+    render::primitives::{CascadesFrusta, Frustum, Plane},
 };
 
 use crate::resources::{DebugRenderConfig, DebugRenderDirectionalLightData};
@@ -40,38 +40,44 @@ fn calculate_frustum_corners(frustum: &Frustum) -> [Vec3; 8] {
 
 pub fn debug_render_directional_light_system(
     debug_render_config: Res<DebugRenderConfig>,
-    query_light: Query<&Frustum, With<DirectionalLight>>,
+    query_cascades_frustum: Query<&CascadesFrusta, With<DirectionalLight>>,
     mut render_data: ResMut<DebugRenderDirectionalLightData>,
 ) {
     if !debug_render_config.directional_light_frustum {
         return;
     }
 
-    if let Ok(frustum) = query_light.get_single() {
-        let corners = calculate_frustum_corners(frustum);
+    if let Ok(cascades_frusta) = query_cascades_frustum.get_single() {
         render_data.frustum.vertices.clear();
-        render_data.frustum.vertices.push(corners[0]);
-        render_data.frustum.vertices.push(corners[2]);
-        render_data.frustum.vertices.push(corners[6]);
-        render_data.frustum.vertices.push(corners[4]);
-        render_data.frustum.vertices.push(corners[0]);
-        render_data.frustum.vertices.push(Vec3::NAN);
-        render_data.frustum.vertices.push(corners[1]);
-        render_data.frustum.vertices.push(corners[3]);
-        render_data.frustum.vertices.push(corners[7]);
-        render_data.frustum.vertices.push(corners[5]);
-        render_data.frustum.vertices.push(corners[1]);
-        render_data.frustum.vertices.push(Vec3::NAN);
-        render_data.frustum.vertices.push(corners[0]);
-        render_data.frustum.vertices.push(corners[1]);
-        render_data.frustum.vertices.push(Vec3::NAN);
-        render_data.frustum.vertices.push(corners[2]);
-        render_data.frustum.vertices.push(corners[3]);
-        render_data.frustum.vertices.push(Vec3::NAN);
-        render_data.frustum.vertices.push(corners[4]);
-        render_data.frustum.vertices.push(corners[5]);
-        render_data.frustum.vertices.push(Vec3::NAN);
-        render_data.frustum.vertices.push(corners[6]);
-        render_data.frustum.vertices.push(corners[7]);
+
+        for (_, frusta) in cascades_frusta.frusta.iter() {
+            for frustum in frusta.iter() {
+                let corners = calculate_frustum_corners(frustum);
+                render_data.frustum.vertices.push(corners[0]);
+                render_data.frustum.vertices.push(corners[2]);
+                render_data.frustum.vertices.push(corners[6]);
+                render_data.frustum.vertices.push(corners[4]);
+                render_data.frustum.vertices.push(corners[0]);
+                render_data.frustum.vertices.push(Vec3::NAN);
+                render_data.frustum.vertices.push(corners[1]);
+                render_data.frustum.vertices.push(corners[3]);
+                render_data.frustum.vertices.push(corners[7]);
+                render_data.frustum.vertices.push(corners[5]);
+                render_data.frustum.vertices.push(corners[1]);
+                render_data.frustum.vertices.push(Vec3::NAN);
+                render_data.frustum.vertices.push(corners[0]);
+                render_data.frustum.vertices.push(corners[1]);
+                render_data.frustum.vertices.push(Vec3::NAN);
+                render_data.frustum.vertices.push(corners[2]);
+                render_data.frustum.vertices.push(corners[3]);
+                render_data.frustum.vertices.push(Vec3::NAN);
+                render_data.frustum.vertices.push(corners[4]);
+                render_data.frustum.vertices.push(corners[5]);
+                render_data.frustum.vertices.push(Vec3::NAN);
+                render_data.frustum.vertices.push(corners[6]);
+                render_data.frustum.vertices.push(corners[7]);
+                render_data.frustum.vertices.push(Vec3::NAN);
+            }
+        }
     }
 }
