@@ -76,9 +76,9 @@ use systems::{
     collision_player_system_join_zoin, command_system, conversation_dialog_system, cooldown_system,
     damage_digit_render_system, debug_render_collider_system,
     debug_render_directional_light_system, debug_render_polylines_setup_system,
-    debug_render_polylines_update_system, debug_render_skeleton_system, directional_light_system,
-    effect_system, facing_direction_system, free_camera_system, game_connection_system,
-    game_mouse_input_system, game_state_enter_system, game_zone_change_system, hit_event_system,
+    debug_render_polylines_update_system, debug_render_skeleton_system, effect_system,
+    facing_direction_system, free_camera_system, game_connection_system, game_mouse_input_system,
+    game_state_enter_system, game_zone_change_system, hit_event_system,
     item_drop_model_add_collider_system, item_drop_model_system, login_connection_system,
     login_event_system, login_state_enter_system, login_state_exit_system, login_system,
     model_viewer_enter_system, model_viewer_exit_system, model_viewer_system, name_tag_system,
@@ -824,7 +824,6 @@ fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsC
             command_system.after(animation_system),
             facing_direction_system.after(command_system),
             update_position_system,
-            directional_light_system.after(update_position_system),
             collision_player_system_join_zoin
                 .after(update_position_system)
                 .before(collision_player_system),
