@@ -10,6 +10,7 @@ pub struct DebugRenderConfig {
     pub skeleton: bool,
     pub bone_up: bool,
     pub directional_light_frustum: bool,
+    pub directional_light_frustum_freeze: bool,
 }
 
 #[derive(Resource)]
