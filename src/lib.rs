@@ -5,7 +5,7 @@ use bevy::{
     core_pipeline::{bloom::BloomSettings, clear_color::ClearColor},
     ecs::event::Events,
     log::Level,
-    pbr::{AmbientLight, CascadeShadowConfig, CascadeShadowConfigBuilder, Cascades},
+    pbr::{AmbientLight, CascadeShadowConfigBuilder},
     prelude::{
         apply_system_buffers, in_state, AddAsset, App, AssetServer, Assets, Camera, Camera3dBundle,
         Color, Commands, CoreSet, DirectionalLight, DirectionalLightBundle, EulerRot,
@@ -13,7 +13,7 @@ use bevy::{
         OnEnter, OnExit, OnUpdate, PluginGroup, Quat, Res, ResMut, StartupSet, State, SystemSet,
         Transform, Vec3,
     },
-    render::{primitives::CascadesFrusta, render_resource::WgpuFeatures, settings::WgpuSettings},
+    render::{render_resource::WgpuFeatures, settings::WgpuSettings},
     window::{Window, WindowMode},
 };
 use bevy_egui::{egui, EguiContexts};
@@ -422,15 +422,17 @@ enum GameStages {
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone, SystemSet)]
 enum GameSystemSets {
-    Ui,
     UpdateCamera,
+    Ui,
 }
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone, SystemSet)]
 enum UiSystemSets {
-    Game,
-    GameOverlay,
-    Debug,
+    UiDebugMenu,
+    UiFirst,
+    Ui,
+    UiLast,
+    UiDebug,
 }
 
 fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsConfig) {
@@ -580,29 +582,6 @@ fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsC
         .add_event::<WorldConnectionEvent>()
         .add_event::<ZoneEvent>();
 
-    app.configure_sets(
-        (GameStages::ZoneChange, GameStages::ZoneChangeFlush)
-            .chain()
-            .after(CoreSet::UpdateFlush)
-            .before(PhysicsSet::SyncBackend),
-    );
-
-    app.configure_sets(
-        (GameStages::DebugRenderPreFlush, GameStages::DebugRender)
-            .chain()
-            .after(PhysicsSet::Writeback)
-            .before(CoreSet::PostUpdate),
-    );
-
-    app.configure_sets(
-        (
-            UiSystemSets::Game,
-            UiSystemSets::GameOverlay,
-            UiSystemSets::Debug,
-        )
-            .chain(),
-    );
-
     app.add_system(apply_system_buffers.in_base_set(GameStages::ZoneChangeFlush));
 
     app.add_system(apply_system_buffers.in_base_set(GameStages::DebugRenderPreFlush));
@@ -682,6 +661,14 @@ fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsC
         .add_system(load_dialog_sprites_system)
         .add_system(zone_time_system.after(world_time_system));
 
+    app.add_system(ui_item_drop_name_system.in_set(UiSystemSets::UiFirst));
+
+    app.add_systems(
+        (ui_message_box_system, ui_number_input_dialog_system).in_set(UiSystemSets::UiLast),
+    );
+
+    app.add_systems((ui_debug_menu_system,).in_set(UiSystemSets::UiDebugMenu));
+
     app.add_systems(
         (
             ui_debug_camera_info_system,
@@ -689,8 +676,8 @@ fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsC
             ui_debug_command_viewer_system,
             ui_debug_dialog_list_system,
             ui_debug_effect_list_system,
+            ui_debug_entity_inspector_system,
             ui_debug_item_list_system,
-            ui_debug_menu_system,
             ui_debug_npc_list_system,
             ui_debug_physics_system,
             ui_debug_render_system,
@@ -700,26 +687,7 @@ fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsC
             ui_debug_zone_time_system,
             ui_debug_diagnostics_system,
         )
-            .in_set(GameSystemSets::Ui)
-            .in_set(UiSystemSets::Debug),
-    )
-    .add_systems(
-        (ui_debug_entity_inspector_system,)
-            .in_set(GameSystemSets::Ui)
-            .in_set(UiSystemSets::Debug),
-    );
-
-    app.add_system(
-        ui_item_drop_name_system
-            .after(GameSystemSets::UpdateCamera)
-            .in_set(GameSystemSets::Ui)
-            .in_set(UiSystemSets::Game),
-    );
-
-    app.add_systems(
-        (ui_message_box_system, ui_number_input_dialog_system)
-            .in_set(GameSystemSets::Ui)
-            .in_set(UiSystemSets::GameOverlay),
+            .in_set(UiSystemSets::UiDebug),
     );
 
     // character_model_blink_system in PostUpdate to avoid any conflicts with model destruction
@@ -770,7 +738,7 @@ fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsC
     app.add_systems(
         (ui_login_system, ui_server_select_system)
             .in_set(OnUpdate(AppState::GameLogin))
-            .in_set(GameSystemSets::Ui)
+            .in_set(UiSystemSets::Ui)
             .after(login_system)
             .before(login_event_system),
     );
@@ -798,7 +766,7 @@ fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsC
             ui_character_select_name_tag_system,
         )
             .in_set(OnUpdate(AppState::GameCharacterSelect))
-            .in_set(GameSystemSets::Ui)
+            .in_set(UiSystemSets::Ui)
             .after(character_select_system)
             .after(character_select_input_system)
             .before(character_select_event_system),
@@ -861,7 +829,7 @@ fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsC
             ui_quest_list_system,
         )
             .in_set(OnUpdate(AppState::Game))
-            .in_set(GameSystemSets::Ui),
+            .in_set(UiSystemSets::Ui),
     )
     .add_systems(
         (
@@ -874,7 +842,7 @@ fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsC
             conversation_dialog_system,
         )
             .in_set(OnUpdate(AppState::Game))
-            .in_set(GameSystemSets::Ui),
+            .in_set(UiSystemSets::Ui),
     );
 
     if !systems_config.disable_player_command_system {
@@ -933,6 +901,34 @@ fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsC
         "custom" => {}
         unknown => panic!("Unknown game data version {}", unknown),
     };
+
+    app.configure_sets(
+        (GameStages::ZoneChange, GameStages::ZoneChangeFlush)
+            .chain()
+            .after(CoreSet::UpdateFlush)
+            .before(PhysicsSet::SyncBackend),
+    );
+
+    app.configure_sets(
+        (GameStages::DebugRenderPreFlush, GameStages::DebugRender)
+            .chain()
+            .after(PhysicsSet::Writeback)
+            .before(CoreSet::PostUpdate),
+    );
+
+    app.configure_sets(
+        (
+            UiSystemSets::UiDebugMenu,
+            UiSystemSets::UiFirst,
+            UiSystemSets::Ui,
+            UiSystemSets::UiLast,
+            UiSystemSets::UiDebug,
+        )
+            .chain()
+            .in_set(GameSystemSets::Ui),
+    );
+
+    app.configure_sets((GameSystemSets::UpdateCamera, GameSystemSets::Ui).chain());
 
     app.run();
 
