@@ -116,6 +116,8 @@ impl From<&EffectMeshMaterial> for EffectMeshMaterialKey {
 }
 
 impl Material for EffectMeshMaterial {
+    type PipelineData = ();
+
     fn specialize(
         _pipeline: &MaterialPipeline<Self>,
         descriptor: &mut RenderPipelineDescriptor,

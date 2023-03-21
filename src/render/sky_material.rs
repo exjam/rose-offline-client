@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 
 use bevy::{
     asset::Handle,
-    core_pipeline::core_3d::Opaque3d,
+    core_pipeline::core_3d::{AlphaMask3d, Opaque3d, Transparent3d},
     ecs::{
         query::ROQueryItem,
         system::{
@@ -11,33 +11,37 @@ use bevy::{
         },
     },
     pbr::{
-        DrawMesh, MeshPipeline, MeshPipelineKey, MeshUniform, SetMeshBindGroup,
-        SetMeshViewBindGroup,
+        extract_materials, prepare_materials, queue_material_meshes, queue_shadows, DrawMesh,
+        DrawPrepass, ExtractedMaterials, MaterialPipeline, MeshPipeline, MeshPipelineKey,
+        MeshUniform, PrepassPipelinePlugin, RenderLightSystems, RenderMaterials,
+        SetMaterialBindGroup, SetMeshBindGroup, SetMeshViewBindGroup, Shadow,
     },
     prelude::{
         error, AddAsset, App, Assets, Commands, FromWorld, HandleUntyped, Image,
-        IntoSystemAppConfig, IntoSystemConfig, Mesh, Msaa, Plugin, Query, Res, ResMut, Resource,
-        World,
+        IntoSystemAppConfig, IntoSystemConfig, Material, Mesh, Msaa, Plugin, Query, Res, ResMut,
+        Resource, World,
     },
     reflect::TypeUuid,
     render::{
         extract_component::ExtractComponentPlugin,
         mesh::MeshVertexBufferLayout,
         prelude::Shader,
-        render_asset::{PrepareAssetError, RenderAsset, RenderAssetPlugin, RenderAssets},
+        render_asset::{
+            PrepareAssetError, PrepareAssetSet, RenderAsset, RenderAssetPlugin, RenderAssets,
+        },
         render_phase::{
             AddRenderCommand, DrawFunctions, PhaseItem, RenderCommand, RenderCommandResult,
             RenderPhase, SetItemPipeline, TrackedRenderPass,
         },
         render_resource::{
             encase::{self, ShaderType},
-            AddressMode, BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout,
-            BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingResource, BindingType, Buffer,
-            BufferBindingType, BufferDescriptor, BufferUsages, CompareFunction, FilterMode,
-            PipelineCache, RenderPipelineDescriptor, Sampler, SamplerBindingType,
-            SamplerDescriptor, ShaderSize, ShaderStages, SpecializedMeshPipeline,
-            SpecializedMeshPipelineError, SpecializedMeshPipelines, TextureSampleType,
-            TextureViewDimension,
+            AddressMode, AsBindGroup, BindGroup, BindGroupDescriptor, BindGroupEntry,
+            BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingResource,
+            BindingType, Buffer, BufferBindingType, BufferDescriptor, BufferUsages,
+            CompareFunction, FilterMode, PipelineCache, RenderPipelineDescriptor, Sampler,
+            SamplerBindingType, SamplerDescriptor, ShaderSize, ShaderStages,
+            SpecializedMeshPipeline, SpecializedMeshPipelineError, SpecializedMeshPipelines,
+            TextureSampleType, TextureViewDimension,
         },
         renderer::{RenderDevice, RenderQueue},
         view::{ExtractedView, VisibleEntities},
@@ -61,6 +65,7 @@ impl Plugin for SkyMaterialPlugin {
             Shader::from_wgsl(include_str!("shaders/sky_material.wgsl")),
         );
 
+        /*
         app.add_asset::<SkyMaterial>()
             .add_plugin(ExtractComponentPlugin::<Handle<SkyMaterial>>::default())
             .add_plugin(RenderAssetPlugin::<SkyMaterial>::default());
@@ -74,6 +79,48 @@ impl Plugin for SkyMaterialPlugin {
                 .add_system(prepare_sky_uniform_data.in_set(RenderSet::Prepare))
                 .add_system(queue_sky_material_meshes.in_set(RenderSet::Queue));
         }
+        */
+
+        app.add_asset::<SkyMaterial>()
+            .add_plugin(ExtractComponentPlugin::<Handle<SkyMaterial>>::extract_visible());
+
+        if let Ok(render_app) = app.get_sub_app_mut(RenderApp) {
+            render_app
+                .init_resource::<DrawFunctions<Shadow>>()
+                .add_render_command::<Shadow, DrawPrepass<SkyMaterial>>()
+                .add_render_command::<Transparent3d, DrawSkyMaterial>()
+                .add_render_command::<Opaque3d, DrawSkyMaterial>()
+                .add_render_command::<AlphaMask3d, DrawSkyMaterial>()
+                .init_resource::<MaterialPipeline<SkyMaterial>>()
+                .init_resource::<ExtractedMaterials<SkyMaterial>>()
+                .init_resource::<RenderMaterials<SkyMaterial>>()
+                .init_resource::<SpecializedMeshPipelines<MaterialPipeline<SkyMaterial>>>()
+                .add_system(extract_materials::<SkyMaterial>.in_schedule(ExtractSchedule))
+                .add_system(
+                    prepare_materials::<SkyMaterial>
+                        .in_set(RenderSet::Prepare)
+                        .after(PrepareAssetSet::PreAssetPrepare),
+                )
+                .add_system(
+                    queue_shadows::<SkyMaterial, DrawPrepass<SkyMaterial>>
+                        .in_set(RenderLightSystems::QueueShadows),
+                )
+                .add_system(
+                    queue_material_meshes::<SkyMaterial, DrawSkyMaterial>.in_set(RenderSet::Queue),
+                );
+
+            render_app
+                .init_resource::<SkyUniformMeta>()
+                .add_system(extract_sky_uniform_data.in_schedule(ExtractSchedule))
+                .add_system(prepare_sky_uniform_data.in_set(RenderSet::Prepare));
+        }
+
+        // PrepassPipelinePlugin is required for shadow mapping and the optional PrepassPlugin
+        app.add_plugin(PrepassPipelinePlugin::<SkyMaterial>::default());
+
+        //if self.prepass_enabled {
+        //    app.add_plugin(PrepassPlugin::<SkyMaterial>::default());
+        //}
     }
 }
 
@@ -155,33 +202,64 @@ fn prepare_sky_uniform_data(
     render_queue.write_buffer(&sky_uniform_meta.buffer, 0, buffer.as_ref());
 }
 
-#[derive(Resource)]
-pub struct SkyMaterialPipeline {
-    pub mesh_pipeline: MeshPipeline,
-    pub material_layout: BindGroupLayout,
-    pub sky_uniform_layout: BindGroupLayout,
-    pub vertex_shader: Option<Handle<Shader>>,
-    pub fragment_shader: Option<Handle<Shader>>,
-    pub sampler: Sampler,
+#[derive(Debug, Clone, TypeUuid, AsBindGroup)]
+#[uuid = "971a6c96-4516-4ea0-aeb6-349633e7934e"]
+pub struct SkyMaterial {
+    #[texture(0)]
+    #[sampler(1)]
+    pub texture_day: Option<Handle<Image>>,
+
+    #[texture(2)]
+    #[sampler(3)]
+    pub texture_night: Option<Handle<Image>>,
 }
 
-impl SpecializedMeshPipeline for SkyMaterialPipeline {
-    type Key = MeshPipelineKey;
+#[derive(Clone)]
+pub struct SkyMaterialPipelineData {
+    pub sky_uniform_layout: BindGroupLayout,
+}
+
+impl FromWorld for SkyMaterialPipelineData {
+    fn from_world(world: &mut World) -> Self {
+        Self {
+            sky_uniform_layout: world.resource::<SkyUniformMeta>().bind_group_layout.clone(),
+        }
+    }
+}
+
+impl Material for SkyMaterial {
+    type PipelineData = SkyMaterialPipelineData;
+
+    fn vertex_shader() -> bevy::render::render_resource::ShaderRef {
+        SKY_MATERIAL_SHADER_HANDLE.typed().into()
+    }
+
+    fn fragment_shader() -> bevy::render::render_resource::ShaderRef {
+        SKY_MATERIAL_SHADER_HANDLE.typed().into()
+    }
+
+    fn alpha_mode(&self) -> bevy::prelude::AlphaMode {
+        bevy::prelude::AlphaMode::Opaque
+    }
+
+    fn depth_bias(&self) -> f32 {
+        9999999999.0
+    }
+
+    fn prepass_vertex_shader() -> bevy::render::render_resource::ShaderRef {
+        SKY_MATERIAL_SHADER_HANDLE.typed().into()
+    }
+
+    fn prepass_fragment_shader() -> bevy::render::render_resource::ShaderRef {
+        SKY_MATERIAL_SHADER_HANDLE.typed().into()
+    }
 
     fn specialize(
-        &self,
-        key: Self::Key,
+        pipeline: &bevy::pbr::MaterialPipeline<Self>,
+        descriptor: &mut RenderPipelineDescriptor,
         layout: &MeshVertexBufferLayout,
-    ) -> Result<RenderPipelineDescriptor, SpecializedMeshPipelineError> {
-        let mut descriptor = self.mesh_pipeline.specialize(key, layout)?;
-        if let Some(vertex_shader) = &self.vertex_shader {
-            descriptor.vertex.shader = vertex_shader.clone();
-        }
-
-        if let Some(fragment_shader) = &self.fragment_shader {
-            descriptor.fragment.as_mut().unwrap().shader = fragment_shader.clone();
-        }
-
+        key: bevy::pbr::MaterialPipelineKey<Self>,
+    ) -> Result<(), SpecializedMeshPipelineError> {
         descriptor
             .depth_stencil
             .as_mut()
@@ -189,8 +267,9 @@ impl SpecializedMeshPipeline for SkyMaterialPipeline {
             .depth_write_enabled = false;
         descriptor.depth_stencil.as_mut().unwrap().depth_compare = CompareFunction::Always;
 
-        descriptor.layout.insert(1, self.material_layout.clone());
-        descriptor.layout.insert(3, self.sky_uniform_layout.clone());
+        descriptor
+            .layout
+            .insert(3, pipeline.data.sky_uniform_layout.clone());
 
         let vertex_layout = layout.get_layout(&[
             Mesh::ATTRIBUTE_POSITION.at_shader_location(0),
@@ -198,171 +277,7 @@ impl SpecializedMeshPipeline for SkyMaterialPipeline {
         ])?;
         descriptor.vertex.buffers = vec![vertex_layout];
 
-        Ok(descriptor)
-    }
-}
-
-impl FromWorld for SkyMaterialPipeline {
-    fn from_world(world: &mut World) -> Self {
-        let render_device = world.resource::<RenderDevice>();
-        let material_layout = render_device.create_bind_group_layout(&BindGroupLayoutDescriptor {
-            entries: &[
-                // Texture 0
-                BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: ShaderStages::FRAGMENT,
-                    ty: BindingType::Texture {
-                        multisampled: false,
-                        sample_type: TextureSampleType::Float { filterable: true },
-                        view_dimension: TextureViewDimension::D2,
-                    },
-                    count: None,
-                },
-                // Texture 0 Sampler
-                BindGroupLayoutEntry {
-                    binding: 1,
-                    visibility: ShaderStages::FRAGMENT,
-                    ty: BindingType::Sampler(SamplerBindingType::Filtering),
-                    count: None,
-                },
-                // Texture 1
-                BindGroupLayoutEntry {
-                    binding: 2,
-                    visibility: ShaderStages::FRAGMENT,
-                    ty: BindingType::Texture {
-                        multisampled: false,
-                        sample_type: TextureSampleType::Float { filterable: true },
-                        view_dimension: TextureViewDimension::D2,
-                    },
-                    count: None,
-                },
-                // Texture 1 Sampler
-                BindGroupLayoutEntry {
-                    binding: 3,
-                    visibility: ShaderStages::FRAGMENT,
-                    ty: BindingType::Sampler(SamplerBindingType::Filtering),
-                    count: None,
-                },
-            ],
-            label: Some("sky_material_layout"),
-        });
-
-        SkyMaterialPipeline {
-            mesh_pipeline: world.resource::<MeshPipeline>().clone(),
-            material_layout,
-            sky_uniform_layout: world.resource::<SkyUniformMeta>().bind_group_layout.clone(),
-            vertex_shader: Some(SKY_MATERIAL_SHADER_HANDLE.typed()),
-            fragment_shader: Some(SKY_MATERIAL_SHADER_HANDLE.typed()),
-            sampler: render_device.create_sampler(&SamplerDescriptor {
-                address_mode_u: AddressMode::Repeat,
-                address_mode_v: AddressMode::Repeat,
-                mag_filter: FilterMode::Linear,
-                min_filter: FilterMode::Linear,
-                ..Default::default()
-            }),
-        }
-    }
-}
-
-#[derive(Debug, Clone, TypeUuid)]
-#[uuid = "971a6c96-4516-4ea0-aeb6-349633e7934e"]
-pub struct SkyMaterial {
-    pub texture_day: Option<Handle<Image>>,
-    pub texture_night: Option<Handle<Image>>,
-}
-
-/// The GPU representation of a [`SkyMaterial`].
-#[derive(Debug, Clone)]
-pub struct GpuSkyMaterial {
-    pub bind_group: BindGroup,
-    pub texture_day: Option<Handle<Image>>,
-    pub texture_night: Option<Handle<Image>>,
-}
-
-impl RenderAsset for SkyMaterial {
-    type ExtractedAsset = SkyMaterial;
-    type PreparedAsset = GpuSkyMaterial;
-    type Param = (
-        SRes<RenderDevice>,
-        SRes<SkyMaterialPipeline>,
-        SRes<RenderAssets<Image>>,
-    );
-
-    fn extract_asset(&self) -> Self::ExtractedAsset {
-        self.clone()
-    }
-
-    fn prepare_asset(
-        material: Self::ExtractedAsset,
-        (render_device, material_pipeline, gpu_images): &mut SystemParamItem<Self::Param>,
-    ) -> Result<Self::PreparedAsset, PrepareAssetError<Self::ExtractedAsset>> {
-        let (texture_day_view, _) = if let Some(result) = material_pipeline
-            .mesh_pipeline
-            .get_image_texture(gpu_images, &material.texture_day)
-        {
-            result
-        } else {
-            return Err(PrepareAssetError::RetryNextUpdate(material));
-        };
-        let texture_day_sampler = &material_pipeline.sampler;
-
-        let (texture_night_view, _) = if let Some(result) = material_pipeline
-            .mesh_pipeline
-            .get_image_texture(gpu_images, &material.texture_night)
-        {
-            result
-        } else {
-            return Err(PrepareAssetError::RetryNextUpdate(material));
-        };
-        let texture_night_sampler = &material_pipeline.sampler;
-
-        let bind_group = render_device.create_bind_group(&BindGroupDescriptor {
-            entries: &[
-                BindGroupEntry {
-                    binding: 0,
-                    resource: BindingResource::TextureView(texture_day_view),
-                },
-                BindGroupEntry {
-                    binding: 1,
-                    resource: BindingResource::Sampler(texture_day_sampler),
-                },
-                BindGroupEntry {
-                    binding: 2,
-                    resource: BindingResource::TextureView(texture_night_view),
-                },
-                BindGroupEntry {
-                    binding: 3,
-                    resource: BindingResource::Sampler(texture_night_sampler),
-                },
-            ],
-            label: Some("sky_material_bind_group"),
-            layout: &material_pipeline.material_layout,
-        });
-
-        Ok(GpuSkyMaterial {
-            bind_group,
-            texture_day: material.texture_day,
-            texture_night: material.texture_night,
-        })
-    }
-}
-
-pub struct SetSkyMaterialBindGroup<const I: usize>(PhantomData<SkyMaterial>);
-impl<P: PhaseItem, const I: usize> RenderCommand<P> for SetSkyMaterialBindGroup<I> {
-    type Param = SRes<RenderAssets<SkyMaterial>>;
-    type ViewWorldQuery = ();
-    type ItemWorldQuery = Read<Handle<SkyMaterial>>;
-
-    fn render<'w>(
-        _: &P,
-        _: ROQueryItem<'w, Self::ViewWorldQuery>,
-        material_handle: ROQueryItem<'w, Self::ItemWorldQuery>,
-        materials: SystemParamItem<'w, '_, Self::Param>,
-        pass: &mut TrackedRenderPass<'w>,
-    ) -> RenderCommandResult {
-        let material = materials.into_inner().get(material_handle).unwrap();
-        pass.set_bind_group(I, &material.bind_group, &[]);
-        RenderCommandResult::Success
+        Ok(())
     }
 }
 
@@ -388,67 +303,8 @@ impl<P: PhaseItem, const I: usize> RenderCommand<P> for SetTimeBindGroup<I> {
 type DrawSkyMaterial = (
     SetItemPipeline,
     SetMeshViewBindGroup<0>,
-    SetSkyMaterialBindGroup<1>,
+    SetMaterialBindGroup<SkyMaterial, 1>,
     SetMeshBindGroup<2>,
     SetTimeBindGroup<3>,
     DrawMesh,
 );
-
-fn queue_sky_material_meshes(
-    opaque_draw_functions: Res<DrawFunctions<Opaque3d>>,
-    material_pipeline: Res<SkyMaterialPipeline>,
-    mut pipelines: ResMut<SpecializedMeshPipelines<SkyMaterialPipeline>>,
-    pipeline_cache: Res<PipelineCache>,
-    msaa: Res<Msaa>,
-    render_meshes: Res<RenderAssets<Mesh>>,
-    render_materials: Res<RenderAssets<SkyMaterial>>,
-    material_meshes: Query<(&Handle<SkyMaterial>, &Handle<Mesh>, &MeshUniform)>,
-    mut views: Query<(&ExtractedView, &VisibleEntities, &mut RenderPhase<Opaque3d>)>,
-) {
-    let draw_opaque = opaque_draw_functions
-        .read()
-        .get_id::<DrawSkyMaterial>()
-        .unwrap();
-
-    for (view, visible_entities, mut opaque_phase) in views.iter_mut() {
-        let inverse_view_matrix = view.transform.compute_matrix().inverse();
-        let _inverse_view_row_2 = inverse_view_matrix.row(2);
-        let view_key = MeshPipelineKey::from_msaa_samples(msaa.samples())
-            | MeshPipelineKey::from_hdr(view.hdr);
-
-        for visible_entity in &visible_entities.entities {
-            if let Ok((material_handle, mesh_handle, _mesh_uniform)) =
-                material_meshes.get(*visible_entity)
-            {
-                if render_materials.get(material_handle).is_some() {
-                    if let Some(mesh) = render_meshes.get(mesh_handle) {
-                        let mesh_key =
-                            MeshPipelineKey::from_primitive_topology(mesh.primitive_topology)
-                                | view_key;
-
-                        let pipeline_id = pipelines.specialize(
-                            &pipeline_cache,
-                            &material_pipeline,
-                            mesh_key,
-                            &mesh.layout,
-                        );
-                        let pipeline_id = match pipeline_id {
-                            Ok(id) => id,
-                            Err(err) => {
-                                error!("{}", err);
-                                continue;
-                            }
-                        };
-
-                        opaque_phase.add(Opaque3d {
-                            entity: *visible_entity,
-                            draw_function: draw_opaque,
-                            pipeline: pipeline_id,
-                            distance: 9999999999.0,
-                        });
-                    }
-                }
-            }
-        }
-    }
-}
