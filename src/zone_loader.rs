@@ -13,7 +13,7 @@ use bevy::{
     pbr::{NotShadowCaster, NotShadowReceiver},
     prelude::{
         AssetServer, Assets, Commands, ComputedVisibility, Entity, EventReader, EventWriter,
-        GlobalTransform, Handle, HandleUntyped, Local, Mesh, Res, ResMut, Transform, Visibility,
+        GlobalTransform, Handle, HandleUntyped, Local, Mesh, Res, ResMut, Transform, Visibility, Image,
     },
     reflect::TypeUuid,
     render::{
@@ -508,7 +508,7 @@ pub fn spawn_zone(
         .get_zone(zone_data.zone_id)
         .ok_or(ZoneLoadError::InvalidZoneId)?;
 
-    let tilemap_texture_array = {
+    let (tilemap_texture_array, bindless_array) = {
         let mut tilemap_texture_array_builder = TextureArrayBuilder::new();
         for path in zone_data.zon.tile_textures.iter() {
             if path == "end" {
@@ -517,7 +517,9 @@ pub fn spawn_zone(
 
             tilemap_texture_array_builder.add(path.clone());
         }
-        texture_arrays.add(tilemap_texture_array_builder.build(asset_server))
+        let texture_array = tilemap_texture_array_builder.build(asset_server);
+        let bindless_array = texture_array.images.clone();
+        (texture_arrays.add(texture_array), bindless_array)
     };
 
     let water_material = {
@@ -562,6 +564,7 @@ pub fn spawn_zone(
                     meshes,
                     terrain_materials,
                     tilemap_texture_array.clone(),
+                    bindless_array.clone(),
                     zone_data,
                     block_data,
                 );
@@ -746,6 +749,7 @@ fn spawn_terrain(
     meshes: &mut Assets<Mesh>,
     terrain_materials: &mut Assets<TerrainMaterial>,
     tilemap_texture_array: Handle<TextureArray>,
+    bindless_array: Vec<Handle<Image>>,
     zone_data: &ZoneLoaderAsset,
     block_data: &ZoneLoaderBlock,
 ) -> Entity {
@@ -875,6 +879,7 @@ fn spawn_terrain(
             block_data.block_y,
         )),
         tilemap_texture_array,
+        tilemap_image_array: bindless_array,
     });
 
     commands

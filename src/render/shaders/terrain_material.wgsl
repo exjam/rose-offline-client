@@ -46,7 +46,8 @@ var lightmap_texture: texture_2d<f32>;
 @group(1) @binding(1)
 var lightmap_sampler: sampler;
 @group(1) @binding(2)
-var tile_array_texture: texture_2d_array<f32>;
+var tile_array_texture: binding_array<texture_2d<f32>>;
+// var tile_array_texture: texture_2d_array<f32>;
 @group(1) @binding(3)
 var tile_array_sampler: sampler;
 
@@ -89,8 +90,8 @@ fn fragment(in: FragmentInput) -> @location(0) vec4<f32> {
         layer2_uv.y = x;
     }
 
-    let layer1 = textureSample(tile_array_texture, tile_array_sampler, in.uv1, tile_layer1_id);
-    let layer2 = textureSample(tile_array_texture, tile_array_sampler, layer2_uv, tile_layer2_id);
+    let layer1 = textureSample(tile_array_texture[tile_layer1_id], tile_array_sampler, in.uv1);
+    let layer2 = textureSample(tile_array_texture[tile_layer2_id], tile_array_sampler, layer2_uv);
     var lightmap = textureSample(lightmap_texture, lightmap_sampler, in.uv0);
     let shadow = fetch_directional_shadow(0u, in.world_position, in.world_normal, view_z);
     lightmap = vec4<f32>(lightmap.xyz * (shadow * 0.2 + 0.8), lightmap.w);

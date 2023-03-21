@@ -1,4 +1,4 @@
-use std::marker::PhantomData;
+use std::{marker::PhantomData, num::NonZeroU32};
 
 use bevy::{
     asset::Handle,
@@ -12,7 +12,7 @@ use bevy::{
     },
     pbr::{
         DrawMesh, MeshPipeline, MeshPipelineKey, MeshUniform, SetMeshBindGroup,
-        SetMeshViewBindGroup,
+        SetMeshViewBindGroup, MaterialPipeline
     },
     prelude::{
         error, AddAsset, App, Assets, FromWorld, HandleUntyped, IntoSystemConfig, Mesh, Msaa,
@@ -56,6 +56,8 @@ pub const TERRAIN_MESH_ATTRIBUTE_TILE_INFO: MeshVertexAttribute =
 
 #[derive(Default)]
 pub struct TerrainMaterialPlugin;
+
+const MAX_TEXTURE_COUNT: usize = 32;
 
 impl Plugin for TerrainMaterialPlugin {
     fn build(&self, app: &mut App) {
@@ -117,9 +119,9 @@ impl FromWorld for TerrainMaterialPipeline {
                     ty: BindingType::Texture {
                         multisampled: false,
                         sample_type: TextureSampleType::Float { filterable: true },
-                        view_dimension: TextureViewDimension::D2Array,
+                        view_dimension: TextureViewDimension::D2,
                     },
-                    count: None,
+                    count: NonZeroU32::new(MAX_TEXTURE_COUNT as u32),
                 },
                 // Tile Array Texture Sampler
                 BindGroupLayoutEntry {
@@ -200,6 +202,7 @@ impl SpecializedMeshPipeline for TerrainMaterialPipeline {
 pub struct TerrainMaterial {
     pub lightmap_texture: Handle<Image>,
     pub tilemap_texture_array: Handle<TextureArray>,
+    pub tilemap_image_array: Vec<Handle<Image>>,
 }
 
 #[derive(Debug, Clone)]
@@ -207,6 +210,7 @@ pub struct GpuTerrainMaterial {
     pub bind_group: BindGroup,
     pub lightmap_texture: Handle<Image>,
     pub tilemap_texture_array: Handle<TextureArray>,
+    pub tilemap_image_array: Vec<Handle<Image>>,
 }
 
 impl RenderAsset for TerrainMaterial {
@@ -239,6 +243,26 @@ impl RenderAsset for TerrainMaterial {
                 return Err(PrepareAssetError::RetryNextUpdate(material));
             };
 
+        let mut texture_views = vec![&**lightmap_texture_view; MAX_TEXTURE_COUNT];
+        let mut sampler = None;
+
+        for (index, handle) in material.tilemap_image_array.iter().enumerate() {
+            match gpu_images.get(handle) {
+                Some(image) => {
+                    if let Some(texture_gpu_image) = gpu_images.get(&handle) {
+                        if sampler.is_none() {
+                            sampler = Some(&texture_gpu_image.sampler);
+                        }
+
+                        texture_views[index] = &*texture_gpu_image.texture_view;
+                    } else {
+                        return Err(PrepareAssetError::RetryNextUpdate(material));
+                    };
+                },
+                None => return Err(PrepareAssetError::RetryNextUpdate(material)),
+            }
+        }
+
         let (tile_array_texture_view, tile_array_texture_sampler) =
             if let Some(tile_array_gpu_image) =
                 gpu_texture_arrays.get(&material.tilemap_texture_array)
@@ -263,7 +287,7 @@ impl RenderAsset for TerrainMaterial {
                 },
                 BindGroupEntry {
                     binding: 2,
-                    resource: BindingResource::TextureView(tile_array_texture_view),
+                    resource: BindingResource::TextureViewArray(&texture_views[..]),
                 },
                 BindGroupEntry {
                     binding: 3,
@@ -278,6 +302,7 @@ impl RenderAsset for TerrainMaterial {
             bind_group,
             lightmap_texture: material.lightmap_texture.clone(),
             tilemap_texture_array: material.tilemap_texture_array.clone(),
+            tilemap_image_array: material.tilemap_image_array.clone(),
         })
     }
 }

@@ -26,7 +26,7 @@ use crate::resources::RenderConfiguration;
 #[derive(Debug, Clone, TypeUuid)]
 #[uuid = "f1963cac-7435-4adf-a3cf-676c62f5453f"]
 pub struct TextureArray {
-    images: Vec<Handle<Image>>,
+    pub images: Vec<Handle<Image>>,
 }
 
 pub struct TextureArrayBuilder {
