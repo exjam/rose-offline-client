@@ -495,7 +495,9 @@ fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsC
                         "wgpu=error,packets=debug,quest=trace,lua=debug,con=trace,animation=info"
                             .to_string(),
                 }),
-        );
+        )
+        .add_plugin(bevy::diagnostic::EntityCountDiagnosticsPlugin::default())
+        .add_plugin(bevy::diagnostic::FrameTimeDiagnosticsPlugin::default());
 
     // Initialise 3rd party bevy plugins
     app.add_plugin(bevy_polyline::PolylinePlugin)
