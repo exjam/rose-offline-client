@@ -28,7 +28,7 @@ fn vertex(vertex: Vertex) -> VertexOutput {
 }
 
 @group(1) @binding(0)
-var water_array_texture: texture_2d_array<f32>;
+var water_array_texture: binding_array<texture_2d<f32>>;
 @group(1) @binding(1)
 var water_array_sampler: sampler;
 
@@ -37,8 +37,7 @@ struct WaterTextureIndex {
     next_index: i32,
     next_weight: f32,
 };
-@group(1) @binding(2)
-var<uniform> water_texture_index: WaterTextureIndex;
+var<push_constant> water_texture_index: WaterTextureIndex;
 
 struct FragmentInput {
     @builtin(position) frag_coord: vec4<f32>,
@@ -55,8 +54,8 @@ fn fragment(in: FragmentInput) -> @location(0) vec4<f32> {
         view.inverse_view[3].z
     ), in.world_position);
 
-    let color1 = textureSample(water_array_texture, water_array_sampler, in.uv0, water_texture_index.current_index);
-    let color2 = textureSample(water_array_texture, water_array_sampler, in.uv0, water_texture_index.next_index);
+    let color1 = textureSample(water_array_texture[water_texture_index.current_index], water_array_sampler, in.uv0);
+    let color2 = textureSample(water_array_texture[water_texture_index.next_index], water_array_sampler, in.uv0);
     let water_color = mix(color1, color2, water_texture_index.next_weight);
     let lit_color = apply_zone_lighting(in.world_position, water_color, view_z);
     let srgb_color = pow(lit_color, vec4<f32>(2.2));

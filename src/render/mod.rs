@@ -74,7 +74,7 @@ impl Plugin for RoseRenderPlugin {
         app.add_plugin(TerrainMaterialPlugin)
             .add_plugin(EffectMeshMaterialPlugin)
             .add_plugin(ObjectMaterialPlugin)
-            .add_plugin(WaterMaterialPlugin)
+            .add_plugin(WaterMaterialPlugin { prepass_enabled })
             .add_plugin(ParticleMaterialPlugin)
             .add_plugin(ParticleRenderPlugin)
             .add_plugin(DamageDigitMaterialPlugin)

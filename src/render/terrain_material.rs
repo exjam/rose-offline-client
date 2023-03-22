@@ -11,8 +11,8 @@ use bevy::{
         },
     },
     pbr::{
-        DrawMesh, MeshPipeline, MeshPipelineKey, MeshUniform, SetMeshBindGroup,
-        SetMeshViewBindGroup, MaterialPipeline
+        DrawMesh, MaterialPipeline, MeshPipeline, MeshPipelineKey, MeshUniform, SetMeshBindGroup,
+        SetMeshViewBindGroup,
     },
     prelude::{
         error, AddAsset, App, Assets, FromWorld, HandleUntyped, IntoSystemConfig, Mesh, Msaa,
@@ -258,7 +258,7 @@ impl RenderAsset for TerrainMaterial {
                     } else {
                         return Err(PrepareAssetError::RetryNextUpdate(material));
                     };
-                },
+                }
                 None => return Err(PrepareAssetError::RetryNextUpdate(material)),
             }
         }

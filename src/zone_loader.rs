@@ -13,7 +13,8 @@ use bevy::{
     pbr::{NotShadowCaster, NotShadowReceiver},
     prelude::{
         AssetServer, Assets, Commands, ComputedVisibility, Entity, EventReader, EventWriter,
-        GlobalTransform, Handle, HandleUntyped, Local, Mesh, Res, ResMut, Transform, Visibility, Image,
+        GlobalTransform, Handle, HandleUntyped, Image, Local, Mesh, Res, ResMut, Transform,
+        Visibility,
     },
     reflect::TypeUuid,
     render::{
@@ -523,14 +524,16 @@ pub fn spawn_zone(
     };
 
     let water_material = {
-        let mut water_texture_array_builder = TextureArrayBuilder::new();
+        let mut water_material_textures = Vec::with_capacity(25);
         for i in 1..=25 {
-            water_texture_array_builder.add(format!("3DDATA/JUNON/WATER/OCEAN01_{:02}.DDS", i));
+            water_material_textures.push(asset_server.load(format!(
+                "3DDATA/JUNON/WATER/OCEAN01_{:02}.DDS.rgb_texture",
+                i
+            )));
         }
 
         water_materials.add(WaterMaterial {
-            water_texture_array: texture_arrays
-                .add(water_texture_array_builder.build(asset_server)),
+            textures: water_material_textures,
         })
     };
 
