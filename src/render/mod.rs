@@ -65,6 +65,8 @@ pub struct RoseRenderPlugin;
 
 impl Plugin for RoseRenderPlugin {
     fn build(&self, app: &mut App) {
+        let prepass_enabled = false;
+
         app.add_plugin(TextureArrayPlugin)
             .add_plugin(ZoneLightingPlugin)
             .init_asset_loader::<RgbTextureLoader>();
@@ -77,7 +79,7 @@ impl Plugin for RoseRenderPlugin {
             .add_plugin(ParticleRenderPlugin)
             .add_plugin(DamageDigitMaterialPlugin)
             .add_plugin(DamageDigitRenderPlugin)
-            .add_plugin(SkyMaterialPlugin)
+            .add_plugin(SkyMaterialPlugin { prepass_enabled })
             .add_plugin(TrailEffectRenderPlugin)
             .add_plugin(WorldUiRenderPlugin);
     }
