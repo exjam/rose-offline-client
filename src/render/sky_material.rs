@@ -1,36 +1,23 @@
 use bevy::{
     asset::Handle,
-    core_pipeline::core_3d::{AlphaMask3d, Opaque3d, Transparent3d},
     ecs::{
         query::ROQueryItem,
         system::{lifetimeless::SRes, SystemParamItem},
     },
-    pbr::{
-        extract_materials, prepare_materials, queue_material_meshes, queue_shadows, DrawMesh,
-        DrawPrepass, ExtractedMaterials, MaterialPipeline, PrepassPipelinePlugin, PrepassPlugin,
-        RenderLightSystems, RenderMaterials, SetMaterialBindGroup, SetMeshBindGroup,
-        SetMeshViewBindGroup, Shadow,
-    },
-    prelude::{
-        AddAsset, App, Assets, HandleUntyped, Image, IntoSystemAppConfig, IntoSystemConfig,
-        Material, Mesh, Plugin,
-    },
+    pbr::{DrawMesh, DrawPrepass, SetMaterialBindGroup, SetMeshBindGroup, SetMeshViewBindGroup},
+    prelude::{App, Assets, HandleUntyped, Image, Material, MaterialPlugin, Mesh, Plugin},
     reflect::TypeUuid,
     render::{
-        extract_component::ExtractComponentPlugin,
         extract_resource::ExtractResourcePlugin,
         mesh::MeshVertexBufferLayout,
         prelude::Shader,
-        render_asset::PrepareAssetSet,
         render_phase::{
-            AddRenderCommand, PhaseItem, RenderCommand, RenderCommandResult, SetItemPipeline,
-            TrackedRenderPass,
+            PhaseItem, RenderCommand, RenderCommandResult, SetItemPipeline, TrackedRenderPass,
         },
         render_resource::{
             AsBindGroup, CompareFunction, PushConstantRange, RenderPipelineDescriptor,
-            ShaderStages, SpecializedMeshPipelineError, SpecializedMeshPipelines,
+            ShaderStages, SpecializedMeshPipelineError,
         },
-        ExtractSchedule, RenderApp, RenderSet,
     },
 };
 
@@ -54,40 +41,12 @@ impl Plugin for SkyMaterialPlugin {
 
         app.add_plugin(ExtractResourcePlugin::<ZoneTime>::default());
 
-        app.add_asset::<SkyMaterial>()
-            .add_plugin(ExtractComponentPlugin::<Handle<SkyMaterial>>::extract_visible());
-
-        if let Ok(render_app) = app.get_sub_app_mut(RenderApp) {
-            render_app
-                .add_render_command::<Shadow, DrawPrepass<SkyMaterial>>()
-                .add_render_command::<Transparent3d, DrawSkyMaterial>()
-                .add_render_command::<Opaque3d, DrawSkyMaterial>()
-                .add_render_command::<AlphaMask3d, DrawSkyMaterial>()
-                .init_resource::<MaterialPipeline<SkyMaterial>>()
-                .init_resource::<ExtractedMaterials<SkyMaterial>>()
-                .init_resource::<RenderMaterials<SkyMaterial>>()
-                .init_resource::<SpecializedMeshPipelines<MaterialPipeline<SkyMaterial>>>()
-                .add_system(extract_materials::<SkyMaterial>.in_schedule(ExtractSchedule))
-                .add_system(
-                    prepare_materials::<SkyMaterial>
-                        .in_set(RenderSet::Prepare)
-                        .after(PrepareAssetSet::PreAssetPrepare),
-                )
-                .add_system(
-                    queue_shadows::<SkyMaterial, DrawPrepass<SkyMaterial>>
-                        .in_set(RenderLightSystems::QueueShadows),
-                )
-                .add_system(
-                    queue_material_meshes::<SkyMaterial, DrawSkyMaterial>.in_set(RenderSet::Queue),
-                );
-        }
-
-        // PrepassPipelinePlugin is required for shadow mapping and the optional PrepassPlugin
-        app.add_plugin(PrepassPipelinePlugin::<SkyMaterial>::default());
-
-        if self.prepass_enabled {
-            app.add_plugin(PrepassPlugin::<SkyMaterial>::default());
-        }
+        app.add_plugin(
+            MaterialPlugin::<SkyMaterial, DrawSkyMaterial, DrawPrepass<SkyMaterial>> {
+                prepass_enabled: self.prepass_enabled,
+                ..Default::default()
+            },
+        );
     }
 }
 

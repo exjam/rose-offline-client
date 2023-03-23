@@ -13,8 +13,7 @@ use bevy::{
     pbr::{NotShadowCaster, NotShadowReceiver},
     prelude::{
         AssetServer, Assets, Commands, ComputedVisibility, Entity, EventReader, EventWriter,
-        GlobalTransform, Handle, HandleUntyped, Image, Local, Mesh, Res, ResMut, Transform,
-        Visibility,
+        GlobalTransform, Handle, HandleUntyped, Local, Mesh, Res, ResMut, Transform, Visibility,
     },
     reflect::TypeUuid,
     render::{
@@ -47,8 +46,8 @@ use crate::{
     events::{LoadZoneEvent, ZoneEvent},
     render::{
         EffectMeshMaterial, ObjectMaterial, ObjectMaterialBlend, ParticleMaterial,
-        RgbTextureLoader, SkyMaterial, TerrainMaterial, TextureArray, TextureArrayBuilder,
-        WaterMaterial, MESH_ATTRIBUTE_UV_1, TERRAIN_MESH_ATTRIBUTE_TILE_INFO,
+        RgbTextureLoader, SkyMaterial, TerrainMaterial, WaterMaterial, MESH_ATTRIBUTE_UV_1,
+        TERRAIN_MATERIAL_MAX_TEXTURES, TERRAIN_MESH_ATTRIBUTE_TILE_INFO,
     },
     resources::{CurrentZone, DebugInspector, GameData},
     VfsResource,
@@ -318,7 +317,6 @@ pub struct SpawnZoneParams<'w, 's> {
     pub particle_materials: ResMut<'w, Assets<ParticleMaterial>>,
     pub object_materials: ResMut<'w, Assets<ObjectMaterial>>,
     pub water_materials: ResMut<'w, Assets<WaterMaterial>>,
-    pub texture_arrays: ResMut<'w, Assets<TextureArray>>,
 }
 
 pub struct CachedZone {
@@ -501,7 +499,6 @@ pub fn spawn_zone(
         particle_materials,
         object_materials,
         water_materials,
-        texture_arrays,
     } = params;
 
     let zone_list_entry = game_data
@@ -509,19 +506,19 @@ pub fn spawn_zone(
         .get_zone(zone_data.zone_id)
         .ok_or(ZoneLoadError::InvalidZoneId)?;
 
-    let (tilemap_texture_array, bindless_array) = {
-        let mut tilemap_texture_array_builder = TextureArrayBuilder::new();
-        for path in zone_data.zon.tile_textures.iter() {
-            if path == "end" {
-                break;
-            }
-
-            tilemap_texture_array_builder.add(path.clone());
+    let terrain_material_handle = terrain_materials.add(TerrainMaterial {
+        textures: Vec::with_capacity(TERRAIN_MATERIAL_MAX_TEXTURES),
+    });
+    let terrain_material = terrain_materials.get_mut(&terrain_material_handle).unwrap();
+    for path in zone_data.zon.tile_textures.iter() {
+        if path == "end" {
+            break;
         }
-        let texture_array = tilemap_texture_array_builder.build(asset_server);
-        let bindless_array = texture_array.images.clone();
-        (texture_arrays.add(texture_array), bindless_array)
-    };
+
+        terrain_material
+            .textures
+            .push(asset_server.load(RgbTextureLoader::convert_path(&Path::new(path))));
+    }
 
     let water_material = {
         let mut water_material_textures = Vec::with_capacity(25);
@@ -565,9 +562,8 @@ pub fn spawn_zone(
                     commands,
                     asset_server,
                     meshes,
-                    terrain_materials,
-                    tilemap_texture_array.clone(),
-                    bindless_array.clone(),
+                    terrain_material_handle.clone(),
+                    terrain_material,
                     zone_data,
                     block_data,
                 );
@@ -750,9 +746,8 @@ fn spawn_terrain(
     commands: &mut Commands,
     asset_server: &AssetServer,
     meshes: &mut Assets<Mesh>,
-    terrain_materials: &mut Assets<TerrainMaterial>,
-    tilemap_texture_array: Handle<TextureArray>,
-    bindless_array: Vec<Handle<Image>>,
+    terrain_material_handle: Handle<TerrainMaterial>,
+    terrain_material: &mut TerrainMaterial,
     zone_data: &ZoneLoaderAsset,
     block_data: &ZoneLoaderBlock,
 ) -> Entity {
@@ -768,6 +763,14 @@ fn spawn_terrain(
 
     let tilemap = block_data.til.as_ref();
     let heightmap = &block_data.him;
+
+    let lightmap_texture_index = terrain_material.textures.len() as u32;
+    terrain_material.textures.push(asset_server.load(format!(
+        "{}/{1:}_{2:}/{1:}_{2:}_PLANELIGHTINGMAP.DDS.rgb_texture",
+        zone_data.zone_path.to_str().unwrap(),
+        block_data.block_x,
+        block_data.block_y,
+    )));
 
     for tile_x in 0..16 {
         for tile_y in 0..16 {
@@ -815,11 +818,13 @@ fn spawn_terrain(
                         (tile_x as f32 * 4.0 + x as f32) / 64.0,
                         (tile_y as f32 * 4.0 + y as f32) / 64.0,
                     ]);
-                    tile_ids.push([
-                        tile_array_index1 as i32,
-                        tile_array_index2 as i32,
-                        tile_rotation,
-                    ]);
+
+                    tile_ids.push(
+                        lightmap_texture_index
+                            | tile_array_index1 << 8
+                            | tile_array_index2 << 16
+                            | tile_rotation << 24,
+                    );
                 }
             }
 
@@ -874,17 +879,6 @@ fn spawn_terrain(
         }
     }
 
-    let material = terrain_materials.add(TerrainMaterial {
-        lightmap_texture: asset_server.load(format!(
-            "{}/{1:}_{2:}/{1:}_{2:}_PLANELIGHTINGMAP.DDS.rgb_texture",
-            zone_data.zone_path.to_str().unwrap(),
-            block_data.block_x,
-            block_data.block_y,
-        )),
-        tilemap_texture_array,
-        tilemap_image_array: bindless_array,
-    });
-
     commands
         .spawn((
             ZoneObject::Terrain(ZoneObjectTerrain {
@@ -892,7 +886,7 @@ fn spawn_terrain(
                 block_y: block_data.block_y as u32,
             }),
             meshes.add(mesh),
-            material,
+            terrain_material_handle,
             Transform::from_xyz(offset_x, 0.0, -offset_y),
             GlobalTransform::default(),
             Visibility::default(),

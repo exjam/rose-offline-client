@@ -14,7 +14,7 @@ struct Vertex {
     @location(1) normal: vec3<f32>,
     @location(2) uv0: vec2<f32>,
     @location(3) uv1: vec2<f32>,
-    @location(4) tile_info: vec3<i32>,
+    @location(4) tile_info: u32,
 };
 
 struct VertexOutput {
@@ -23,7 +23,7 @@ struct VertexOutput {
     @location(1) world_normal: vec3<f32>,
     @location(2) uv0: vec2<f32>,
     @location(3) uv1: vec2<f32>,
-    @location(4) tile_info: vec3<i32>,
+    @location(4) tile_info: u32,
 };
 
 @vertex
@@ -42,13 +42,8 @@ fn vertex(vertex: Vertex) -> VertexOutput {
 }
 
 @group(1) @binding(0)
-var lightmap_texture: texture_2d<f32>;
-@group(1) @binding(1)
-var lightmap_sampler: sampler;
-@group(1) @binding(2)
 var tile_array_texture: binding_array<texture_2d<f32>>;
-// var tile_array_texture: texture_2d_array<f32>;
-@group(1) @binding(3)
+@group(1) @binding(1)
 var tile_array_sampler: sampler;
 
 struct FragmentInput {
@@ -57,7 +52,7 @@ struct FragmentInput {
     @location(1) world_normal: vec3<f32>,
     @location(2) uv0: vec2<f32>,
     @location(3) uv1: vec2<f32>,
-    @location(4) tile_info: vec3<i32>,
+    @location(4) tile_info: u32,
 };
 
 @fragment
@@ -69,22 +64,23 @@ fn fragment(in: FragmentInput) -> @location(0) vec4<f32> {
         view.inverse_view[3].z
     ), in.world_position);
 
-    var tile_layer1_id: i32 = in.tile_info.x;
-    var tile_layer2_id: i32 = in.tile_info.y;
-    var tile_rotation: i32 = in.tile_info.z;
+    var lightmap_id: u32 = in.tile_info & 0xffu;
+    var tile_layer1_id: u32 = (in.tile_info >> 8u) & 0xffu;
+    var tile_layer2_id: u32 = (in.tile_info >> 16u) & 0xffu;
+    var tile_rotation: u32 = (in.tile_info >> 24u) & 0xffu;
     var layer2_uv: vec2<f32> = in.uv1;
-    if (tile_rotation == 2) {
+    if (tile_rotation == 2u) {
         layer2_uv.x = 1.0 - layer2_uv.x;
-    } else if (tile_rotation == 3) {
+    } else if (tile_rotation == 3u) {
         layer2_uv.y = 1.0 - layer2_uv.y;
-    } else if (tile_rotation == 4) {
+    } else if (tile_rotation == 4u) {
         layer2_uv.x = 1.0 - layer2_uv.x;
         layer2_uv.y = 1.0 - layer2_uv.y;
-    } else if (tile_rotation == 5) {
+    } else if (tile_rotation == 5u) {
         var x: f32 = layer2_uv.x;
         layer2_uv.x = layer2_uv.y;
         layer2_uv.y = 1.0 - x;
-    } else if (tile_rotation == 6) {
+    } else if (tile_rotation == 6u) {
         var x: f32 = layer2_uv.x;
         layer2_uv.x = layer2_uv.y;
         layer2_uv.y = x;
@@ -92,7 +88,7 @@ fn fragment(in: FragmentInput) -> @location(0) vec4<f32> {
 
     let layer1 = textureSample(tile_array_texture[tile_layer1_id], tile_array_sampler, in.uv1);
     let layer2 = textureSample(tile_array_texture[tile_layer2_id], tile_array_sampler, layer2_uv);
-    var lightmap = textureSample(lightmap_texture, lightmap_sampler, in.uv0);
+    var lightmap = textureSample(tile_array_texture[lightmap_id], tile_array_sampler, in.uv0);
     let shadow = fetch_directional_shadow(0u, in.world_position, in.world_normal, view_z);
     lightmap = vec4<f32>(lightmap.xyz * (shadow * 0.2 + 0.8), lightmap.w);
 

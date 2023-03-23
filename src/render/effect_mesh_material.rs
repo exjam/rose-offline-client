@@ -1,6 +1,9 @@
 use bevy::{
     asset::Handle,
-    pbr::{AlphaMode, Material, MaterialPipeline, MaterialPipelineKey, MaterialPlugin},
+    pbr::{
+        AlphaMode, DrawMaterial, DrawPrepass, Material, MaterialPipeline, MaterialPipelineKey,
+        MaterialPlugin,
+    },
     prelude::{App, Assets, HandleUntyped, Mesh, Plugin},
     reflect::TypeUuid,
     render::{
@@ -20,7 +23,9 @@ pub const EFFECT_MESH_MATERIAL_SHADER_HANDLE: HandleUntyped =
     HandleUntyped::weak_from_u64(Shader::TYPE_UUID, 0x90d5233c3001d33e);
 
 #[derive(Default)]
-pub struct EffectMeshMaterialPlugin;
+pub struct EffectMeshMaterialPlugin {
+    pub prepass_enabled: bool,
+}
 
 impl Plugin for EffectMeshMaterialPlugin {
     fn build(&self, app: &mut App) {
@@ -30,7 +35,14 @@ impl Plugin for EffectMeshMaterialPlugin {
             Shader::from_wgsl(include_str!("shaders/effect_mesh_material.wgsl")),
         );
 
-        app.add_plugin(MaterialPlugin::<EffectMeshMaterial>::default());
+        app.add_plugin(MaterialPlugin::<
+            EffectMeshMaterial,
+            DrawMaterial<EffectMeshMaterial>,
+            DrawPrepass<EffectMeshMaterial>,
+        > {
+            prepass_enabled: self.prepass_enabled,
+            ..Default::default()
+        });
     }
 }
 
