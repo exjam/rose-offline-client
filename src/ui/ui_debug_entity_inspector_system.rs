@@ -1,8 +1,16 @@
-use bevy::prelude::World;
+use bevy::{
+    prelude::{Camera3d, Entity, Mut, With, World, DirectionalLight},
+    window::PrimaryWindow,
+};
+use bevy_egui::EguiContext;
+
+use crate::{components::PlayerCharacter, resources::DebugInspector, ui::UiStateDebugWindows};
 
 pub fn ui_debug_entity_inspector_system(world: &mut World) {
-    /*
-    TODO: Fix ui_debug_entity_inspector_system
+    let mut egui_context = world
+        .query_filtered::<&mut EguiContext, With<PrimaryWindow>>()
+        .single(world)
+        .clone();
 
     world.resource_scope(
         |world, mut ui_state_debug_windows: Mut<UiStateDebugWindows>| {
@@ -11,15 +19,38 @@ pub fn ui_debug_entity_inspector_system(world: &mut World) {
                     return;
                 }
 
-                let mut egui_context = world.get_resource_mut::<EguiContexts>().unwrap();
-                let ctx = egui_context.ctx_mut().clone();
-
                 egui::Window::new("Entity Inspector")
                     .open(&mut ui_state_debug_windows.object_inspector_open)
                     .resizable(true)
                     .vscroll(true)
-                    .show(&ctx, |ui| {
+                    .show(egui_context.get_mut(), |ui| {
                         ui.style_mut().wrap = Some(false);
+
+                        ui.horizontal(|ui| {
+                            if ui.button("Camera").clicked() {
+                                debug_inspector_state.entity = Some(
+                                    world
+                                        .query_filtered::<Entity, With<Camera3d>>()
+                                        .single(world)
+                                );
+                            }
+
+                            if ui.button("Player").clicked() {
+                                debug_inspector_state.entity = Some(
+                                    world
+                                        .query_filtered::<Entity, With<PlayerCharacter>>()
+                                        .single(world)
+                                );
+                            }
+
+                            if ui.button("Light").clicked() {
+                                debug_inspector_state.entity = Some(
+                                    world
+                                        .query_filtered::<Entity, With<DirectionalLight>>()
+                                        .single(world)
+                                );
+                            }
+                        });
 
                         let mut enable_picking = debug_inspector_state.enable_picking;
                         ui.checkbox(
@@ -38,5 +69,4 @@ pub fn ui_debug_entity_inspector_system(world: &mut World) {
             });
         },
     );
-    */
 }
