@@ -1,5 +1,5 @@
 use bevy::{
-    prelude::{Camera3d, Entity, Mut, With, World, DirectionalLight},
+    prelude::{Camera3d, DirectionalLight, Entity, Mut, With, World},
     window::PrimaryWindow,
 };
 use bevy_egui::EguiContext;
@@ -31,7 +31,7 @@ pub fn ui_debug_entity_inspector_system(world: &mut World) {
                                 debug_inspector_state.entity = Some(
                                     world
                                         .query_filtered::<Entity, With<Camera3d>>()
-                                        .single(world)
+                                        .single(world),
                                 );
                             }
 
@@ -39,7 +39,7 @@ pub fn ui_debug_entity_inspector_system(world: &mut World) {
                                 debug_inspector_state.entity = Some(
                                     world
                                         .query_filtered::<Entity, With<PlayerCharacter>>()
-                                        .single(world)
+                                        .single(world),
                                 );
                             }
 
@@ -47,7 +47,7 @@ pub fn ui_debug_entity_inspector_system(world: &mut World) {
                                 debug_inspector_state.entity = Some(
                                     world
                                         .query_filtered::<Entity, With<DirectionalLight>>()
-                                        .single(world)
+                                        .single(world),
                                 );
                             }
                         });

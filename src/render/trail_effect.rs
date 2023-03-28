@@ -2,7 +2,7 @@ use std::collections::VecDeque;
 
 use bevy::{
     app::prelude::*,
-    asset::{Assets, Handle, HandleUntyped},
+    asset::{load_internal_asset, Assets, Handle, HandleUntyped},
     core_pipeline::core_3d::Transparent3d,
     ecs::{
         prelude::*,
@@ -42,10 +42,11 @@ pub struct TrailEffectRenderPlugin;
 
 impl Plugin for TrailEffectRenderPlugin {
     fn build(&self, app: &mut App) {
-        let mut shader_assets = app.world.resource_mut::<Assets<Shader>>();
-        shader_assets.set_untracked(
+        load_internal_asset!(
+            app,
             TRAIL_EFFECT_SHADER_HANDLE,
-            Shader::from_wgsl(include_str!("shaders/trail_effect.wgsl")),
+            "shaders/trail_effect.wgsl",
+            Shader::from_wgsl
         );
 
         app.add_systems(

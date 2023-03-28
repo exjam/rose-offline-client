@@ -1,6 +1,6 @@
 use bevy::{
     app::prelude::*,
-    asset::{Assets, Handle, HandleUntyped},
+    asset::{load_internal_asset, Assets, Handle, HandleUntyped},
     core_pipeline::core_3d::Transparent3d,
     ecs::{
         prelude::*,
@@ -38,10 +38,11 @@ pub struct DamageDigitRenderPlugin;
 
 impl Plugin for DamageDigitRenderPlugin {
     fn build(&self, app: &mut App) {
-        let mut shader_assets = app.world.resource_mut::<Assets<Shader>>();
-        shader_assets.set_untracked(
+        load_internal_asset!(
+            app,
             DAMAGE_DIGIT_SHADER_HANDLE,
-            Shader::from_wgsl(include_str!("shaders/damage_digit.wgsl")),
+            "shaders/damage_digit.wgsl",
+            Shader::from_wgsl
         );
 
         let render_app = app.sub_app_mut(RenderApp);

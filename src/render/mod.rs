@@ -39,7 +39,9 @@ pub use particle_material::ParticleMaterial;
 pub use particle_render_data::{ParticleRenderBillboardType, ParticleRenderData};
 pub use rgb_texture_loader::RgbTextureLoader;
 pub use sky_material::SkyMaterial;
-pub use terrain_material::{TerrainMaterial, TERRAIN_MESH_ATTRIBUTE_TILE_INFO};
+pub use terrain_material::{
+    TerrainMaterial, TERRAIN_MATERIAL_MAX_TEXTURES, TERRAIN_MESH_ATTRIBUTE_TILE_INFO,
+};
 pub use texture_array::{GpuTextureArray, TextureArray, TextureArrayBuilder};
 pub use trail_effect::TrailEffect;
 pub use water_material::WaterMaterial;
@@ -65,19 +67,21 @@ pub struct RoseRenderPlugin;
 
 impl Plugin for RoseRenderPlugin {
     fn build(&self, app: &mut App) {
+        let prepass_enabled = false;
+
         app.add_plugin(TextureArrayPlugin)
             .add_plugin(ZoneLightingPlugin)
             .init_asset_loader::<RgbTextureLoader>();
 
-        app.add_plugin(TerrainMaterialPlugin)
-            .add_plugin(EffectMeshMaterialPlugin)
-            .add_plugin(ObjectMaterialPlugin)
-            .add_plugin(WaterMaterialPlugin)
+        app.add_plugin(TerrainMaterialPlugin { prepass_enabled })
+            .add_plugin(EffectMeshMaterialPlugin { prepass_enabled })
+            .add_plugin(ObjectMaterialPlugin { prepass_enabled })
+            .add_plugin(WaterMaterialPlugin { prepass_enabled })
             .add_plugin(ParticleMaterialPlugin)
             .add_plugin(ParticleRenderPlugin)
             .add_plugin(DamageDigitMaterialPlugin)
             .add_plugin(DamageDigitRenderPlugin)
-            .add_plugin(SkyMaterialPlugin)
+            .add_plugin(SkyMaterialPlugin { prepass_enabled })
             .add_plugin(TrailEffectRenderPlugin)
             .add_plugin(WorldUiRenderPlugin);
     }

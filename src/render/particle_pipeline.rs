@@ -1,6 +1,6 @@
 use bevy::{
     app::prelude::*,
-    asset::{Assets, Handle, HandleUntyped},
+    asset::{load_internal_asset, Assets, Handle, HandleUntyped},
     core_pipeline::core_3d::Transparent3d,
     ecs::{
         prelude::*,
@@ -43,10 +43,11 @@ pub struct ParticleRenderPlugin;
 
 impl Plugin for ParticleRenderPlugin {
     fn build(&self, app: &mut App) {
-        let mut shader_assets = app.world.resource_mut::<Assets<Shader>>();
-        shader_assets.set_untracked(
+        load_internal_asset!(
+            app,
             PARTICLE_SHADER_HANDLE,
-            Shader::from_wgsl(include_str!("shaders/particle.wgsl")),
+            "shaders/particle.wgsl",
+            Shader::from_wgsl
         );
 
         app.add_system(compute_particles_aabb.in_set(VisibilitySystems::CalculateBounds));

@@ -1,4 +1,4 @@
-use bevy::prelude::Resource;
+use bevy::{prelude::Resource, render::extract_resource::ExtractResource};
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum ZoneTimeState {
@@ -8,7 +8,7 @@ pub enum ZoneTimeState {
     Night,
 }
 
-#[derive(Resource)]
+#[derive(Clone, Resource, ExtractResource)]
 pub struct ZoneTime {
     pub state: ZoneTimeState,
     pub state_percent_complete: f32,

@@ -63,7 +63,7 @@ use resources::{
     load_ui_resources, run_network_thread, update_ui_resources, AppState, ClientEntityList,
     DamageDigitsSpawner, DebugRenderConfig, GameData, NameTagSettings, NetworkThread,
     NetworkThreadMessage, RenderConfiguration, SelectedTarget, ServerConfiguration, SoundSettings,
-    VfsResource, WorldTime, ZoneTime,
+    SpecularTexture, VfsResource, WorldTime, ZoneTime,
 };
 use scripting::RoseScriptingPlugin;
 use systems::{
@@ -496,6 +496,9 @@ fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsC
                     filter:
                         "wgpu=error,packets=debug,quest=trace,lua=debug,con=trace,animation=info"
                             .to_string(),
+                })
+                .set(bevy::pbr::PbrPlugin {
+                    prepass_enabled: false,
                 }),
         )
         .add_plugin(bevy::diagnostic::EntityCountDiagnosticsPlugin::default())
@@ -1058,6 +1061,10 @@ fn load_common_game_data(
     mut damage_digit_materials: ResMut<Assets<DamageDigitMaterial>>,
     mut egui_context: EguiContexts,
 ) {
+    commands.insert_resource(SpecularTexture {
+        image: asset_server.load("ETC/SPECULAR_SPHEREMAP.DDS"),
+    });
+
     commands.insert_resource(
         ModelLoader::new(
             vfs_resource.vfs.clone(),
@@ -1066,6 +1073,7 @@ fn load_common_game_data(
             game_data.items.clone(),
             game_data.npcs.clone(),
             asset_server.load("3DDATA/EFFECT/TRAIL.DDS"),
+            asset_server.load("ETC/SPECULAR_SPHEREMAP.DDS"),
         )
         .expect("Failed to create model loader"),
     );
@@ -1094,7 +1102,7 @@ fn load_common_game_data(
         },
         cascade_shadow_config: CascadeShadowConfigBuilder {
             num_cascades: 1,
-            minimum_distance: 0.1,
+            minimum_distance: 1.0,
             maximum_distance: 100.0,
             ..Default::default()
         }

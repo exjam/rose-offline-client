@@ -13,7 +13,8 @@ use bevy::{
     pbr::{NotShadowCaster, NotShadowReceiver},
     prelude::{
         AssetServer, Assets, Commands, ComputedVisibility, Entity, EventReader, EventWriter,
-        GlobalTransform, Handle, HandleUntyped, Local, Mesh, Res, ResMut, Transform, Visibility,
+        GlobalTransform, Handle, HandleUntyped, Image, Local, Mesh, Res, ResMut, Transform,
+        Visibility,
     },
     reflect::TypeUuid,
     render::{
@@ -25,6 +26,7 @@ use bevy::{
 use bevy_rapier3d::prelude::{
     AsyncCollider, Collider, CollisionGroups, ComputedColliderShape, RigidBody,
 };
+use log::warn;
 use thiserror::Error;
 
 use rose_data::{SkyboxData, WarpGateId, ZoneId, ZoneList};
@@ -46,10 +48,10 @@ use crate::{
     events::{LoadZoneEvent, ZoneEvent},
     render::{
         EffectMeshMaterial, ObjectMaterial, ObjectMaterialBlend, ParticleMaterial,
-        RgbTextureLoader, SkyMaterial, TerrainMaterial, TextureArray, TextureArrayBuilder,
-        WaterMaterial, MESH_ATTRIBUTE_UV_1, TERRAIN_MESH_ATTRIBUTE_TILE_INFO,
+        RgbTextureLoader, SkyMaterial, TerrainMaterial, WaterMaterial, MESH_ATTRIBUTE_UV_1,
+        TERRAIN_MATERIAL_MAX_TEXTURES, TERRAIN_MESH_ATTRIBUTE_TILE_INFO,
     },
-    resources::{CurrentZone, DebugInspector, GameData},
+    resources::{CurrentZone, DebugInspector, GameData, SpecularTexture},
     VfsResource,
 };
 
@@ -311,13 +313,13 @@ pub struct SpawnZoneParams<'w, 's> {
     pub game_data: Res<'w, GameData>,
     pub vfs_resource: Res<'w, VfsResource>,
     pub meshes: ResMut<'w, Assets<Mesh>>,
+    pub specular_texture: Res<'w, SpecularTexture>,
     pub sky_materials: ResMut<'w, Assets<SkyMaterial>>,
     pub terrain_materials: ResMut<'w, Assets<TerrainMaterial>>,
     pub effect_mesh_materials: ResMut<'w, Assets<EffectMeshMaterial>>,
     pub particle_materials: ResMut<'w, Assets<ParticleMaterial>>,
     pub object_materials: ResMut<'w, Assets<ObjectMaterial>>,
     pub water_materials: ResMut<'w, Assets<WaterMaterial>>,
-    pub texture_arrays: ResMut<'w, Assets<TextureArray>>,
 }
 
 pub struct CachedZone {
@@ -494,13 +496,13 @@ pub fn spawn_zone(
         game_data,
         vfs_resource,
         meshes,
+        specular_texture,
         sky_materials,
         terrain_materials,
         effect_mesh_materials,
         particle_materials,
         object_materials,
         water_materials,
-        texture_arrays,
     } = params;
 
     let zone_list_entry = game_data
@@ -508,27 +510,27 @@ pub fn spawn_zone(
         .get_zone(zone_data.zone_id)
         .ok_or(ZoneLoadError::InvalidZoneId)?;
 
-    let tilemap_texture_array = {
-        let mut tilemap_texture_array_builder = TextureArrayBuilder::new();
-        for path in zone_data.zon.tile_textures.iter() {
-            if path == "end" {
-                break;
-            }
-
-            tilemap_texture_array_builder.add(path.clone());
+    let mut tile_textures: Vec<Handle<Image>> =
+        Vec::with_capacity(zone_data.zon.tile_textures.len());
+    for path in zone_data.zon.tile_textures.iter() {
+        if path == "end" {
+            break;
         }
-        texture_arrays.add(tilemap_texture_array_builder.build(asset_server))
-    };
+
+        tile_textures.push(asset_server.load(RgbTextureLoader::convert_path(Path::new(path))));
+    }
 
     let water_material = {
-        let mut water_texture_array_builder = TextureArrayBuilder::new();
+        let mut water_material_textures = Vec::with_capacity(25);
         for i in 1..=25 {
-            water_texture_array_builder.add(format!("3DDATA/JUNON/WATER/OCEAN01_{:02}.DDS", i));
+            water_material_textures.push(asset_server.load(format!(
+                "3DDATA/JUNON/WATER/OCEAN01_{:02}.DDS.rgb_texture",
+                i
+            )));
         }
 
         water_materials.add(WaterMaterial {
-            water_texture_array: texture_arrays
-                .add(water_texture_array_builder.build(asset_server)),
+            textures: water_material_textures,
         })
     };
 
@@ -561,7 +563,7 @@ pub fn spawn_zone(
                     asset_server,
                     meshes,
                     terrain_materials,
-                    tilemap_texture_array.clone(),
+                    &tile_textures,
                     zone_data,
                     block_data,
                 );
@@ -593,6 +595,7 @@ pub fn spawn_zone(
                             effect_mesh_materials.as_mut(),
                             particle_materials.as_mut(),
                             object_materials.as_mut(),
+                            specular_texture,
                             &game_data.zsc_event_object,
                             &lightmap_path,
                             None,
@@ -620,6 +623,7 @@ pub fn spawn_zone(
                             effect_mesh_materials.as_mut(),
                             particle_materials.as_mut(),
                             object_materials.as_mut(),
+                            specular_texture,
                             &game_data.zsc_special_object,
                             &lightmap_path,
                             None,
@@ -652,6 +656,7 @@ pub fn spawn_zone(
                             effect_mesh_materials.as_mut(),
                             particle_materials.as_mut(),
                             object_materials.as_mut(),
+                            specular_texture,
                             &zone_data.zsc_cnst,
                             &lightmap_path,
                             lit_object,
@@ -680,6 +685,7 @@ pub fn spawn_zone(
                             effect_mesh_materials.as_mut(),
                             particle_materials.as_mut(),
                             object_materials.as_mut(),
+                            specular_texture,
                             &zone_data.zsc_deco,
                             &lightmap_path,
                             lit_object,
@@ -745,7 +751,7 @@ fn spawn_terrain(
     asset_server: &AssetServer,
     meshes: &mut Assets<Mesh>,
     terrain_materials: &mut Assets<TerrainMaterial>,
-    tilemap_texture_array: Handle<TextureArray>,
+    tile_textures: &Vec<Handle<Image>>,
     zone_data: &ZoneLoaderAsset,
     block_data: &ZoneLoaderBlock,
 ) -> Entity {
@@ -762,6 +768,19 @@ fn spawn_terrain(
     let tilemap = block_data.til.as_ref();
     let heightmap = &block_data.him;
 
+    let mut tile_texture_map = vec![0; tile_textures.len()];
+    let mut terrain_material = TerrainMaterial {
+        textures: Vec::with_capacity(tile_textures.len() + 1),
+    };
+
+    terrain_material.textures.push(asset_server.load(format!(
+        "{}/{1:}_{2:}/{1:}_{2:}_PLANELIGHTINGMAP.DDS.rgb_texture",
+        zone_data.zone_path.to_str().unwrap(),
+        block_data.block_x,
+        block_data.block_y,
+    )));
+
+    // Build TerrainMaterial and tile_texture_map
     for tile_x in 0..16 {
         for tile_y in 0..16 {
             let tile = &zone_data.zon.tiles[tilemap
@@ -769,6 +788,62 @@ fn spawn_terrain(
                 .unwrap_or(0)];
             let tile_array_index1 = tile.layer1 + tile.offset1;
             let tile_array_index2 = tile.layer2 + tile.offset2;
+
+            if tile_array_index1 as usize >= tile_texture_map.len() {
+                warn!(
+                    "Invalid tile layer1 id {}, tile.layer1: {} + tile.offset1: {}",
+                    tile_array_index1, tile.layer1, tile.offset1
+                );
+            }
+
+            if tile_array_index2 as usize >= tile_texture_map.len() {
+                warn!(
+                    "Invalid tile layer2 id {}, tile.layer2: {} + tile.offset2: {}",
+                    tile_array_index2, tile.layer2, tile.offset2
+                );
+            }
+
+            if tile_texture_map[tile_array_index1 as usize] == 0 {
+                let index = terrain_material.textures.len();
+                if index == TERRAIN_MATERIAL_MAX_TEXTURES {
+                    warn!(
+                        "Reached maximum TERRAIN_MATERIAL_MAX_TEXTURES for block ({}, {})",
+                        block_data.block_x, block_data.block_y
+                    );
+                    tile_texture_map[tile_array_index1 as usize] = 0;
+                } else {
+                    terrain_material
+                        .textures
+                        .push(tile_textures[tile_array_index1 as usize].clone());
+                    tile_texture_map[tile_array_index1 as usize] = index as u32;
+                }
+            }
+
+            if tile_texture_map[tile_array_index2 as usize] == 0 {
+                let index = terrain_material.textures.len();
+                if index == TERRAIN_MATERIAL_MAX_TEXTURES {
+                    warn!(
+                        "Reached maximum TERRAIN_MATERIAL_MAX_TEXTURES for block ({}, {})",
+                        block_data.block_x, block_data.block_y
+                    );
+                    tile_texture_map[tile_array_index2 as usize] = 0;
+                } else {
+                    terrain_material
+                        .textures
+                        .push(tile_textures[tile_array_index2 as usize].clone());
+                    tile_texture_map[tile_array_index2 as usize] = index as u32;
+                }
+            }
+        }
+    }
+
+    for tile_x in 0..16 {
+        for tile_y in 0..16 {
+            let tile = &zone_data.zon.tiles[tilemap
+                .map(|tilemap| tilemap.get_clamped(tile_x, tile_y) as usize)
+                .unwrap_or(0)];
+            let tile_array_index1 = tile_texture_map[(tile.layer1 + tile.offset1) as usize];
+            let tile_array_index2 = tile_texture_map[(tile.layer2 + tile.offset2) as usize];
             let tile_rotation = match tile.rotation {
                 ZonTileRotation::FlipHorizontal => 2,
                 ZonTileRotation::FlipVertical => 3,
@@ -808,11 +883,10 @@ fn spawn_terrain(
                         (tile_x as f32 * 4.0 + x as f32) / 64.0,
                         (tile_y as f32 * 4.0 + y as f32) / 64.0,
                     ]);
-                    tile_ids.push([
-                        tile_array_index1 as i32,
-                        tile_array_index2 as i32,
-                        tile_rotation,
-                    ]);
+
+                    tile_ids.push(
+                        tile_array_index1 | tile_array_index2 << 8 | tile_rotation << 16,
+                    );
                 }
             }
 
@@ -867,16 +941,6 @@ fn spawn_terrain(
         }
     }
 
-    let material = terrain_materials.add(TerrainMaterial {
-        lightmap_texture: asset_server.load(format!(
-            "{}/{1:}_{2:}/{1:}_{2:}_PLANELIGHTINGMAP.DDS.rgb_texture",
-            zone_data.zone_path.to_str().unwrap(),
-            block_data.block_x,
-            block_data.block_y,
-        )),
-        tilemap_texture_array,
-    });
-
     commands
         .spawn((
             ZoneObject::Terrain(ZoneObjectTerrain {
@@ -884,7 +948,7 @@ fn spawn_terrain(
                 block_y: block_data.block_y as u32,
             }),
             meshes.add(mesh),
-            material,
+            terrain_materials.add(terrain_material),
             Transform::from_xyz(offset_x, 0.0, -offset_y),
             GlobalTransform::default(),
             Visibility::default(),
@@ -977,6 +1041,7 @@ fn spawn_object(
     effect_mesh_materials: &mut Assets<EffectMeshMaterial>,
     particle_materials: &mut Assets<ParticleMaterial>,
     object_materials: &mut Assets<ObjectMaterial>,
+    specular_texture: &SpecularTexture,
     zsc: &ZscFile,
     lightmap_path: &Path,
     lit_object: Option<&LitObject>,
@@ -1101,7 +1166,11 @@ fn spawn_object(
                     two_sided: zsc_material.two_sided,
                     z_write_enabled: zsc_material.z_write_enabled,
                     z_test_enabled: zsc_material.z_test_enabled,
-                    specular_enabled: zsc_material.specular_enabled,
+                    specular_texture: if zsc_material.specular_enabled {
+                        Some(specular_texture.image.clone())
+                    } else {
+                        None
+                    },
                     blend: zsc_material.blend_mode.into(),
                     glow: zsc_material.glow.map(|x| x.into()),
                     skinned: zsc_material.is_skin,
@@ -1302,7 +1371,7 @@ fn spawn_animated_object(
         two_sided,
         z_write_enabled,
         z_test_enabled,
-        specular_enabled: false,
+        specular_texture: None,
         blend: ObjectMaterialBlend::Normal,
         glow: None,
         skinned: false,

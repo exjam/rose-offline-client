@@ -1,12 +1,13 @@
 use bevy::{
+    asset::load_internal_asset,
     ecs::{
         query::ROQueryItem,
         system::{lifetimeless::SRes, SystemParamItem},
     },
     math::{Vec3, Vec4},
     prelude::{
-        App, Assets, Commands, FromWorld, HandleUntyped, IntoSystemAppConfig, IntoSystemConfig,
-        Plugin, Res, ResMut, Resource, Shader, World,
+        App, Commands, FromWorld, HandleUntyped, IntoSystemAppConfig, IntoSystemConfig, Plugin,
+        Res, ResMut, Resource, Shader, World,
     },
     reflect::TypeUuid,
     render::{
@@ -30,10 +31,11 @@ pub struct ZoneLightingPlugin;
 
 impl Plugin for ZoneLightingPlugin {
     fn build(&self, app: &mut App) {
-        let mut shader_assets = app.world.resource_mut::<Assets<Shader>>();
-        shader_assets.set_untracked(
+        load_internal_asset!(
+            app,
             ZONE_LIGHTING_SHADER_HANDLE,
-            Shader::from_wgsl(include_str!("shaders/zone_lighting.wgsl")),
+            "shaders/zone_lighting.wgsl",
+            Shader::from_wgsl
         );
 
         app.world.insert_resource(ZoneLighting {

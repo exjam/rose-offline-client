@@ -1,186 +1,140 @@
-use std::marker::PhantomData;
+use std::num::NonZeroU32;
 
 use bevy::{
-    asset::Handle,
-    core_pipeline::core_3d::Opaque3d,
-    ecs::{
-        query::ROQueryItem,
-        system::{
-            lifetimeless::{Read, SRes},
-            SystemParamItem,
-        },
-    },
+    asset::{load_internal_asset, Handle},
     pbr::{
-        DrawMesh, MeshPipeline, MeshPipelineKey, MeshUniform, SetMeshBindGroup,
+        DrawMesh, DrawPrepass, MeshPipelineKey, SetMaterialBindGroup, SetMeshBindGroup,
         SetMeshViewBindGroup,
     },
     prelude::{
-        error, AddAsset, App, Assets, FromWorld, HandleUntyped, IntoSystemConfig, Mesh, Msaa,
-        Plugin, Query, Res, ResMut, Resource, World,
+        AlphaMode, App, FromWorld, HandleUntyped, Material, MaterialPlugin, Mesh, Plugin, World,
     },
     reflect::TypeUuid,
     render::{
-        extract_component::ExtractComponentPlugin,
         mesh::{MeshVertexAttribute, MeshVertexBufferLayout},
         prelude::Shader,
-        render_asset::{PrepareAssetError, RenderAsset, RenderAssetPlugin, RenderAssets},
-        render_phase::{
-            AddRenderCommand, DrawFunctions, PhaseItem, RenderCommand, RenderCommandResult,
-            RenderPhase, SetItemPipeline, TrackedRenderPass,
-        },
+        render_asset::RenderAssets,
+        render_phase::SetItemPipeline,
         render_resource::{
-            BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout,
-            BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingResource, BindingType,
-            BlendComponent, BlendFactor, BlendOperation, BlendState, PipelineCache,
-            RenderPipelineDescriptor, SamplerBindingType, ShaderStages, SpecializedMeshPipeline,
-            SpecializedMeshPipelineError, SpecializedMeshPipelines, TextureSampleType,
-            TextureViewDimension, VertexFormat,
+            AddressMode, AsBindGroup, AsBindGroupError, BindGroupDescriptor, BindGroupEntry,
+            BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingResource,
+            BindingType, BlendComponent, BlendFactor, BlendOperation, BlendState, FilterMode,
+            PreparedBindGroup, RenderPipelineDescriptor, SamplerBindingType, SamplerDescriptor,
+            ShaderStages, SpecializedMeshPipelineError, TextureSampleType, TextureViewDimension,
+            VertexFormat,
         },
         renderer::RenderDevice,
-        texture::Image,
-        view::{ExtractedView, VisibleEntities},
-        RenderApp, RenderSet,
+        texture::{FallbackImage, Image},
     },
 };
 
 use crate::render::{
     zone_lighting::{SetZoneLightingBindGroup, ZoneLightingUniformMeta},
-    TextureArray, MESH_ATTRIBUTE_UV_1,
+    MESH_ATTRIBUTE_UV_1,
 };
 
 pub const TERRAIN_MATERIAL_SHADER_HANDLE: HandleUntyped =
     HandleUntyped::weak_from_u64(Shader::TYPE_UUID, 0x3d7939250aff89cb);
 
 pub const TERRAIN_MESH_ATTRIBUTE_TILE_INFO: MeshVertexAttribute =
-    MeshVertexAttribute::new("Vertex_TileInfo", 3855645392, VertexFormat::Sint32x3);
+    MeshVertexAttribute::new("Vertex_TileInfo", 3855645392, VertexFormat::Uint32);
+
+pub const TERRAIN_MATERIAL_MAX_TEXTURES: usize = 100;
 
 #[derive(Default)]
-pub struct TerrainMaterialPlugin;
+pub struct TerrainMaterialPlugin {
+    pub prepass_enabled: bool,
+}
 
 impl Plugin for TerrainMaterialPlugin {
     fn build(&self, app: &mut App) {
-        let mut shader_assets = app.world.resource_mut::<Assets<Shader>>();
-        shader_assets.set_untracked(
+        load_internal_asset!(
+            app,
             TERRAIN_MATERIAL_SHADER_HANDLE,
-            Shader::from_wgsl(include_str!("shaders/terrain_material.wgsl")),
+            "shaders/terrain_material.wgsl",
+            Shader::from_wgsl
         );
 
-        app.add_asset::<TerrainMaterial>()
-            .add_plugin(ExtractComponentPlugin::<Handle<TerrainMaterial>>::extract_visible())
-            .add_plugin(RenderAssetPlugin::<TerrainMaterial>::default());
-        if let Ok(render_app) = app.get_sub_app_mut(RenderApp) {
-            render_app
-                .add_render_command::<Opaque3d, DrawTerrainMaterial>()
-                .init_resource::<TerrainMaterialPipeline>()
-                .init_resource::<SpecializedMeshPipelines<TerrainMaterialPipeline>>()
-                .add_system(queue_terrain_material_meshes.in_set(RenderSet::Queue));
-        }
+        app.add_plugin(MaterialPlugin::<
+            TerrainMaterial,
+            DrawTerrainMaterial,
+            DrawPrepass<TerrainMaterial>,
+        > {
+            prepass_enabled: self.prepass_enabled,
+            ..Default::default()
+        });
     }
 }
 
-#[derive(Resource)]
-pub struct TerrainMaterialPipeline {
-    pub mesh_pipeline: MeshPipeline,
-    pub material_layout: BindGroupLayout,
+#[derive(Clone)]
+pub struct TerrainMaterialPipelineData {
     pub zone_lighting_layout: BindGroupLayout,
-    pub vertex_shader: Option<Handle<Shader>>,
-    pub fragment_shader: Option<Handle<Shader>>,
 }
 
-impl FromWorld for TerrainMaterialPipeline {
+impl FromWorld for TerrainMaterialPipelineData {
     fn from_world(world: &mut World) -> Self {
-        let render_device = world.resource::<RenderDevice>();
-        let material_layout = render_device.create_bind_group_layout(&BindGroupLayoutDescriptor {
-            entries: &[
-                // Lightmap Texture
-                BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: ShaderStages::FRAGMENT,
-                    ty: BindingType::Texture {
-                        multisampled: false,
-                        sample_type: TextureSampleType::Float { filterable: true },
-                        view_dimension: TextureViewDimension::D2,
-                    },
-                    count: None,
-                },
-                // Lightmap Texture Sampler
-                BindGroupLayoutEntry {
-                    binding: 1,
-                    visibility: ShaderStages::FRAGMENT,
-                    ty: BindingType::Sampler(SamplerBindingType::Filtering),
-                    count: None,
-                },
-                // Tile Array Texture
-                BindGroupLayoutEntry {
-                    binding: 2,
-                    visibility: ShaderStages::FRAGMENT,
-                    ty: BindingType::Texture {
-                        multisampled: false,
-                        sample_type: TextureSampleType::Float { filterable: true },
-                        view_dimension: TextureViewDimension::D2Array,
-                    },
-                    count: None,
-                },
-                // Tile Array Texture Sampler
-                BindGroupLayoutEntry {
-                    binding: 3,
-                    visibility: ShaderStages::FRAGMENT,
-                    ty: BindingType::Sampler(SamplerBindingType::Filtering),
-                    count: None,
-                },
-            ],
-            label: Some("terrain_material_layout"),
-        });
-        TerrainMaterialPipeline {
-            mesh_pipeline: world.resource::<MeshPipeline>().clone(),
-            material_layout,
+        TerrainMaterialPipelineData {
             zone_lighting_layout: world
                 .resource::<ZoneLightingUniformMeta>()
                 .bind_group_layout
                 .clone(),
-            vertex_shader: Some(TERRAIN_MATERIAL_SHADER_HANDLE.typed()),
-            fragment_shader: Some(TERRAIN_MATERIAL_SHADER_HANDLE.typed()),
         }
     }
 }
 
-impl SpecializedMeshPipeline for TerrainMaterialPipeline {
-    type Key = MeshPipelineKey;
+#[derive(Debug, Clone, TypeUuid)]
+#[uuid = "403e3628-46d2-4d2a-b74c-ce84be2b1ba2"]
+pub struct TerrainMaterial {
+    pub textures: Vec<Handle<Image>>,
+}
+
+impl Material for TerrainMaterial {
+    type PipelineData = TerrainMaterialPipelineData;
+
+    fn alpha_mode(&self) -> AlphaMode {
+        AlphaMode::Opaque
+    }
+
+    fn vertex_shader() -> bevy::render::render_resource::ShaderRef {
+        TERRAIN_MATERIAL_SHADER_HANDLE.typed().into()
+    }
+
+    fn fragment_shader() -> bevy::render::render_resource::ShaderRef {
+        TERRAIN_MATERIAL_SHADER_HANDLE.typed().into()
+    }
 
     fn specialize(
-        &self,
-        key: Self::Key,
+        pipeline: &bevy::pbr::MaterialPipeline<Self>,
+        descriptor: &mut RenderPipelineDescriptor,
         layout: &MeshVertexBufferLayout,
-    ) -> Result<RenderPipelineDescriptor, SpecializedMeshPipelineError> {
-        let mut descriptor = self.mesh_pipeline.specialize(key, layout)?;
-        if let Some(vertex_shader) = &self.vertex_shader {
-            descriptor.vertex.shader = vertex_shader.clone();
+        key: bevy::pbr::MaterialPipelineKey<Self>,
+    ) -> Result<(), SpecializedMeshPipelineError> {
+        if key.mesh_key.contains(MeshPipelineKey::DEPTH_PREPASS)
+            || key.mesh_key.contains(MeshPipelineKey::NORMAL_PREPASS)
+        {
+            return Ok(());
         }
 
-        if let Some(fragment_shader) = &self.fragment_shader {
-            descriptor.fragment.as_mut().unwrap().shader = fragment_shader.clone();
+        if let Some(fragment) = descriptor.fragment.as_mut() {
+            for color_target_state in fragment.targets.iter_mut().filter_map(|x| x.as_mut()) {
+                color_target_state.blend = Some(BlendState {
+                    color: BlendComponent {
+                        src_factor: BlendFactor::SrcAlpha,
+                        dst_factor: BlendFactor::OneMinusSrcAlpha,
+                        operation: BlendOperation::Add,
+                    },
+                    alpha: BlendComponent {
+                        src_factor: BlendFactor::SrcAlpha,
+                        dst_factor: BlendFactor::OneMinusSrcAlpha,
+                        operation: BlendOperation::Add,
+                    },
+                });
+            }
         }
 
-        descriptor.fragment.as_mut().unwrap().targets[0]
-            .as_mut()
-            .unwrap()
-            .blend = Some(BlendState {
-            color: BlendComponent {
-                src_factor: BlendFactor::SrcAlpha,
-                dst_factor: BlendFactor::OneMinusSrcAlpha,
-                operation: BlendOperation::Add,
-            },
-            alpha: BlendComponent {
-                src_factor: BlendFactor::SrcAlpha,
-                dst_factor: BlendFactor::OneMinusSrcAlpha,
-                operation: BlendOperation::Add,
-            },
-        });
-
-        descriptor.layout.insert(1, self.material_layout.clone());
         descriptor
             .layout
-            .insert(3, self.zone_lighting_layout.clone());
+            .insert(3, pipeline.data.zone_lighting_layout.clone());
 
         let vertex_layout = layout.get_layout(&[
             Mesh::ATTRIBUTE_POSITION.at_shader_location(0),
@@ -191,181 +145,96 @@ impl SpecializedMeshPipeline for TerrainMaterialPipeline {
         ])?;
         descriptor.vertex.buffers = vec![vertex_layout];
 
-        Ok(descriptor)
+        Ok(())
     }
 }
 
-#[derive(Debug, Clone, TypeUuid)]
-#[uuid = "403e3628-46d2-4d2a-b74c-ce84be2b1ba2"]
-pub struct TerrainMaterial {
-    pub lightmap_texture: Handle<Image>,
-    pub tilemap_texture_array: Handle<TextureArray>,
-}
+impl AsBindGroup for TerrainMaterial {
+    type Data = ();
 
-#[derive(Debug, Clone)]
-pub struct GpuTerrainMaterial {
-    pub bind_group: BindGroup,
-    pub lightmap_texture: Handle<Image>,
-    pub tilemap_texture_array: Handle<TextureArray>,
-}
+    fn as_bind_group(
+        &self,
+        layout: &BindGroupLayout,
+        render_device: &RenderDevice,
+        image_assets: &RenderAssets<Image>,
+        fallback_image: &FallbackImage,
+    ) -> Result<PreparedBindGroup<Self::Data>, AsBindGroupError> {
+        let mut images = vec![];
+        for handle in self.textures.iter().take(TERRAIN_MATERIAL_MAX_TEXTURES) {
+            match image_assets.get(handle) {
+                Some(image) => images.push(image),
+                None => return Err(AsBindGroupError::RetryNextUpdate),
+            }
+        }
 
-impl RenderAsset for TerrainMaterial {
-    type ExtractedAsset = TerrainMaterial;
-    type PreparedAsset = GpuTerrainMaterial;
-    type Param = (
-        SRes<RenderDevice>,
-        SRes<TerrainMaterialPipeline>,
-        SRes<RenderAssets<Image>>,
-        SRes<RenderAssets<TextureArray>>,
-    );
+        let mut textures = vec![&*fallback_image.texture_view; TERRAIN_MATERIAL_MAX_TEXTURES];
+        for (id, image) in images.into_iter().enumerate() {
+            textures[id] = &*image.texture_view;
+        }
 
-    fn extract_asset(&self) -> Self::ExtractedAsset {
-        self.clone()
-    }
-
-    fn prepare_asset(
-        material: Self::ExtractedAsset,
-        (render_device, material_pipeline, gpu_images, gpu_texture_arrays): &mut SystemParamItem<
-            Self::Param,
-        >,
-    ) -> Result<Self::PreparedAsset, PrepareAssetError<Self::ExtractedAsset>> {
-        let (lightmap_texture_view, lightmap_texture_sampler) =
-            if let Some(lightmap_gpu_image) = gpu_images.get(&material.lightmap_texture) {
-                (
-                    &lightmap_gpu_image.texture_view,
-                    &lightmap_gpu_image.sampler,
-                )
-            } else {
-                return Err(PrepareAssetError::RetryNextUpdate(material));
-            };
-
-        let (tile_array_texture_view, tile_array_texture_sampler) =
-            if let Some(tile_array_gpu_image) =
-                gpu_texture_arrays.get(&material.tilemap_texture_array)
-            {
-                (
-                    &tile_array_gpu_image.texture_view,
-                    &tile_array_gpu_image.sampler,
-                )
-            } else {
-                return Err(PrepareAssetError::RetryNextUpdate(material));
-            };
+        let sampler = render_device.create_sampler(&SamplerDescriptor {
+            address_mode_u: AddressMode::ClampToEdge,
+            address_mode_v: AddressMode::ClampToEdge,
+            mag_filter: FilterMode::Linear,
+            min_filter: FilterMode::Linear,
+            ..Default::default()
+        });
 
         let bind_group = render_device.create_bind_group(&BindGroupDescriptor {
+            label: "terrain_material_bind_group".into(),
+            layout,
             entries: &[
                 BindGroupEntry {
                     binding: 0,
-                    resource: BindingResource::TextureView(lightmap_texture_view),
+                    resource: BindingResource::TextureViewArray(&textures[..]),
                 },
                 BindGroupEntry {
                     binding: 1,
-                    resource: BindingResource::Sampler(lightmap_texture_sampler),
-                },
-                BindGroupEntry {
-                    binding: 2,
-                    resource: BindingResource::TextureView(tile_array_texture_view),
-                },
-                BindGroupEntry {
-                    binding: 3,
-                    resource: BindingResource::Sampler(tile_array_texture_sampler),
+                    resource: BindingResource::Sampler(&sampler),
                 },
             ],
-            label: Some("terrain_material_bind_group"),
-            layout: &material_pipeline.material_layout,
         });
 
-        Ok(GpuTerrainMaterial {
+        Ok(PreparedBindGroup {
+            bindings: vec![],
             bind_group,
-            lightmap_texture: material.lightmap_texture.clone(),
-            tilemap_texture_array: material.tilemap_texture_array.clone(),
+            data: (),
         })
     }
-}
 
-pub struct SetTerrainMaterialBindGroup<const I: usize>(PhantomData<TerrainMaterial>);
-impl<P: PhaseItem, const I: usize> RenderCommand<P> for SetTerrainMaterialBindGroup<I> {
-    type Param = SRes<RenderAssets<TerrainMaterial>>;
-    type ViewWorldQuery = ();
-    type ItemWorldQuery = Read<Handle<TerrainMaterial>>;
-
-    fn render<'w>(
-        _: &P,
-        _: ROQueryItem<'w, Self::ViewWorldQuery>,
-        material_handle: ROQueryItem<'w, Self::ItemWorldQuery>,
-        materials: SystemParamItem<'w, '_, Self::Param>,
-        pass: &mut TrackedRenderPass<'w>,
-    ) -> RenderCommandResult {
-        let material = materials.into_inner().get(material_handle).unwrap();
-        pass.set_bind_group(I, &material.bind_group, &[]);
-        RenderCommandResult::Success
+    fn bind_group_layout(render_device: &RenderDevice) -> BindGroupLayout
+    where
+        Self: Sized,
+    {
+        render_device.create_bind_group_layout(&BindGroupLayoutDescriptor {
+            label: "terrain_material_layout".into(),
+            entries: &[
+                BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: ShaderStages::FRAGMENT,
+                    ty: BindingType::Texture {
+                        sample_type: TextureSampleType::Float { filterable: true },
+                        view_dimension: TextureViewDimension::D2,
+                        multisampled: false,
+                    },
+                    count: NonZeroU32::new(TERRAIN_MATERIAL_MAX_TEXTURES as u32),
+                },
+                BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: ShaderStages::FRAGMENT,
+                    ty: BindingType::Sampler(SamplerBindingType::Filtering),
+                    count: None,
+                },
+            ],
+        })
     }
 }
 
 type DrawTerrainMaterial = (
     SetItemPipeline,
     SetMeshViewBindGroup<0>,
-    SetTerrainMaterialBindGroup<1>,
+    SetMaterialBindGroup<TerrainMaterial, 1>,
     SetMeshBindGroup<2>,
     SetZoneLightingBindGroup<3>,
     DrawMesh,
 );
-
-#[allow(clippy::too_many_arguments)]
-pub fn queue_terrain_material_meshes(
-    opaque_draw_functions: Res<DrawFunctions<Opaque3d>>,
-    material_pipeline: Res<TerrainMaterialPipeline>,
-    mut pipelines: ResMut<SpecializedMeshPipelines<TerrainMaterialPipeline>>,
-    pipeline_cache: Res<PipelineCache>,
-    msaa: Res<Msaa>,
-    render_meshes: Res<RenderAssets<Mesh>>,
-    render_materials: Res<RenderAssets<TerrainMaterial>>,
-    material_meshes: Query<(&Handle<TerrainMaterial>, &Handle<Mesh>, &MeshUniform)>,
-    mut views: Query<(&ExtractedView, &VisibleEntities, &mut RenderPhase<Opaque3d>)>,
-) {
-    for (view, visible_entities, mut opaque_phase) in views.iter_mut() {
-        let draw_opaque_pbr = opaque_draw_functions
-            .read()
-            .get_id::<DrawTerrainMaterial>()
-            .unwrap();
-
-        let rangefinder = view.rangefinder3d();
-        let view_key = MeshPipelineKey::from_msaa_samples(msaa.samples())
-            | MeshPipelineKey::from_hdr(view.hdr);
-
-        for visible_entity in &visible_entities.entities {
-            if let Ok((material_handle, mesh_handle, mesh_uniform)) =
-                material_meshes.get(*visible_entity)
-            {
-                if render_materials.contains_key(material_handle) {
-                    if let Some(mesh) = render_meshes.get(mesh_handle) {
-                        let mesh_key =
-                            MeshPipelineKey::from_primitive_topology(mesh.primitive_topology)
-                                | view_key;
-
-                        let pipeline_id = pipelines.specialize(
-                            &pipeline_cache,
-                            &material_pipeline,
-                            mesh_key,
-                            &mesh.layout,
-                        );
-                        let pipeline_id = match pipeline_id {
-                            Ok(id) => id,
-                            Err(err) => {
-                                error!("{}", err);
-                                continue;
-                            }
-                        };
-
-                        let distance = rangefinder.distance(&mesh_uniform.transform);
-                        opaque_phase.add(Opaque3d {
-                            entity: *visible_entity,
-                            draw_function: draw_opaque_pbr,
-                            pipeline: pipeline_id,
-                            distance,
-                        });
-                    }
-                }
-            }
-        }
-    }
-}

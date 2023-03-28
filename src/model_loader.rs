@@ -53,6 +53,7 @@ pub struct ModelLoader {
     item_database: Arc<ItemDatabase>,
     npc_database: Arc<NpcDatabase>,
     trail_effect_image: Handle<Image>,
+    specular_image: Handle<Image>,
 
     // Male
     skeleton_male: ZmdFile,
@@ -100,6 +101,7 @@ impl ModelLoader {
         item_database: Arc<ItemDatabase>,
         npc_database: Arc<NpcDatabase>,
         trail_effect_image: Handle<Image>,
+        specular_image: Handle<Image>,
     ) -> Result<ModelLoader, anyhow::Error> {
         Ok(ModelLoader {
             // Male
@@ -146,6 +148,7 @@ impl ModelLoader {
             item_database,
             npc_database,
             trail_effect_image,
+            specular_image,
         })
     }
 
@@ -247,6 +250,7 @@ impl ModelLoader {
                 None,
                 dummy_bone_offset,
                 false,
+                &self.specular_image,
             );
             model_parts.append(&mut parts);
         }
@@ -287,6 +291,7 @@ impl ModelLoader {
                     None,
                     dummy_bone_offset,
                     false,
+                    &self.specular_image,
                 );
                 model_parts.append(&mut parts);
             }
@@ -303,6 +308,7 @@ impl ModelLoader {
                     None,
                     dummy_bone_offset,
                     false,
+                    &self.specular_image,
                 );
                 model_parts.append(&mut parts);
             }
@@ -359,6 +365,7 @@ impl ModelLoader {
             None,
             0,
             false,
+            &self.specular_image,
         );
 
         PersonalStoreModel {
@@ -411,6 +418,7 @@ impl ModelLoader {
                     None,
                     0,
                     false,
+                    &self.specular_image,
                 ),
             },
             asset_server.load(&self.field_item_motion_path),
@@ -750,6 +758,7 @@ impl ModelLoader {
             model_part.default_bone_id(dummy_bone_offset),
             dummy_bone_offset,
             matches!(model_part, CharacterModelPart::CharacterFace),
+            &self.specular_image,
         );
 
         if matches!(model_part, CharacterModelPart::Weapon) {
@@ -960,6 +969,7 @@ impl ModelLoader {
                         None,
                         dummy_bone_offset,
                         false,
+                        &self.specular_image,
                     ),
                 );
 
@@ -1179,6 +1189,7 @@ fn spawn_model(
     default_bone_index: Option<usize>,
     dummy_bone_offset: usize,
     load_clip_faces: bool,
+    specular_image: &Handle<Image>,
 ) -> Vec<Entity> {
     let mut parts = Vec::new();
     let object = if let Some(object) = model_list.objects.get(model_id) {
@@ -1207,7 +1218,11 @@ fn spawn_model(
             two_sided: zsc_material.two_sided,
             z_write_enabled: zsc_material.z_write_enabled,
             z_test_enabled: zsc_material.z_test_enabled,
-            specular_enabled: zsc_material.specular_enabled,
+            specular_texture: if zsc_material.specular_enabled {
+                Some(specular_image.clone())
+            } else {
+                None
+            },
             skinned: zsc_material.is_skin,
             ..Default::default()
         });

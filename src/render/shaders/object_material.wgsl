@@ -112,11 +112,12 @@ fn fragment(in: FragmentInput) -> @location(0) vec4<f32> {
         view.inverse_view[3].z
     ), in.world_position);
 
+    let shadow = fetch_directional_shadow(0u, in.world_position, in.world_normal, view_z);
+    output_color = vec4<f32>(output_color.xyz * (shadow * 0.2 + 0.8), output_color.w);
+
 #ifdef HAS_OBJECT_LIGHTMAP
     var lightmap = textureSample(lightmap_texture, lightmap_sampler, (in.lightmap_uv + material.lightmap_uv_offset) * material.lightmap_uv_scale);
-    let shadow = fetch_directional_shadow(0u, in.world_position, in.world_normal, view_z);
-    lightmap = vec4<f32>(lightmap.xyz * (shadow * 0.2 + 0.8), lightmap.w);
-    output_color = output_color * lightmap * 2.0;
+    output_color = vec4<f32>(output_color.xyz * lightmap.xyz * 2.0, output_color.w);
 #endif
 
     if ((material.flags & OBJECT_MATERIAL_FLAGS_SPECULAR) != 0u) {

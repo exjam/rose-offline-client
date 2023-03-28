@@ -1,7 +1,10 @@
 use bevy::{
-    asset::Handle,
-    pbr::{AlphaMode, Material, MaterialPipeline, MaterialPipelineKey, MaterialPlugin},
-    prelude::{App, Assets, HandleUntyped, Mesh, Plugin},
+    asset::{load_internal_asset, Handle},
+    pbr::{
+        AlphaMode, DrawMaterial, DrawPrepass, Material, MaterialPipeline, MaterialPipelineKey,
+        MaterialPlugin, MeshPipelineKey,
+    },
+    prelude::{App, HandleUntyped, Mesh, Plugin},
     reflect::TypeUuid,
     render::{
         mesh::MeshVertexBufferLayout,
@@ -20,17 +23,27 @@ pub const EFFECT_MESH_MATERIAL_SHADER_HANDLE: HandleUntyped =
     HandleUntyped::weak_from_u64(Shader::TYPE_UUID, 0x90d5233c3001d33e);
 
 #[derive(Default)]
-pub struct EffectMeshMaterialPlugin;
+pub struct EffectMeshMaterialPlugin {
+    pub prepass_enabled: bool,
+}
 
 impl Plugin for EffectMeshMaterialPlugin {
     fn build(&self, app: &mut App) {
-        let mut shader_assets = app.world.resource_mut::<Assets<Shader>>();
-        shader_assets.set_untracked(
+        load_internal_asset!(
+            app,
             EFFECT_MESH_MATERIAL_SHADER_HANDLE,
-            Shader::from_wgsl(include_str!("shaders/effect_mesh_material.wgsl")),
+            "shaders/effect_mesh_material.wgsl",
+            Shader::from_wgsl
         );
 
-        app.add_plugin(MaterialPlugin::<EffectMeshMaterial>::default());
+        app.add_plugin(MaterialPlugin::<
+            EffectMeshMaterial,
+            DrawMaterial<EffectMeshMaterial>,
+            DrawPrepass<EffectMeshMaterial>,
+        > {
+            prepass_enabled: self.prepass_enabled,
+            ..Default::default()
+        });
     }
 }
 
@@ -116,34 +129,14 @@ impl From<&EffectMeshMaterial> for EffectMeshMaterialKey {
 }
 
 impl Material for EffectMeshMaterial {
+    type PipelineData = ();
+
     fn specialize(
         _pipeline: &MaterialPipeline<Self>,
         descriptor: &mut RenderPipelineDescriptor,
         layout: &MeshVertexBufferLayout,
         key: MaterialPipelineKey<Self>,
     ) -> Result<(), SpecializedMeshPipelineError> {
-        let vertex_attributes = [
-            Mesh::ATTRIBUTE_POSITION.at_shader_location(0),
-            Mesh::ATTRIBUTE_UV_0.at_shader_location(1),
-        ];
-
-        descriptor.vertex.buffers = vec![layout.get_layout(&vertex_attributes)?];
-        descriptor.fragment.as_mut().unwrap().targets[0]
-            .as_mut()
-            .unwrap()
-            .blend = Some(BlendState {
-            color: BlendComponent {
-                src_factor: key.bind_group_data.src_blend_factor,
-                dst_factor: key.bind_group_data.dst_blend_factor,
-                operation: key.bind_group_data.blend_op,
-            },
-            alpha: BlendComponent {
-                src_factor: key.bind_group_data.src_blend_factor,
-                dst_factor: key.bind_group_data.dst_blend_factor,
-                operation: key.bind_group_data.blend_op,
-            },
-        });
-
         if key.bind_group_data.two_sided {
             descriptor.primitive.cull_mode = None;
         }
@@ -156,6 +149,36 @@ impl Material for EffectMeshMaterial {
 
         if !key.bind_group_data.z_test_enabled {
             descriptor.depth_stencil.as_mut().unwrap().depth_compare = CompareFunction::Always;
+        }
+
+        if key.mesh_key.contains(MeshPipelineKey::DEPTH_PREPASS)
+            || key.mesh_key.contains(MeshPipelineKey::NORMAL_PREPASS)
+        {
+            return Ok(());
+        }
+
+        let vertex_attributes = [
+            Mesh::ATTRIBUTE_POSITION.at_shader_location(0),
+            Mesh::ATTRIBUTE_UV_0.at_shader_location(1),
+        ];
+
+        descriptor.vertex.buffers = vec![layout.get_layout(&vertex_attributes)?];
+
+        if let Some(fragment) = descriptor.fragment.as_mut() {
+            for color_target_state in fragment.targets.iter_mut().filter_map(|x| x.as_mut()) {
+                color_target_state.blend = Some(BlendState {
+                    color: BlendComponent {
+                        src_factor: key.bind_group_data.src_blend_factor,
+                        dst_factor: key.bind_group_data.dst_blend_factor,
+                        operation: key.bind_group_data.blend_op,
+                    },
+                    alpha: BlendComponent {
+                        src_factor: key.bind_group_data.src_blend_factor,
+                        dst_factor: key.bind_group_data.dst_blend_factor,
+                        operation: key.bind_group_data.blend_op,
+                    },
+                });
+            }
         }
 
         Ok(())

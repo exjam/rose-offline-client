@@ -19,6 +19,7 @@ mod selected_target;
 mod server_configuration;
 mod server_list;
 mod sound_settings;
+mod specular_texture;
 mod ui_resources;
 mod virtual_filesystem;
 mod world_connection;
@@ -49,6 +50,7 @@ pub use selected_target::SelectedTarget;
 pub use server_configuration::ServerConfiguration;
 pub use server_list::{ServerList, ServerListGameServer, ServerListWorldServer};
 pub use sound_settings::SoundSettings;
+pub use specular_texture::SpecularTexture;
 pub use ui_resources::{
     load_ui_resources, update_ui_resources, UiResources, UiSprite, UiSpriteSheet,
     UiSpriteSheetType, UiTexture,

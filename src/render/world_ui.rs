@@ -1,7 +1,7 @@
 use std::{cmp::Ordering, ops::Range};
 
 use bevy::{
-    asset::{Handle, HandleId},
+    asset::{load_internal_asset, Handle, HandleId},
     core_pipeline::core_3d::Transparent3d,
     ecs::{
         query::ROQueryItem,
@@ -55,10 +55,11 @@ pub struct WorldUiRenderPlugin;
 
 impl Plugin for WorldUiRenderPlugin {
     fn build(&self, app: &mut App) {
-        let mut shader_assets = app.world.resource_mut::<Assets<Shader>>();
-        shader_assets.set_untracked(
+        load_internal_asset!(
+            app,
             WORLD_UI_SHADER_HANDLE,
-            Shader::from_wgsl(include_str!("shaders/world_ui.wgsl")),
+            "shaders/world_ui.wgsl",
+            Shader::from_wgsl
         );
 
         if let Ok(render_app) = app.get_sub_app_mut(RenderApp) {
