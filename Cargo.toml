@@ -48,22 +48,22 @@ rose-network-common = { git = "https://github.com/exjam/rose-offline", rev = "8f
 rose-network-irose = { git = "https://github.com/exjam/rose-offline", rev = "8ffe8dbb5150dd061b136b8eee99938a1ec8e52c" }
 
 [patch.crates-io]
-bevy = { git = "https://github.com/exjam/bevy", rev = "0fe8266b0a2cd66fd7db544231a953599fc8f241" }
+bevy = { git = "https://github.com/exjam/bevy", rev = "71dc4c95762d3dcdc64e7027a207ce0713ea87d2" }
 egui = { git = "https://github.com/exjam/egui", rev = "3ff66738341330d40e206269ce3540379b9ce1f5" }
 oddio = { git = "https://github.com/exjam/oddio", rev = "3c20292903fe629d7eab08c1790db70b9fddac96" }
 # Thanks bevy-inspector-egui
-bevy_app = { git = "https://github.com/exjam/bevy", rev = "0fe8266b0a2cd66fd7db544231a953599fc8f241" }
-bevy_asset = { git = "https://github.com/exjam/bevy", rev = "0fe8266b0a2cd66fd7db544231a953599fc8f241" }
-bevy_core = { git = "https://github.com/exjam/bevy", rev = "0fe8266b0a2cd66fd7db544231a953599fc8f241" }
-bevy_ecs = { git = "https://github.com/exjam/bevy", rev = "0fe8266b0a2cd66fd7db544231a953599fc8f241" }
-bevy_hierarchy = { git = "https://github.com/exjam/bevy", rev = "0fe8266b0a2cd66fd7db544231a953599fc8f241" }
-bevy_log = { git = "https://github.com/exjam/bevy", rev = "0fe8266b0a2cd66fd7db544231a953599fc8f241" }
-bevy_math = { git = "https://github.com/exjam/bevy", rev = "0fe8266b0a2cd66fd7db544231a953599fc8f241" }
-bevy_reflect = { git = "https://github.com/exjam/bevy", rev = "0fe8266b0a2cd66fd7db544231a953599fc8f241" }
-bevy_utils = { git = "https://github.com/exjam/bevy", rev = "0fe8266b0a2cd66fd7db544231a953599fc8f241" }
-bevy_core_pipeline = { git = "https://github.com/exjam/bevy", rev = "0fe8266b0a2cd66fd7db544231a953599fc8f241" }
-bevy_pbr = { git = "https://github.com/exjam/bevy", rev = "0fe8266b0a2cd66fd7db544231a953599fc8f241" }
-bevy_render = { git = "https://github.com/exjam/bevy", rev = "0fe8266b0a2cd66fd7db544231a953599fc8f241" }
+bevy_app = { git = "https://github.com/exjam/bevy", rev = "71dc4c95762d3dcdc64e7027a207ce0713ea87d2" }
+bevy_asset = { git = "https://github.com/exjam/bevy", rev = "71dc4c95762d3dcdc64e7027a207ce0713ea87d2" }
+bevy_core = { git = "https://github.com/exjam/bevy", rev = "71dc4c95762d3dcdc64e7027a207ce0713ea87d2" }
+bevy_ecs = { git = "https://github.com/exjam/bevy", rev = "71dc4c95762d3dcdc64e7027a207ce0713ea87d2" }
+bevy_hierarchy = { git = "https://github.com/exjam/bevy", rev = "71dc4c95762d3dcdc64e7027a207ce0713ea87d2" }
+bevy_log = { git = "https://github.com/exjam/bevy", rev = "71dc4c95762d3dcdc64e7027a207ce0713ea87d2" }
+bevy_math = { git = "https://github.com/exjam/bevy", rev = "71dc4c95762d3dcdc64e7027a207ce0713ea87d2" }
+bevy_reflect = { git = "https://github.com/exjam/bevy", rev = "71dc4c95762d3dcdc64e7027a207ce0713ea87d2" }
+bevy_utils = { git = "https://github.com/exjam/bevy", rev = "71dc4c95762d3dcdc64e7027a207ce0713ea87d2" }
+bevy_core_pipeline = { git = "https://github.com/exjam/bevy", rev = "71dc4c95762d3dcdc64e7027a207ce0713ea87d2" }
+bevy_pbr = { git = "https://github.com/exjam/bevy", rev = "71dc4c95762d3dcdc64e7027a207ce0713ea87d2" }
+bevy_render = { git = "https://github.com/exjam/bevy", rev = "71dc4c95762d3dcdc64e7027a207ce0713ea87d2" }
 
 [profile.dev.package."*"]
 opt-level = 3

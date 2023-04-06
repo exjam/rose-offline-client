@@ -6,7 +6,7 @@ use bevy::{
     core_pipeline::{bloom::BloomSettings, clear_color::ClearColor},
     ecs::event::Events,
     log::Level,
-    pbr::{AmbientLight, CascadeShadowConfigBuilder},
+    pbr::{AmbientLight, CascadeShadowConfig},
     prelude::{
         apply_system_buffers, in_state, AddAsset, App, AssetServer, Assets, Camera, Camera3dBundle,
         Color, Commands, CoreSet, DirectionalLight, DirectionalLightBundle, EulerRot,
@@ -77,8 +77,8 @@ use systems::{
     conversation_dialog_system, cooldown_system, damage_digit_render_system,
     debug_render_collider_system, debug_render_directional_light_system,
     debug_render_polylines_setup_system, debug_render_polylines_update_system,
-    debug_render_skeleton_system, effect_system, facing_direction_system, free_camera_system,
-    game_connection_system, game_mouse_input_system, game_state_enter_system,
+    debug_render_skeleton_system, directional_light_system, effect_system, facing_direction_system,
+    free_camera_system, game_connection_system, game_mouse_input_system, game_state_enter_system,
     game_zone_change_system, hit_event_system, item_drop_model_add_collider_system,
     item_drop_model_system, login_connection_system, login_event_system, login_state_enter_system,
     login_state_exit_system, login_system, model_viewer_enter_system, model_viewer_exit_system,
@@ -655,7 +655,8 @@ fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsC
         .add_system(world_time_system)
         .add_system(system_func_event_system)
         .add_system(load_dialog_sprites_system)
-        .add_system(zone_time_system.after(world_time_system));
+        .add_system(zone_time_system.after(world_time_system))
+        .add_system(directional_light_system);
 
     app.add_system(ui_item_drop_name_system.in_set(UiSystemSets::UiFirst));
 
@@ -787,7 +788,7 @@ fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsC
             clan_system,
             command_system.after(RoseAnimationSystem),
             facing_direction_system.after(command_system),
-            update_position_system,
+            update_position_system.before(directional_light_system),
             collision_player_system_join_zoin
                 .after(update_position_system)
                 .before(collision_player_system),
@@ -1093,13 +1094,12 @@ fn load_common_game_data(
             shadows_enabled: true,
             ..Default::default()
         },
-        cascade_shadow_config: CascadeShadowConfigBuilder {
-            num_cascades: 1,
-            minimum_distance: 1.0,
-            maximum_distance: 100.0,
-            ..Default::default()
-        }
-        .build(),
+        cascade_shadow_config: CascadeShadowConfig {
+            bounds: vec![10000.0],
+            overlap_proportion: 2.0,
+            minimum_distance: 0.1,
+            manual_cascades: true,
+        },
         ..Default::default()
     });
 
