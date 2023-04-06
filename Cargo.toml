@@ -10,7 +10,7 @@ async-trait = "0.1"
 bevy = { version = "0.10", default-features = false, features = ["dds", "tga", "bevy_asset", "bevy_core_pipeline", "bevy_winit", "bevy_render", "bevy_pbr"] }
 bevy_egui = "0.20.1"
 bevy-inspector-egui = "0.18"
-bevy_polyline = "0.4.0"
+bevy_polyline = "0.6.0"
 bevy_rapier3d = "0.21"
 bitflags = "1.2"
 bytemuck = { version = "1.7.0", features = ["derive"] }
@@ -18,7 +18,7 @@ chrono = "0.4"
 clap = "3.2"
 cpal = "0.15"
 crossbeam-channel = "0.5"
-directories = "4.0"
+directories = "5.0"
 dolly = "0.4.1"
 egui = "0.21"
 egui_extras = "0.21"
@@ -49,7 +49,6 @@ rose-network-irose = { git = "https://github.com/exjam/rose-offline", rev = "556
 
 [patch.crates-io]
 bevy = { git = "https://github.com/exjam/bevy", rev = "0fe8266b0a2cd66fd7db544231a953599fc8f241" }
-bevy_polyline = { git = "https://github.com/exjam/bevy_polyline", rev = "aae7ad5aece9f9fbc059936a5d8161e682d6c237" }
 egui = { git = "https://github.com/exjam/egui", rev = "3ff66738341330d40e206269ce3540379b9ce1f5" }
 oddio = { git = "https://github.com/exjam/oddio", rev = "3c20292903fe629d7eab08c1790db70b9fddac96" }
 # Thanks bevy-inspector-egui
