@@ -13,8 +13,8 @@ use bevy::{
         SetMeshViewBindGroup,
     },
     prelude::{
-        App, Component, FromWorld, HandleUntyped, Material, MaterialPlugin, Mesh, Plugin, Vec3,
-        With, World,
+        AddAsset, App, Component, FromWorld, HandleUntyped, Material, MaterialPlugin, Mesh, Plugin,
+        Vec3, With, World,
     },
     reflect::{FromReflect, Reflect, TypeUuid},
     render::{
@@ -60,6 +60,8 @@ impl Plugin for ObjectMaterialPlugin {
 
         app.add_plugin(ExtractComponentPlugin::<ObjectMaterialClipFace>::extract_visible());
 
+        app.register_type::<ObjectMaterial>();
+
         app.add_plugin(MaterialPlugin::<
             ObjectMaterial,
             DrawObjectMaterial,
@@ -68,10 +70,13 @@ impl Plugin for ObjectMaterialPlugin {
             prepass_enabled: self.prepass_enabled,
             ..Default::default()
         });
+
+        app.register_asset_reflect::<ObjectMaterial>();
+        app.register_type::<ObjectMaterialClipFace>();
     }
 }
 
-#[derive(Copy, Clone, Component)]
+#[derive(Copy, Clone, Component, Reflect)]
 pub enum ObjectMaterialClipFace {
     First(u32),
     Last(u32),
@@ -208,7 +213,7 @@ impl From<&ObjectMaterial> for ObjectMaterialUniformData {
     }
 }
 
-#[derive(Copy, Clone, Debug, Default, Reflect)]
+#[derive(Copy, Clone, Debug, Default, Reflect, FromReflect)]
 pub enum ObjectMaterialBlend {
     #[default]
     Normal,
@@ -255,7 +260,7 @@ impl From<ZscMaterialGlow> for ObjectMaterialGlow {
     }
 }
 
-#[derive(Debug, Clone, TypeUuid, Reflect, AsBindGroup)]
+#[derive(Debug, Clone, TypeUuid, Reflect, FromReflect, AsBindGroup)]
 #[uniform(0, ObjectMaterialUniformData)]
 #[bind_group_data(ObjectMaterialKey)]
 #[uuid = "62a496fa-33e8-41a8-9a44-237d70214227"]

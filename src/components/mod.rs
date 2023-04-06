@@ -1,4 +1,3 @@
-mod active_motion;
 mod bank;
 mod character_model;
 mod character_model_blink_timer;
@@ -38,7 +37,6 @@ mod warp_object;
 mod zone;
 mod zone_object;
 
-pub use active_motion::ActiveMotion;
 pub use bank::Bank;
 pub use character_model::{CharacterModel, CharacterModelPart, CharacterModelPartIndex};
 pub use character_model_blink_timer::CharacterBlinkTimer;

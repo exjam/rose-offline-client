@@ -5,8 +5,7 @@ use bevy::{
 };
 
 use crate::{
-    components::{ActiveMotion, DamageDigits},
-    render::DamageDigitRenderData,
+    animation::TransformAnimation, components::DamageDigits, render::DamageDigitRenderData,
 };
 
 pub fn damage_digit_render_system(
@@ -14,17 +13,17 @@ pub fn damage_digit_render_system(
     mut query: Query<(
         Entity,
         &GlobalTransform,
-        Option<&ActiveMotion>,
+        &TransformAnimation,
         &DamageDigits,
         &mut DamageDigitRenderData,
     )>,
 ) {
-    for (entity, global_transform, active_motion, damage_digits, mut damage_digit_render_data) in
+    for (entity, global_transform, animation, damage_digits, mut damage_digit_render_data) in
         query.iter_mut()
     {
         damage_digit_render_data.clear();
 
-        if active_motion.is_none() {
+        if animation.completed() {
             // Animation completed, despawn
             commands.entity(entity).despawn_recursive();
             continue;

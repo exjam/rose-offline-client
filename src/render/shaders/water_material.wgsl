@@ -57,7 +57,6 @@ fn fragment(in: FragmentInput) -> @location(0) vec4<f32> {
     let color1 = textureSample(water_array_texture[water_texture_index.current_index], water_array_sampler, in.uv0);
     let color2 = textureSample(water_array_texture[water_texture_index.next_index], water_array_sampler, in.uv0);
     let water_color = mix(color1, color2, water_texture_index.next_weight);
-    let lit_color = apply_zone_lighting(in.world_position, water_color, view_z);
-    let srgb_color = pow(lit_color, vec4<f32>(2.2));
-    return vec4<f32>(srgb_color.rgb, 1.0);
+    let lit_color = apply_zone_lighting(in.world_position, vec3<f32>(0.0, 1.0, 0.0), water_color, view_z);
+    return vec4<f32>(pow(lit_color.xyz, vec3<f32>(2.2)), lit_color.w);
 }

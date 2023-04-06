@@ -23,13 +23,13 @@ use rose_game_common::components::{
 };
 
 use crate::{
+    animation::ZmoAsset,
     components::{
         CharacterModel, CharacterModelPart, CharacterModelPartIndex, DummyBoneOffset,
         ItemDropModel, NpcModel, PersonalStoreModel, VehicleModel,
     },
     effect_loader::spawn_effect,
     render::{EffectMeshMaterial, ObjectMaterial, ParticleMaterial, RgbTextureLoader, TrailEffect},
-    zmo_asset_loader::ZmoAsset,
     zms_asset_loader::ZmsMaterialNumFaces,
 };
 

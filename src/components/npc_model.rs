@@ -3,7 +3,7 @@ use enum_map::EnumMap;
 
 use rose_data::{NpcId, NpcMotionAction};
 
-use crate::zmo_asset_loader::ZmoAsset;
+use crate::animation::ZmoAsset;
 
 #[derive(Component)]
 pub struct NpcModel {

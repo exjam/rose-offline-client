@@ -12,7 +12,7 @@ use rose_data::ZoneId;
 use rose_game_common::messages::client::{ClientMessage, JoinServer};
 
 use crate::{
-    components::ActiveMotion,
+    animation::CameraAnimation,
     events::{LoadZoneEvent, LoginEvent, NetworkEvent},
     resources::{Account, LoginConnection, LoginState, ServerConfiguration, ServerList},
     systems::{FreeCamera, OrbitCamera},
@@ -41,8 +41,9 @@ pub fn login_state_enter_system(
             )
             .remove::<FreeCamera>()
             .remove::<OrbitCamera>()
-            .insert(ActiveMotion::new_repeating(
+            .insert(CameraAnimation::repeat(
                 asset_server.load("3DDATA/TITLE/CAMERA01_INTRO01.ZMO"),
+                None,
             ));
     }
 

@@ -5,7 +5,8 @@ use bevy::{
 use rose_game_common::messages::client::ClientMessage;
 
 use crate::{
-    components::{ActiveMotion, PlayerCharacter},
+    animation::CameraAnimation,
+    components::PlayerCharacter,
     events::ZoneEvent,
     resources::GameConnection,
     systems::{FreeCamera, OrbitCamera},
@@ -22,7 +23,7 @@ pub fn game_state_enter_system(
         commands
             .entity(entity)
             .remove::<FreeCamera>()
-            .remove::<ActiveMotion>()
+            .remove::<CameraAnimation>()
             .insert(OrbitCamera::new(
                 player_entity,
                 Vec3::new(0.0, 1.7, 0.0),

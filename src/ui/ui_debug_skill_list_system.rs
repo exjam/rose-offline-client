@@ -12,9 +12,10 @@ use rose_game_common::{
 };
 
 use crate::{
+    animation::SkeletalAnimation,
     components::{
-        ActiveMotion, CharacterModel, Command, CommandCastSkill, CommandCastSkillState,
-        CommandCastSkillTarget, NextCommand, PlayerCharacter,
+        CharacterModel, Command, CommandCastSkill, CommandCastSkillState, CommandCastSkillTarget,
+        NextCommand, PlayerCharacter,
     },
     resources::{
         AppState, GameConnection, GameData, SelectedTarget, UiResources, UiSpriteSheetType,
@@ -301,7 +302,7 @@ pub fn ui_debug_skill_list_system(
                                                             ready_action: true,
                                                         }))
                                                         .insert(
-                                                            ActiveMotion::new_once(
+                                                            SkeletalAnimation::once(
                                                                 asset_server
                                                                     .load(motion_data.path.path()),
                                                             )
@@ -357,7 +358,7 @@ pub fn ui_debug_skill_list_system(
                                                             cast_skill_state: CommandCastSkillState::Action,
                                                             ready_action: true,
                                                         })).insert(
-                                                            ActiveMotion::new_once(
+                                                            SkeletalAnimation::once(
                                                                 asset_server
                                                                     .load(motion_data.path.path()),
                                                             )

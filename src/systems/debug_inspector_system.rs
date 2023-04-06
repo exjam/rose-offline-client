@@ -1,8 +1,7 @@
 use bevy::{
     input::Input,
     prelude::{
-        App, Camera, Camera3d, GlobalTransform, Handle, MouseButton, Plugin, Query, Res, ResMut,
-        With,
+        App, Camera, Camera3d, GlobalTransform, MouseButton, Plugin, Query, Res, ResMut, With,
     },
     render::camera::Projection,
     window::{PrimaryWindow, Window},
@@ -17,7 +16,7 @@ use crate::{
         COLLISION_FILTER_INSPECTABLE,
     },
     ray_from_screenspace::ray_from_screenspace,
-    render::{ObjectMaterial, ObjectMaterialBlend, ObjectMaterialGlow},
+    render::{ObjectMaterialBlend, ObjectMaterialGlow},
     resources::DebugInspector,
 };
 
@@ -36,10 +35,8 @@ impl Plugin for DebugInspectorPlugin {
             .register_type::<ZoneObjectPart>()
             .register_type::<ZoneObjectPartCollisionShape>()
             .register_type::<ZoneObjectId>()
-            .register_type::<ObjectMaterial>()
             .register_type::<ObjectMaterialBlend>()
-            .register_type::<ObjectMaterialGlow>()
-            .register_type::<Handle<ObjectMaterial>>();
+            .register_type::<ObjectMaterialGlow>();
 
         app.add_plugin(bevy_inspector_egui::DefaultInspectorConfigPlugin);
     }

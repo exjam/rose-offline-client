@@ -10,7 +10,7 @@ use rose_game_common::{
 };
 
 use crate::{
-    components::ActiveMotion,
+    animation::CameraAnimation,
     resources::{CharacterSelectState, UiResources, WorldConnection},
     ui::widgets::{DataBindings, Dialog},
 };
@@ -295,7 +295,7 @@ pub fn ui_character_create_system(
     if response_cancel.map_or(false, |r| r.clicked()) {
         commands
             .entity(query_camera.single())
-            .insert(ActiveMotion::new_once(
+            .insert(CameraAnimation::once(
                 asset_server.load("3DDATA/TITLE/CAMERA01_OUTCREATE01.ZMO"),
             ));
         *character_select_state = CharacterSelectState::CharacterSelect(None);

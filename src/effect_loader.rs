@@ -14,11 +14,14 @@ use bevy::{
 use rose_file_readers::{EftFile, EftMesh, EftParticle, PtlFile, VfsPath, VirtualFilesystem};
 
 use crate::{
+    animation::MeshAnimation,
+    animation::{TransformAnimation, ZmoTextureAssetLoader},
     components::{Effect, EffectMesh, EffectParticle, ParticleSequence},
     render::{
-        EffectMeshMaterial, ParticleMaterial, ParticleRenderBillboardType, ParticleRenderData,
-        RgbTextureLoader,
+        EffectMeshAnimationRenderState, EffectMeshMaterial, ParticleMaterial,
+        ParticleRenderBillboardType, ParticleRenderData, RgbTextureLoader,
     },
+    zms_asset_loader::ZmsNoSkinAssetLoader,
 };
 
 pub fn spawn_effect(
@@ -78,7 +81,7 @@ pub fn spawn_effect(
     }
 }
 
-fn decode_blend_op(value: u32) -> BlendOperation {
+pub fn decode_blend_op(value: u32) -> BlendOperation {
     match value {
         1 => BlendOperation::Add,
         2 => BlendOperation::Subtract,
@@ -89,7 +92,7 @@ fn decode_blend_op(value: u32) -> BlendOperation {
     }
 }
 
-fn decode_blend_factor(value: u32) -> BlendFactor {
+pub fn decode_blend_factor(value: u32) -> BlendFactor {
     match value {
         1 => BlendFactor::Zero,
         2 => BlendFactor::One,
@@ -112,6 +115,7 @@ fn spawn_mesh(
     effect_mesh_materials: &mut Assets<EffectMeshMaterial>,
     eft_mesh: &EftMesh,
 ) -> Option<Entity> {
+    // Visible Entity > Animatable Entity > Effect Mesh Entity
     Some(
         commands
             .spawn((
@@ -132,9 +136,11 @@ fn spawn_mesh(
                 ComputedVisibility::default(),
             ))
             .with_children(|child_builder| {
-                child_builder.spawn((
+                let mut entity_comands = child_builder.spawn((
                     EffectMesh {},
-                    asset_server.load::<Mesh, _>(eft_mesh.mesh_file.path()),
+                    asset_server.load::<Mesh, _>(ZmsNoSkinAssetLoader::convert_path(
+                        eft_mesh.mesh_file.path(),
+                    )),
                     effect_mesh_materials.add(EffectMeshMaterial {
                         base_texture: Some(asset_server.load(RgbTextureLoader::convert_path(
                             eft_mesh.mesh_texture_file.path(),
@@ -147,6 +153,11 @@ fn spawn_mesh(
                         src_blend_factor: decode_blend_factor(eft_mesh.src_blend_factor),
                         dst_blend_factor: decode_blend_factor(eft_mesh.dst_blend_factor),
                         blend_op: decode_blend_op(eft_mesh.blend_op),
+                        animation_texture: eft_mesh.mesh_animation_file.as_ref().map(|path| {
+                            asset_server.load(ZmoTextureAssetLoader::convert_path_texture(
+                                path.path().to_str().unwrap(),
+                            ))
+                        }),
                     }),
                     Visibility::default(),
                     ComputedVisibility::default(),
@@ -154,28 +165,38 @@ fn spawn_mesh(
                     GlobalTransform::default(),
                 ));
 
-                /*
-                TODO: Support morph target animations
-
-                if let Some(mesh_animation_file) = eft_mesh.mesh_animation_file.as_ref() {
-                    entity_comands.insert(ActiveMotion {
-                        motion: asset_server.load(mesh_animation_file.path()),
-                        repeat_limit: if eft_mesh.repeat_count == 0 {
-                            None
-                        } else {
-                            Some(eft_mesh.repeat_count as usize)
-                        },
-                        complete: false,
-                        animation_speed: 1.0,
-                        start_time: None,
-                    });
-                }
-                */
-
                 // TODO: eft_mesh.start_delay
                 // TODO: eft_mesh.is_linked
-                // TODO: eft_mesh.animation_file
-                // TODO: eft_mesh.animation_repeat_count
+
+                if let Some(mesh_animation_path) = &eft_mesh.mesh_animation_file {
+                    let motion = asset_server.load(ZmoTextureAssetLoader::convert_path(
+                        mesh_animation_path.path(),
+                    ));
+                    entity_comands.insert((
+                        NoFrustumCulling, // AABB culling is broken for mesh animations
+                        MeshAnimation::repeat(
+                            motion,
+                            if eft_mesh.repeat_count == 0 {
+                                None
+                            } else {
+                                Some(eft_mesh.repeat_count as usize)
+                            },
+                        ),
+                        EffectMeshAnimationRenderState::default(),
+                    ));
+                }
+
+                if let Some(transform_animation_path) = &eft_mesh.animation_file {
+                    let motion = asset_server.load(transform_animation_path.path());
+                    entity_comands.insert((TransformAnimation::repeat(
+                        motion,
+                        if eft_mesh.animation_repeat_count == 0 {
+                            None
+                        } else {
+                            Some(eft_mesh.animation_repeat_count as usize)
+                        },
+                    ),));
+                }
             })
             .id(),
     )

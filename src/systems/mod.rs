@@ -1,7 +1,6 @@
 mod ability_values_system;
 mod animation_effect_system;
 mod animation_sound_system;
-mod animation_system;
 mod auto_login_system;
 mod background_music_system;
 mod character_model_add_collider_system;
@@ -66,7 +65,6 @@ mod zone_viewer_system;
 pub use ability_values_system::ability_values_system;
 pub use animation_effect_system::animation_effect_system;
 pub use animation_sound_system::animation_sound_system;
-pub use animation_system::animation_system;
 pub use auto_login_system::auto_login_system;
 pub use background_music_system::background_music_system;
 pub use character_model_add_collider_system::character_model_add_collider_system;

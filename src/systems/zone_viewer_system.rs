@@ -4,7 +4,7 @@ use bevy::{
 };
 
 use crate::{
-    components::ActiveMotion,
+    animation::CameraAnimation,
     systems::{FreeCamera, OrbitCamera},
     ui::UiStateDebugWindows,
 };
@@ -19,7 +19,7 @@ pub fn zone_viewer_enter_system(
         commands
             .entity(entity)
             .remove::<OrbitCamera>()
-            .remove::<ActiveMotion>()
+            .remove::<CameraAnimation>()
             .insert(FreeCamera::new(
                 Vec3::new(5120.0, 50.0, -5120.0),
                 -45.0,

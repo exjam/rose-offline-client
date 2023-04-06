@@ -4,7 +4,7 @@ use bevy::prelude::{
 use bevy_egui::{egui, EguiContexts};
 
 use crate::{
-    components::ActiveMotion,
+    animation::CameraAnimation,
     events::CharacterSelectEvent,
     resources::{CharacterList, CharacterSelectState, GameData, UiResources},
     ui::{
@@ -115,7 +115,7 @@ pub fn ui_character_select_system(
     {
         commands
             .entity(query_camera.single())
-            .insert(ActiveMotion::new_once(
+            .insert(CameraAnimation::once(
                 asset_server.load("3DDATA/TITLE/CAMERA01_CREATE01.ZMO"),
             ));
 

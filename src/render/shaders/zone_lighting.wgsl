@@ -40,7 +40,7 @@ fn apply_zone_lighting_fog(world_position: vec4<f32>, fragment_color: vec4<f32>,
     return fog_color;
 }
 
-fn apply_zone_lighting(world_position: vec4<f32>, fragment_color: vec4<f32>, view_z: f32) -> vec4<f32> {
+fn apply_zone_lighting(world_position: vec4<f32>, world_normal: vec3<f32>, fragment_color: vec4<f32>, view_z: f32) -> vec4<f32> {
     var fog_amount: f32 = clamp(1.0 - exp2(-zone_lighting.fog_density * zone_lighting.fog_density * view_z * view_z * 1.442695), 0.0, 1.0);
 
     if (world_position.y >= zone_lighting.fog_height_offset) {
@@ -48,7 +48,8 @@ fn apply_zone_lighting(world_position: vec4<f32>, fragment_color: vec4<f32>, vie
     }
 
 #ifdef ZONE_LIGHTING_CHARACTER
-    let lit_color = vec4<f32>(fragment_color.rgb * zone_lighting.character_ambient_color.rgb, fragment_color.a);
+    let light = saturate(zone_lighting.character_ambient_color.rgb + zone_lighting.character_diffuse_color.rgb * clamp(dot(world_normal, vec3<f32>(1.0, 1.0, 1.0)), 0.0, 1.0));
+    let lit_color = vec4<f32>(fragment_color.rgb * light.rgb, fragment_color.a);
 #else
     let lit_color = vec4<f32>(fragment_color.rgb * zone_lighting.map_ambient_color.rgb, fragment_color.a);
 #endif

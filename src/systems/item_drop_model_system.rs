@@ -12,8 +12,9 @@ use bevy_rapier3d::prelude::{Collider, CollisionGroups};
 use rose_game_common::components::ItemDrop;
 
 use crate::{
+    animation::TransformAnimation,
     components::{
-        ActiveMotion, ColliderEntity, ColliderParent, ItemDropModel, COLLISION_FILTER_CLICKABLE,
+        ColliderEntity, ColliderParent, ItemDropModel, COLLISION_FILTER_CLICKABLE,
         COLLISION_FILTER_INSPECTABLE, COLLISION_GROUP_ITEM_DROP, COLLISION_GROUP_PHYSICS_TOY,
     },
     model_loader::ModelLoader,
@@ -51,7 +52,7 @@ pub fn item_drop_model_system(
         let root_model_bone = item_drop_model.root_bone;
         commands
             .entity(root_model_bone)
-            .insert(ActiveMotion::new_once(drop_motion));
+            .insert(TransformAnimation::once(drop_motion));
 
         commands.entity(entity).insert(item_drop_model);
     }

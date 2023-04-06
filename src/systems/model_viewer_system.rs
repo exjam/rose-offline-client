@@ -20,9 +20,8 @@ use rose_data::{
 use rose_game_common::components::{CharacterGender, CharacterInfo, Equipment, Npc};
 
 use crate::{
-    components::{
-        ActiveMotion, CharacterModel, ClientEntityName, ModelHeight, NameTagType, NpcModel,
-    },
+    animation::{CameraAnimation, SkeletalAnimation},
+    components::{CharacterModel, ClientEntityName, ModelHeight, NameTagType, NpcModel},
     resources::{DamageDigitsSpawner, GameData, NameTagSettings},
     systems::{FreeCamera, OrbitCamera},
     ui::UiStateDebugWindows,
@@ -58,7 +57,7 @@ pub fn model_viewer_enter_system(
             .entity(entity)
             .remove::<FreeCamera>()
             .remove::<OrbitCamera>()
-            .remove::<ActiveMotion>()
+            .remove::<CameraAnimation>()
             .insert(FreeCamera::new(Vec3::new(0.0, 10.0, 15.0), 0.0, -20.0));
     }
 
@@ -311,14 +310,16 @@ pub fn model_viewer_system(
             |name: &str, character_action: CharacterMotionAction, npc_action: NpcMotionAction| {
                 if ui.button(name).clicked() {
                     for (entity, character_model) in query_character_model.iter() {
-                        commands.entity(entity).insert(ActiveMotion::new_repeating(
+                        commands.entity(entity).insert(SkeletalAnimation::repeat(
                             character_model.action_motions[character_action].clone(),
+                            None,
                         ));
                     }
 
                     for (entity, npc_model) in query_npc_model.iter() {
-                        commands.entity(entity).insert(ActiveMotion::new_repeating(
+                        commands.entity(entity).insert(SkeletalAnimation::repeat(
                             npc_model.action_motions[npc_action].clone(),
+                            None,
                         ));
                     }
                 }

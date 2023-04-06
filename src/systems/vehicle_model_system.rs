@@ -10,7 +10,8 @@ use bevy::{
 use rose_game_common::components::{Equipment, MoveMode};
 
 use crate::{
-    components::{ActiveMotion, DummyBoneOffset, Vehicle, VehicleModel},
+    animation::SkeletalAnimation,
+    components::{DummyBoneOffset, Vehicle, VehicleModel},
     model_loader::ModelLoader,
     render::{EffectMeshMaterial, ObjectMaterial, ParticleMaterial},
 };
@@ -55,17 +56,18 @@ pub fn vehicle_model_system(
                 .entity(entity)
                 .add_child(vehicle_model.driver_model_entity);
 
-            // Move driver ActiveMotion, SkinnedMesh, DummyBoneOffset to root entity
+            // Move driver SkeletalAnimation, SkinnedMesh, DummyBoneOffset to root entity
             let driver_model_entity = vehicle_model.driver_model_entity;
             commands.add(move |world: &mut World| {
                 let mut driver_model_entity_mut = world.entity_mut(driver_model_entity);
-                let character_active_motion = driver_model_entity_mut.take::<ActiveMotion>();
+                let character_skeletal_animation =
+                    driver_model_entity_mut.take::<SkeletalAnimation>();
                 let character_dummy_bone_offset = driver_model_entity_mut.take::<DummyBoneOffset>();
                 let character_skinned_mesh = driver_model_entity_mut.take::<SkinnedMesh>();
 
                 let mut root_entity_mut = world.entity_mut(entity);
-                if let Some(character_active_motion) = character_active_motion {
-                    root_entity_mut.insert(character_active_motion);
+                if let Some(character_skeletal_animation) = character_skeletal_animation {
+                    root_entity_mut.insert(character_skeletal_animation);
                 }
                 if let Some(character_dummy_bone_offset) = character_dummy_bone_offset {
                     root_entity_mut.insert(character_dummy_bone_offset);
@@ -125,14 +127,14 @@ pub fn vehicle_model_system(
             commands.add(move |world: &mut World| {
                 // Move character ActiveMotion, DummyBoneOffset, SkinnedMesh to character model
                 let mut root_entity_mut = world.entity_mut(entity);
-                let character_active_motion = root_entity_mut.take::<ActiveMotion>();
+                let character_skeletal_animation = root_entity_mut.take::<SkeletalAnimation>();
                 let character_dummy_bone_offset = root_entity_mut.take::<DummyBoneOffset>();
                 let character_skinned_mesh = root_entity_mut.take::<SkinnedMesh>();
 
                 let mut driver_model_entity_mut =
                     world.entity_mut(vehicle_model.driver_model_entity);
-                if let Some(character_active_motion) = character_active_motion {
-                    driver_model_entity_mut.insert(character_active_motion);
+                if let Some(character_skeletal_animation) = character_skeletal_animation {
+                    driver_model_entity_mut.insert(character_skeletal_animation);
                 }
                 if let Some(character_dummy_bone_offset) = character_dummy_bone_offset {
                     driver_model_entity_mut.insert(character_dummy_bone_offset);

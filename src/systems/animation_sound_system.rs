@@ -11,9 +11,9 @@ use rose_data::{
 use rose_game_common::components::{Equipment, MoveMode, Npc, Target};
 
 use crate::{
+    animation::AnimationFrameEvent,
     audio::SpatialSound,
     components::{Command, DummyBoneOffset, PlayerCharacter, SoundCategory},
-    events::AnimationFrameEvent,
     resources::{CurrentZone, GameData, SoundSettings},
     zone_loader::ZoneLoaderAsset,
 };

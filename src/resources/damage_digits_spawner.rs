@@ -7,9 +7,9 @@ use bevy::{
 };
 
 use crate::{
-    components::{ActiveMotion, DamageDigits},
+    animation::{TransformAnimation, ZmoAsset},
+    components::DamageDigits,
     render::{DamageDigitMaterial, DamageDigitRenderData},
-    zmo_asset_loader::ZmoAsset,
 };
 
 #[derive(Resource)]
@@ -70,7 +70,7 @@ impl DamageDigitsSpawner {
                     } else {
                         self.texture_damage.clone_weak()
                     },
-                    ActiveMotion::new_once(self.motion.clone_weak()),
+                    TransformAnimation::once(self.motion.clone_weak()),
                     Transform::default(),
                     GlobalTransform::default(),
                     Aabb::default(),

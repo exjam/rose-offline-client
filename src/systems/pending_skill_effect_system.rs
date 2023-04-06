@@ -9,9 +9,10 @@ use rose_game_common::components::{
 };
 
 use crate::{
+    animation::AnimationFrameEvent,
     bundles::ability_values_get_value,
     components::{PendingSkillEffectList, PendingSkillTargetList},
-    events::{AnimationFrameEvent, HitEvent},
+    events::HitEvent,
     resources::GameData,
 };
 

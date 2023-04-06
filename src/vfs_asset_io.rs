@@ -27,7 +27,9 @@ impl AssetIo for VfsAssetIo {
                 .to_str()
                 .unwrap()
                 .trim_end_matches(".image_copy_src")
-                .trim_end_matches(".rgb_texture");
+                .trim_end_matches(".rgb_texture")
+                .trim_end_matches(".no_skin")
+                .trim_end_matches(".zmo_texture");
             if path.ends_with(".zone_loader") {
                 let zone_id = path.trim_end_matches(".zone_loader").parse::<u8>().unwrap();
                 Ok(vec![zone_id])

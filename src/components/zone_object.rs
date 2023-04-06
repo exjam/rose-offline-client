@@ -76,6 +76,14 @@ pub enum ZoneObject {
     DecoObject(ZoneObjectId),
     DecoObjectPart(ZoneObjectPart),
     Terrain(ZoneObjectTerrain),
+    EffectObject {
+        ifo_object_id: usize,
+        effect_path: String,
+    },
+    SoundObject {
+        ifo_object_id: usize,
+        sound_path: String,
+    },
     #[default]
     Water,
 }

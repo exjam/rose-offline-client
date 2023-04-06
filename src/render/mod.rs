@@ -31,7 +31,9 @@ pub const MESH_ATTRIBUTE_UV_3: MeshVertexAttribute =
 
 pub use damage_digit_material::DamageDigitMaterial;
 pub use damage_digit_render_data::DamageDigitRenderData;
-pub use effect_mesh_material::EffectMeshMaterial;
+pub use effect_mesh_material::{
+    EffectMeshAnimationFlags, EffectMeshAnimationRenderState, EffectMeshMaterial,
+};
 pub use object_material::{
     ObjectMaterial, ObjectMaterialBlend, ObjectMaterialClipFace, ObjectMaterialGlow,
 };

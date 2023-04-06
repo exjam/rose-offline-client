@@ -10,10 +10,10 @@ use rose_data::{
 use rose_game_common::components::{Equipment, MoveMode, MoveSpeed, Npc};
 
 use crate::{
+    animation::AnimationFrameEvent,
     components::{Command, PlayerCharacter},
     events::{
-        AnimationFrameEvent, HitEvent, SpawnEffectData, SpawnEffectEvent, SpawnProjectileEvent,
-        SpawnProjectileTarget,
+        HitEvent, SpawnEffectData, SpawnEffectEvent, SpawnProjectileEvent, SpawnProjectileTarget,
     },
     resources::GameData,
 };

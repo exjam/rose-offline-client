@@ -1,6 +1,7 @@
 #![allow(clippy::type_complexity)]
 #![allow(clippy::too_many_arguments)]
 
+use animation::{RoseAnimationPlugin, RoseAnimationSystem};
 use bevy::{
     core_pipeline::{bloom::BloomSettings, clear_color::ClearColor},
     ecs::event::Events,
@@ -31,6 +32,7 @@ use rose_file_readers::{
     VirtualFilesystem, VirtualFilesystemDevice, ZscFile,
 };
 
+pub mod animation;
 pub mod audio;
 pub mod bundles;
 pub mod components;
@@ -45,15 +47,14 @@ pub mod scripting;
 pub mod systems;
 pub mod ui;
 pub mod vfs_asset_io;
-pub mod zmo_asset_loader;
 pub mod zms_asset_loader;
 pub mod zone_loader;
 
 use audio::OddioPlugin;
 use events::{
-    AnimationFrameEvent, BankEvent, CharacterSelectEvent, ChatboxEvent, ClanDialogEvent,
-    ClientEntityEvent, ConversationDialogEvent, GameConnectionEvent, HitEvent, LoadZoneEvent,
-    LoginEvent, MessageBoxEvent, NetworkEvent, NpcStoreEvent, NumberInputDialogEvent, PartyEvent,
+    BankEvent, CharacterSelectEvent, ChatboxEvent, ClanDialogEvent, ClientEntityEvent,
+    ConversationDialogEvent, GameConnectionEvent, HitEvent, LoadZoneEvent, LoginEvent,
+    MessageBoxEvent, NetworkEvent, NpcStoreEvent, NumberInputDialogEvent, PartyEvent,
     PersonalStoreEvent, PlayerCommandEvent, QuestTriggerEvent, SpawnEffectEvent,
     SpawnProjectileEvent, SystemFuncEvent, UseItemEvent, WorldConnectionEvent, ZoneEvent,
 };
@@ -67,31 +68,30 @@ use resources::{
 };
 use scripting::RoseScriptingPlugin;
 use systems::{
-    ability_values_system, animation_effect_system, animation_sound_system, animation_system,
-    auto_login_system, background_music_system, character_model_add_collider_system,
-    character_model_blink_system, character_model_update_system, character_select_enter_system,
-    character_select_event_system, character_select_exit_system, character_select_input_system,
-    character_select_models_system, character_select_system, clan_system,
-    client_entity_event_system, collision_height_only_system, collision_player_system,
-    collision_player_system_join_zoin, command_system, conversation_dialog_system, cooldown_system,
-    damage_digit_render_system, debug_render_collider_system,
-    debug_render_directional_light_system, debug_render_polylines_setup_system,
-    debug_render_polylines_update_system, debug_render_skeleton_system, effect_system,
-    facing_direction_system, free_camera_system, game_connection_system, game_mouse_input_system,
-    game_state_enter_system, game_zone_change_system, hit_event_system,
-    item_drop_model_add_collider_system, item_drop_model_system, login_connection_system,
-    login_event_system, login_state_enter_system, login_state_exit_system, login_system,
-    model_viewer_enter_system, model_viewer_exit_system, model_viewer_system, name_tag_system,
-    name_tag_update_color_system, name_tag_update_healthbar_system, name_tag_visibility_system,
-    network_thread_system, npc_idle_sound_system, npc_model_add_collider_system,
-    npc_model_update_system, orbit_camera_system, particle_sequence_system,
-    passive_recovery_system, pending_damage_system, pending_skill_effect_system,
-    personal_store_model_add_collider_system, personal_store_model_system, player_command_system,
-    projectile_system, quest_trigger_system, spawn_effect_system, spawn_projectile_system,
-    status_effect_system, system_func_event_system, update_position_system, use_item_event_system,
-    vehicle_model_system, vehicle_sound_system, visible_status_effects_system,
-    world_connection_system, world_time_system, zone_time_system, zone_viewer_enter_system,
-    DebugInspectorPlugin,
+    ability_values_system, animation_effect_system, animation_sound_system, auto_login_system,
+    background_music_system, character_model_add_collider_system, character_model_blink_system,
+    character_model_update_system, character_select_enter_system, character_select_event_system,
+    character_select_exit_system, character_select_input_system, character_select_models_system,
+    character_select_system, clan_system, client_entity_event_system, collision_height_only_system,
+    collision_player_system, collision_player_system_join_zoin, command_system,
+    conversation_dialog_system, cooldown_system, damage_digit_render_system,
+    debug_render_collider_system, debug_render_directional_light_system,
+    debug_render_polylines_setup_system, debug_render_polylines_update_system,
+    debug_render_skeleton_system, effect_system, facing_direction_system, free_camera_system,
+    game_connection_system, game_mouse_input_system, game_state_enter_system,
+    game_zone_change_system, hit_event_system, item_drop_model_add_collider_system,
+    item_drop_model_system, login_connection_system, login_event_system, login_state_enter_system,
+    login_state_exit_system, login_system, model_viewer_enter_system, model_viewer_exit_system,
+    model_viewer_system, name_tag_system, name_tag_update_color_system,
+    name_tag_update_healthbar_system, name_tag_visibility_system, network_thread_system,
+    npc_idle_sound_system, npc_model_add_collider_system, npc_model_update_system,
+    orbit_camera_system, particle_sequence_system, passive_recovery_system, pending_damage_system,
+    pending_skill_effect_system, personal_store_model_add_collider_system,
+    personal_store_model_system, player_command_system, projectile_system, quest_trigger_system,
+    spawn_effect_system, spawn_projectile_system, status_effect_system, system_func_event_system,
+    update_position_system, use_item_event_system, vehicle_model_system, vehicle_sound_system,
+    visible_status_effects_system, world_connection_system, world_time_system, zone_time_system,
+    zone_viewer_enter_system, DebugInspectorPlugin,
 };
 use ui::{
     load_dialog_sprites_system, ui_bank_system, ui_character_create_system,
@@ -111,8 +111,7 @@ use ui::{
     DialogLoader, UiStateDebugWindows, UiStateDragAndDrop, UiStateWindows,
 };
 use vfs_asset_io::VfsAssetIo;
-use zmo_asset_loader::{ZmoAsset, ZmoAssetLoader};
-use zms_asset_loader::{ZmsAssetLoader, ZmsMaterialNumFaces};
+use zms_asset_loader::{ZmsAssetLoader, ZmsMaterialNumFaces, ZmsNoSkinAssetLoader};
 use zone_loader::{zone_loader_system, ZoneLoader, ZoneLoaderAsset};
 
 use crate::components::SoundCategory;
@@ -519,9 +518,8 @@ fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsC
 
     // Initialise rose stuff
     app.init_asset_loader::<ZmsAssetLoader>()
-        .add_asset::<ZmoAsset>()
+        .init_asset_loader::<ZmsNoSkinAssetLoader>()
         .add_asset::<ZmsMaterialNumFaces>()
-        .init_asset_loader::<ZmoAssetLoader>()
         .add_asset::<ZoneLoaderAsset>()
         .init_asset_loader::<DialogLoader>()
         .add_asset::<Dialog>()
@@ -551,6 +549,7 @@ fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsC
                 SoundCategory::NpcSounds => config.sound.volume.npc_sounds,
             },
         })
+        .add_plugin(RoseAnimationPlugin)
         .add_plugin(RoseRenderPlugin)
         .add_plugin(RoseScriptingPlugin)
         .add_plugin(DebugInspectorPlugin);
@@ -559,8 +558,7 @@ fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsC
     app.add_state::<AppState>()
         .insert_resource(State::<AppState>(app_state));
 
-    app.add_event::<AnimationFrameEvent>()
-        .add_event::<BankEvent>()
+    app.add_event::<BankEvent>()
         .add_event::<ChatboxEvent>()
         .add_event::<CharacterSelectEvent>()
         .add_event::<ClanDialogEvent>()
@@ -593,29 +591,24 @@ fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsC
 
     app.add_system(auto_login_system)
         .add_system(background_music_system)
-        .add_system(character_model_update_system)
+        .add_system(character_model_update_system.before(RoseAnimationSystem))
         .add_system(character_model_add_collider_system.after(character_model_update_system))
         .add_system(personal_store_model_system)
         .add_system(personal_store_model_add_collider_system.after(personal_store_model_system))
-        .add_system(npc_model_update_system)
+        .add_system(npc_model_update_system.before(RoseAnimationSystem))
         .add_system(npc_model_add_collider_system.after(npc_model_update_system))
         .add_system(item_drop_model_system)
         .add_system(item_drop_model_add_collider_system.after(item_drop_model_system))
         .add_system(vehicle_model_system.after(character_model_update_system))
         .add_system(vehicle_sound_system.after(vehicle_model_system))
-        .add_system(
-            animation_system
-                .after(character_model_update_system)
-                .after(npc_model_update_system),
-        )
         .add_system(particle_sequence_system)
         .add_system(effect_system)
         .add_system(
             animation_effect_system
-                .after(animation_system)
+                .after(RoseAnimationSystem)
                 .before(spawn_effect_system),
         )
-        .add_system(animation_sound_system.after(animation_system))
+        .add_system(animation_sound_system.after(RoseAnimationSystem))
         .add_system(
             projectile_system
                 .after(animation_effect_system)
@@ -792,7 +785,7 @@ fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsC
         (
             ability_values_system,
             clan_system,
-            command_system.after(animation_system),
+            command_system.after(RoseAnimationSystem),
             facing_direction_system.after(command_system),
             update_position_system,
             collision_player_system_join_zoin

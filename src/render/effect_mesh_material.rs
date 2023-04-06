@@ -1,23 +1,38 @@
 use bevy::{
     asset::{load_internal_asset, Handle},
-    pbr::{
-        AlphaMode, DrawMaterial, DrawPrepass, Material, MaterialPipeline, MaterialPipelineKey,
-        MaterialPlugin, MeshPipelineKey,
+    ecs::{
+        query::{QueryItem, ROQueryItem},
+        system::{
+            lifetimeless::{Read, SRes},
+            SystemParamItem,
+        },
     },
-    prelude::{App, HandleUntyped, Mesh, Plugin},
-    reflect::TypeUuid,
+    pbr::{
+        AlphaMode, DrawPrepass, Material, MaterialPipeline, MaterialPipelineKey, MaterialPlugin,
+        MeshPipelineKey, SetMaterialBindGroup, SetMeshBindGroup, SetMeshViewBindGroup,
+    },
+    prelude::{App, Component, FromWorld, HandleUntyped, Mesh, Plugin, With, World},
+    reflect::{Reflect, TypeUuid},
     render::{
-        mesh::MeshVertexBufferLayout,
+        extract_component::{ExtractComponent, ExtractComponentPlugin},
+        mesh::{GpuBufferInfo, MeshVertexBufferLayout},
         prelude::Shader,
         render_asset::RenderAssets,
+        render_phase::{
+            PhaseItem, RenderCommand, RenderCommandResult, SetItemPipeline, TrackedRenderPass,
+        },
         render_resource::{
-            encase::ShaderType, AsBindGroup, AsBindGroupShaderType, BlendComponent, BlendFactor,
-            BlendOperation, BlendState, CompareFunction, RenderPipelineDescriptor, ShaderRef,
+            encase::{self, ShaderType},
+            AsBindGroup, AsBindGroupShaderType, BindGroupLayout, BlendComponent, BlendFactor,
+            BlendOperation, BlendState, CompareFunction, PushConstantRange,
+            RenderPipelineDescriptor, ShaderDefVal, ShaderRef, ShaderSize, ShaderStages,
             SpecializedMeshPipelineError,
         },
         texture::Image,
     },
 };
+
+use crate::render::zone_lighting::{SetZoneLightingBindGroup, ZoneLightingUniformMeta};
 
 pub const EFFECT_MESH_MATERIAL_SHADER_HANDLE: HandleUntyped =
     HandleUntyped::weak_from_u64(Shader::TYPE_UUID, 0x90d5233c3001d33e);
@@ -36,24 +51,56 @@ impl Plugin for EffectMeshMaterialPlugin {
             Shader::from_wgsl
         );
 
+        app.add_plugin(ExtractComponentPlugin::<EffectMeshAnimationRenderState>::extract_visible());
+        app.register_type::<EffectMeshAnimationRenderState>();
+
         app.add_plugin(MaterialPlugin::<
             EffectMeshMaterial,
-            DrawMaterial<EffectMeshMaterial>,
+            DrawEffectMeshMaterial,
             DrawPrepass<EffectMeshMaterial>,
         > {
             prepass_enabled: self.prepass_enabled,
             ..Default::default()
         });
+        //TODO? .register_asset_reflect::<EffectMeshMaterial>();
     }
 }
 
-// NOTE: These must match the bit flags in shaders/effect_mesh_material.wgsl!
 bitflags::bitflags! {
     #[repr(transparent)]
     pub struct EffectMeshMaterialFlags: u32 {
-        const ALPHA_MODE_OPAQUE          = (1 << 0);
-        const ALPHA_MODE_MASK            = (1 << 1);
-        const NONE                       = 0;
+        const ALPHA_MODE_OPAQUE         = (1 << 0);
+        const ALPHA_MODE_MASK           = (1 << 1);
+        const NONE                      = 0;
+    }
+}
+
+bitflags::bitflags! {
+    #[repr(transparent)]
+    pub struct EffectMeshAnimationFlags: u32 {
+        const ANIMATE_POSITION          = (1 << 0);
+        const ANIMATE_NORMALS           = (1 << 1);
+        const ANIMATE_UV                = (1 << 2);
+        const ANIMATE_ALPHA             = (1 << 3);
+        const NONE                      = 0;
+    }
+}
+
+#[derive(Copy, Clone, Default, Component, ShaderType, Reflect)]
+pub struct EffectMeshAnimationRenderState {
+    pub flags: u32,
+    pub current_next_frame: u32,
+    pub next_weight: f32,
+    pub alpha: f32,
+}
+
+impl ExtractComponent for EffectMeshAnimationRenderState {
+    type Query = &'static Self;
+    type Filter = With<Handle<EffectMeshMaterial>>;
+    type Out = Self;
+
+    fn extract_component(item: QueryItem<Self::Query>) -> Option<Self> {
+        Some(*item)
     }
 }
 
@@ -71,6 +118,10 @@ pub struct EffectMeshMaterial {
     #[texture(1)]
     #[sampler(2)]
     pub base_texture: Option<Handle<Image>>,
+
+    #[texture(3)]
+    #[sampler(4)]
+    pub animation_texture: Option<Handle<Image>>,
 
     pub alpha_enabled: bool,
     pub alpha_test: bool,
@@ -103,6 +154,7 @@ impl AsBindGroupShaderType<EffectMeshMaterialUniformData> for EffectMeshMaterial
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct EffectMeshMaterialKey {
+    has_animation_texture: bool,
     alpha_enabled: bool,
     alpha_test: bool,
     two_sided: bool,
@@ -116,6 +168,7 @@ pub struct EffectMeshMaterialKey {
 impl From<&EffectMeshMaterial> for EffectMeshMaterialKey {
     fn from(material: &EffectMeshMaterial) -> Self {
         EffectMeshMaterialKey {
+            has_animation_texture: material.animation_texture.is_some(),
             alpha_enabled: material.alpha_enabled,
             alpha_test: material.alpha_test,
             two_sided: material.two_sided,
@@ -128,11 +181,27 @@ impl From<&EffectMeshMaterial> for EffectMeshMaterialKey {
     }
 }
 
+#[derive(Clone)]
+pub struct EffectMeshMaterialPipelineData {
+    pub zone_lighting_layout: BindGroupLayout,
+}
+
+impl FromWorld for EffectMeshMaterialPipelineData {
+    fn from_world(world: &mut World) -> Self {
+        EffectMeshMaterialPipelineData {
+            zone_lighting_layout: world
+                .resource::<ZoneLightingUniformMeta>()
+                .bind_group_layout
+                .clone(),
+        }
+    }
+}
+
 impl Material for EffectMeshMaterial {
-    type PipelineData = ();
+    type PipelineData = EffectMeshMaterialPipelineData;
 
     fn specialize(
-        _pipeline: &MaterialPipeline<Self>,
+        pipeline: &MaterialPipeline<Self>,
         descriptor: &mut RenderPipelineDescriptor,
         layout: &MeshVertexBufferLayout,
         key: MaterialPipelineKey<Self>,
@@ -151,18 +220,48 @@ impl Material for EffectMeshMaterial {
             descriptor.depth_stencil.as_mut().unwrap().depth_compare = CompareFunction::Always;
         }
 
+        if key.bind_group_data.has_animation_texture {
+            descriptor
+                .vertex
+                .shader_defs
+                .push(ShaderDefVal::Bool("HAS_ANIMATION_TEXTURE".into(), true));
+
+            if let Some(fragment) = descriptor.fragment.as_mut() {
+                fragment
+                    .shader_defs
+                    .push(ShaderDefVal::Bool("HAS_ANIMATION_TEXTURE".into(), true));
+            }
+
+            descriptor.push_constant_ranges.push(PushConstantRange {
+                stages: ShaderStages::VERTEX_FRAGMENT,
+                range: 0..EffectMeshAnimationRenderState::SHADER_SIZE.get() as u32,
+            });
+        }
+
         if key.mesh_key.contains(MeshPipelineKey::DEPTH_PREPASS)
             || key.mesh_key.contains(MeshPipelineKey::NORMAL_PREPASS)
         {
             return Ok(());
         }
 
-        let vertex_attributes = [
-            Mesh::ATTRIBUTE_POSITION.at_shader_location(0),
-            Mesh::ATTRIBUTE_UV_0.at_shader_location(1),
-        ];
+        descriptor
+            .layout
+            .insert(3, pipeline.data.zone_lighting_layout.clone());
 
-        descriptor.vertex.buffers = vec![layout.get_layout(&vertex_attributes)?];
+        if layout.contains(Mesh::ATTRIBUTE_NORMAL) {
+            let vertex_attributes = [
+                Mesh::ATTRIBUTE_POSITION.at_shader_location(0),
+                Mesh::ATTRIBUTE_UV_0.at_shader_location(1),
+                Mesh::ATTRIBUTE_NORMAL.at_shader_location(2),
+            ];
+            descriptor.vertex.buffers = vec![layout.get_layout(&vertex_attributes)?];
+        } else {
+            let vertex_attributes = [
+                Mesh::ATTRIBUTE_POSITION.at_shader_location(0),
+                Mesh::ATTRIBUTE_UV_0.at_shader_location(1),
+            ];
+            descriptor.vertex.buffers = vec![layout.get_layout(&vertex_attributes)?];
+        }
 
         if let Some(fragment) = descriptor.fragment.as_mut() {
             for color_target_state in fragment.targets.iter_mut().filter_map(|x| x.as_mut()) {
@@ -206,3 +305,58 @@ impl Material for EffectMeshMaterial {
         }
     }
 }
+
+pub struct DrawEffectMesh;
+impl<P: PhaseItem> RenderCommand<P> for DrawEffectMesh {
+    type Param = SRes<RenderAssets<Mesh>>;
+    type ItemWorldQuery = (
+        Read<Handle<Mesh>>,
+        Option<Read<EffectMeshAnimationRenderState>>,
+    );
+    type ViewWorldQuery = ();
+
+    #[inline]
+    fn render<'w>(
+        _: &P,
+        _: ROQueryItem<'_, Self::ViewWorldQuery>,
+        (mesh_handle, animation_state): ROQueryItem<'_, Self::ItemWorldQuery>,
+        meshes: SystemParamItem<'w, '_, Self::Param>,
+        pass: &mut TrackedRenderPass<'w>,
+    ) -> RenderCommandResult {
+        if let Some(animation_state) = animation_state {
+            let byte_buffer = [0u8; EffectMeshAnimationRenderState::SHADER_SIZE.get() as usize];
+            let mut buffer = encase::StorageBuffer::new(byte_buffer);
+            buffer.write(animation_state).unwrap();
+            pass.set_push_constants(ShaderStages::VERTEX_FRAGMENT, 0, buffer.as_ref());
+        }
+
+        if let Some(gpu_mesh) = meshes.into_inner().get(mesh_handle) {
+            pass.set_vertex_buffer(0, gpu_mesh.vertex_buffer.slice(..));
+            match &gpu_mesh.buffer_info {
+                GpuBufferInfo::Indexed {
+                    buffer,
+                    index_format,
+                    count,
+                } => {
+                    pass.set_index_buffer(buffer.slice(..), 0, *index_format);
+                    pass.draw_indexed(0..*count, 0, 0..1);
+                }
+                GpuBufferInfo::NonIndexed { vertex_count } => {
+                    pass.draw(0..*vertex_count, 0..1);
+                }
+            }
+            RenderCommandResult::Success
+        } else {
+            RenderCommandResult::Failure
+        }
+    }
+}
+
+type DrawEffectMeshMaterial = (
+    SetItemPipeline,
+    SetMeshViewBindGroup<0>,
+    SetMaterialBindGroup<EffectMeshMaterial, 1>,
+    SetMeshBindGroup<2>,
+    SetZoneLightingBindGroup<3>,
+    DrawEffectMesh,
+);

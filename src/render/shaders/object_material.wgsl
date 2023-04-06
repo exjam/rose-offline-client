@@ -15,6 +15,21 @@ var<uniform> joint_matrices: SkinnedMesh;
 #import bevy_pbr::skinning
 #endif
 
+@group(1) @binding(0)
+var<uniform> material: StaticMeshMaterialData;
+@group(1) @binding(1)
+var base_texture: texture_2d<f32>;
+@group(1) @binding(2)
+var base_sampler: sampler;
+@group(1) @binding(3)
+var lightmap_texture: texture_2d<f32>;
+@group(1) @binding(4)
+var lightmap_sampler: sampler;
+@group(1) @binding(5)
+var specular_texture: texture_2d<f32>;
+@group(1) @binding(6)
+var specular_sampler: sampler;
+
 struct Vertex {
     @location(0) position: vec3<f32>,
     @location(1) normal: vec3<f32>,
@@ -51,13 +66,13 @@ fn vertex(vertex: Vertex) -> VertexOutput {
 #endif
 
 #ifdef SKINNED
-    var model = skin_model(vertex.joint_indexes, vertex.joint_weights);
-    out.world_normal = skin_normals(model, vertex.normal);
+    let skinned_model = skin_model(vertex.joint_indexes, vertex.joint_weights);
+    out.world_position = mesh_position_local_to_world(skinned_model, vec4<f32>(vertex.position, 1.0));
+    out.world_normal = skin_normals(skinned_model, vertex.normal);
 #else
-    var model = mesh.model;
+    out.world_position = mesh_position_local_to_world(mesh.model, vec4<f32>(vertex.position, 1.0));
     out.world_normal = mesh_normal_local_to_world(vertex.normal);
-#endif
-    out.world_position = mesh_position_local_to_world(model, vec4<f32>(vertex.position, 1.0));
+#endif // ifdef SKINNED
 
     out.clip_position = view.view_proj * out.world_position;
     return out;
@@ -76,21 +91,6 @@ const OBJECT_MATERIAL_FLAGS_ALPHA_MODE_MASK: u32                = 2u;
 const OBJECT_MATERIAL_FLAGS_ALPHA_MODE_BLEND: u32               = 4u;
 const OBJECT_MATERIAL_FLAGS_HAS_ALPHA_VALUE: u32                = 8u;
 const OBJECT_MATERIAL_FLAGS_SPECULAR: u32                       = 16u;
-
-@group(1) @binding(0)
-var<uniform> material: StaticMeshMaterialData;
-@group(1) @binding(1)
-var base_texture: texture_2d<f32>;
-@group(1) @binding(2)
-var base_sampler: sampler;
-@group(1) @binding(3)
-var lightmap_texture: texture_2d<f32>;
-@group(1) @binding(4)
-var lightmap_sampler: sampler;
-@group(1) @binding(5)
-var specular_texture: texture_2d<f32>;
-@group(1) @binding(6)
-var specular_sampler: sampler;
 
 struct FragmentInput {
     @builtin(position) frag_coord: vec4<f32>,
@@ -112,10 +112,11 @@ fn fragment(in: FragmentInput) -> @location(0) vec4<f32> {
         view.inverse_view[3].z
     ), in.world_position);
 
+
+#ifdef HAS_OBJECT_LIGHTMAP
     let shadow = fetch_directional_shadow(0u, in.world_position, in.world_normal, view_z);
     output_color = vec4<f32>(output_color.xyz * (shadow * 0.2 + 0.8), output_color.w);
 
-#ifdef HAS_OBJECT_LIGHTMAP
     var lightmap = textureSample(lightmap_texture, lightmap_sampler, (in.lightmap_uv + material.lightmap_uv_offset) * material.lightmap_uv_scale);
     output_color = vec4<f32>(output_color.xyz * lightmap.xyz * 2.0, output_color.w);
 #endif
@@ -143,7 +144,6 @@ fn fragment(in: FragmentInput) -> @location(0) vec4<f32> {
         }
     }
 
-    output_color = apply_zone_lighting(in.world_position, output_color, view_z);
-    output_color = pow(output_color, vec4<f32>(2.2));
-    return output_color;
+    output_color = apply_zone_lighting(in.world_position, in.world_normal, output_color, view_z);
+    return vec4<f32>(pow(output_color.xyz, vec3<f32>(2.2)), output_color.a);
 }

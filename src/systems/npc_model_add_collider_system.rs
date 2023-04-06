@@ -16,11 +16,11 @@ use bevy_rapier3d::prelude::{Collider, CollisionGroups};
 use rose_data::NpcMotionAction;
 
 use crate::{
+    animation::ZmoAsset,
     components::{
         ColliderEntity, ColliderParent, ModelHeight, NpcModel, COLLISION_FILTER_CLICKABLE,
         COLLISION_FILTER_INSPECTABLE, COLLISION_GROUP_NPC, COLLISION_GROUP_PHYSICS_TOY,
     },
-    zmo_asset_loader::ZmoAsset,
 };
 
 pub fn npc_model_add_collider_system(

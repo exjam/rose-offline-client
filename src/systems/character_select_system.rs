@@ -21,9 +21,10 @@ use rose_game_common::messages::{
 };
 
 use crate::{
+    animation::{CameraAnimation, SkeletalAnimation, ZmoAsset},
     components::{
-        ActiveMotion, CharacterModel, ColliderParent, COLLISION_FILTER_CLICKABLE,
-        COLLISION_GROUP_CHARACTER, COLLISION_GROUP_PLAYER,
+        CharacterModel, ColliderParent, COLLISION_FILTER_CLICKABLE, COLLISION_GROUP_CHARACTER,
+        COLLISION_GROUP_PLAYER,
     },
     events::{CharacterSelectEvent, GameConnectionEvent, LoadZoneEvent, WorldConnectionEvent},
     ray_from_screenspace::ray_from_screenspace,
@@ -32,7 +33,6 @@ use crate::{
         WorldConnection,
     },
     systems::{FreeCamera, OrbitCamera},
-    zmo_asset_loader::ZmoAsset,
 };
 
 #[derive(Component)]
@@ -68,7 +68,7 @@ pub fn character_select_enter_system(
             )
             .remove::<FreeCamera>()
             .remove::<OrbitCamera>()
-            .insert(ActiveMotion::new_once(
+            .insert(CameraAnimation::once(
                 asset_server.load("3DDATA/TITLE/CAMERA01_INSELECT01.ZMO"),
             ));
     }
@@ -115,7 +115,7 @@ pub fn character_select_models_system(
     mut model_list: ResMut<CharacterSelectModelList>,
     character_list: Option<Res<CharacterList>>,
     character_select_state: Res<CharacterSelectState>,
-    query_characters: Query<(Option<&ActiveMotion>, &CharacterModel), With<SkinnedMesh>>,
+    query_characters: Query<(Option<&SkeletalAnimation>, &CharacterModel), With<SkinnedMesh>>,
 ) {
     // Ensure all character list models are up to date
     if let Some(character_list) = character_list.as_ref() {
@@ -130,7 +130,7 @@ pub fn character_select_models_system(
                 model_list.models[index].0 = Some(character.info.name.clone());
             }
 
-            if let Ok((active_motion, character_model)) = query_characters.get(entity) {
+            if let Ok((skeletal_animation, character_model)) = query_characters.get(entity) {
                 let deleting = character.delete_time.is_some();
                 let selected = if let CharacterSelectState::CharacterSelect(Some(selected_index)) =
                     *character_select_state
@@ -148,10 +148,10 @@ pub fn character_select_models_system(
                     &character_model.action_motions[CharacterMotionAction::Stop1]
                 };
 
-                if active_motion.map_or(true, |x| x.motion.id() != desired_motion.id()) {
+                if skeletal_animation.map_or(true, |x| x.motion().id() != desired_motion.id()) {
                     commands
                         .entity(entity)
-                        .insert(ActiveMotion::new_repeating(desired_motion.clone()));
+                        .insert(SkeletalAnimation::repeat(desired_motion.clone(), None));
                 }
             }
         }
@@ -168,7 +168,10 @@ pub fn character_select_system(
     mut world_connection_events: EventReader<WorldConnectionEvent>,
     mut load_zone_events: EventWriter<LoadZoneEvent>,
     mut join_zone_id: Local<Option<ZoneId>>,
-    query_camera: Query<(Entity, &Camera, &GlobalTransform, Option<&ActiveMotion>), With<Camera3d>>,
+    query_camera: Query<
+        (Entity, &Camera, &GlobalTransform, Option<&CameraAnimation>),
+        With<Camera3d>,
+    >,
     world_connection: Option<Res<WorldConnection>>,
     mut character_list: Option<ResMut<CharacterList>>,
     server_configuration: Res<ServerConfiguration>,
@@ -188,11 +191,9 @@ pub fn character_select_system(
             WorldConnectionEvent::CreateCharacterResponse(response) => match response {
                 Ok(_) => {
                     let (camera_entity, _, _, _) = query_camera.single();
-                    commands
-                        .entity(camera_entity)
-                        .insert(ActiveMotion::new_once(
-                            asset_server.load("3DDATA/TITLE/CAMERA01_OUTCREATE01.ZMO"),
-                        ));
+                    commands.entity(camera_entity).insert(CameraAnimation::once(
+                        asset_server.load("3DDATA/TITLE/CAMERA01_OUTCREATE01.ZMO"),
+                    ));
                     *character_select_state = CharacterSelectState::CharacterSelect(None);
 
                     world_connection
@@ -249,7 +250,9 @@ pub fn character_select_system(
     match character_select_state {
         CharacterSelectState::Entering => {
             let (_, _, _, camera_motion) = query_camera.single();
-            if camera_motion.is_none() || server_configuration.auto_login {
+            if camera_motion.map_or(true, |animation| animation.completed())
+                || server_configuration.auto_login
+            {
                 *character_select_state = CharacterSelectState::CharacterSelect(None);
             }
         }
@@ -276,11 +279,9 @@ pub fn character_select_system(
 
                 // Start camera animation
                 let (camera_entity, _, _, _) = query_camera.single();
-                commands
-                    .entity(camera_entity)
-                    .insert(ActiveMotion::new_once(
-                        asset_server.load("3DDATA/TITLE/CAMERA01_INGAME01.ZMO"),
-                    ));
+                commands.entity(camera_entity).insert(CameraAnimation::once(
+                    asset_server.load("3DDATA/TITLE/CAMERA01_INGAME01.ZMO"),
+                ));
 
                 *character_select_state = CharacterSelectState::Leaving;
                 *join_zone_id = Some(zone_id);
@@ -288,7 +289,9 @@ pub fn character_select_system(
         }
         CharacterSelectState::Leaving => {
             let (_, _, _, camera_motion) = query_camera.single();
-            if camera_motion.is_none() || server_configuration.auto_login {
+            if camera_motion.map_or(true, |animation| animation.completed())
+                || server_configuration.auto_login
+            {
                 // Wait until camera motion complete, then load the zone!
                 *character_select_state = CharacterSelectState::Loading;
                 load_zone_events.send(LoadZoneEvent::new(join_zone_id.take().unwrap()));

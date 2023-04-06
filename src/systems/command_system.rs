@@ -18,15 +18,15 @@ use rose_game_common::{
 };
 
 use crate::{
+    animation::{SkeletalAnimation, ZmoAsset},
     components::{
-        ActiveMotion, CharacterModel, ClientEntity, ClientEntityType, Command, CommandAttack,
-        CommandCastSkill, CommandCastSkillState, CommandCastSkillTarget, CommandEmote, CommandMove,
-        CommandSit, Dead, FacingDirection, NextCommand, NpcModel, PersonalStore, PlayerCharacter,
-        Position, Vehicle, VehicleModel,
+        CharacterModel, ClientEntity, ClientEntityType, Command, CommandAttack, CommandCastSkill,
+        CommandCastSkillState, CommandCastSkillTarget, CommandEmote, CommandMove, CommandSit, Dead,
+        FacingDirection, NextCommand, NpcModel, PersonalStore, PlayerCharacter, Position, Vehicle,
+        VehicleModel,
     },
     events::{ClientEntityEvent, ConversationDialogEvent, PersonalStoreEvent},
     resources::{GameConnection, GameData},
-    zmo_asset_loader::ZmoAsset,
 };
 
 const NPC_MOVE_TO_DISTANCE: f32 = 250.0;
@@ -274,24 +274,27 @@ fn get_vehicle_attack_animation<R: rand::Rng + ?Sized>(
 
 fn update_active_motion(
     entity_commands: &mut EntityCommands,
-    active_motion: &mut Option<Mut<ActiveMotion>>,
+    active_motion: &mut Option<Mut<SkeletalAnimation>>,
     motion: Handle<ZmoAsset>,
     animation_speed: f32,
     repeat: bool,
 ) {
     if let Some(active_motion) = active_motion.as_mut() {
-        if active_motion.motion == motion {
+        if active_motion.motion().id() == motion.id() {
             // Already playing this animation
-            active_motion.animation_speed = animation_speed;
+            active_motion.set_animation_speed(animation_speed);
             return;
         }
     }
 
-    entity_commands.insert(if repeat {
-        ActiveMotion::new_repeating(motion).with_animation_speed(animation_speed)
-    } else {
-        ActiveMotion::new_once(motion).with_animation_speed(animation_speed)
-    });
+    entity_commands.insert(
+        if repeat {
+            SkeletalAnimation::repeat(motion, None)
+        } else {
+            SkeletalAnimation::once(motion)
+        }
+        .with_animation_speed(animation_speed),
+    );
 }
 
 fn get_attack_animation_speed(ability_values: &AbilityValues) -> f32 {
@@ -333,7 +336,7 @@ pub fn command_system(
         ),
         Or<(With<CharacterModel>, With<NpcModel>)>,
     >,
-    mut query_active_motion: Query<Option<&mut ActiveMotion>>,
+    mut query_animation: Query<Option<&mut SkeletalAnimation>>,
     query_vehicle_model: Query<&VehicleModel>,
     query_move_target: Query<(&Position, &ClientEntity)>,
     query_attack_target: Query<QueryAttackTarget>,
@@ -371,14 +374,14 @@ pub fn command_system(
             mut vehicle_active_motion,
         ) = {
             if let Some(vehicle) = vehicle.as_ref() {
-                query_active_motion
+                query_animation
                     .get_many_mut([vehicle.driver_model_entity, entity])
                     .map_or(
                         (vehicle.driver_model_entity, None, entity, None),
                         |[a, b]| (vehicle.driver_model_entity, a, entity, b),
                     )
             } else {
-                query_active_motion
+                query_animation
                     .get_mut(entity)
                     .ok()
                     .map_or((entity, None, entity, None), |x| (entity, x, entity, None))
@@ -395,10 +398,16 @@ pub fn command_system(
             command.requires_animation_complete()
         };
 
+        let active_motion_completed = active_motion
+            .as_ref()
+            .map_or(true, |animation| animation.completed());
+        let vehicle_active_motion_completed = vehicle_active_motion
+            .as_ref()
+            .map_or(true, |animation| animation.completed());
         if !next_command.is_die()
             && requires_animation_complete
-            && ((vehicle.is_none() && active_motion.is_some())
-                || (vehicle.is_some() && vehicle_active_motion.is_some()))
+            && ((vehicle.is_none() && !active_motion_completed)
+                || (vehicle.is_some() && !vehicle_active_motion_completed))
         {
             // Current command still in animation
             continue;

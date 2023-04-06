@@ -7,8 +7,9 @@ use rand::Rng;
 use rose_game_common::components::Npc;
 
 use crate::{
+    animation::SkeletalAnimation,
     audio::{SoundRadius, SpatialSound},
-    components::{ActiveMotion, Command, SoundCategory},
+    components::{Command, SoundCategory},
     resources::{GameData, SoundSettings},
 };
 
@@ -22,7 +23,7 @@ pub fn npc_idle_sound_system(
     mut query: Query<(
         Entity,
         &Npc,
-        &ActiveMotion,
+        &SkeletalAnimation,
         &Command,
         &GlobalTransform,
         Option<&mut NpcIdleSoundState>,
@@ -34,7 +35,7 @@ pub fn npc_idle_sound_system(
     let mut rng = rand::thread_rng();
     let gain = sound_settings.gain(SoundCategory::NpcSounds);
 
-    for (entity, npc, active_motion, command, global_transform, idle_sound_state) in
+    for (entity, npc, skeletal_animation, command, global_transform, idle_sound_state) in
         query.iter_mut()
     {
         if idle_sound_state.is_none() {
@@ -50,12 +51,12 @@ pub fn npc_idle_sound_system(
 
         // There is a 20% chance to play the idle sound, once per animation loop
         if let Some(last_idle_loop_count) = idle_sound_state.last_idle_loop_count {
-            if last_idle_loop_count >= active_motion.loop_count {
+            if last_idle_loop_count >= skeletal_animation.current_loop_count() {
                 continue;
             }
-            idle_sound_state.last_idle_loop_count = Some(active_motion.loop_count);
+            idle_sound_state.last_idle_loop_count = Some(skeletal_animation.current_loop_count());
         } else {
-            idle_sound_state.last_idle_loop_count = Some(active_motion.loop_count);
+            idle_sound_state.last_idle_loop_count = Some(skeletal_animation.current_loop_count());
         }
 
         if rng.gen_range(0..100) < 20 {

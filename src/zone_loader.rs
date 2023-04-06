@@ -31,23 +31,26 @@ use thiserror::Error;
 
 use rose_data::{SkyboxData, WarpGateId, ZoneId, ZoneList};
 use rose_file_readers::{
-    HimFile, IfoFile, IfoObject, LitFile, LitObject, RoseFile, RoseFileReader, StbFile, TilFile,
-    ZonFile, ZonTileRotation, ZscCollisionFlags, ZscEffectType, ZscFile,
+    HimFile, IfoEffectObject, IfoFile, IfoObject, IfoSoundObject, LitFile, LitObject, RoseFile,
+    RoseFileReader, StbFile, TilFile, ZonFile, ZonTileRotation, ZscCollisionFlags, ZscEffectType,
+    ZscFile,
 };
 
 use crate::{
+    animation::{MeshAnimation, TransformAnimation, ZmoTextureAssetLoader},
+    audio::{SoundRadius, SpatialSound},
     components::{
-        ActiveMotion, ColliderParent, EventObject, NightTimeEffect, WarpObject, Zone, ZoneObject,
+        ColliderParent, EventObject, NightTimeEffect, WarpObject, Zone, ZoneObject,
         ZoneObjectAnimatedObject, ZoneObjectId, ZoneObjectPart, ZoneObjectTerrain,
         COLLISION_FILTER_CLICKABLE, COLLISION_FILTER_COLLIDABLE, COLLISION_FILTER_INSPECTABLE,
         COLLISION_FILTER_MOVEABLE, COLLISION_GROUP_PHYSICS_TOY, COLLISION_GROUP_ZONE_EVENT_OBJECT,
         COLLISION_GROUP_ZONE_OBJECT, COLLISION_GROUP_ZONE_TERRAIN,
         COLLISION_GROUP_ZONE_WARP_OBJECT, COLLISION_GROUP_ZONE_WATER,
     },
-    effect_loader::spawn_effect,
+    effect_loader::{decode_blend_factor, decode_blend_op, spawn_effect},
     events::{LoadZoneEvent, ZoneEvent},
     render::{
-        EffectMeshMaterial, ObjectMaterial, ObjectMaterialBlend, ParticleMaterial,
+        EffectMeshAnimationRenderState, EffectMeshMaterial, ObjectMaterial, ParticleMaterial,
         RgbTextureLoader, SkyMaterial, TerrainMaterial, WaterMaterial, MESH_ATTRIBUTE_UV_1,
         TERRAIN_MATERIAL_MAX_TEXTURES, TERRAIN_MESH_ATTRIBUTE_TILE_INFO,
     },
@@ -703,10 +706,29 @@ pub fn spawn_zone(
                         let object_entity = spawn_animated_object(
                             commands,
                             asset_server,
-                            object_materials.as_mut(),
+                            effect_mesh_materials.as_mut(),
                             &game_data.stb_morph_object,
                             object_instance,
                         );
+                        commands.entity(zone_entity).add_child(object_entity);
+                    }
+
+                    for (ifo_object_id, effect_object) in ifo.effect_objects.iter().enumerate() {
+                        let object_entity = spawn_effect_object(
+                            commands,
+                            asset_server,
+                            vfs_resource,
+                            effect_mesh_materials.as_mut(),
+                            particle_materials.as_mut(),
+                            effect_object,
+                            ifo_object_id,
+                        );
+                        commands.entity(zone_entity).add_child(object_entity);
+                    }
+
+                    for (ifo_object_id, sound_object) in ifo.sound_objects.iter().enumerate() {
+                        let object_entity =
+                            spawn_sound_object(commands, asset_server, sound_object, ifo_object_id);
                         commands.entity(zone_entity).add_child(object_entity);
                     }
                 }
@@ -884,9 +906,7 @@ fn spawn_terrain(
                         (tile_y as f32 * 4.0 + y as f32) / 64.0,
                     ]);
 
-                    tile_ids.push(
-                        tile_array_index1 | tile_array_index2 << 8 | tile_rotation << 16,
-                    );
+                    tile_ids.push(tile_array_index1 | tile_array_index2 << 8 | tile_rotation << 16);
                 }
             }
 
@@ -1250,7 +1270,7 @@ fn spawn_object(
             ));
 
             let active_motion = object_part.animation_path.as_ref().map(|animation_path| {
-                ActiveMotion::new_repeating(asset_server.load(animation_path.path()))
+                TransformAnimation::repeat(asset_server.load(animation_path.path()), None)
             });
             if let Some(active_motion) = active_motion {
                 part_commands.insert(active_motion);
@@ -1318,7 +1338,7 @@ fn spawn_object(
 fn spawn_animated_object(
     commands: &mut Commands,
     asset_server: &AssetServer,
-    object_materials: &mut Assets<ObjectMaterial>,
+    effect_mesh_materials: &mut Assets<EffectMeshMaterial>,
     stb_morph_object: &StbFile,
     object_instance: &IfoObject,
 ) -> Entity {
@@ -1333,10 +1353,9 @@ fn spawn_animated_object(
     let z_test_enabled = stb_morph_object.get_int(object_id, 7) != 0;
     let z_write_enabled = stb_morph_object.get_int(object_id, 8) != 0;
 
-    // TODO: Animated object material blend op
-    let _src_blend = stb_morph_object.get_int(object_id, 9);
-    let _dst_blend = stb_morph_object.get_int(object_id, 10);
-    let _blend_op = stb_morph_object.get_int(object_id, 11);
+    let src_blend_factor = stb_morph_object.get_int(object_id, 9) as u32;
+    let dst_blend_factor = stb_morph_object.get_int(object_id, 10) as u32;
+    let blend_op = stb_morph_object.get_int(object_id, 11) as u32;
 
     let object_transform = Transform::default()
         .with_translation(
@@ -1360,26 +1379,23 @@ fn spawn_animated_object(
         ));
 
     let mesh = asset_server.load::<Mesh, _>(mesh_path);
-    let material = object_materials.add(ObjectMaterial {
+    let material = effect_mesh_materials.add(EffectMeshMaterial {
         base_texture: Some(
             asset_server.load(RgbTextureLoader::convert_path(Path::new(texture_path))),
         ),
-        lightmap_texture: None,
-        alpha_value: None,
         alpha_enabled,
-        alpha_test: if alpha_test_enabled { Some(0.5) } else { None },
+        alpha_test: alpha_test_enabled,
         two_sided,
-        z_write_enabled,
         z_test_enabled,
-        specular_texture: None,
-        blend: ObjectMaterialBlend::Normal,
-        glow: None,
-        skinned: false,
-        lightmap_uv_offset: Vec2::new(0.0, 0.0),
-        lightmap_uv_scale: 1.0,
+        z_write_enabled,
+        src_blend_factor: decode_blend_factor(src_blend_factor),
+        dst_blend_factor: decode_blend_factor(dst_blend_factor),
+        blend_op: decode_blend_op(blend_op),
+        animation_texture: Some(
+            asset_server.load(ZmoTextureAssetLoader::convert_path_texture(motion_path)),
+        ),
     });
 
-    // TODO: Animation object morph targets, blocked by lack of bevy morph targets
     commands
         .spawn((
             ZoneObject::AnimatedObject(ZoneObjectAnimatedObject {
@@ -1389,7 +1405,13 @@ fn spawn_animated_object(
             }),
             mesh,
             material,
+            EffectMeshAnimationRenderState::default(),
+            MeshAnimation::repeat(
+                asset_server.load(ZmoTextureAssetLoader::convert_path(motion_path)),
+                None,
+            ),
             object_transform,
+            NoFrustumCulling, // AABB culling is broken for mesh animations
             NotShadowCaster,
             GlobalTransform::default(),
             Visibility::default(),
@@ -1398,4 +1420,96 @@ fn spawn_animated_object(
             CollisionGroups::new(COLLISION_GROUP_ZONE_OBJECT, COLLISION_FILTER_INSPECTABLE),
         ))
         .id()
+}
+
+fn spawn_effect_object(
+    commands: &mut Commands,
+    asset_server: &AssetServer,
+    vfs_resource: &VfsResource,
+    effect_mesh_materials: &mut Assets<EffectMeshMaterial>,
+    particle_materials: &mut Assets<ParticleMaterial>,
+    effect_object: &IfoEffectObject,
+    ifo_object_id: usize,
+) -> Entity {
+    let object = &effect_object.object;
+    let object_transform = Transform::default()
+        .with_translation(
+            Vec3::new(object.position.x, object.position.z, -object.position.y) / 100.0
+                + Vec3::new(5200.0, 0.0, -5200.0),
+        )
+        .with_rotation(Quat::from_xyzw(
+            object.rotation.x,
+            object.rotation.z,
+            -object.rotation.y,
+            object.rotation.w,
+        ))
+        .with_scale(Vec3::new(object.scale.x, object.scale.z, object.scale.y));
+
+    let effect_object_entity = commands
+        .spawn((
+            ZoneObject::EffectObject {
+                ifo_object_id,
+                effect_path: effect_object
+                    .effect_path
+                    .path()
+                    .to_string_lossy()
+                    .to_string(),
+            },
+            object_transform,
+            GlobalTransform::from(object_transform),
+            Visibility::default(),
+            ComputedVisibility::default(),
+        ))
+        .id();
+
+    spawn_effect(
+        &vfs_resource.vfs,
+        commands,
+        asset_server,
+        particle_materials,
+        effect_mesh_materials,
+        (&effect_object.effect_path).into(),
+        false,
+        Some(effect_object_entity),
+    );
+
+    effect_object_entity
+}
+
+fn spawn_sound_object(
+    commands: &mut Commands,
+    asset_server: &AssetServer,
+    sound_object: &IfoSoundObject,
+    ifo_object_id: usize,
+) -> Entity {
+    let object = &sound_object.object;
+    let object_transform = Transform::default()
+        .with_translation(
+            Vec3::new(object.position.x, object.position.z, -object.position.y) / 100.0
+                + Vec3::new(5200.0, 0.0, -5200.0),
+        )
+        .with_rotation(Quat::from_xyzw(
+            object.rotation.x,
+            object.rotation.z,
+            -object.rotation.y,
+            object.rotation.w,
+        ))
+        .with_scale(Vec3::new(object.scale.x, object.scale.z, object.scale.y));
+
+    let effect_object_entity = commands
+        .spawn((
+            ZoneObject::SoundObject {
+                ifo_object_id,
+                sound_path: sound_object.sound_path.path().to_string_lossy().to_string(),
+            },
+            SpatialSound::new_repeating(asset_server.load(sound_object.sound_path.path())),
+            SoundRadius::new(sound_object.range as f32 / 10.0),
+            object_transform,
+            GlobalTransform::from(object_transform),
+            Visibility::default(),
+            ComputedVisibility::default(),
+        ))
+        .id();
+
+    effect_object_entity
 }
