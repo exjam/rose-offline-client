@@ -45,6 +45,7 @@ pub struct UiStateMinimap {
     pub is_expanded: bool,
     pub is_minimised: bool,
     pub scroll: Vec2,
+    pub zone_name_pixels_per_point: f32,
     pub zone_name_text_galley: Option<Arc<egui::Galley>>,
     pub zone_name_text_expanded_galley: Option<Arc<egui::Galley>>,
 }
@@ -105,23 +106,29 @@ pub fn ui_minimap_system(
     let camera_angle = -camera_forward_2d.angle_between(Vec2::Y);
 
     // If zone has changed, reload the minimap image
-    if ui_state.zone_id != Some(current_zone.id) {
-        ui_state.minimap_image = Default::default();
-        ui_state.minimap_texture = Default::default();
-        ui_state.minimap_image_size = Default::default();
+    let pixels_per_point = egui_context.ctx_mut().pixels_per_point();
+    if ui_state.zone_id != Some(current_zone.id)
+        || pixels_per_point != ui_state.zone_name_pixels_per_point
+    {
+        let zone_data = game_data.zone_list.get_zone(current_zone.id);
+        if ui_state.zone_id != Some(current_zone.id) {
+            ui_state.minimap_image = Default::default();
+            ui_state.minimap_texture = Default::default();
+            ui_state.minimap_image_size = Default::default();
 
-        let zone_name = if let Some(zone_data) = game_data.zone_list.get_zone(current_zone.id) {
-            if let Some(minimap_path) = zone_data.minimap_path.as_ref() {
+            if let Some(minimap_path) =
+                zone_data.and_then(|zone_data| zone_data.minimap_path.as_ref())
+            {
                 ui_state.minimap_image = asset_server.load(minimap_path.path());
                 ui_state.minimap_texture =
                     egui_context.add_image(ui_state.minimap_image.clone_weak());
             }
 
-            zone_data.name
-        } else {
-            "???"
-        };
+            ui_state.zone_id = Some(current_zone.id);
+            ui_state.last_player_position = Vec2::default();
+        }
 
+        let zone_name = zone_data.map_or("???", |zone_data| zone_data.name);
         let ctx = egui_context.ctx_mut();
         ui_state.zone_name_text_galley = Some(generate_text_galley(
             ctx,
@@ -135,8 +142,7 @@ pub fn ui_minimap_system(
             16.0,
             zone_name.to_string(),
         ));
-        ui_state.zone_id = Some(current_zone.id);
-        ui_state.last_player_position = Vec2::default();
+        ui_state.zone_name_pixels_per_point = pixels_per_point;
     }
 
     if ui_state.minimap_image_size.is_none() {
