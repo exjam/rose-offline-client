@@ -580,7 +580,7 @@ pub fn queue_world_ui_meshes(
                 entity: visible_entity,
                 draw_function: draw_alpha_mask,
                 pipeline,
-                distance: inverse_view_row_2.dot(rect.world_position.extend(1.0)),
+                distance: inverse_view_row_2.dot(rect.world_position.extend(1.0)) + 999999.0,
             });
         }
     }
