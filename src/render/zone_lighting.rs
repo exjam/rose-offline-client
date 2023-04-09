@@ -110,7 +110,7 @@ impl Default for ZoneLighting {
             map_ambient_color: Vec3::ONE,
             character_ambient_color: Vec3::ONE,
             character_diffuse_color: Vec3::ONE,
-            light_direction: default_light_transform().forward().normalize(),
+            light_direction: default_light_transform().back().normalize(),
             fog_color: Vec3::new(0.2, 0.2, 0.2),
             color_fog_enabled: true,
             fog_density: 0.0018,
