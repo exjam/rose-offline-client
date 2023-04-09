@@ -19,7 +19,7 @@ use crate::{
         ColliderParent, PlayerCharacter, Position, ZoneObject, COLLISION_FILTER_CLICKABLE,
         COLLISION_GROUP_PHYSICS_TOY, COLLISION_GROUP_PLAYER,
     },
-    events::PlayerCommandEvent,
+    events::{MoveDestinationEffectEvent, PlayerCommandEvent},
     ray_from_screenspace::ray_from_screenspace,
     resources::SelectedTarget,
 };
@@ -46,6 +46,7 @@ pub fn game_mouse_input_system(
     )>,
     query_player: Query<PlayerQuery, With<PlayerCharacter>>,
     mut player_command_events: EventWriter<PlayerCommandEvent>,
+    mut move_destination_effect_events: EventWriter<MoveDestinationEffectEvent>,
     mut selected_target: ResMut<SelectedTarget>,
 ) {
     selected_target.hover = None;
@@ -105,6 +106,10 @@ pub fn game_mouse_input_system(
                                 )),
                                 None,
                             ));
+
+                            move_destination_effect_events.send(MoveDestinationEffectEvent::Show {
+                                position: hit_position,
+                            });
                         }
                     } else if hit_item_drop.is_some() {
                         selected_target.hover = Some(hit_entity);

@@ -52,9 +52,10 @@ use audio::OddioPlugin;
 use events::{
     BankEvent, CharacterSelectEvent, ChatboxEvent, ClanDialogEvent, ClientEntityEvent,
     ConversationDialogEvent, GameConnectionEvent, HitEvent, LoadZoneEvent, LoginEvent,
-    MessageBoxEvent, NetworkEvent, NpcStoreEvent, NumberInputDialogEvent, PartyEvent,
-    PersonalStoreEvent, PlayerCommandEvent, QuestTriggerEvent, SpawnEffectEvent,
-    SpawnProjectileEvent, SystemFuncEvent, UseItemEvent, WorldConnectionEvent, ZoneEvent,
+    MessageBoxEvent, MoveDestinationEffectEvent, NetworkEvent, NpcStoreEvent,
+    NumberInputDialogEvent, PartyEvent, PersonalStoreEvent, PlayerCommandEvent, QuestTriggerEvent,
+    SpawnEffectEvent, SpawnProjectileEvent, SystemFuncEvent, UseItemEvent, WorldConnectionEvent,
+    ZoneEvent,
 };
 use model_loader::ModelLoader;
 use render::{DamageDigitMaterial, RoseRenderPlugin};
@@ -80,16 +81,17 @@ use systems::{
     game_zone_change_system, hit_event_system, item_drop_model_add_collider_system,
     item_drop_model_system, login_connection_system, login_event_system, login_state_enter_system,
     login_state_exit_system, login_system, model_viewer_enter_system, model_viewer_exit_system,
-    model_viewer_system, name_tag_system, name_tag_update_color_system,
-    name_tag_update_healthbar_system, name_tag_visibility_system, network_thread_system,
-    npc_idle_sound_system, npc_model_add_collider_system, npc_model_update_system,
-    orbit_camera_system, particle_sequence_system, passive_recovery_system, pending_damage_system,
-    pending_skill_effect_system, personal_store_model_add_collider_system,
-    personal_store_model_system, player_command_system, projectile_system, quest_trigger_system,
-    spawn_effect_system, spawn_projectile_system, status_effect_system, system_func_event_system,
-    update_position_system, use_item_event_system, vehicle_model_system, vehicle_sound_system,
-    visible_status_effects_system, world_connection_system, world_time_system, zone_time_system,
-    zone_viewer_enter_system, DebugInspectorPlugin,
+    model_viewer_system, move_destination_effect_system, name_tag_system,
+    name_tag_update_color_system, name_tag_update_healthbar_system, name_tag_visibility_system,
+    network_thread_system, npc_idle_sound_system, npc_model_add_collider_system,
+    npc_model_update_system, orbit_camera_system, particle_sequence_system,
+    passive_recovery_system, pending_damage_system, pending_skill_effect_system,
+    personal_store_model_add_collider_system, personal_store_model_system, player_command_system,
+    projectile_system, quest_trigger_system, spawn_effect_system, spawn_projectile_system,
+    status_effect_system, system_func_event_system, update_position_system, use_item_event_system,
+    vehicle_model_system, vehicle_sound_system, visible_status_effects_system,
+    world_connection_system, world_time_system, zone_time_system, zone_viewer_enter_system,
+    DebugInspectorPlugin,
 };
 use ui::{
     load_dialog_sprites_system, ui_bank_system, ui_character_create_system,
@@ -567,6 +569,7 @@ fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsC
         .add_event::<LoginEvent>()
         .add_event::<LoadZoneEvent>()
         .add_event::<MessageBoxEvent>()
+        .add_event::<MoveDestinationEffectEvent>()
         .add_event::<NetworkEvent>()
         .add_event::<NumberInputDialogEvent>()
         .add_event::<NpcStoreEvent>()
@@ -645,6 +648,7 @@ fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsC
         )
         .add_system(update_ui_resources)
         .add_system(spawn_effect_system)
+        .add_system(move_destination_effect_system.after(game_mouse_input_system))
         .add_system(npc_idle_sound_system)
         .add_system(name_tag_system)
         .add_system(name_tag_visibility_system.after(game_mouse_input_system))

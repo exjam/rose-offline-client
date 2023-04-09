@@ -31,6 +31,7 @@ mod item_drop_model_system;
 mod login_connection_system;
 mod login_system;
 mod model_viewer_system;
+mod move_destination_effect_system;
 mod name_tag_system;
 mod name_tag_update_color_system;
 mod name_tag_update_healthbar_system;
@@ -107,6 +108,7 @@ pub use login_system::{
 pub use model_viewer_system::{
     model_viewer_enter_system, model_viewer_exit_system, model_viewer_system,
 };
+pub use move_destination_effect_system::move_destination_effect_system;
 pub use name_tag_system::name_tag_system;
 pub use name_tag_update_color_system::name_tag_update_color_system;
 pub use name_tag_update_healthbar_system::name_tag_update_healthbar_system;
