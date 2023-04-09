@@ -597,8 +597,6 @@ fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsC
         .add_system(npc_model_add_collider_system.after(npc_model_update_system))
         .add_system(item_drop_model_system)
         .add_system(item_drop_model_add_collider_system.after(item_drop_model_system))
-        .add_system(vehicle_model_system.after(character_model_update_system))
-        .add_system(vehicle_sound_system.after(vehicle_model_system))
         .add_system(particle_sequence_system)
         .add_system(effect_system)
         .add_system(
@@ -632,7 +630,8 @@ fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsC
             hit_event_system
                 .after(animation_effect_system)
                 .after(pending_skill_effect_system)
-                .after(projectile_system),
+                .after(projectile_system)
+                .before(spawn_effect_system),
         )
         .add_system(
             damage_digit_render_system
@@ -688,6 +687,14 @@ fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsC
     // character_model_blink_system in PostUpdate to avoid any conflicts with model destruction
     // e.g. through the character select exit system.
     app.add_system(character_model_blink_system.in_base_set(CoreSet::PostUpdate));
+
+    // vehicle_model_system in PostUpdate to avoid any conflicts with model destruction
+    app.add_system(vehicle_model_system.in_base_set(CoreSet::PostUpdate));
+    app.add_system(
+        vehicle_sound_system
+            .in_base_set(CoreSet::PostUpdate)
+            .after(vehicle_model_system),
+    );
 
     // Run zone change system just before physics sync which is after Update
     app.add_systems(
@@ -793,8 +800,8 @@ fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsC
             collision_height_only_system.after(update_position_system),
             collision_player_system.after(update_position_system),
             cooldown_system.before(GameSystemSets::Ui),
-            client_entity_event_system,
-            use_item_event_system,
+            client_entity_event_system.before(spawn_effect_system),
+            use_item_event_system.before(spawn_effect_system),
             status_effect_system,
             passive_recovery_system,
             quest_trigger_system,
