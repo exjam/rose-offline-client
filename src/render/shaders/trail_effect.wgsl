@@ -40,5 +40,5 @@ struct FragmentInput {
 
 @fragment
 fn fs_main(in: FragmentInput) -> @location(0) vec4<f32> {
-    return pow(textureSample(base_texture, base_sampler, in.uv) * in.colour, vec4<f32>(2.2));
+    return textureSample(base_texture, base_sampler, in.uv) * in.colour;
 }

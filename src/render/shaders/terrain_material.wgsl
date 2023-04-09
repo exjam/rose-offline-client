@@ -92,8 +92,6 @@ fn fragment(in: FragmentInput) -> @location(0) vec4<f32> {
     lightmap = vec4<f32>(lightmap.xyz * (shadow * 0.2 + 0.8), lightmap.w);
 
     let terrain_color = mix(layer1, layer2, layer2.a) * lightmap * 2.0;
-    var lit_color: vec4<f32> = apply_zone_lighting(in.world_position, in.world_normal, vec4<f32>(terrain_color.rgb, 1.0), view_z);
 
-    let srgb_color = pow(lit_color, vec4<f32>(2.2));
-    return srgb_color;
+    return apply_zone_lighting(in.world_position, in.world_normal, vec4<f32>(terrain_color.rgb, 1.0), view_z);
 }

@@ -59,6 +59,6 @@ fn fragment(in: FragmentInput) -> @location(0) vec4<f32> {
         view.inverse_view[2].z,
         view.inverse_view[3].z
     ), in.world_position);
-    let texture_color = textureSample(base_texture, base_sampler, in.uv) * pow(in.color, vec4<f32>(2.2));
+    let texture_color = textureSample(base_texture, base_sampler, in.uv) * in.color;
     return apply_zone_lighting_fog(in.world_position, texture_color, view_z);
 }

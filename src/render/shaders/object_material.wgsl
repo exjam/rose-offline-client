@@ -144,6 +144,5 @@ fn fragment(in: FragmentInput) -> @location(0) vec4<f32> {
         }
     }
 
-    output_color = apply_zone_lighting(in.world_position, in.world_normal, output_color, view_z);
-    return vec4<f32>(pow(output_color.xyz, vec3<f32>(2.2)), output_color.a);
+    return apply_zone_lighting(in.world_position, in.world_normal, output_color, view_z);
 }
