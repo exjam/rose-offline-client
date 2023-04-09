@@ -27,8 +27,8 @@ use bevy::{
             BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry,
             BindingResource, BindingType, BlendComponent, BlendFactor, BlendOperation, BlendState,
             FilterMode, PreparedBindGroup, PushConstantRange, RenderPipelineDescriptor,
-            SamplerBindingType, SamplerDescriptor, ShaderSize, ShaderStages, ShaderType,
-            SpecializedMeshPipelineError, TextureSampleType, TextureViewDimension,
+            SamplerBindingType, SamplerDescriptor, ShaderDefVal, ShaderSize, ShaderStages,
+            ShaderType, SpecializedMeshPipelineError, TextureSampleType, TextureViewDimension,
         },
         renderer::RenderDevice,
         texture::FallbackImage,
@@ -162,6 +162,12 @@ impl Material for WaterMaterial {
                     },
                 });
             }
+
+            // Do not apply color fog to additive blended water
+            fragment.shader_defs.push(ShaderDefVal::Bool(
+                "ZONE_LIGHTING_DISABLE_COLOR_FOG".into(),
+                true,
+            ));
         }
 
         descriptor

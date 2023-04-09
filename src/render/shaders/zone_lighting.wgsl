@@ -24,7 +24,11 @@ var<uniform> zone_lighting: ZoneLighting;
 fn apply_zone_lighting_fog(world_position: vec4<f32>, fragment_color: vec4<f32>, view_z: f32) -> vec4<f32> {
     var fog_amount: f32 = clamp(1.0 - exp2(-zone_lighting.fog_density * zone_lighting.fog_density * view_z * view_z * 1.442695), 0.0, 1.0);
 
+#ifdef ZONE_LIGHTING_DISABLE_COLOR_FOG
+    var fog_color: vec4<f32> = fragment_color;
+#else
     var fog_color: vec4<f32> = vec4<f32>(mix(fragment_color.rgb, zone_lighting.fog_color.rgb, clamp(fog_amount, zone_lighting.fog_min_density, zone_lighting.fog_max_density)), fragment_color.a);
+#endif
 
     if (fog_amount >= zone_lighting.fog_alpha_range_end) {
         discard;

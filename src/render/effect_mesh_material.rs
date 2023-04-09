@@ -244,6 +244,16 @@ impl Material for EffectMeshMaterial {
             return Ok(());
         }
 
+        if matches!(key.bind_group_data.blend_op, BlendOperation::Add) {
+            // Do not apply color fog to additive blended mesh
+            if let Some(fragment) = descriptor.fragment.as_mut() {
+                fragment.shader_defs.push(ShaderDefVal::Bool(
+                    "ZONE_LIGHTING_DISABLE_COLOR_FOG".into(),
+                    true,
+                ));
+            }
+        }
+
         descriptor
             .layout
             .insert(3, pipeline.data.zone_lighting_layout.clone());
