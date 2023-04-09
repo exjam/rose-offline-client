@@ -6,13 +6,11 @@ use bevy::{
     core_pipeline::{bloom::BloomSettings, clear_color::ClearColor},
     ecs::event::Events,
     log::Level,
-    pbr::{AmbientLight, CascadeShadowConfig},
     prelude::{
         apply_system_buffers, in_state, AddAsset, App, AssetServer, Assets, Camera, Camera3dBundle,
-        Color, Commands, CoreSet, DirectionalLight, DirectionalLightBundle, EulerRot,
-        IntoSystemAppConfig, IntoSystemConfig, IntoSystemConfigs, IntoSystemSetConfigs, Msaa,
-        OnEnter, OnExit, OnUpdate, PluginGroup, Quat, Res, ResMut, StartupSet, State, SystemSet,
-        Transform, Vec3,
+        Color, Commands, CoreSet, IntoSystemAppConfig, IntoSystemConfig, IntoSystemConfigs,
+        IntoSystemSetConfigs, Msaa, OnEnter, OnExit, OnUpdate, PluginGroup, Quat, Res, ResMut,
+        StartupSet, State, SystemSet, Transform, Vec3,
     },
     render::{render_resource::WgpuFeatures, settings::WgpuSettings},
     window::{Window, WindowMode},
@@ -1082,31 +1080,6 @@ fn load_common_game_data(
         },
         BloomSettings::NATURAL,
     ));
-
-    commands.spawn(DirectionalLightBundle {
-        transform: Transform::from_rotation(Quat::from_euler(
-            EulerRot::ZYX,
-            0.0,
-            std::f32::consts::PI * (2.0 / 3.0),
-            -std::f32::consts::PI / 4.0,
-        )),
-        directional_light: DirectionalLight {
-            shadows_enabled: true,
-            ..Default::default()
-        },
-        cascade_shadow_config: CascadeShadowConfig {
-            bounds: vec![10000.0],
-            overlap_proportion: 2.0,
-            minimum_distance: 0.1,
-            manual_cascades: true,
-        },
-        ..Default::default()
-    });
-
-    commands.insert_resource(AmbientLight {
-        color: Color::rgb(1.0, 1.0, 1.0),
-        brightness: 0.9,
-    });
 
     commands.insert_resource(DamageDigitsSpawner::load(
         &asset_server,
