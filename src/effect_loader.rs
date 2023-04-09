@@ -34,6 +34,7 @@ pub fn spawn_effect(
     manual_despawn: bool,
     effect_entity: Option<Entity>,
 ) -> Option<Entity> {
+    // TODO: We need caching to avoid loading from file every time
     let eft_file = vfs.read_file::<EftFile, _>(effect_path).ok()?;
 
     let mut child_entities = Vec::with_capacity(eft_file.particles.len());
@@ -115,7 +116,6 @@ fn spawn_mesh(
     effect_mesh_materials: &mut Assets<EffectMeshMaterial>,
     eft_mesh: &EftMesh,
 ) -> Option<Entity> {
-    // Visible Entity > Animatable Entity > Effect Mesh Entity
     Some(
         commands
             .spawn((
@@ -214,7 +214,6 @@ fn spawn_particle(
         .ok()?;
 
     // TODO: eft_particle.is_linked
-    // TODO: eft_particle.animation_file / eft_particle.animation_repeat_count
 
     Some(
         commands
@@ -237,7 +236,7 @@ fn spawn_particle(
             ))
             .with_children(|child_builder| {
                 for sequence in ptl_file.sequences {
-                    child_builder.spawn((
+                    let mut entity_comands = child_builder.spawn((
                         EffectParticle {},
                         ParticleRenderData::new(
                             sequence.num_particles as usize,
@@ -264,6 +263,18 @@ fn spawn_particle(
                         ComputedVisibility::default(),
                         NoFrustumCulling, // AABB culling is broken for particles
                     ));
+
+                    if let Some(transform_animation_path) = &eft_particle.animation_file {
+                        let motion = asset_server.load(transform_animation_path.path());
+                        entity_comands.insert((TransformAnimation::repeat(
+                            motion,
+                            if eft_particle.animation_repeat_count == 0 {
+                                None
+                            } else {
+                                Some(eft_particle.animation_repeat_count as usize)
+                            },
+                        ),));
+                    }
                 }
             })
             .id(),
