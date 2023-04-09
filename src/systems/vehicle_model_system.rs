@@ -11,7 +11,7 @@ use rose_game_common::components::{Equipment, MoveMode};
 
 use crate::{
     animation::SkeletalAnimation,
-    components::{DummyBoneOffset, Vehicle, VehicleModel},
+    components::{CharacterModel, CharacterModelPart, DummyBoneOffset, Vehicle, VehicleModel},
     model_loader::ModelLoader,
     render::{EffectMeshMaterial, ObjectMaterial, ParticleMaterial},
 };
@@ -75,6 +75,33 @@ pub fn vehicle_model_system(
                 if let Some(character_skinned_mesh) = character_skinned_mesh {
                     root_entity_mut.insert(character_skinned_mesh);
                 }
+
+                // Un-hide Weapon, SubWeapon, and Back items when stopping driving vehicle
+                if let Some(character_model) = root_entity_mut.get::<CharacterModel>() {
+                    let hide_models: Vec<Entity> = character_model.model_parts
+                        [CharacterModelPart::Weapon]
+                        .1
+                        .iter()
+                        .chain(
+                            character_model.model_parts[CharacterModelPart::SubWeapon]
+                                .1
+                                .iter(),
+                        )
+                        .chain(
+                            character_model.model_parts[CharacterModelPart::Back]
+                                .1
+                                .iter(),
+                        )
+                        .cloned()
+                        .collect();
+
+                    for model_entity in hide_models {
+                        let mut hide_entity_mut = world.entity_mut(model_entity);
+                        if let Some(mut visibility) = hide_entity_mut.get_mut::<Visibility>() {
+                            *visibility = Visibility::Inherited;
+                        }
+                    }
+                }
             });
 
             // Despawn vehicle model
@@ -130,6 +157,33 @@ pub fn vehicle_model_system(
                 let character_skeletal_animation = root_entity_mut.take::<SkeletalAnimation>();
                 let character_dummy_bone_offset = root_entity_mut.take::<DummyBoneOffset>();
                 let character_skinned_mesh = root_entity_mut.take::<SkinnedMesh>();
+
+                // Hide Weapon, SubWeapon, and Back items when driving vehicle
+                if let Some(character_model) = root_entity_mut.get::<CharacterModel>() {
+                    let hide_models: Vec<Entity> = character_model.model_parts
+                        [CharacterModelPart::Weapon]
+                        .1
+                        .iter()
+                        .chain(
+                            character_model.model_parts[CharacterModelPart::SubWeapon]
+                                .1
+                                .iter(),
+                        )
+                        .chain(
+                            character_model.model_parts[CharacterModelPart::Back]
+                                .1
+                                .iter(),
+                        )
+                        .cloned()
+                        .collect();
+
+                    for model_entity in hide_models {
+                        let mut hide_entity_mut = world.entity_mut(model_entity);
+                        if let Some(mut visibility) = hide_entity_mut.get_mut::<Visibility>() {
+                            *visibility = Visibility::Hidden;
+                        }
+                    }
+                }
 
                 let mut driver_model_entity_mut =
                     world.entity_mut(vehicle_model.driver_model_entity);
