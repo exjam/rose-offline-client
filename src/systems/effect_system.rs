@@ -36,7 +36,7 @@ pub fn effect_system(
                         let particle_sequence_completed =
                             particle_sequence.finished && particle_sequence.particles.is_empty();
                         let transform_animation_completed = transform_animation
-                            .map_or(true, |transform_animation| transform_animation.completed());
+                            .map_or(false, |transform_animation| transform_animation.completed());
 
                         if particle_sequence_completed || transform_animation_completed {
                             children_finished += 1;
