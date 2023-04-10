@@ -55,6 +55,9 @@ pub struct AnimationState {
 
     /// This is used to track which frame events we have emitted so far
     last_absolute_event_frame: usize,
+
+    /// Seconds to delay animation start by
+    start_delay: Option<f32>,
 }
 
 impl Default for AnimationState {
@@ -71,6 +74,7 @@ impl Default for AnimationState {
             current_frame_index: 0,
             next_frame_index: 1,
             last_absolute_event_frame: 0,
+            start_delay: None,
         }
     }
 }
@@ -110,6 +114,14 @@ impl AnimationState {
         self.completed = true;
     }
 
+    pub fn set_start_delay(&mut self, start_delay: f32) {
+        if start_delay > 0.0 {
+            self.start_delay = Some(start_delay);
+        } else {
+            self.start_delay = None;
+        }
+    }
+
     pub fn completed(&self) -> bool {
         self.completed
     }
@@ -146,6 +158,16 @@ impl AnimationState {
     pub fn advance(&mut self, zmo_asset: &ZmoAsset, time: &Time) -> bool {
         if self.completed {
             return true;
+        }
+
+        if let Some(start_delay) = self.start_delay.as_mut() {
+            *start_delay -= time.delta_seconds();
+            if *start_delay > 0.0 {
+                // Waiting until start time
+                return false;
+            } else {
+                self.start_delay = None;
+            }
         }
 
         let current_time = time.elapsed_seconds_f64();

@@ -21,6 +21,11 @@ impl MeshAnimation {
     pub fn once(motion: Handle<ZmoAsset>) -> Self {
         Self(AnimationState::once(motion))
     }
+
+    pub fn with_start_delay(mut self, start_delay: f32) -> Self {
+        self.set_start_delay(start_delay);
+        self
+    }
 }
 
 pub fn mesh_animation_system(

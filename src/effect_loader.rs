@@ -165,7 +165,6 @@ fn spawn_mesh(
                     GlobalTransform::default(),
                 ));
 
-                // TODO: eft_mesh.start_delay
                 // TODO: eft_mesh.is_linked
 
                 if let Some(mesh_animation_path) = &eft_mesh.mesh_animation_file {
@@ -181,7 +180,8 @@ fn spawn_mesh(
                             } else {
                                 Some(eft_mesh.repeat_count as usize)
                             },
-                        ),
+                        )
+                        .with_start_delay(eft_mesh.start_delay as f32 / 1000.0),
                         EffectMeshAnimationRenderState::default(),
                     ));
                 }
