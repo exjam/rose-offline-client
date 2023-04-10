@@ -69,7 +69,8 @@ impl DrawWidget for Editbox {
         }
         .frame(false)
         .margin(egui::vec2(0.0, 0.0))
-        .password(self.password != 0);
+        .password(self.password != 0)
+        .text_color(egui::Color32::WHITE);
 
         let mut number_input_filter = |text: &str| text.chars().all(|c| c.is_ascii_digit());
 
@@ -81,8 +82,11 @@ impl DrawWidget for Editbox {
 
         let response = ui
             .allocate_ui_at_rect(rect, |ui| {
-                ui.centered_and_justified(|ui| ui.add_enabled(enabled, text_edit))
-                    .inner
+                ui.with_layout(
+                    egui::Layout::centered_and_justified(egui::Direction::TopDown),
+                    |ui| ui.add_enabled(enabled, text_edit),
+                )
+                .inner
             })
             .inner;
 
