@@ -95,8 +95,8 @@ pub fn ui_item_drop_name_system(
                 .translate(egui::vec2(visible_name.pos.x, visible_name.pos.y))
                 .expand(2.0),
             rounding: egui::Rounding::none(),
-            fill: egui::Color32::from_rgba_unmultiplied(50, 50, 50, 200),
-            stroke: egui::Stroke::NONE,
+            fill: style.visuals.window_fill,
+            stroke: style.visuals.window_stroke,
         });
         tooltip_painter.add(egui::epaint::TextShape {
             pos: visible_name.pos,

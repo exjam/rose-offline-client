@@ -21,12 +21,11 @@ pub fn ui_character_select_name_tag_system(
                     game_data.character_select_positions[index].translation
                         + Vec3::new(0.0, 4.0, 0.0),
                 ) {
-                    let screen_size = egui_context
-                        .ctx_mut()
-                        .input(|input| input.screen_rect().size());
+                    let ctx = egui_context.ctx_mut();
+                    let screen_size = ctx.input(|input| input.screen_rect().size());
 
                     egui::containers::popup::show_tooltip_at(
-                        egui_context.ctx_mut(),
+                        ctx,
                         egui::Id::new("selected_character_plate"),
                         Some(egui::Pos2::new(
                             screen_pos.x - 30.0,

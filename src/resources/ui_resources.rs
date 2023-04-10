@@ -402,6 +402,15 @@ pub fn load_ui_resources(
         );
     }
 
+    let mut style = (*egui_context.ctx_mut().style()).clone();
+    style.visuals.menu_rounding = egui::Rounding::same(2.0);
+    style.visuals.window_fill = egui::Color32::from_rgba_unmultiplied(10, 10, 10, 220);
+    style.visuals.window_stroke = egui::Stroke::NONE;
+    style.visuals.popup_shadow = egui::epaint::Shadow::NONE;
+    style.visuals.window_shadow = egui::epaint::Shadow::NONE;
+    style.visuals.widgets.noninteractive.fg_stroke.color = egui::Color32::WHITE;
+    egui_context.ctx_mut().set_style(style);
+
     commands.insert_resource(UiResources {
         loaded_all_textures: false,
         sprite_sheets: enum_map! {
