@@ -10,6 +10,7 @@ pub struct DataBindings<'a> {
     pub text: &'a mut [(i32, &'a mut String)],
     pub gauge: &'a mut [(i32, &'a f32, &'a str)],
     pub label: &'a mut [(i32, &'a str)],
+    pub listbox: &'a mut [(i32, (&'a mut i32, &'a dyn Fn(i32) -> Option<String>))],
     pub tabs: &'a mut [(i32, &'a mut i32)],
     pub radio: &'a mut [(i32, &'a mut i32)],
     pub scroll: &'a mut [(i32, (&'a mut i32, Range<i32>, i32))], // (current_scroll, scroll_range, num_visible)
@@ -99,6 +100,13 @@ impl<'a> DataBindings<'a> {
         &dyn Fn(&mut egui::Ui, i32, i32, i32) -> egui::Response,
     )> {
         self.table
+            .iter_mut()
+            .find(|(x, _)| *x == id)
+            .map(|(_, (a, b))| (&mut **a, &**b))
+    }
+
+    pub fn get_list(&mut self, id: i32) -> Option<(&mut i32, &dyn Fn(i32) -> Option<String>)> {
+        self.listbox
             .iter_mut()
             .find(|(x, _)| *x == id)
             .map(|(_, (a, b))| (&mut **a, &**b))

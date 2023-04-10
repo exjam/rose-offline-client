@@ -56,12 +56,58 @@ impl DrawWidget for Listbox {
         }
 
         let rect = self.widget_rect(ui.min_rect().min);
-        let response = ui.allocate_rect(rect, egui::Sense::click());
+        let (scroll_index, scroll_range) = bindings
+            .get_scroll(self.id)
+            .as_ref()
+            .map(|(scroll_index, scroll_range, _)| (**scroll_index, scroll_range.clone()))
+            .unwrap_or((0, 0..self.extent));
+        let mut listbox_response = None;
 
-        if ui.is_rect_visible(rect) {
-            // TODO: Implement list box... somehow...
+        ui.allocate_ui_at_rect(rect, |ui| {
+            let rect_min = ui.min_rect().min;
+
+            if let Some((current_index, get_item_text)) = bindings.get_list(self.id) {
+                for i in 0..self.extent {
+                    let index = scroll_index + i;
+                    if index >= scroll_range.end {
+                        break;
+                    }
+                    let Some(text) = get_item_text(i) else {
+                        break;
+                    };
+
+                    let y = i * (self.char_height + self.line_space);
+                    let color = if index == *current_index {
+                        egui::Color32::from_rgb(255, 255, 128)
+                    } else {
+                        egui::Color32::WHITE
+                    };
+
+                    let response = ui
+                        .allocate_ui_at_rect(
+                            egui::Rect::from_min_size(
+                                egui::pos2(rect_min.x, rect_min.y + y as f32),
+                                egui::vec2(self.width, self.char_height as f32),
+                            ),
+                            |ui| {
+                                ui.add(
+                                    egui::Label::new(egui::RichText::new(text).color(color))
+                                        .wrap(true)
+                                        .sense(egui::Sense::click()),
+                                )
+                            },
+                        )
+                        .inner;
+                    if response.clicked() {
+                        *current_index = index;
+                        listbox_response = Some(response);
+                    }
+                }
+            }
+        });
+
+        if let Some(response) = listbox_response {
+            bindings.set_response(self.id, response);
         }
-
-        bindings.set_response(self.id, response);
     }
 }
