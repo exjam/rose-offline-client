@@ -1,9 +1,11 @@
+use std::sync::Arc;
+
 use bevy::asset::{AssetLoader, BoxedFuture, LoadContext, LoadedAsset};
 use hound::WavReader;
 
 use crate::audio::audio_source::AudioSource;
 
-use super::audio_source::StreamingAudioSource;
+use super::audio_source::AudioSourceDecoded;
 
 #[derive(Default)]
 pub struct WavLoader;
@@ -14,72 +16,51 @@ impl AssetLoader for WavLoader {
         bytes: &'a [u8],
         load_context: &'a mut LoadContext,
     ) -> BoxedFuture<'a, anyhow::Result<()>> {
+        let mut reader = match WavReader::new(std::io::Cursor::new(bytes)) {
+            Ok(reader) => reader,
+            Err(error) => {
+                return Box::pin(async move { Err(error.into()) });
+            }
+        };
+
+        let hound::WavSpec {
+            bits_per_sample,
+            sample_format,
+            sample_rate,
+            channels,
+        } = reader.spec();
+
+        let samples: Result<Vec<f32>, _> = match sample_format {
+            hound::SampleFormat::Int => {
+                let max_value = 2_u32.pow(bits_per_sample as u32 - 1) - 1;
+                reader
+                    .samples::<i32>()
+                    .map(|sample| sample.map(|sample| sample as f32 / max_value as f32))
+                    .collect()
+            }
+            hound::SampleFormat::Float => reader.samples::<f32>().collect(),
+        };
+
+        let samples = match samples {
+            Ok(samples) => samples,
+            Err(error) => {
+                return Box::pin(async move { Err(error.into()) });
+            }
+        };
+
         load_context.set_default_asset(LoadedAsset::new(AudioSource {
-            bytes: bytes.into(),
-            create_streaming_source_fn: |audio_source| {
-                WavAudioSource::new(audio_source)
-                    .map(|source| Box::new(source) as Box<dyn StreamingAudioSource + Send + Sync>)
-            },
+            bytes: Arc::new([]),
+            decoded: Some(Arc::new(AudioSourceDecoded {
+                samples,
+                channel_count: channels as u32,
+                sample_rate,
+            })),
+            create_streaming_source_fn: |_| Err(anyhow::anyhow!("Unsupported")),
         }));
         Box::pin(async move { Ok(()) })
     }
 
     fn extensions(&self) -> &[&str] {
         &["wav"]
-    }
-}
-
-struct WavAudioSource {
-    reader: WavReader<std::io::Cursor<AudioSource>>,
-}
-
-impl WavAudioSource {
-    pub fn new(audio_source: &AudioSource) -> Result<Self, anyhow::Error> {
-        Ok(Self {
-            reader: WavReader::new(std::io::Cursor::new(audio_source.clone()))?,
-        })
-    }
-}
-
-impl StreamingAudioSource for WavAudioSource {
-    fn channel_count(&self) -> u32 {
-        self.reader.spec().channels as u32
-    }
-
-    fn sample_rate(&self) -> u32 {
-        self.reader.spec().sample_rate
-    }
-
-    fn rewind(&mut self) {
-        self.reader.seek(0).ok();
-    }
-
-    fn read_packet(&mut self) -> Vec<f32> {
-        let hound::WavSpec {
-            bits_per_sample,
-            sample_format,
-            sample_rate,
-            channels,
-        } = self.reader.spec();
-
-        let read_num_samples = (channels as usize * sample_rate as usize) / 20;
-
-        let samples: Result<Vec<f32>, _> = match sample_format {
-            hound::SampleFormat::Int => {
-                let max_value = 2_u32.pow(bits_per_sample as u32 - 1) - 1;
-                self.reader
-                    .samples::<i32>()
-                    .map(|sample| sample.map(|sample| sample as f32 / max_value as f32))
-                    .take(read_num_samples)
-                    .collect()
-            }
-            hound::SampleFormat::Float => self
-                .reader
-                .samples::<f32>()
-                .take(read_num_samples)
-                .collect(),
-        };
-
-        samples.unwrap_or_else(|_| Vec::default())
     }
 }

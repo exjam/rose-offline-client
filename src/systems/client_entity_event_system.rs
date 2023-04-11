@@ -10,7 +10,7 @@ use crate::{
     audio::SpatialSound,
     components::{PlayerCharacter, SoundCategory},
     events::{ChatboxEvent, ClientEntityEvent, SpawnEffectData, SpawnEffectEvent},
-    resources::{GameData, SoundSettings},
+    resources::{GameData, SoundCache, SoundSettings},
 };
 
 pub fn client_entity_event_system(
@@ -24,6 +24,7 @@ pub fn client_entity_event_system(
     asset_server: Res<AssetServer>,
     game_data: Res<GameData>,
     sound_settings: Res<SoundSettings>,
+    sound_cache: Res<SoundCache>,
 ) {
     let is_player = |entity| query_player.contains(entity);
 
@@ -39,7 +40,7 @@ pub fn client_entity_event_system(
                             commands.spawn((
                                 SoundCategory::NpcSounds,
                                 sound_settings.gain(SoundCategory::NpcSounds),
-                                SpatialSound::new(asset_server.load(sound_data.path.path())),
+                                SpatialSound::new(sound_cache.load(sound_data, &asset_server)),
                                 Transform::from_translation(global_transform.translation()),
                                 GlobalTransform::from_translation(global_transform.translation()),
                             ));
@@ -75,7 +76,7 @@ pub fn client_entity_event_system(
                         commands.spawn((
                             sound_category,
                             sound_settings.gain(sound_category),
-                            SpatialSound::new(asset_server.load(sound_data.path.path())),
+                            SpatialSound::new(sound_cache.load(sound_data, &asset_server)),
                             Transform::from_translation(global_transform.translation()),
                             GlobalTransform::from_translation(global_transform.translation()),
                         ));

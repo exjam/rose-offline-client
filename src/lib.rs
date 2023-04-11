@@ -62,8 +62,8 @@ use render::{DamageDigitMaterial, RoseRenderPlugin};
 use resources::{
     load_ui_resources, run_network_thread, update_ui_resources, AppState, ClientEntityList,
     DamageDigitsSpawner, DebugRenderConfig, GameData, NameTagSettings, NetworkThread,
-    NetworkThreadMessage, RenderConfiguration, SelectedTarget, ServerConfiguration, SoundSettings,
-    SpecularTexture, VfsResource, WorldTime, ZoneTime,
+    NetworkThreadMessage, RenderConfiguration, SelectedTarget, ServerConfiguration, SoundCache,
+    SoundSettings, SpecularTexture, VfsResource, WorldTime, ZoneTime,
 };
 use scripting::RoseScriptingPlugin;
 use systems::{
@@ -981,10 +981,14 @@ fn load_game_data_irose(
         rose_data_irose::get_zone_list(&vfs_resource.vfs, string_database.clone())
             .expect("Failed to load zone list"),
     );
+    let sounds = rose_data_irose::get_sound_database(&vfs_resource.vfs)
+        .expect("Failed to load sound database");
 
     asset_server.add_loader(ZoneLoader {
         zone_list: zone_list.clone(),
     });
+
+    commands.insert_resource(SoundCache::new(sounds.len()));
 
     commands.insert_resource(GameData {
         ability_value_calculator: rose_game_irose::data::get_ability_value_calculator(
@@ -1012,8 +1016,7 @@ fn load_game_data_irose(
         skills,
         skybox: rose_data_irose::get_skybox_database(&vfs_resource.vfs)
             .expect("Failed to load skybox database"),
-        sounds: rose_data_irose::get_sound_database(&vfs_resource.vfs)
-            .expect("Failed to load sound database"),
+        sounds,
         status_effects: Arc::new(
             rose_data_irose::get_status_effect_database(&vfs_resource.vfs, string_database.clone())
                 .expect("Failed to load status effect database"),

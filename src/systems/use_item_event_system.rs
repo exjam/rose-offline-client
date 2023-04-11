@@ -16,7 +16,7 @@ use crate::{
     audio::SpatialSound,
     components::{PlayerCharacter, SoundCategory},
     events::{SpawnEffectData, SpawnEffectEvent, UseItemEvent},
-    resources::{GameData, SoundSettings},
+    resources::{GameData, SoundCache, SoundSettings},
 };
 
 #[derive(WorldQuery)]
@@ -37,6 +37,7 @@ pub fn use_item_event_system(
     asset_server: Res<AssetServer>,
     game_data: Res<GameData>,
     sound_settings: Res<SoundSettings>,
+    sound_cache: Res<SoundCache>,
     time: Res<Time>,
 ) {
     for UseItemEvent { entity, item } in events.iter() {
@@ -78,7 +79,7 @@ pub fn use_item_event_system(
             commands.spawn((
                 category,
                 sound_settings.gain(category),
-                SpatialSound::new(asset_server.load(sound_data.path.path())),
+                SpatialSound::new(sound_cache.load(sound_data, &asset_server)),
                 Transform::from_translation(user.global_transform.translation()),
                 GlobalTransform::from_translation(user.global_transform.translation()),
             ));

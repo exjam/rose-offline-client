@@ -18,6 +18,7 @@ impl AssetLoader for OggLoader {
     ) -> BoxedFuture<'a, anyhow::Result<()>> {
         load_context.set_default_asset(LoadedAsset::new(AudioSource {
             bytes: bytes.into(),
+            decoded: None,
             create_streaming_source_fn: |audio_source| {
                 OggAudioSource::new(audio_source)
                     .map(|source| Box::new(source) as Box<dyn StreamingAudioSource + Send + Sync>)

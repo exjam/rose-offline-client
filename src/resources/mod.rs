@@ -18,6 +18,7 @@ mod render_configuration;
 mod selected_target;
 mod server_configuration;
 mod server_list;
+mod sound_cache;
 mod sound_settings;
 mod specular_texture;
 mod ui_resources;
@@ -49,6 +50,7 @@ pub use render_configuration::RenderConfiguration;
 pub use selected_target::SelectedTarget;
 pub use server_configuration::ServerConfiguration;
 pub use server_list::{ServerList, ServerListGameServer, ServerListWorldServer};
+pub use sound_cache::SoundCache;
 pub use sound_settings::SoundSettings;
 pub use specular_texture::SpecularTexture;
 pub use ui_resources::{

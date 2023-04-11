@@ -14,7 +14,7 @@ use crate::{
     animation::AnimationFrameEvent,
     audio::SpatialSound,
     components::{Command, DummyBoneOffset, PlayerCharacter, SoundCategory},
-    resources::{CurrentZone, GameData, SoundSettings},
+    resources::{CurrentZone, GameData, SoundCache, SoundSettings},
     zone_loader::ZoneLoaderAsset,
 };
 
@@ -49,6 +49,7 @@ pub fn animation_sound_system(
     query_event_entity: Query<EventEntity>,
     query_target_entity: Query<TargetEntity>,
     query_global_transform: Query<&GlobalTransform>,
+    sound_cache: Res<SoundCache>,
 ) {
     for event in animation_frame_events.iter() {
         let event_entity = if let Ok(event_entity) = query_event_entity.get(event.entity) {
@@ -106,7 +107,7 @@ pub fn animation_sound_system(
                 commands.spawn((
                     sound_category,
                     sound_settings.gain(sound_category),
-                    SpatialSound::new(asset_server.load(sound_data.path.path())),
+                    SpatialSound::new(sound_cache.load(sound_data, &asset_server)),
                     Transform::from_translation(event_entity.global_transform.translation()),
                     GlobalTransform::from_translation(event_entity.global_transform.translation()),
                 ));
@@ -146,7 +147,7 @@ pub fn animation_sound_system(
                         commands.spawn((
                             sound_category,
                             sound_settings.gain(sound_category),
-                            SpatialSound::new(asset_server.load(sound_data.path.path())),
+                            SpatialSound::new(sound_cache.load(sound_data, &asset_server)),
                             Transform::from_translation(dummy_transform.translation()),
                             GlobalTransform::from_translation(dummy_transform.translation()),
                         ));
@@ -166,7 +167,7 @@ pub fn animation_sound_system(
                         commands.spawn((
                             sound_category,
                             sound_settings.gain(sound_category),
-                            SpatialSound::new(asset_server.load(sound_data.path.path())),
+                            SpatialSound::new(sound_cache.load(sound_data, &asset_server)),
                             Transform::from_translation(dummy_transform.translation()),
                             GlobalTransform::from_translation(dummy_transform.translation()),
                         ));
@@ -207,7 +208,7 @@ pub fn animation_sound_system(
                 commands.spawn((
                     sound_category,
                     sound_settings.gain(sound_category),
-                    SpatialSound::new(asset_server.load(sound_data.path.path())),
+                    SpatialSound::new(sound_cache.load(sound_data, &asset_server)),
                     Transform::from_translation(event_entity.global_transform.translation()),
                     GlobalTransform::from_translation(event_entity.global_transform.translation()),
                 ));
@@ -267,7 +268,7 @@ pub fn animation_sound_system(
                     commands.spawn((
                         sound_category,
                         sound_settings.gain(sound_category),
-                        SpatialSound::new(asset_server.load(sound_data.path.path())),
+                        SpatialSound::new(sound_cache.load(sound_data, &asset_server)),
                         Transform::from_translation(target_entity.global_transform.translation()),
                         GlobalTransform::from_translation(
                             target_entity.global_transform.translation(),
@@ -343,7 +344,7 @@ pub fn animation_sound_system(
                     commands.spawn((
                         sound_category,
                         sound_settings.gain(sound_category),
-                        SpatialSound::new(asset_server.load(sound_data.path.path())),
+                        SpatialSound::new(sound_cache.load(sound_data, &asset_server)),
                         Transform::from_translation(event_entity.global_transform.translation()),
                         GlobalTransform::from_translation(
                             event_entity.global_transform.translation(),
@@ -375,7 +376,7 @@ pub fn animation_sound_system(
                     commands.spawn((
                         sound_category,
                         sound_settings.gain(sound_category),
-                        SpatialSound::new(asset_server.load(sound_data.path.path())),
+                        SpatialSound::new(sound_cache.load(sound_data, &asset_server)),
                         Transform::from_translation(event_entity.global_transform.translation()),
                         GlobalTransform::from_translation(
                             event_entity.global_transform.translation(),
@@ -404,7 +405,7 @@ pub fn animation_sound_system(
                     commands.spawn((
                         sound_category,
                         sound_settings.gain(sound_category),
-                        SpatialSound::new(asset_server.load(sound_data.path.path())),
+                        SpatialSound::new(sound_cache.load(sound_data, &asset_server)),
                         Transform::from_translation(target_entity.global_transform.translation()),
                         GlobalTransform::from_translation(
                             target_entity.global_transform.translation(),
@@ -436,7 +437,7 @@ pub fn animation_sound_system(
                     commands.spawn((
                         sound_category,
                         sound_settings.gain(sound_category),
-                        SpatialSound::new(asset_server.load(sound_data.path.path())),
+                        SpatialSound::new(sound_cache.load(sound_data, &asset_server)),
                         Transform::from_translation(target_entity.global_transform.translation()),
                         GlobalTransform::from_translation(
                             target_entity.global_transform.translation(),
@@ -468,7 +469,7 @@ pub fn animation_sound_system(
                     commands.spawn((
                         sound_category,
                         sound_settings.gain(sound_category),
-                        SpatialSound::new(asset_server.load(sound_data.path.path())),
+                        SpatialSound::new(sound_cache.load(sound_data, &asset_server)),
                         Transform::from_translation(target_entity.global_transform.translation()),
                         GlobalTransform::from_translation(
                             target_entity.global_transform.translation(),
