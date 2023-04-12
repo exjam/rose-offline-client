@@ -28,7 +28,7 @@ use bevy::{
         render_resource::{
             encase::ShaderType, AsBindGroup, BindGroupLayout, BlendComponent, BlendFactor,
             BlendOperation, BlendState, CompareFunction, RenderPipelineDescriptor, ShaderDefVal,
-            SpecializedMeshPipelineError,
+            ShaderRef, SpecializedMeshPipelineError,
         },
         texture::Image,
     },
@@ -309,11 +309,19 @@ impl FromWorld for ObjectMaterialPipelineData {
 impl Material for ObjectMaterial {
     type PipelineData = ObjectMaterialPipelineData;
 
-    fn vertex_shader() -> bevy::render::render_resource::ShaderRef {
+    fn vertex_shader() -> ShaderRef {
         OBJECT_MATERIAL_SHADER_HANDLE.typed().into()
     }
 
-    fn fragment_shader() -> bevy::render::render_resource::ShaderRef {
+    fn fragment_shader() -> ShaderRef {
+        OBJECT_MATERIAL_SHADER_HANDLE.typed().into()
+    }
+
+    fn prepass_fragment_shader() -> ShaderRef {
+        OBJECT_MATERIAL_SHADER_HANDLE.typed().into()
+    }
+
+    fn prepass_vertex_shader() -> ShaderRef {
         OBJECT_MATERIAL_SHADER_HANDLE.typed().into()
     }
 
@@ -365,20 +373,6 @@ impl Material for ObjectMaterial {
             descriptor.primitive.cull_mode = None;
         }
 
-        if key.mesh_key.contains(MeshPipelineKey::DEPTH_PREPASS)
-            || key.mesh_key.contains(MeshPipelineKey::NORMAL_PREPASS)
-        {
-            return Ok(());
-        }
-
-        descriptor.layout.insert(
-            3,
-            object_material_pipeline_data
-                .data
-                .zone_lighting_layout
-                .clone(),
-        );
-
         let mut vertex_attributes = vec![
             Mesh::ATTRIBUTE_POSITION.at_shader_location(0),
             Mesh::ATTRIBUTE_NORMAL.at_shader_location(1),
@@ -423,6 +417,20 @@ impl Material for ObjectMaterial {
         }
 
         descriptor.vertex.buffers = vec![layout.get_layout(&vertex_attributes)?];
+
+        if key.mesh_key.contains(MeshPipelineKey::DEPTH_PREPASS)
+            || key.mesh_key.contains(MeshPipelineKey::NORMAL_PREPASS)
+        {
+            return Ok(());
+        }
+
+        descriptor.layout.insert(
+            3,
+            object_material_pipeline_data
+                .data
+                .zone_lighting_layout
+                .clone(),
+        );
 
         if let Some(fragment) = descriptor.fragment.as_mut() {
             for color_target_state in fragment.targets.iter_mut().filter_map(|x| x.as_mut()) {

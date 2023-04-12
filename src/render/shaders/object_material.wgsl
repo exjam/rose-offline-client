@@ -102,6 +102,17 @@ struct FragmentInput {
 #endif
 };
 
+#ifdef DEPTH_PREPASS
+@fragment
+fn fragment(in: FragmentInput) {
+    var output_color: vec4<f32> = textureSample(base_texture, base_sampler, in.uv);
+    if ((material.flags & OBJECT_MATERIAL_FLAGS_ALPHA_MODE_MASK) != 0u) {
+        if (output_color.a < material.alpha_cutoff) {
+            discard;
+        }
+    }
+}
+#else // ifdef DEPTH_PREPASS
 @fragment
 fn fragment(in: FragmentInput) -> @location(0) vec4<f32> {
     var output_color: vec4<f32> = textureSample(base_texture, base_sampler, in.uv);
@@ -146,3 +157,4 @@ fn fragment(in: FragmentInput) -> @location(0) vec4<f32> {
 
     return apply_zone_lighting(in.world_position, in.world_normal, output_color, view_z);
 }
+#endif  // else ifdef DEPTH_PREPASS
