@@ -27,13 +27,13 @@ impl DamageDigitsSpawner {
     ) -> Self {
         Self {
             texture_damage: damage_digit_materials.add(DamageDigitMaterial {
-                texture: asset_server.load("3DDATA/EFFECT/SPECIAL/DIGITNUMBER01.DDS.rgb_texture"),
+                texture: asset_server.load("3DDATA/EFFECT/SPECIAL/DIGITNUMBER01.DDS"),
             }),
             texture_damage_player: damage_digit_materials.add(DamageDigitMaterial {
-                texture: asset_server.load("3DDATA/EFFECT/SPECIAL/DIGITNUMBER02.DDS.rgb_texture"),
+                texture: asset_server.load("3DDATA/EFFECT/SPECIAL/DIGITNUMBER02.DDS"),
             }),
             texture_miss: damage_digit_materials.add(DamageDigitMaterial {
-                texture: asset_server.load("3DDATA/EFFECT/SPECIAL/DIGITNUMBERMISS.DDS.rgb_texture"),
+                texture: asset_server.load("3DDATA/EFFECT/SPECIAL/DIGITNUMBERMISS.DDS"),
             }),
             motion: asset_server.load("3DDATA/EFFECT/SPECIAL/HIT_FIGURE_01.ZMO"),
         }

@@ -51,7 +51,7 @@ use crate::{
     events::{LoadZoneEvent, ZoneEvent},
     render::{
         EffectMeshAnimationRenderState, EffectMeshMaterial, ObjectMaterial, ParticleMaterial,
-        RgbTextureLoader, SkyMaterial, TerrainMaterial, WaterMaterial, MESH_ATTRIBUTE_UV_1,
+        SkyMaterial, TerrainMaterial, WaterMaterial, MESH_ATTRIBUTE_UV_1,
         TERRAIN_MATERIAL_MAX_TEXTURES, TERRAIN_MESH_ATTRIBUTE_TILE_INFO,
     },
     resources::{CurrentZone, DebugInspector, GameData, SpecularTexture},
@@ -520,16 +520,14 @@ pub fn spawn_zone(
             break;
         }
 
-        tile_textures.push(asset_server.load(RgbTextureLoader::convert_path(Path::new(path))));
+        tile_textures.push(asset_server.load(path));
     }
 
     let water_material = {
         let mut water_material_textures = Vec::with_capacity(25);
         for i in 1..=25 {
-            water_material_textures.push(asset_server.load(format!(
-                "3DDATA/JUNON/WATER/OCEAN01_{:02}.DDS.rgb_texture",
-                i
-            )));
+            water_material_textures
+                .push(asset_server.load(format!("3DDATA/JUNON/WATER/OCEAN01_{:02}.DDS", i)));
         }
 
         water_materials.add(WaterMaterial {
@@ -751,12 +749,8 @@ fn spawn_skybox(
         .spawn((
             asset_server.load::<Mesh, _>(skybox_data.mesh.path()),
             sky_materials.add(SkyMaterial {
-                texture_day: Some(asset_server.load(RgbTextureLoader::convert_path(
-                    skybox_data.texture_day.path(),
-                ))),
-                texture_night: Some(asset_server.load(RgbTextureLoader::convert_path(
-                    skybox_data.texture_night.path(),
-                ))),
+                texture_day: Some(asset_server.load(skybox_data.texture_day.path())),
+                texture_night: Some(asset_server.load(skybox_data.texture_night.path())),
             }),
             Transform::from_scale(Vec3::splat(SKYBOX_MODEL_SCALE)),
             GlobalTransform::default(),
@@ -796,7 +790,7 @@ fn spawn_terrain(
     };
 
     terrain_material.textures.push(asset_server.load(format!(
-        "{}/{1:}_{2:}/{1:}_{2:}_PLANELIGHTINGMAP.DDS.rgb_texture",
+        "{}/{1:}_{2:}/{1:}_{2:}_PLANELIGHTINGMAP.DDS",
         zone_data.zone_path.to_str().unwrap(),
         block_data.block_x,
         block_data.block_y,
@@ -1150,11 +1144,8 @@ fn spawn_object(
 
                 lit_object.parts.get(part_index)
             });
-            let lightmap_texture = lit_part.map(|lit_part| {
-                asset_server.load(RgbTextureLoader::convert_path(
-                    &lightmap_path.join(&lit_part.filename),
-                ))
-            });
+            let lightmap_texture =
+                lit_part.map(|lit_part| asset_server.load(lightmap_path.join(&lit_part.filename)));
             let (lightmap_uv_offset, lightmap_uv_scale) = lit_part
                 .map(|lit_part| {
                     let scale = 1.0 / lit_part.parts_per_row as f32;
@@ -1172,9 +1163,7 @@ fn spawn_object(
             let material = material_cache[material_id].clone().unwrap_or_else(|| {
                 let zsc_material = &zsc.materials[material_id];
                 let handle = object_materials.add(ObjectMaterial {
-                    base_texture: Some(
-                        asset_server.load(RgbTextureLoader::convert_path(zsc_material.path.path())),
-                    ),
+                    base_texture: Some(asset_server.load(zsc_material.path.path())),
                     lightmap_texture,
                     alpha_value: if zsc_material.alpha != 1.0 {
                         Some(zsc_material.alpha)
@@ -1380,9 +1369,7 @@ fn spawn_animated_object(
 
     let mesh = asset_server.load::<Mesh, _>(mesh_path);
     let material = effect_mesh_materials.add(EffectMeshMaterial {
-        base_texture: Some(
-            asset_server.load(RgbTextureLoader::convert_path(Path::new(texture_path))),
-        ),
+        base_texture: Some(asset_server.load(texture_path)),
         alpha_enabled,
         alpha_test: alpha_test_enabled,
         two_sided,

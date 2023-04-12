@@ -1,5 +1,5 @@
 use bevy::{
-    prelude::{AddAsset, App, Plugin},
+    prelude::{App, Plugin},
     render::{mesh::MeshVertexAttribute, render_resource::VertexFormat},
 };
 
@@ -11,10 +11,8 @@ mod object_material;
 mod particle_material;
 mod particle_pipeline;
 mod particle_render_data;
-mod rgb_texture_loader;
 mod sky_material;
 mod terrain_material;
-mod texture_array;
 mod trail_effect;
 mod water_material;
 mod world_ui;
@@ -39,12 +37,10 @@ pub use object_material::{
 };
 pub use particle_material::ParticleMaterial;
 pub use particle_render_data::{ParticleRenderBillboardType, ParticleRenderData};
-pub use rgb_texture_loader::RgbTextureLoader;
 pub use sky_material::SkyMaterial;
 pub use terrain_material::{
     TerrainMaterial, TERRAIN_MATERIAL_MAX_TEXTURES, TERRAIN_MESH_ATTRIBUTE_TILE_INFO,
 };
-pub use texture_array::{GpuTextureArray, TextureArray, TextureArrayBuilder};
 pub use trail_effect::TrailEffect;
 pub use water_material::WaterMaterial;
 pub use world_ui::WorldUiRect;
@@ -58,7 +54,6 @@ use particle_material::ParticleMaterialPlugin;
 use particle_pipeline::ParticleRenderPlugin;
 use sky_material::SkyMaterialPlugin;
 use terrain_material::TerrainMaterialPlugin;
-use texture_array::TextureArrayPlugin;
 use trail_effect::TrailEffectRenderPlugin;
 use water_material::WaterMaterialPlugin;
 use world_ui::WorldUiRenderPlugin;
@@ -71,11 +66,8 @@ impl Plugin for RoseRenderPlugin {
     fn build(&self, app: &mut App) {
         let prepass_enabled = false;
 
-        app.add_plugin(TextureArrayPlugin)
-            .add_plugin(ZoneLightingPlugin)
-            .init_asset_loader::<RgbTextureLoader>();
-
-        app.add_plugin(TerrainMaterialPlugin { prepass_enabled })
+        app.add_plugin(ZoneLightingPlugin)
+            .add_plugin(TerrainMaterialPlugin { prepass_enabled })
             .add_plugin(EffectMeshMaterialPlugin { prepass_enabled })
             .add_plugin(ObjectMaterialPlugin { prepass_enabled })
             .add_plugin(WaterMaterialPlugin { prepass_enabled })

@@ -20,14 +20,10 @@ impl AssetIo for VfsAssetIo {
     fn load_path<'a>(&'a self, path: &'a Path) -> BoxedFuture<'a, Result<Vec<u8>, AssetIoError>> {
         Box::pin(async move {
             // bevy plsssss whyyy
-            // HACK: render/texture_array.rs relies on a custom asset loader with extension .image_copy_src
-            // HACK: render/rgb_texture_loader.rs relies on a custom asset loader with extension .rgb_texture
             // HACK: zone_loader.rs relies on a custom asset loader with extension .zone_loader
             let path = path
                 .to_str()
                 .unwrap()
-                .trim_end_matches(".image_copy_src")
-                .trim_end_matches(".rgb_texture")
                 .trim_end_matches(".no_skin")
                 .trim_end_matches(".zmo_texture");
             if path.ends_with(".zone_loader") {

@@ -29,7 +29,7 @@ use crate::{
         ItemDropModel, NpcModel, PersonalStoreModel, VehicleModel,
     },
     effect_loader::spawn_effect,
-    render::{EffectMeshMaterial, ObjectMaterial, ParticleMaterial, RgbTextureLoader, TrailEffect},
+    render::{EffectMeshMaterial, ObjectMaterial, ParticleMaterial, TrailEffect},
     zms_asset_loader::ZmsMaterialNumFaces,
 };
 
@@ -1204,9 +1204,7 @@ fn spawn_model(
         let material_id = object_part.material_id as usize;
         let zsc_material = &model_list.materials[material_id];
         let material = object_materials.add(ObjectMaterial {
-            base_texture: Some(
-                asset_server.load(RgbTextureLoader::convert_path(zsc_material.path.path())),
-            ),
+            base_texture: Some(asset_server.load(zsc_material.path.path())),
             lightmap_texture: None,
             alpha_value: if zsc_material.alpha != 1.0 {
                 Some(zsc_material.alpha)
