@@ -10,6 +10,7 @@ use enum_map::{enum_map, Enum, EnumMap};
 use rose_file_readers::{IdFile, TsiFile, TsiSprite, VirtualFilesystem};
 
 use crate::{
+    exe_resource_loader::ExeResourceCursor,
     ui::widgets::{Dialog, Widget},
     VfsResource,
 };
@@ -65,6 +66,39 @@ pub struct UiSpriteSheet {
     pub sprites_by_name: Option<IdFile>,
 }
 
+#[derive(Enum)]
+pub enum UiCursorType {
+    Default,
+    Attack,
+    Inventory,
+    PickupItem,
+    Left,
+    Right,
+    Npc,
+    User,
+    Wheel,
+    NoUi,
+    Repair,
+    Appraisal,
+}
+
+#[derive(Default, Clone)]
+pub struct UiCursor {
+    pub handle: Handle<ExeResourceCursor>,
+    pub texture_id: Option<egui::TextureId>,
+    pub size: Vec2,
+    pub hotspot: Vec2,
+}
+
+impl UiCursor {
+    pub fn new(handle: Handle<ExeResourceCursor>) -> Self {
+        Self {
+            handle,
+            ..Default::default()
+        }
+    }
+}
+
 #[derive(Resource)]
 pub struct UiResources {
     pub loaded_all_textures: bool,
@@ -96,6 +130,8 @@ pub struct UiResources {
     pub skill_tree_hawker: Handle<Dialog>,
     pub skill_tree_muse: Handle<Dialog>,
     pub skill_tree_soldier: Handle<Dialog>,
+
+    pub cursors: EnumMap<UiCursorType, UiCursor>,
 }
 
 impl UiResources {
@@ -255,6 +291,7 @@ fn load_ui_spritesheet(
 pub fn update_ui_resources(
     mut ui_resources: ResMut<UiResources>,
     images: Res<Assets<Image>>,
+    cursors: Res<Assets<ExeResourceCursor>>,
     asset_server: Res<AssetServer>,
     mut dialog_assets: ResMut<Assets<Dialog>>,
     mut egui_context: EguiContexts,
@@ -285,6 +322,25 @@ pub fn update_ui_resources(
             } else {
                 loaded_all = false;
             }
+        }
+    }
+
+    for (_, ui_cursor) in ui_resources.cursors.iter_mut() {
+        if ui_cursor.texture_id.is_some() {
+            continue;
+        }
+
+        if let Some(resource_cursor) = cursors.get(&ui_cursor.handle) {
+            ui_cursor.texture_id = Some(egui_context.add_image(resource_cursor.image.clone_weak()));
+            ui_cursor.size = resource_cursor.size;
+            ui_cursor.hotspot = resource_cursor.hotspot;
+        } else if matches!(
+            asset_server.get_load_state(&ui_cursor.handle),
+            LoadState::Failed
+        ) {
+            ui_cursor.texture_id = Some(egui::TextureId::default());
+        } else {
+            loaded_all = false;
         }
     }
 
@@ -480,5 +536,20 @@ pub fn load_ui_resources(
         skill_tree_muse: dialog_files["SKILLTREE_MUSE.XML"].clone(),
         skill_tree_soldier: dialog_files["SKILLTREE_SOLDIER.XML"].clone(),
         dialog_files,
+
+        cursors: enum_map! {
+            UiCursorType::Default =>  UiCursor::new(asset_server.load("trose.exe#cursor_196")),
+            UiCursorType::Attack =>  UiCursor::new(asset_server.load("trose.exe#cursor_190")),
+            UiCursorType::Inventory =>  UiCursor::new(asset_server.load("trose.exe#cursor_195")),
+            UiCursorType::PickupItem =>  UiCursor::new(asset_server.load("trose.exe#cursor_194")),
+            UiCursorType::Left =>  UiCursor::new(asset_server.load("trose.exe#cursor_193")),
+            UiCursorType::Right =>  UiCursor::new(asset_server.load("trose.exe#cursor_191")),
+            UiCursorType::Npc =>  UiCursor::new(asset_server.load("trose.exe#cursor_192")),
+            UiCursorType::User =>  UiCursor::new(asset_server.load("trose.exe#cursor_199")),
+            UiCursorType::Wheel =>  UiCursor::new(asset_server.load("trose.exe#cursor_197")),
+            UiCursorType::NoUi =>  UiCursor::new(asset_server.load("trose.exe#cursor_201")),
+            UiCursorType::Repair =>  UiCursor::new(asset_server.load("trose.exe#cursor_203")),
+            UiCursorType::Appraisal =>  UiCursor::new(asset_server.load("trose.exe#cursor_206")),
+        },
     });
 }

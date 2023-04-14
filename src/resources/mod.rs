@@ -54,7 +54,7 @@ pub use sound_cache::SoundCache;
 pub use sound_settings::SoundSettings;
 pub use specular_texture::SpecularTexture;
 pub use ui_resources::{
-    load_ui_resources, update_ui_resources, UiResources, UiSprite, UiSpriteSheet,
+    load_ui_resources, update_ui_resources, UiCursorType, UiResources, UiSprite, UiSpriteSheet,
     UiSpriteSheetType, UiTexture,
 };
 pub use virtual_filesystem::VfsResource;

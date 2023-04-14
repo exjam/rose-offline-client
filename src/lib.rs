@@ -18,6 +18,7 @@ use bevy::{
 use bevy_egui::{egui, EguiContexts};
 use bevy_rapier3d::plugin::PhysicsSet;
 use enum_map::enum_map;
+use exe_resource_loader::{ExeResourceCursor, ExeResourceLoader};
 use serde::Deserialize;
 use std::{
     path::{Path, PathBuf},
@@ -36,6 +37,7 @@ pub mod bundles;
 pub mod components;
 pub mod effect_loader;
 pub mod events;
+pub mod exe_resource_loader;
 pub mod model_loader;
 pub mod protocol;
 pub mod ray_from_screenspace;
@@ -521,6 +523,8 @@ fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsC
         .init_asset_loader::<ZmsNoSkinAssetLoader>()
         .add_asset::<ZmsMaterialNumFaces>()
         .add_asset::<ZoneLoaderAsset>()
+        .init_asset_loader::<ExeResourceLoader>()
+        .add_asset::<ExeResourceCursor>()
         .init_asset_loader::<DialogLoader>()
         .add_asset::<Dialog>()
         .insert_resource(RenderConfiguration {

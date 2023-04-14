@@ -24,7 +24,7 @@ egui = "0.21"
 egui_extras = "0.21"
 enum-map = { version = "2.0", features = ["serde"] }
 hound = "3.4"
-image = { version = "0.24", default-features = false, features = ["dds"] }
+image = { version = "0.24", default-features = false, features = ["dds", "ico", "tga"] }
 lazy_static = "1.4.0"
 lewton = "0.10"
 log = "0.4.14"
@@ -32,6 +32,7 @@ md5 = "0.7.0"
 num-derive = "0.3"
 num-traits = "0.2"
 oddio = "0.6"
+pelite = "0.10.0"
 rand = "0.8"
 serde = "1.0"
 thiserror = "1.0"
@@ -52,6 +53,7 @@ bevy = { git = "https://github.com/exjam/bevy", rev = "177857c24fe027004b34e8662
 bevy_egui = { git = "https://github.com/exjam/bevy_egui", rev = "6613843ee112f943e78987cc4ab1fbb72da8ba02" }
 egui = { git = "https://github.com/exjam/egui", rev = "3ff66738341330d40e206269ce3540379b9ce1f5" }
 oddio = { git = "https://github.com/exjam/oddio", rev = "3c20292903fe629d7eab08c1790db70b9fddac96" }
+pelite = { git = "https://github.com/exjam/pelite", rev = "750b4aea126b1248b46e52cf2b9ad288d01e698c" }
 # Thanks bevy-inspector-egui
 bevy_app = { git = "https://github.com/exjam/bevy", rev = "177857c24fe027004b34e8662acfd7c2b98941a7" }
 bevy_asset = { git = "https://github.com/exjam/bevy", rev = "177857c24fe027004b34e8662acfd7c2b98941a7" }
