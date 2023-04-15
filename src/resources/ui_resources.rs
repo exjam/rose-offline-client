@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use bevy::{
     asset::LoadState,
     prelude::{AssetServer, Assets, Commands, Handle, Image, Res, ResMut, Resource, Vec2},
+    window::CursorIcon,
 };
 use bevy_egui::{egui, EguiContexts};
 use enum_map::{enum_map, Enum, EnumMap};
@@ -86,6 +87,7 @@ pub enum UiCursorType {
 pub struct UiCursor {
     pub handle: Handle<ExeResourceCursor>,
     pub texture_id: Option<egui::TextureId>,
+    pub cursor: CursorIcon,
     pub size: Vec2,
     pub hotspot: Vec2,
 }
@@ -334,6 +336,7 @@ pub fn update_ui_resources(
             ui_cursor.texture_id = Some(egui_context.add_image(resource_cursor.image.clone_weak()));
             ui_cursor.size = resource_cursor.size;
             ui_cursor.hotspot = resource_cursor.hotspot;
+            ui_cursor.cursor = resource_cursor.cursor.clone();
         } else if matches!(
             asset_server.get_load_state(&ui_cursor.handle),
             LoadState::Failed
