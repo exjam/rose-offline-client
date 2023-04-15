@@ -15,7 +15,7 @@ use bevy::{
     render::{render_resource::WgpuFeatures, settings::WgpuSettings},
     window::{Window, WindowMode},
 };
-use bevy_egui::{egui, EguiContexts};
+use bevy_egui::{egui, EguiContexts, EguiSet};
 use bevy_rapier3d::plugin::PhysicsSet;
 use enum_map::enum_map;
 use exe_resource_loader::{ExeResourceCursor, ExeResourceLoader};
@@ -62,10 +62,10 @@ use events::{
 use model_loader::ModelLoader;
 use render::{DamageDigitMaterial, RoseRenderPlugin};
 use resources::{
-    load_ui_resources, run_network_thread, update_ui_resources, AppState, ClientEntityList,
-    DamageDigitsSpawner, DebugRenderConfig, GameData, NameTagSettings, NetworkThread,
-    NetworkThreadMessage, RenderConfiguration, SelectedTarget, ServerConfiguration, SoundCache,
-    SoundSettings, SpecularTexture, VfsResource, WorldTime, ZoneTime,
+    load_ui_resources, run_network_thread, ui_requested_cursor_apply_system, update_ui_resources,
+    AppState, ClientEntityList, DamageDigitsSpawner, DebugRenderConfig, GameData, NameTagSettings,
+    NetworkThread, NetworkThreadMessage, RenderConfiguration, SelectedTarget, ServerConfiguration,
+    SoundCache, SoundSettings, SpecularTexture, VfsResource, WorldTime, ZoneTime,
 };
 use scripting::RoseScriptingPlugin;
 use systems::{
@@ -662,6 +662,12 @@ fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsC
         .add_system(load_dialog_sprites_system)
         .add_system(zone_time_system.after(world_time_system))
         .add_system(directional_light_system);
+
+    app.add_system(
+        ui_requested_cursor_apply_system
+            .in_base_set(CoreSet::PostUpdate)
+            .after(EguiSet::ProcessOutput),
+    );
 
     app.add_system(ui_item_drop_name_system.in_set(UiSystemSets::UiFirst));
 

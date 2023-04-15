@@ -7,7 +7,7 @@ use bevy::{
         With,
     },
     render::camera::Projection,
-    window::{PrimaryWindow, Window},
+    window::{CursorGrabMode, PrimaryWindow, Window},
 };
 use bevy_egui::EguiContexts;
 use bevy_rapier3d::prelude::{CollisionGroups, QueryFilter, RapierContext};
@@ -16,12 +16,12 @@ use rose_game_common::components::{ItemDrop, Team};
 
 use crate::{
     components::{
-        ColliderParent, PlayerCharacter, Position, ZoneObject, COLLISION_FILTER_CLICKABLE,
-        COLLISION_GROUP_PHYSICS_TOY, COLLISION_GROUP_PLAYER,
+        ClientEntity, ClientEntityType, ColliderParent, PlayerCharacter, Position, ZoneObject,
+        COLLISION_FILTER_CLICKABLE, COLLISION_GROUP_PHYSICS_TOY, COLLISION_GROUP_PLAYER,
     },
     events::{MoveDestinationEffectEvent, PlayerCommandEvent},
     ray_from_screenspace::ray_from_screenspace,
-    resources::SelectedTarget,
+    resources::{SelectedTarget, UiCursorType, UiRequestedCursor},
 };
 
 #[derive(WorldQuery)]
@@ -43,113 +43,149 @@ pub fn game_mouse_input_system(
         Option<&Position>,
         Option<&ItemDrop>,
         Option<&ZoneObject>,
+        Option<&ClientEntity>,
     )>,
     query_player: Query<PlayerQuery, With<PlayerCharacter>>,
     mut player_command_events: EventWriter<PlayerCommandEvent>,
     mut move_destination_effect_events: EventWriter<MoveDestinationEffectEvent>,
     mut selected_target: ResMut<SelectedTarget>,
+    mut ui_requested_cursor: ResMut<UiRequestedCursor>,
 ) {
     selected_target.hover = None;
-
-    if egui_ctx.ctx_mut().wants_pointer_input() {
-        // Mouse is over UI
-        return;
-    }
+    ui_requested_cursor.world_cursor = UiCursorType::Default;
 
     let Ok(window) = query_window.get_single() else {
         return;
     };
 
+    if !matches!(window.cursor.grab_mode, CursorGrabMode::None) {
+        // Cursor is currently grabbed
+        return;
+    }
+
     let Some(cursor_position) = window.cursor_position() else {
-            return;
-        };
+        // Failed to get cursor position
+        return;
+    };
+
+    if egui_ctx.ctx_mut().wants_pointer_input() {
+        return;
+    }
 
     let player = if let Ok(player) = query_player.get_single() {
         player
     } else {
         return;
     };
+    let Ok((camera, camera_projection, camera_transform)) = query_camera.get_single() else {
+        return;
+    };
 
-    for (camera, camera_projection, camera_transform) in query_camera.iter() {
-        if let Some((ray_origin, ray_direction)) = ray_from_screenspace(
-            cursor_position,
-            window,
-            camera,
-            camera_projection,
-            camera_transform,
+    if let Some((ray_origin, ray_direction)) = ray_from_screenspace(
+        cursor_position,
+        window,
+        camera,
+        camera_projection,
+        camera_transform,
+    ) {
+        if let Some((collider_entity, distance)) = rapier_context.cast_ray(
+            ray_origin,
+            ray_direction,
+            10000000.0,
+            false,
+            QueryFilter::new().groups(CollisionGroups::new(
+                COLLISION_FILTER_CLICKABLE,
+                !COLLISION_GROUP_PLAYER & !COLLISION_GROUP_PHYSICS_TOY,
+            )),
         ) {
-            if let Some((collider_entity, distance)) = rapier_context.cast_ray(
-                ray_origin,
-                ray_direction,
-                10000000.0,
-                false,
-                QueryFilter::new().groups(CollisionGroups::new(
-                    COLLISION_FILTER_CLICKABLE,
-                    !COLLISION_GROUP_PLAYER & !COLLISION_GROUP_PHYSICS_TOY,
-                )),
-            ) {
-                let hit_position = ray_origin + ray_direction * distance;
-                let hit_entity = query_collider_parent
-                    .get(collider_entity)
-                    .map_or(collider_entity, |collider_parent| collider_parent.entity);
+            let hit_position = ray_origin + ray_direction * distance;
+            let hit_entity = query_collider_parent
+                .get(collider_entity)
+                .map_or(collider_entity, |collider_parent| collider_parent.entity);
 
-                if let Ok((hit_team, hit_entity_position, hit_item_drop, hit_zone_object)) =
-                    query_hit_entity.get(hit_entity)
-                {
-                    if hit_zone_object.is_some() {
-                        if mouse_button_input.just_pressed(MouseButton::Left) {
+            if let Ok((
+                hit_team,
+                hit_entity_position,
+                hit_item_drop,
+                hit_zone_object,
+                hit_client_entity,
+            )) = query_hit_entity.get(hit_entity)
+            {
+                if let Some(hit_client_entity) = hit_client_entity {
+                    match hit_client_entity.entity_type {
+                        ClientEntityType::Character => {
+                            ui_requested_cursor.world_cursor = UiCursorType::User
+                        }
+                        ClientEntityType::Monster => {
+                            ui_requested_cursor.world_cursor = UiCursorType::Attack
+                        }
+                        ClientEntityType::Npc => {
+                            ui_requested_cursor.world_cursor = UiCursorType::Npc
+                        }
+                        ClientEntityType::ItemDrop => {
+                            ui_requested_cursor.world_cursor = UiCursorType::PickupItem
+                        }
+                    }
+                }
+
+                if let Some(hit_team) = hit_team.as_ref() {
+                    if hit_team.id != Team::DEFAULT_NPC_TEAM_ID && hit_team.id != player.team.id {
+                        ui_requested_cursor.world_cursor = UiCursorType::Attack;
+                    }
+                }
+
+                if hit_zone_object.is_some() {
+                    if mouse_button_input.just_pressed(MouseButton::Left) {
+                        player_command_events.send(PlayerCommandEvent::Move(
+                            Position::new(Vec3::new(
+                                hit_position.x * 100.0,
+                                -hit_position.z * 100.0,
+                                f32::max(0.0, hit_position.y * 100.0),
+                            )),
+                            None,
+                        ));
+
+                        move_destination_effect_events.send(MoveDestinationEffectEvent::Show {
+                            position: hit_position,
+                        });
+                    }
+                } else if hit_item_drop.is_some() {
+                    selected_target.hover = Some(hit_entity);
+
+                    if mouse_button_input.just_pressed(MouseButton::Left) {
+                        if let Some(hit_entity_position) = hit_entity_position {
+                            // Move to target item drop, once we are close enough the command_system
+                            // will send the pickup client message to perform the actual pickup
                             player_command_events.send(PlayerCommandEvent::Move(
-                                Position::new(Vec3::new(
-                                    hit_position.x * 100.0,
-                                    -hit_position.z * 100.0,
-                                    f32::max(0.0, hit_position.y * 100.0),
-                                )),
-                                None,
+                                hit_entity_position.clone(),
+                                Some(hit_entity),
                             ));
-
-                            move_destination_effect_events.send(MoveDestinationEffectEvent::Show {
-                                position: hit_position,
-                            });
                         }
-                    } else if hit_item_drop.is_some() {
-                        selected_target.hover = Some(hit_entity);
+                    }
+                } else if let Some(hit_team) = hit_team {
+                    selected_target.hover = Some(hit_entity);
 
-                        if mouse_button_input.just_pressed(MouseButton::Left) {
-                            if let Some(hit_entity_position) = hit_entity_position {
-                                // Move to target item drop, once we are close enough the command_system
-                                // will send the pickup client message to perform the actual pickup
-                                player_command_events.send(PlayerCommandEvent::Move(
-                                    hit_entity_position.clone(),
-                                    Some(hit_entity),
-                                ));
-                            }
-                        }
-                    } else if let Some(hit_team) = hit_team {
-                        selected_target.hover = Some(hit_entity);
-
-                        if mouse_button_input.just_pressed(MouseButton::Left) {
-                            if selected_target
-                                .selected
-                                .map_or(false, |selected_entity| selected_entity == hit_entity)
+                    if mouse_button_input.just_pressed(MouseButton::Left) {
+                        if selected_target
+                            .selected
+                            .map_or(false, |selected_entity| selected_entity == hit_entity)
+                        {
+                            if hit_team.id == Team::DEFAULT_NPC_TEAM_ID
+                                || hit_team.id == player.team.id
                             {
-                                if hit_team.id == Team::DEFAULT_NPC_TEAM_ID
-                                    || hit_team.id == player.team.id
-                                {
-                                    // Move towards friendly
-                                    if let Some(hit_entity_position) = hit_entity_position {
-                                        player_command_events.send(PlayerCommandEvent::Move(
-                                            hit_entity_position.clone(),
-                                            Some(hit_entity),
-                                        ));
-                                    }
-                                } else {
-                                    // Attack enemy
-                                    player_command_events
-                                        .send(PlayerCommandEvent::Attack(hit_entity));
+                                // Move towards friendly
+                                if let Some(hit_entity_position) = hit_entity_position {
+                                    player_command_events.send(PlayerCommandEvent::Move(
+                                        hit_entity_position.clone(),
+                                        Some(hit_entity),
+                                    ));
                                 }
                             } else {
-                                selected_target.selected = Some(hit_entity);
+                                // Attack enemy
+                                player_command_events.send(PlayerCommandEvent::Attack(hit_entity));
                             }
+                        } else {
+                            selected_target.selected = Some(hit_entity);
                         }
                     }
                 }

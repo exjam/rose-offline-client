@@ -1,9 +1,8 @@
 use bevy::{
     asset::{AssetLoader, LoadContext, LoadedAsset},
-    prelude::{Handle, Image, Vec2},
     reflect::TypeUuid,
-    render::texture::{CompressedImageFormats, ImageType},
     utils::BoxedFuture,
+    window::{CursorIcon, CursorIconCustom},
 };
 
 #[derive(Clone, Default)]
@@ -12,9 +11,7 @@ pub struct ExeResourceLoader;
 #[derive(Debug, TypeUuid, Clone)]
 #[uuid = "dda4ba39-576d-4863-a8b4-ca73cedcfbcd"]
 pub struct ExeResourceCursor {
-    pub hotspot: Vec2,
-    pub size: Vec2,
-    pub image: Handle<Image>,
+    pub cursor: CursorIcon,
 }
 
 impl AssetLoader for ExeResourceLoader {
@@ -36,33 +33,32 @@ impl AssetLoader for ExeResourceLoader {
                 let mut buffer = Vec::new();
                 cursor.write(&mut buffer)?;
 
-                let image = Image::from_buffer(
-                    &buffer,
-                    ImageType::Extension("ico"),
-                    CompressedImageFormats::empty(),
-                    false,
-                )
-                .map_err(|err| {
-                    anyhow::anyhow!(
-                        "Failed to load cursor {} from {} with error {}",
-                        name,
-                        load_context.path().display(),
-                        err
-                    )
-                })?;
+                let mut reader = image::io::Reader::new(std::io::Cursor::new(&buffer));
+                reader.set_format(image::ImageFormat::Ico);
+                reader.no_limits();
+                let dyn_img = reader.decode()?;
 
-                let size = image.size();
+                let image::DynamicImage::ImageRgba8(image_buffer) = dyn_img else  {
+                    return Err(anyhow::anyhow!("Unexpected .ico format"));
+                };
+
                 let (hotspot_x, hotspot_y) = cursor.hotspot(0).unwrap();
-                let hotspot = Vec2::new(hotspot_x as f32, hotspot_y as f32);
-                let image_handle = load_context
-                    .set_labeled_asset(&format!("cursor_image_{}", id), LoadedAsset::new(image));
+                let bgra: Vec<u8> = image_buffer
+                    .chunks_exact(4)
+                    .flat_map(|rgba| [rgba[2], rgba[1], rgba[0], rgba[3]])
+                    .collect();
+
+                let cursor = CursorIcon::Custom(CursorIconCustom {
+                    hotspot_x: hotspot_x as u32,
+                    hotspot_y: hotspot_y as u32,
+                    width: image_buffer.width(),
+                    height: image_buffer.height(),
+                    data: bgra.into(),
+                });
+
                 load_context.set_labeled_asset(
                     &format!("cursor_{}", id),
-                    LoadedAsset::new(ExeResourceCursor {
-                        hotspot,
-                        size,
-                        image: image_handle,
-                    }),
+                    LoadedAsset::new(ExeResourceCursor { cursor }),
                 );
             }
 

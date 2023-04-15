@@ -2,9 +2,12 @@ use std::collections::HashMap;
 
 use bevy::{
     asset::LoadState,
-    prelude::{AssetServer, Assets, Commands, Handle, Image, Res, ResMut, Resource, Vec2},
+    prelude::{
+        AssetServer, Assets, Commands, Handle, Image, Query, Res, ResMut, Resource, Vec2, With,
+    },
+    window::{CursorGrabMode, CursorIcon, PrimaryWindow, Window},
 };
-use bevy_egui::{egui, EguiContexts};
+use bevy_egui::{egui, EguiContexts, EguiRequestedCursor};
 use enum_map::{enum_map, Enum, EnumMap};
 
 use rose_file_readers::{IdFile, TsiFile, TsiSprite, VirtualFilesystem};
@@ -66,8 +69,9 @@ pub struct UiSpriteSheet {
     pub sprites_by_name: Option<IdFile>,
 }
 
-#[derive(Enum)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Default, Enum)]
 pub enum UiCursorType {
+    #[default]
     Default,
     Attack,
     Inventory,
@@ -85,16 +89,14 @@ pub enum UiCursorType {
 #[derive(Default, Clone)]
 pub struct UiCursor {
     pub handle: Handle<ExeResourceCursor>,
-    pub texture_id: Option<egui::TextureId>,
-    pub size: Vec2,
-    pub hotspot: Vec2,
+    pub cursor: Option<CursorIcon>,
 }
 
 impl UiCursor {
     pub fn new(handle: Handle<ExeResourceCursor>) -> Self {
         Self {
             handle,
-            ..Default::default()
+            cursor: None,
         }
     }
 }
@@ -132,6 +134,12 @@ pub struct UiResources {
     pub skill_tree_soldier: Handle<Dialog>,
 
     pub cursors: EnumMap<UiCursorType, UiCursor>,
+}
+
+#[derive(Default, Resource)]
+pub struct UiRequestedCursor {
+    pub moving_camera: bool,
+    pub world_cursor: UiCursorType,
 }
 
 impl UiResources {
@@ -326,19 +334,17 @@ pub fn update_ui_resources(
     }
 
     for (_, ui_cursor) in ui_resources.cursors.iter_mut() {
-        if ui_cursor.texture_id.is_some() {
+        if ui_cursor.cursor.is_some() {
             continue;
         }
 
         if let Some(resource_cursor) = cursors.get(&ui_cursor.handle) {
-            ui_cursor.texture_id = Some(egui_context.add_image(resource_cursor.image.clone_weak()));
-            ui_cursor.size = resource_cursor.size;
-            ui_cursor.hotspot = resource_cursor.hotspot;
+            ui_cursor.cursor = Some(resource_cursor.cursor.clone());
         } else if matches!(
             asset_server.get_load_state(&ui_cursor.handle),
             LoadState::Failed
         ) {
-            ui_cursor.texture_id = Some(egui::TextureId::default());
+            ui_cursor.cursor = Some(CursorIcon::Default);
         } else {
             loaded_all = false;
         }
@@ -467,6 +473,7 @@ pub fn load_ui_resources(
     style.visuals.widgets.noninteractive.fg_stroke.color = egui::Color32::WHITE;
     egui_context.ctx_mut().set_style(style);
 
+    commands.init_resource::<UiRequestedCursor>();
     commands.insert_resource(UiResources {
         loaded_all_textures: false,
         sprite_sheets: enum_map! {
@@ -552,4 +559,47 @@ pub fn load_ui_resources(
             UiCursorType::Appraisal =>  UiCursor::new(asset_server.load("trose.exe#cursor_206")),
         },
     });
+}
+
+pub fn ui_requested_cursor_apply_system(
+    mut query_window: Query<&mut Window, With<PrimaryWindow>>,
+    ui_requested_cursor: Res<UiRequestedCursor>,
+    egui_requested_cursor: Res<EguiRequestedCursor>,
+    ui_resources: Res<UiResources>,
+    mut egui_ctx: EguiContexts,
+) {
+    let Ok(mut window) = query_window.get_single_mut() else {
+        return;
+    };
+
+    if egui_ctx.ctx_mut().wants_pointer_input() {
+        // Allow text selection cursor, otherwise use the default in game cursor icon
+        let requested_icon = match egui_requested_cursor.cursor {
+            CursorIcon::Text => &CursorIcon::Text,
+            _ => ui_resources.cursors[UiCursorType::Default]
+                .cursor
+                .as_ref()
+                .unwrap_or(&CursorIcon::Default),
+        };
+
+        if window.cursor.icon != *requested_icon {
+            window.cursor.icon = requested_icon.clone();
+        }
+    } else {
+        let world_cursor = if matches!(window.cursor.grab_mode, CursorGrabMode::None) {
+            ui_resources.cursors[ui_requested_cursor.world_cursor]
+                .cursor
+                .as_ref()
+                .unwrap_or(&CursorIcon::Default)
+        } else {
+            ui_resources.cursors[UiCursorType::Wheel]
+                .cursor
+                .as_ref()
+                .unwrap_or(&CursorIcon::Default)
+        };
+
+        if window.cursor.icon != *world_cursor {
+            window.cursor.icon = world_cursor.clone();
+        }
+    }
 }
