@@ -1,6 +1,6 @@
 use bevy::{
     input::{
-        mouse::{MouseMotion, MouseWheel},
+        mouse::{MouseMotion, MouseScrollUnit, MouseWheel},
         Input,
     },
     math::{Quat, Vec2, Vec3},
@@ -141,7 +141,10 @@ pub fn orbit_camera_system(
 
     if allow_mouse_input {
         for event in mouse_wheel_reader.iter() {
-            zoom_multiplier *= 1.0 - event.y * 0.10;
+            match event.unit {
+                MouseScrollUnit::Line => zoom_multiplier *= 1.0 - event.y * 0.10,
+                MouseScrollUnit::Pixel => zoom_multiplier *= 1.0 - event.y * 0.0005,
+            }
         }
     }
 

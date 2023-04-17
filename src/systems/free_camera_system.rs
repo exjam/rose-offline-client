@@ -1,6 +1,6 @@
 use bevy::{
     input::{
-        mouse::{MouseMotion, MouseWheel},
+        mouse::{MouseMotion, MouseScrollUnit, MouseWheel},
         Input,
     },
     math::{Quat, Vec2, Vec3},
@@ -88,7 +88,10 @@ pub fn free_camera_system(
         }
 
         for event in mouse_wheel_reader.iter() {
-            move_speed_multiplier *= 1.0 + event.y * 0.10;
+            match event.unit {
+                MouseScrollUnit::Line => move_speed_multiplier *= 1.0 + event.y * 0.10,
+                MouseScrollUnit::Pixel => move_speed_multiplier *= 1.0 + event.y * 0.0005,
+            }
         }
         free_camera.move_speed = (free_camera.move_speed * move_speed_multiplier).max(1.0);
     }
