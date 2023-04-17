@@ -1,4 +1,4 @@
-use bevy::prelude::{Assets, Local, Query, Res, ResMut, With};
+use bevy::prelude::{Assets, EventWriter, Local, Query, Res, ResMut, With};
 use bevy_egui::{egui, EguiContexts};
 
 use rose_data::Item;
@@ -11,7 +11,7 @@ use crate::{
         tooltips::{PlayerTooltipQuery, PlayerTooltipQueryItem},
         ui_add_item_tooltip,
         widgets::{DataBindings, Dialog, DrawText, Widget},
-        DragAndDropId, DragAndDropSlot, UiStateWindows,
+        DragAndDropId, DragAndDropSlot, UiSoundEvent, UiStateWindows,
     },
 };
 
@@ -90,6 +90,7 @@ pub fn ui_quest_list_system(
     mut ui_state: Local<UiQuestListState>,
     mut egui_context: EguiContexts,
     mut ui_state_windows: ResMut<UiStateWindows>,
+    mut ui_sound_events: EventWriter<UiSoundEvent>,
     query_player: Query<&QuestState, With<PlayerCharacter>>,
     query_player_tooltip: Query<PlayerTooltipQuery, With<PlayerCharacter>>,
     game_data: Res<GameData>,
@@ -141,6 +142,7 @@ pub fn ui_quest_list_system(
             dialog.draw(
                 ui,
                 DataBindings {
+                    sound_events: Some(&mut ui_sound_events),
                     visible: &mut [
                         (IID_ZLIST_SCROLLBAR, !is_minimised),
                         (IID_ZLIST_QUEST, !is_minimised),

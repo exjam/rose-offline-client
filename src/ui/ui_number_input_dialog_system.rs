@@ -1,4 +1,4 @@
-use bevy::prelude::{Assets, Commands, Events, Local, Res, ResMut};
+use bevy::prelude::{Assets, Commands, EventWriter, Events, Local, Res, ResMut};
 use bevy_egui::{
     egui,
     egui::{
@@ -11,7 +11,10 @@ use bevy_egui::{
 use crate::{
     events::NumberInputDialogEvent,
     resources::UiResources,
-    ui::{widgets::Dialog, DataBindings},
+    ui::{
+        UiSoundEvent,
+        {widgets::Dialog, DataBindings},
+    },
 };
 
 const IID_EDITBOX: i32 = 2;
@@ -47,6 +50,7 @@ pub struct UiStateMessageBox {
 pub fn ui_number_input_dialog_system(
     mut commands: Commands,
     mut ui_state: Local<UiStateMessageBox>,
+    mut ui_sound_events: EventWriter<UiSoundEvent>,
     mut egui_context: EguiContexts,
     mut number_input_dialog_events: ResMut<Events<NumberInputDialogEvent>>,
     dialog_assets: Res<Assets<Dialog>>,
@@ -151,6 +155,7 @@ pub fn ui_number_input_dialog_system(
         dialog.draw(
             ui,
             DataBindings {
+                sound_events: Some(&mut ui_sound_events),
                 visible: &mut [(IID_BTN_MAX, active_dialog.max_value.is_some())],
                 text: &mut [(IID_EDITBOX, &mut active_dialog.current_value)],
                 response: &mut [

@@ -4,7 +4,10 @@ use bevy_egui::{egui, EguiContexts};
 use crate::{
     events::LoginEvent,
     resources::{LoginConnection, LoginState, ServerList, UiResources},
-    ui::widgets::{DataBindings, Dialog},
+    ui::{
+        widgets::{DataBindings, Dialog},
+        UiSoundEvent,
+    },
 };
 
 #[derive(Default)]
@@ -17,6 +20,7 @@ pub struct UiStateServerSelect {
 pub fn ui_server_select_system(
     mut commands: Commands,
     mut ui_state: Local<UiStateServerSelect>,
+    mut ui_sound_events: EventWriter<UiSoundEvent>,
     mut egui_context: EguiContexts,
     login_state: Res<LoginState>,
     dialog_assets: Res<Assets<Dialog>>,
@@ -61,6 +65,7 @@ pub fn ui_server_select_system(
             dialog.draw(
                 ui,
                 DataBindings {
+                    sound_events: Some(&mut ui_sound_events),
                     response: &mut [
                         (10, &mut response_ok_button),
                         (11, &mut response_cancel_button),

@@ -17,7 +17,7 @@ use crate::{
         tooltips::{PlayerTooltipQuery, PlayerTooltipQueryItem, SkillTooltipType},
         ui_add_skill_tooltip,
         widgets::{DataBindings, Dialog, DrawText, Widget},
-        DragAndDropId, DragAndDropSlot, UiStateDragAndDrop, UiStateWindows,
+        DragAndDropId, DragAndDropSlot, UiSoundEvent, UiStateDragAndDrop, UiStateWindows,
     },
 };
 
@@ -129,6 +129,7 @@ pub fn ui_skill_list_system(
     mut ui_state_skill_list: Local<UiStateSkillList>,
     mut ui_state_dnd: ResMut<UiStateDragAndDrop>,
     mut ui_state_windows: ResMut<UiStateWindows>,
+    mut ui_sound_events: EventWriter<UiSoundEvent>,
     mut player_command_events: EventWriter<PlayerCommandEvent>,
     query_player: Query<PlayerQuery, With<PlayerCharacter>>,
     query_player_tooltip: Query<PlayerTooltipQuery, With<PlayerCharacter>>,
@@ -172,6 +173,7 @@ pub fn ui_skill_list_system(
             dialog.draw(
                 ui,
                 DataBindings {
+                    sound_events: Some(&mut ui_sound_events),
                     tabs: &mut [(IID_TABBEDPANE, &mut ui_state_skill_list.current_page)],
                     scroll: &mut [
                         (

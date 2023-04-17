@@ -9,7 +9,7 @@ use crate::{
     resources::{CharacterList, CharacterSelectState, GameData, UiResources},
     ui::{
         widgets::{DataBindings, Dialog, Widget},
-        DialogInstance,
+        DialogInstance, UiSoundEvent,
     },
 };
 
@@ -41,6 +41,7 @@ pub fn ui_character_select_system(
     dialog_assets: Res<Assets<Dialog>>,
     game_data: Res<GameData>,
     ui_resources: Res<UiResources>,
+    mut ui_sound_events: EventWriter<UiSoundEvent>,
     mut character_select_events: EventWriter<CharacterSelectEvent>,
 ) {
     let ui_state = &mut *ui_state;
@@ -96,6 +97,7 @@ pub fn ui_character_select_system(
             dialog.draw(
                 ui,
                 DataBindings {
+                    sound_events: Some(&mut ui_sound_events),
                     response: &mut [
                         (IID_BTN_CREATE, &mut response_create_button),
                         (IID_BTN_DELETE, &mut response_delete_button),

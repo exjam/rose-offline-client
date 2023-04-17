@@ -1,6 +1,6 @@
 use bevy::{
     ecs::query::WorldQuery,
-    prelude::{Assets, Local, Query, Res, ResMut, With},
+    prelude::{Assets, EventWriter, Local, Query, Res, ResMut, With},
 };
 use bevy_egui::{egui, EguiContexts};
 
@@ -17,7 +17,7 @@ use crate::{
     resources::{GameConnection, GameData, UiResources},
     ui::{
         widgets::{DataBindings, Dialog, DrawText},
-        UiStateWindows,
+        UiSoundEvent, UiStateWindows,
     },
 };
 
@@ -70,6 +70,7 @@ pub fn ui_character_info_system(
     query_player: Query<PlayerQuery, With<PlayerCharacter>>,
     mut ui_state: Local<UiStateCharacterInfo>,
     mut ui_state_windows: ResMut<UiStateWindows>,
+    mut ui_sound_events: EventWriter<UiSoundEvent>,
     ui_resources: Res<UiResources>,
     dialog_assets: Res<Assets<Dialog>>,
     game_connection: Option<Res<GameConnection>>,
@@ -112,6 +113,7 @@ pub fn ui_character_info_system(
             dialog.draw(
                 ui,
                 DataBindings {
+                    sound_events: Some(&mut ui_sound_events),
                     response: &mut [
                         (IID_BTN_CLOSE, &mut response_close_button),
                         (IID_BTN_UP_STR, &mut response_raise_str_button),

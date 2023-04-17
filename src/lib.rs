@@ -109,8 +109,9 @@ use ui::{
     ui_minimap_system, ui_npc_store_system, ui_number_input_dialog_system, ui_party_option_system,
     ui_party_system, ui_personal_store_system, ui_player_info_system, ui_quest_list_system,
     ui_respawn_system, ui_selected_target_system, ui_server_select_system, ui_settings_system,
-    ui_skill_list_system, ui_skill_tree_system, ui_status_effects_system, widgets::Dialog,
-    DialogLoader, UiStateDebugWindows, UiStateDragAndDrop, UiStateWindows,
+    ui_skill_list_system, ui_skill_tree_system, ui_sound_event_system, ui_status_effects_system,
+    ui_window_sound_system, widgets::Dialog, DialogLoader, UiSoundEvent, UiStateDebugWindows,
+    UiStateDragAndDrop, UiStateWindows,
 };
 use vfs_asset_io::VfsAssetIo;
 use zms_asset_loader::{ZmsAssetLoader, ZmsMaterialNumFaces, ZmsNoSkinAssetLoader};
@@ -308,6 +309,7 @@ pub struct SoundVolumeConfig {
     pub other_footstep: f32,
     pub other_combat: f32,
     pub npc_sounds: f32,
+    pub ui_sounds: f32,
 }
 
 impl Default for SoundVolumeConfig {
@@ -320,6 +322,7 @@ impl Default for SoundVolumeConfig {
             other_footstep: 0.5,
             other_combat: 0.5,
             npc_sounds: 0.6,
+            ui_sounds: 0.5,
         }
     }
 }
@@ -551,6 +554,7 @@ fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsC
                 SoundCategory::OtherFootstep => config.sound.volume.other_footstep,
                 SoundCategory::OtherCombat => config.sound.volume.other_combat,
                 SoundCategory::NpcSounds => config.sound.volume.npc_sounds,
+                SoundCategory::Ui => config.sound.volume.ui_sounds,
             },
         })
         .add_plugin(RoseAnimationPlugin)
@@ -586,7 +590,8 @@ fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsC
         .add_event::<SpawnProjectileEvent>()
         .add_event::<UseItemEvent>()
         .add_event::<WorldConnectionEvent>()
-        .add_event::<ZoneEvent>();
+        .add_event::<ZoneEvent>()
+        .add_event::<UiSoundEvent>();
 
     app.add_system(apply_system_buffers.in_base_set(GameStages::ZoneChangeFlush));
 
@@ -674,7 +679,13 @@ fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsC
     app.add_systems(
         (ui_message_box_system, ui_number_input_dialog_system).in_set(UiSystemSets::UiLast),
     );
-
+    app.add_systems(
+        (
+            ui_window_sound_system.before(ui_sound_event_system),
+            ui_sound_event_system,
+        )
+            .after(UiSystemSets::UiLast),
+    );
     app.add_systems((ui_debug_menu_system,).in_set(UiSystemSets::UiDebugMenu));
 
     app.add_systems(

@@ -1,6 +1,7 @@
 use bevy::prelude::{
     AssetServer, Assets, Camera3d, Commands, ComputedVisibility, DespawnRecursiveExt, Entity,
-    GlobalTransform, Local, Quat, Query, Res, ResMut, Transform, Vec3, Visibility, With,
+    EventWriter, GlobalTransform, Local, Quat, Query, Res, ResMut, Transform, Vec3, Visibility,
+    With,
 };
 use bevy_egui::{egui, EguiContexts};
 use rose_data::ZoneId;
@@ -12,10 +13,11 @@ use rose_game_common::{
 use crate::{
     animation::CameraAnimation,
     resources::{CharacterSelectState, UiResources, WorldConnection},
-    ui::widgets::{DataBindings, Dialog},
+    ui::{
+        widgets::{DataBindings, Dialog, DrawText},
+        UiSoundEvent,
+    },
 };
-
-use super::widgets::DrawText;
 
 const IID_EDITBOX: i32 = 7;
 const IID_BTN_OK: i32 = 10;
@@ -81,6 +83,7 @@ impl Default for UiCharacterCreateState {
 pub fn ui_character_create_system(
     mut commands: Commands,
     mut ui_state: Local<UiCharacterCreateState>,
+    mut ui_sound_events: EventWriter<UiSoundEvent>,
     mut character_select_state: ResMut<CharacterSelectState>,
     mut egui_context: EguiContexts,
     query_camera: Query<Entity, With<Camera3d>>,
@@ -145,6 +148,7 @@ pub fn ui_character_create_system(
             dialog.draw(
                 ui,
                 DataBindings {
+                    sound_events: Some(&mut ui_sound_events),
                     text: &mut [(IID_EDITBOX, &mut ui_state.name)],
                     response: &mut [
                         (IID_BTN_OK, &mut response_ok),

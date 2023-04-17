@@ -1,11 +1,11 @@
-use bevy::prelude::{Assets, Local, Res, ResMut};
+use bevy::prelude::{Assets, EventWriter, Local, Res, ResMut};
 use bevy_egui::{egui, EguiContexts};
 
 use crate::{
     resources::UiResources,
     ui::{
         widgets::{DataBindings, Dialog},
-        UiStateWindows,
+        UiSoundEvent, UiStateWindows,
     },
 };
 
@@ -22,14 +22,16 @@ const IID_BTN_EXIT: i32 = 19;
 
 #[derive(Default)]
 pub struct UiGameMenuState {
+    pub was_open: bool,
     pub mouse_up_after_open: bool,
 }
 
 pub fn ui_game_menu_system(
     mut egui_context: EguiContexts,
     mut ui_state_windows: ResMut<UiStateWindows>,
-    mut ui_state_game_menu: Local<UiGameMenuState>,
+    mut ui_state: Local<UiGameMenuState>,
     ui_resources: Res<UiResources>,
+    mut ui_sound_events: EventWriter<UiSoundEvent>,
     dialog_assets: Res<Assets<Dialog>>,
 ) {
     let dialog = if let Some(dialog) = dialog_assets.get(&ui_resources.dialog_game_menu) {
@@ -61,6 +63,7 @@ pub fn ui_game_menu_system(
             dialog.draw(
                 ui,
                 DataBindings {
+                    sound_events: Some(&mut ui_sound_events),
                     response: &mut [
                         (IID_BTN_CHAR, &mut response_button_character_info),
                         (IID_BTN_ITEM, &mut response_button_inventory),
@@ -83,7 +86,7 @@ pub fn ui_game_menu_system(
         // To avoid clicked_elsewhere being triggered as soon as we open menu,
         // we will only look for it after we have detected all mouse buttons
         // have been released after opening
-        if ui_state_game_menu.mouse_up_after_open {
+        if ui_state.mouse_up_after_open {
             if response.response.clicked_elsewhere() {
                 ui_state_windows.menu_open = false;
             }
@@ -92,10 +95,10 @@ pub fn ui_game_menu_system(
             .ctx
             .input(|input| input.pointer.any_down())
         {
-            ui_state_game_menu.mouse_up_after_open = true;
+            ui_state.mouse_up_after_open = true;
         }
     } else {
-        ui_state_game_menu.mouse_up_after_open = false;
+        ui_state.mouse_up_after_open = false;
     }
 
     if response_button_character_info.map_or(false, |r| r.clicked()) {

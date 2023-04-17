@@ -1,13 +1,16 @@
 use std::num::NonZeroU16;
 
-use bevy::prelude::{Assets, EventReader, EventWriter, Local, Res};
+use bevy::prelude::{Assets, EventReader, EventWriter, Local, Res, ResMut};
 use bevy_egui::{egui, EguiContexts};
 use rose_game_common::{components::ClanMark, messages::client::ClientMessage};
 
 use crate::{
     events::{ClanDialogEvent, MessageBoxEvent},
     resources::{GameConnection, GameData, UiResources, UiSpriteSheetType},
-    ui::widgets::{DataBindings, Dialog, Widget},
+    ui::{
+        widgets::{DataBindings, Dialog, Widget},
+        UiSoundEvent, UiStateWindows,
+    },
 };
 
 const IID_BTN_CONFIRM: i32 = 10;
@@ -19,7 +22,7 @@ const IID_TABLE_CLANCENTER: i32 = 30;
 const IID_TABLE_CLANBACK: i32 = 40;
 
 pub struct UiCreateClanState {
-    pub open: bool,
+    pub was_open: bool,
     pub clan_name: String,
     pub clan_slogan: String,
     pub selected_mark_foreground: i32,
@@ -31,7 +34,7 @@ pub struct UiCreateClanState {
 impl Default for UiCreateClanState {
     fn default() -> Self {
         Self {
-            open: false,
+            was_open: false,
             clan_name: String::new(),
             clan_slogan: String::new(),
             selected_mark_foreground: 1,
@@ -44,6 +47,8 @@ impl Default for UiCreateClanState {
 
 pub fn ui_create_clan_system(
     mut ui_state: Local<UiCreateClanState>,
+    mut ui_state_windows: ResMut<UiStateWindows>,
+    mut ui_sound_events: EventWriter<UiSoundEvent>,
     mut egui_context: EguiContexts,
     ui_resources: Res<UiResources>,
     dialog_assets: Res<Assets<Dialog>>,
@@ -61,7 +66,7 @@ pub fn ui_create_clan_system(
 
     for event in clan_dialog_events.iter() {
         let ClanDialogEvent::Open = event;
-        ui_state.open = true;
+        ui_state_windows.create_clan_open = true;
     }
 
     let mut response_confirm_button = None;
@@ -70,7 +75,7 @@ pub fn ui_create_clan_system(
 
     egui::Window::new("Create Clan")
         .frame(egui::Frame::none())
-        .open(&mut ui_state.open)
+        .open(&mut ui_state_windows.create_clan_open)
         .title_bar(false)
         .resizable(false)
         .default_width(dialog.width)
@@ -110,6 +115,7 @@ pub fn ui_create_clan_system(
             dialog.draw(
                 ui,
                 DataBindings {
+                    sound_events: Some(&mut ui_sound_events),
                     response: &mut [
                         (IID_BTN_CONFIRM, &mut response_confirm_button),
                         (IID_BTN_CLOSE, &mut response_cancel_button),
@@ -270,6 +276,6 @@ pub fn ui_create_clan_system(
     if response_cancel_button.map_or(false, |r| r.clicked())
         || response_close_button.map_or(false, |r| r.clicked())
     {
-        ui_state.open = false;
+        ui_state_windows.create_clan_open = false;
     }
 }

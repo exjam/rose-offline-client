@@ -9,4 +9,5 @@ pub enum SoundCategory {
     PlayerCombat,
     OtherCombat,
     NpcSounds,
+    Ui,
 }

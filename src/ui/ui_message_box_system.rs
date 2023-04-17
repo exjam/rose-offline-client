@@ -1,4 +1,4 @@
-use bevy::prelude::{Assets, Commands, Events, Local, Res, ResMut};
+use bevy::prelude::{Assets, Commands, EventWriter, Events, Local, Res, ResMut};
 use bevy_egui::{egui, EguiContexts};
 use bevy_inspector_egui::egui::text::LayoutJob;
 
@@ -7,7 +7,7 @@ use crate::{
     resources::UiResources,
     ui::{
         widgets::{Dialog, DrawWidget, Widget},
-        DataBindings, DialogInstance,
+        DataBindings, DialogInstance, UiSoundEvent,
     },
 };
 
@@ -37,6 +37,7 @@ pub struct UiStateMessageBox {
 pub fn ui_message_box_system(
     mut commands: Commands,
     mut ui_state: Local<UiStateMessageBox>,
+    mut ui_sound_events: EventWriter<UiSoundEvent>,
     mut egui_context: EguiContexts,
     mut message_box_events: ResMut<Events<MessageBoxEvent>>,
     dialog_assets: Res<Assets<Dialog>>,
@@ -218,6 +219,7 @@ pub fn ui_message_box_system(
             dialog.draw(
                 ui,
                 DataBindings {
+                    sound_events: Some(&mut ui_sound_events),
                     visible: &mut [(IID_BUTTON_OK, false), (IID_BUTTON_CANCEL, false)],
                     response: &mut [
                         (IID_BUTTON_OK, &mut response_button_ok),

@@ -1,4 +1,4 @@
-use bevy::prelude::{Assets, Local, Query, Res, ResMut, With};
+use bevy::prelude::{Assets, EventWriter, Local, Query, Res, ResMut, With};
 use bevy_egui::{egui, EguiContexts};
 
 use rose_game_common::messages::{client::ClientMessage, PartyItemSharing, PartyXpSharing};
@@ -8,7 +8,7 @@ use crate::{
     resources::{GameConnection, UiResources},
     ui::{
         widgets::{DataBindings, Dialog, DrawText},
-        UiStateWindows,
+        UiSoundEvent, UiStateWindows,
     },
 };
 
@@ -43,6 +43,7 @@ impl Default for UiStatePartyOptionSystem {
 pub fn ui_party_option_system(
     mut ui_state: Local<UiStatePartyOptionSystem>,
     mut ui_state_windows: ResMut<UiStateWindows>,
+    mut ui_sound_events: EventWriter<UiSoundEvent>,
     mut egui_context: EguiContexts,
     mut query_party_info: Query<&PartyInfo, With<PlayerCharacter>>,
     ui_resources: Res<UiResources>,
@@ -96,6 +97,7 @@ pub fn ui_party_option_system(
             dialog.draw(
                 ui,
                 DataBindings {
+                    sound_events: Some(&mut ui_sound_events),
                     checked: &mut [(
                         IID_CHECKBOX_SHOW_PARTYMEMBER_HPGUAGE,
                         &mut ui_state.show_party_member_hp_gauge,

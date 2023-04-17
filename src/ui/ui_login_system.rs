@@ -7,7 +7,10 @@ use bevy_egui::{egui, EguiContexts};
 use crate::{
     events::LoginEvent,
     resources::{LoginState, ServerConfiguration, UiResources},
-    ui::widgets::{DataBindings, Dialog},
+    ui::{
+        widgets::{DataBindings, Dialog},
+        UiSoundEvent,
+    },
 };
 
 const IID_EDIT_ID: i32 = 2;
@@ -27,6 +30,7 @@ pub struct UiStateLogin {
 #[allow(clippy::too_many_arguments)]
 pub fn ui_login_system(
     mut ui_state: Local<UiStateLogin>,
+    mut ui_sound_events: EventWriter<UiSoundEvent>,
     mut egui_context: EguiContexts,
     dialog_assets: Res<Assets<Dialog>>,
     login_state: Res<LoginState>,
@@ -79,6 +83,7 @@ pub fn ui_login_system(
             dialog.draw(
                 ui,
                 DataBindings {
+                    sound_events: Some(&mut ui_sound_events),
                     checked: &mut [(
                         IID_CHECKBOX_SAVE_LASTCONECTID,
                         &mut ui_state.remember_details,

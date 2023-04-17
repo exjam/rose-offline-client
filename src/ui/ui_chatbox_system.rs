@@ -1,4 +1,4 @@
-use bevy::prelude::{Assets, EventReader, Local, Res};
+use bevy::prelude::{Assets, EventReader, EventWriter, Local, Res};
 use bevy_egui::{egui, EguiContexts};
 
 use rose_game_common::messages::client::ClientMessage;
@@ -6,7 +6,10 @@ use rose_game_common::messages::client::ClientMessage;
 use crate::{
     events::ChatboxEvent,
     resources::{GameConnection, UiResources},
-    ui::widgets::{DataBindings, Dialog},
+    ui::{
+        widgets::{DataBindings, Dialog},
+        UiSoundEvent,
+    },
 };
 
 const MAX_CHATBOX_ENTRIES: usize = 100;
@@ -78,6 +81,7 @@ pub fn ui_chatbox_system(
     mut chatbox_events: EventReader<ChatboxEvent>,
     game_connection: Option<Res<GameConnection>>,
     ui_resources: Res<UiResources>,
+    mut ui_sound_events: EventWriter<UiSoundEvent>,
     dialog_assets: Res<Assets<Dialog>>,
 ) {
     let ui_state_chatbox = &mut *ui_state_chatbox;
@@ -236,6 +240,7 @@ pub fn ui_chatbox_system(
             dialog.draw(
                 ui,
                 DataBindings {
+                    sound_events: Some(&mut ui_sound_events),
                     text: &mut [(IID_EDITBOX, &mut ui_state_chatbox.textbox_text)],
                     radio: &mut [(IID_RADIOBOX, &mut ui_state_chatbox.selected_channel)],
                     response: &mut [

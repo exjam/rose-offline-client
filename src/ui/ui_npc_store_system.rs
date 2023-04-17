@@ -27,7 +27,7 @@ use crate::{
         ui_add_item_tooltip,
         ui_drag_and_drop_system::UiStateDragAndDrop,
         widgets::{DataBindings, Dialog, DrawText},
-        DragAndDropId, DragAndDropSlot,
+        DragAndDropId, DragAndDropSlot, UiSoundEvent,
     },
 };
 
@@ -402,6 +402,7 @@ pub fn ui_npc_store_system(
     mut egui_context: EguiContexts,
     mut ui_state: Local<UiNpcStoreState>,
     mut ui_state_dnd: ResMut<UiStateDragAndDrop>,
+    mut ui_sound_events: EventWriter<UiSoundEvent>,
     mut npc_store_events: EventReader<NpcStoreEvent>,
     query_player: Query<NpcStorePlayerWorldQuery>,
     query_player_tooltip: Query<PlayerTooltipQuery, With<PlayerCharacter>>,
@@ -520,6 +521,7 @@ pub fn ui_npc_store_system(
             store_dialog.draw(
                 ui,
                 DataBindings {
+                    sound_events: Some(&mut ui_sound_events),
                     response: &mut [(IID_STORE_BTN_CLOSE, &mut response_close)],
                     radio: &mut [(IID_STORE_RADIOBOX, &mut ui_state.current_tab_index)],
                     visible: &mut [

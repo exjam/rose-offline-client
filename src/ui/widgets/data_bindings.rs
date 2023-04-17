@@ -1,9 +1,14 @@
 use std::ops::Range;
 
+use bevy::prelude::EventWriter;
 use bevy_egui::egui;
 
+use rose_data::SoundId;
+
+use crate::ui::UiSoundEvent;
+
 #[derive(Default)]
-pub struct DataBindings<'a> {
+pub struct DataBindings<'a, 'w> {
     pub visible: &'a mut [(i32, bool)],
     pub checked: &'a mut [(i32, &'a mut bool)],
     pub enabled: &'a mut [(i32, bool)],
@@ -34,9 +39,16 @@ pub struct DataBindings<'a> {
         ),
     )],
     pub response: &'a mut [(i32, &'a mut Option<egui::Response>)],
+    pub sound_events: Option<&'a mut EventWriter<'w, UiSoundEvent>>,
 }
 
-impl<'a> DataBindings<'a> {
+impl<'a, 'w> DataBindings<'a, 'w> {
+    pub fn emit_sound(&mut self, sound_id: SoundId) {
+        if let Some(sound_events) = self.sound_events.as_mut() {
+            sound_events.send(UiSoundEvent::new(sound_id));
+        }
+    }
+
     pub fn set_response(&mut self, id: i32, response: egui::Response) {
         if let Some((_, out)) = self.response.iter_mut().find(|(x, _)| *x == id) {
             **out = Some(response);

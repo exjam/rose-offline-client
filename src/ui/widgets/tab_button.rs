@@ -1,9 +1,11 @@
 use bevy_egui::egui;
 use serde::Deserialize;
 
+use rose_data::SoundId;
+
 use crate::resources::{UiResources, UiSprite};
 
-use super::{DataBindings, DrawWidget, LoadWidget};
+use super::{dialog::deserialize_sound_id, DataBindings, DrawWidget, LoadWidget};
 
 #[derive(Clone, Default, Deserialize)]
 #[serde(rename = "TABBUTTON")]
@@ -34,8 +36,9 @@ pub struct TabButton {
     pub over_sprite_name: String,
     #[serde(rename = "DOWNGID")]
     pub down_sprite_name: String,
+    #[serde(deserialize_with = "deserialize_sound_id")]
     #[serde(rename = "DISABLESID")]
-    pub disable_sound_id: i32,
+    pub disable_sound_id: Option<SoundId>,
 
     #[serde(skip)]
     pub tab_id: i32,
@@ -70,17 +73,10 @@ impl DrawWidget for TabButton {
         let selected = current_tab.as_mut().map_or(0, |x| **x) == self.tab_id;
 
         let rect = self.widget_rect(ui.min_rect().min);
-        let response = ui.allocate_rect(
-            rect,
-            if enabled {
-                egui::Sense::click()
-            } else {
-                egui::Sense::hover()
-            },
-        );
+        let response = ui.allocate_rect(rect, egui::Sense::click());
 
         if ui.is_rect_visible(rect) {
-            let sprite = if !response.sense.interactive() {
+            let sprite = if !enabled {
                 self.normal_sprite.as_ref()
             } else if selected || response.is_pointer_button_down_on() {
                 self.down_sprite.as_ref()
@@ -97,8 +93,12 @@ impl DrawWidget for TabButton {
         }
 
         if response.clicked() {
-            if let Some(current_tab) = current_tab.as_mut() {
-                **current_tab = self.tab_id;
+            if enabled {
+                if let Some(current_tab) = current_tab.as_mut() {
+                    **current_tab = self.tab_id;
+                }
+            } else if let Some(disable_sound_id) = self.disable_sound_id {
+                bindings.emit_sound(disable_sound_id);
             }
         }
 

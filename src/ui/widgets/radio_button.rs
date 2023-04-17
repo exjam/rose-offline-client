@@ -1,9 +1,11 @@
 use bevy_egui::{egui, egui::Widget};
 use serde::Deserialize;
 
+use rose_data::SoundId;
+
 use crate::resources::{UiResources, UiSprite};
 
-use super::{DataBindings, DrawWidget, LoadWidget};
+use super::{dialog::deserialize_sound_id, DataBindings, DrawWidget, LoadWidget};
 
 #[derive(Clone, Default, Deserialize)]
 #[serde(rename = "RADIOBUTTON")]
@@ -36,8 +38,9 @@ pub struct RadioButton {
     pub over_sprite_name: String,
     #[serde(rename = "DOWNGID")]
     pub down_sprite_name: String,
+    #[serde(deserialize_with = "deserialize_sound_id")]
     #[serde(rename = "DISABLESID")]
-    pub disable_sound_id: i32,
+    pub disable_sound_id: Option<SoundId>,
 
     #[serde(skip)]
     pub normal_sprite: Option<UiSprite>,
@@ -81,7 +84,7 @@ impl DrawWidget for RadioButton {
 
         if ui.is_rect_visible(rect) {
             let mut label_colour = egui::Color32::WHITE;
-            let sprite = if !response.sense.interactive() {
+            let sprite = if !enabled {
                 self.normal_sprite.as_ref()
             } else if *selected == self.id || response.is_pointer_button_down_on() {
                 label_colour = egui::Color32::YELLOW;
@@ -100,8 +103,12 @@ impl DrawWidget for RadioButton {
             // Update selected after drawing to avoid two boxes being
             // rendered as selected in same frame
             if response.clicked() {
-                *selected = self.id;
-                response.mark_changed();
+                if enabled {
+                    *selected = self.id;
+                    response.mark_changed();
+                } else if let Some(disable_sound_id) = self.disable_sound_id {
+                    bindings.emit_sound(disable_sound_id);
+                }
             }
 
             let label = bindings.get_label(self.id);

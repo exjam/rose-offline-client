@@ -1,5 +1,6 @@
 use bevy::reflect::TypeUuid;
 use bevy_egui::egui;
+use rose_data::SoundId;
 use serde::{Deserialize, Deserializer};
 
 use super::{DataBindings, DrawWidget, GetWidget, Widget};
@@ -25,6 +26,14 @@ where
     })
 }
 
+pub fn deserialize_sound_id<'de, D>(deserializer: D) -> Result<Option<SoundId>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let sound_id = u16::deserialize(deserializer).unwrap_or(0);
+    Ok(SoundId::new(sound_id))
+}
+
 #[derive(Clone, Default, Deserialize, TypeUuid)]
 #[uuid = "95ddb227-6e9f-43ee-8026-28ddb6fc9634"]
 #[serde(rename = "Root_Element")]
@@ -42,10 +51,12 @@ pub struct Dialog {
     pub height: f32,
     #[serde(rename = "MODAL")]
     pub modal: i32,
+    #[serde(deserialize_with = "deserialize_sound_id")]
     #[serde(rename = "SHOWSID")]
-    pub show_sound_id: i32,
+    pub show_sound_id: Option<SoundId>,
+    #[serde(deserialize_with = "deserialize_sound_id")]
     #[serde(rename = "HIDESID")]
-    pub hide_sound_id: i32,
+    pub hide_sound_id: Option<SoundId>,
     #[serde(rename = "EXTENT")]
     pub extent: i32,
     #[serde(rename = "DEFAULT_X")]

@@ -2,7 +2,10 @@ use std::sync::Arc;
 
 use bevy::{
     math::{Vec2, Vec3Swizzles},
-    prelude::{AssetServer, Assets, Camera3d, Handle, Image, Local, Query, Res, Transform, With},
+    prelude::{
+        AssetServer, Assets, Camera3d, EventWriter, Handle, Image, Local, Query, Res, Transform,
+        With,
+    },
 };
 use bevy_egui::{egui, EguiContexts};
 
@@ -11,7 +14,10 @@ use rose_data::ZoneId;
 use crate::{
     components::{PlayerCharacter, Position},
     resources::{CurrentZone, GameData, UiResources},
-    ui::widgets::{DataBindings, Dialog, Widget},
+    ui::{
+        widgets::{DataBindings, Dialog, Widget},
+        UiSoundEvent,
+    },
     zone_loader::ZoneLoaderAsset,
 };
 
@@ -79,6 +85,7 @@ fn generate_text_galley(
 pub fn ui_minimap_system(
     mut egui_context: EguiContexts,
     mut ui_state: Local<UiStateMinimap>,
+    mut ui_sound_events: EventWriter<UiSoundEvent>,
     player_position: Query<&Position, With<PlayerCharacter>>,
     asset_server: Res<AssetServer>,
     query_camera: Query<&Transform, With<Camera3d>>,
@@ -279,6 +286,7 @@ pub fn ui_minimap_system(
             dialog.draw(
                 ui,
                 DataBindings {
+                    sound_events: Some(&mut ui_sound_events),
                     response: &mut [
                         (IID_BTN_EXPAND, &mut response_expand_button),
                         (IID_BTN_NORMAL, &mut response_shrink_button),

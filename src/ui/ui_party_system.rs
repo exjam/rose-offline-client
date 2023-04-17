@@ -1,6 +1,6 @@
 use bevy::{
     ecs::query::WorldQuery,
-    prelude::{Assets, Entity, EventReader, Local, Query, Res, ResMut, With},
+    prelude::{Assets, Entity, EventReader, EventWriter, Local, Query, Res, ResMut, With},
 };
 use bevy_egui::{egui, EguiContexts};
 
@@ -15,7 +15,10 @@ use crate::{
     components::{ClientEntity, ClientEntityName, PartyInfo, PartyOwner, PlayerCharacter},
     events::PartyEvent,
     resources::{ClientEntityList, GameConnection, SelectedTarget, UiResources},
-    ui::widgets::{Dialog, Gauge},
+    ui::{
+        widgets::{Dialog, Gauge},
+        UiSoundEvent,
+    },
 };
 
 use super::{
@@ -94,6 +97,7 @@ impl Default for UiStatePartySystem {
 pub fn ui_party_system(
     mut ui_state: Local<UiStatePartySystem>,
     mut ui_state_windows: ResMut<UiStateWindows>,
+    mut ui_sound_events: EventWriter<UiSoundEvent>,
     mut egui_context: EguiContexts,
     query_player: Query<PlayerQuery>,
     query_party_member: Query<PartyMemberQuery>,
@@ -241,6 +245,8 @@ pub fn ui_party_system(
     let mut response_leave_button = None;
     let mut response_option_button = None;
 
+    ui_state_windows.party_open = player.party_info.is_some();
+
     if let Some(party_info) = player.party_info {
         let player_is_owner = matches!(party_info.owner, PartyOwner::Player);
 
@@ -255,6 +261,7 @@ pub fn ui_party_system(
                 dialog.draw(
                     ui,
                     DataBindings {
+                        sound_events: Some(&mut ui_sound_events),
                         gauge: &mut [(IID_PARTY_XP_GAUGE, &0.5, "50%")],
                         response: &mut [
                             (IID_BTN_ENTRUST, &mut response_entrust_button),

@@ -1,4 +1,4 @@
-use bevy::prelude::{Assets, Local, Query, Res, ResMut, With};
+use bevy::prelude::{Assets, EventWriter, Local, Query, Res, ResMut, With};
 use bevy_egui::{egui, EguiContexts};
 use rose_data::ClanMemberPosition;
 
@@ -7,7 +7,7 @@ use crate::{
     resources::{GameData, UiResources},
     ui::{
         widgets::{DataBindings, Dialog, DrawText},
-        UiStateWindows,
+        UiSoundEvent, UiStateWindows,
     },
 };
 
@@ -62,6 +62,7 @@ pub fn ui_clan_system(
     query_clan: Query<(&Clan, &ClanMembership), With<PlayerCharacter>>,
     mut ui_state: Local<UiStateClan>,
     mut ui_state_windows: ResMut<UiStateWindows>,
+    mut ui_sound_events: EventWriter<UiSoundEvent>,
     ui_resources: Res<UiResources>,
     dialog_assets: Res<Assets<Dialog>>,
     game_data: Res<GameData>,
@@ -98,6 +99,7 @@ pub fn ui_clan_system(
             dialog.draw(
                 ui,
                 DataBindings {
+                    sound_events: Some(&mut ui_sound_events),
                     response: &mut [(IID_BTN_CLOSE, &mut response_close_button)],
                     tabs: &mut [(IID_TABBEDPANE, &mut ui_state.current_tab)],
                     scroll: &mut [(

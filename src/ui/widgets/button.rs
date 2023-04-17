@@ -1,9 +1,11 @@
 use bevy_egui::{egui, egui::Widget};
 use serde::Deserialize;
 
+use rose_data::SoundId;
+
 use crate::resources::{UiResources, UiSprite};
 
-use super::{DataBindings, DrawWidget, LoadWidget};
+use super::{dialog::deserialize_sound_id, DataBindings, DrawWidget, LoadWidget};
 
 #[derive(Clone, Default, Deserialize)]
 #[serde(rename = "BUTTON")]
@@ -37,10 +39,12 @@ pub struct Button {
     pub blink_sprite_name: String,
     #[serde(rename = "DISABLEGID")]
     pub disable_sprite_name: String,
+    #[serde(deserialize_with = "deserialize_sound_id")]
     #[serde(rename = "OVERSID")]
-    pub over_sound_id: i32,
+    pub over_sound_id: Option<SoundId>,
+    #[serde(deserialize_with = "deserialize_sound_id")]
     #[serde(rename = "CLICKSID")]
-    pub click_sound_id: i32,
+    pub click_sound_id: Option<SoundId>,
     #[serde(rename = "NOIMAGE")]
     pub no_image: i32,
 
@@ -99,6 +103,12 @@ impl DrawWidget for Button {
 
             if let Some(sprite) = sprite {
                 sprite.draw(ui, rect.min);
+            }
+
+            if response.clicked() {
+                if let Some(click_sound_id) = self.click_sound_id {
+                    bindings.emit_sound(click_sound_id);
+                }
             }
 
             let label = bindings.get_label(self.id);

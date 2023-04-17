@@ -1,6 +1,6 @@
 use bevy::{
     ecs::query::WorldQuery,
-    prelude::{Assets, Local, Query, Res, ResMut, With},
+    prelude::{Assets, EventWriter, Local, Query, Res, ResMut, With},
 };
 use bevy_egui::{egui, EguiContexts};
 
@@ -14,7 +14,7 @@ use crate::{
         tooltips::{PlayerTooltipQuery, PlayerTooltipQueryItem, SkillTooltipType},
         ui_add_skill_tooltip,
         widgets::{DataBindings, Dialog, DrawWidget, Skill, Widget},
-        DragAndDropId, DragAndDropSlot, UiStateWindows,
+        DragAndDropId, DragAndDropSlot, UiSoundEvent, UiStateWindows,
     },
 };
 
@@ -168,6 +168,7 @@ pub fn ui_skill_tree_system(
     mut egui_context: EguiContexts,
     mut ui_state: Local<UiStateSkillTree>,
     mut ui_state_windows: ResMut<UiStateWindows>,
+    mut ui_sound_events: EventWriter<UiSoundEvent>,
     query_player: Query<PlayerQuery, With<PlayerCharacter>>,
     query_player_tooltip: Query<PlayerTooltipQuery, With<PlayerCharacter>>,
     game_data: Res<GameData>,
@@ -226,6 +227,7 @@ pub fn ui_skill_tree_system(
             dialog.draw(
                 ui,
                 DataBindings {
+                    sound_events: Some(&mut ui_sound_events),
                     visible: &mut [
                         (IID_TEXT_SOLDIER, (player.character_info.job / 100) == 1),
                         (IID_TEXT_MUSE, (player.character_info.job / 100) == 2),

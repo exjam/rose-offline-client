@@ -46,7 +46,9 @@ mod ui_server_select_system;
 mod ui_settings_system;
 mod ui_skill_list_system;
 mod ui_skill_tree_system;
+mod ui_sound_event_system;
 mod ui_status_effects_system;
+mod ui_window_sound_system;
 pub mod widgets;
 
 #[derive(Default, Resource)]
@@ -59,7 +61,14 @@ pub struct UiStateWindows {
     pub quest_list_open: bool,
     pub settings_open: bool,
     pub menu_open: bool,
+    pub party_open: bool,
     pub party_options_open: bool,
+
+    // Below are only opened via in game events rather than directly
+    pub bank_open: bool,
+    pub create_clan_open: bool,
+
+    // Test ui
     pub selected_target_ui_open: bool,
 }
 
@@ -112,5 +121,7 @@ pub use ui_server_select_system::ui_server_select_system;
 pub use ui_settings_system::ui_settings_system;
 pub use ui_skill_list_system::ui_skill_list_system;
 pub use ui_skill_tree_system::ui_skill_tree_system;
+pub use ui_sound_event_system::{ui_sound_event_system, UiSoundEvent};
 pub use ui_status_effects_system::ui_status_effects_system;
+pub use ui_window_sound_system::ui_window_sound_system;
 pub use widgets::DataBindings;

@@ -1,13 +1,15 @@
-use bevy::prelude::{Assets, Query, Res, With};
+use bevy::prelude::{Assets, EventWriter, Query, Res, With};
 use bevy_egui::{egui, EguiContexts};
 use rose_game_common::messages::client::{ClientMessage, ReviveRequestType};
 
 use crate::{
     components::{Dead, PlayerCharacter},
     resources::{GameConnection, UiResources},
+    ui::{
+        widgets::{DataBindings, Dialog},
+        UiSoundEvent,
+    },
 };
-
-use super::{widgets::Dialog, DataBindings};
 
 const IID_BTN_SAVE_POSITION: i32 = 3;
 const IID_BTN_REVIVE_POSITION: i32 = 4;
@@ -16,6 +18,7 @@ pub fn ui_respawn_system(
     query_player_dead: Query<&Dead, With<PlayerCharacter>>,
     dialog_assets: Res<Assets<Dialog>>,
     ui_resources: Res<UiResources>,
+    mut ui_sound_events: EventWriter<UiSoundEvent>,
     mut egui_context: EguiContexts,
     game_connection: Option<Res<GameConnection>>,
 ) {
@@ -49,6 +52,7 @@ pub fn ui_respawn_system(
             dialog.draw(
                 ui,
                 DataBindings {
+                    sound_events: Some(&mut ui_sound_events),
                     response: &mut [
                         (IID_BTN_SAVE_POSITION, &mut response_save_position),
                         (IID_BTN_REVIVE_POSITION, &mut response_revive_position),

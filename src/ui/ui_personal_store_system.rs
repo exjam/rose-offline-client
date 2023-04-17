@@ -19,7 +19,7 @@ use crate::{
         tooltips::{PlayerTooltipQuery, PlayerTooltipQueryItem},
         ui_add_item_tooltip,
         widgets::{DataBindings, Dialog},
-        DragAndDropId, DragAndDropSlot, UiStateDragAndDrop,
+        DragAndDropId, DragAndDropSlot, UiSoundEvent, UiStateDragAndDrop,
     },
 };
 
@@ -126,6 +126,7 @@ pub fn ui_personal_store_system(
     mut egui_context: EguiContexts,
     mut ui_state: Local<UiPersonalStoreState>,
     mut ui_state_dnd: ResMut<UiStateDragAndDrop>,
+    mut ui_sound_events: EventWriter<UiSoundEvent>,
     mut personal_store_events: EventReader<PersonalStoreEvent>,
     query_personal_store: Query<(&ClientEntity, &PersonalStore, &Position), With<PersonalStore>>,
     query_player: Query<&Position, With<PlayerCharacter>>,
@@ -271,6 +272,7 @@ pub fn ui_personal_store_system(
             dialog.draw(
                 ui,
                 DataBindings {
+                    sound_events: Some(&mut ui_sound_events),
                     radio: &mut [(IID_RADIOBOX, &mut ui_state.selected_tab)],
                     response: &mut [(IID_BTN_CLOSE, &mut response_close_button)],
                     ..Default::default()

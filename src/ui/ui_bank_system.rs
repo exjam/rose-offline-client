@@ -18,7 +18,7 @@ use crate::{
         tooltips::{PlayerTooltipQuery, PlayerTooltipQueryItem},
         ui_add_item_tooltip,
         widgets::{DataBindings, Dialog},
-        DragAndDropId, DragAndDropSlot, UiStateDragAndDrop, UiStateWindows,
+        DragAndDropId, DragAndDropSlot, UiSoundEvent, UiStateDragAndDrop, UiStateWindows,
     },
 };
 
@@ -33,7 +33,6 @@ const BANK_SLOTS_PER_PAGE: usize = 40;
 const BANK_SLOTS_PER_ROW: usize = 8;
 
 pub struct UiStateBank {
-    bank_open: bool,
     bank_entity: Option<Entity>,
     current_page: i32,
 }
@@ -41,7 +40,6 @@ pub struct UiStateBank {
 impl Default for UiStateBank {
     fn default() -> Self {
         Self {
-            bank_open: false,
             bank_entity: None,
             current_page: IID_BTN_TAB1,
         }
@@ -116,6 +114,7 @@ pub fn ui_bank_system(
     mut ui_state: Local<UiStateBank>,
     mut ui_state_dnd: ResMut<UiStateDragAndDrop>,
     mut ui_state_windows: ResMut<UiStateWindows>,
+    mut ui_sound_events: EventWriter<UiSoundEvent>,
     ui_resources: Res<UiResources>,
     dialog_assets: Res<Assets<Dialog>>,
     mut bank_events: EventReader<BankEvent>,
@@ -147,7 +146,7 @@ pub fn ui_bank_system(
                 }
             }
             BankEvent::Show => {
-                ui_state.bank_open = true;
+                ui_state_windows.bank_open = true;
 
                 if !ui_state_windows.inventory_open {
                     ui_state_windows.inventory_open = true;
@@ -156,7 +155,7 @@ pub fn ui_bank_system(
         }
     }
 
-    if !ui_state.bank_open {
+    if !ui_state_windows.bank_open {
         return;
     }
 
@@ -179,7 +178,7 @@ pub fn ui_bank_system(
             .distance(bank_position.position.xy())
             > 1000.0
         {
-            ui_state.bank_open = false;
+            ui_state_windows.bank_open = false;
             ui_state.bank_entity = None;
             return;
         }
@@ -197,6 +196,7 @@ pub fn ui_bank_system(
             dialog.draw(
                 ui,
                 DataBindings {
+                    sound_events: Some(&mut ui_sound_events),
                     radio: &mut [(IID_RADIOBOX, &mut ui_state.current_page)],
                     response: &mut [(IID_BTN_CLOSE, &mut response_close_button)],
                     label: &mut [
@@ -266,6 +266,6 @@ pub fn ui_bank_system(
         });
 
     if response_close_button.map_or(false, |r| r.clicked()) {
-        ui_state.bank_open = false;
+        ui_state_windows.bank_open = false;
     }
 }

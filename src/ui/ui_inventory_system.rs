@@ -18,7 +18,8 @@ use crate::{
         tooltips::{PlayerTooltipQuery, PlayerTooltipQueryItem},
         ui_add_item_tooltip,
         widgets::{DataBindings, Dialog, Widget},
-        DialogInstance, DragAndDropId, DragAndDropSlot, UiStateDragAndDrop, UiStateWindows,
+        DialogInstance, DragAndDropId, DragAndDropSlot, UiSoundEvent, UiStateDragAndDrop,
+        UiStateWindows,
     },
 };
 
@@ -459,6 +460,7 @@ pub fn ui_inventory_system(
     mut ui_state_inventory: Local<UiStateInventory>,
     mut ui_state_dnd: ResMut<UiStateDragAndDrop>,
     mut ui_state_windows: ResMut<UiStateWindows>,
+    mut ui_sound_events: EventWriter<UiSoundEvent>,
     query_player: Query<PlayerQuery, With<PlayerCharacter>>,
     query_player_tooltip: Query<PlayerTooltipQuery, With<PlayerCharacter>>,
     dialog_assets: Res<Assets<Dialog>>,
@@ -501,6 +503,7 @@ pub fn ui_inventory_system(
             dialog.draw(
                 ui,
                 DataBindings {
+                    sound_events: Some(&mut ui_sound_events),
                     tabs: &mut [
                         (
                             IID_TABBEDPANE_EQUIP,

@@ -1,6 +1,6 @@
 use bevy::{
     ecs::query::WorldQuery,
-    prelude::{Assets, Entity, Query, Res, ResMut, With},
+    prelude::{Assets, Entity, EventWriter, Query, Res, ResMut, With},
 };
 use bevy_egui::{egui, EguiContexts};
 use rose_data::{AmmoIndex, EquipmentIndex, Item, ItemClass};
@@ -15,7 +15,7 @@ use crate::{
         tooltips::{PlayerTooltipQuery, PlayerTooltipQueryItem},
         ui_add_item_tooltip,
         widgets::{DataBindings, Dialog, DrawText},
-        DragAndDropId, DragAndDropSlot, UiStateWindows,
+        DragAndDropId, DragAndDropSlot, UiSoundEvent, UiStateWindows,
     },
 };
 
@@ -106,6 +106,7 @@ fn add_equipped_weapon_slot(
 pub fn ui_player_info_system(
     mut egui_context: EguiContexts,
     mut ui_state_windows: ResMut<UiStateWindows>,
+    mut ui_sound_events: EventWriter<UiSoundEvent>,
     query_player: Query<PlayerQuery, With<PlayerCharacter>>,
     query_player_tooltip: Query<PlayerTooltipQuery, With<PlayerCharacter>>,
     game_data: Res<GameData>,
@@ -146,6 +147,7 @@ pub fn ui_player_info_system(
             dialog.draw(
                 ui,
                 DataBindings {
+                    sound_events: Some(&mut ui_sound_events),
                     response: &mut [(IID_BTN_MENU, &mut response_menu_button)],
                     gauge: &mut [
                         (

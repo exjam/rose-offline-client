@@ -18,7 +18,7 @@ use crate::{
         ui_add_item_tooltip, ui_add_skill_tooltip,
         ui_inventory_system::GetItem,
         widgets::{DataBindings, Dialog, Widget},
-        DialogInstance, DragAndDropId, DragAndDropSlot, UiStateDragAndDrop,
+        DialogInstance, DragAndDropId, DragAndDropSlot, UiSoundEvent, UiStateDragAndDrop,
     },
 };
 
@@ -200,6 +200,7 @@ pub fn ui_hotbar_system(
     mut egui_context: EguiContexts,
     mut ui_state_hot_bar: Local<UiStateHotBar>,
     mut ui_state_dnd: ResMut<UiStateDragAndDrop>,
+    mut ui_sound_events: EventWriter<UiSoundEvent>,
     mut query_player: Query<PlayerQuery, With<PlayerCharacter>>,
     query_player_tooltip: Query<PlayerTooltipQuery, With<PlayerCharacter>>,
     mut player_command_events: EventWriter<PlayerCommandEvent>,
@@ -275,6 +276,7 @@ pub fn ui_hotbar_system(
             dialog.draw(
                 ui,
                 DataBindings {
+                    sound_events: Some(&mut ui_sound_events),
                     visible: &mut [
                         (IID_BG_HORIZONTAL, !is_vertical),
                         (IID_BTN_HORIZONTAL_PREV, !is_vertical),
