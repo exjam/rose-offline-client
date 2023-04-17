@@ -1,7 +1,7 @@
 #![allow(clippy::type_complexity)]
 #![allow(clippy::too_many_arguments)]
 
-use animation::{RoseAnimationPlugin, RoseAnimationSystem};
+use animation::RoseAnimationPlugin;
 use bevy::{
     core_pipeline::{bloom::BloomSettings, clear_color::ClearColor},
     ecs::event::Events,
@@ -602,22 +602,18 @@ fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsC
 
     app.add_system(auto_login_system)
         .add_system(background_music_system)
-        .add_system(character_model_update_system.before(RoseAnimationSystem))
+        .add_system(character_model_update_system)
         .add_system(character_model_add_collider_system.after(character_model_update_system))
         .add_system(personal_store_model_system)
         .add_system(personal_store_model_add_collider_system.after(personal_store_model_system))
-        .add_system(npc_model_update_system.before(RoseAnimationSystem))
+        .add_system(npc_model_update_system)
         .add_system(npc_model_add_collider_system.after(npc_model_update_system))
         .add_system(item_drop_model_system)
         .add_system(item_drop_model_add_collider_system.after(item_drop_model_system))
         .add_system(particle_sequence_system)
         .add_system(effect_system)
-        .add_system(
-            animation_effect_system
-                .after(RoseAnimationSystem)
-                .before(spawn_effect_system),
-        )
-        .add_system(animation_sound_system.after(RoseAnimationSystem))
+        .add_system(animation_effect_system.before(spawn_effect_system))
+        .add_system(animation_sound_system)
         .add_system(
             projectile_system
                 .after(animation_effect_system)
@@ -712,9 +708,10 @@ fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsC
 
     // character_model_blink_system in PostUpdate to avoid any conflicts with model destruction
     // e.g. through the character select exit system.
-    app.add_system(character_model_blink_system.in_base_set(GameStages::AfterUpdate));
+    app.add_system(character_model_blink_system.in_base_set(CoreSet::PostUpdate));
 
-    // vehicle_model_system in PostUpdate to avoid any conflicts with model destruction
+    // vehicle_model_system in after ::Update but before ::PostUpdate to avoid any conflicts,
+    // with model destruction but to also be before global transform is calculated.
     app.add_system(vehicle_model_system.in_base_set(GameStages::AfterUpdate));
     app.add_system(
         vehicle_sound_system
@@ -817,7 +814,7 @@ fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsC
         (
             ability_values_system,
             clan_system,
-            command_system.after(RoseAnimationSystem),
+            command_system,
             facing_direction_system.after(command_system),
             update_position_system.before(directional_light_system),
             collision_player_system_join_zoin

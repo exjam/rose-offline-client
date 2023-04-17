@@ -1,5 +1,6 @@
-use bevy::prelude::{
-    AddAsset, App, CoreSet, IntoSystemConfigs, IntoSystemSetConfig, Plugin, SystemSet,
+use bevy::{
+    prelude::{AddAsset, App, CoreSet, IntoSystemConfigs, IntoSystemSetConfig, Plugin, SystemSet},
+    transform::TransformSystem,
 };
 
 mod animation_state;
@@ -47,15 +48,19 @@ impl Plugin for RoseAnimationPlugin {
             .register_type::<SkeletalAnimation>()
             .register_type::<TransformAnimation>();
 
-        app.configure_set(RoseAnimationSystem.in_base_set(CoreSet::Update))
-            .add_systems(
-                (
-                    camera_animation_system,
-                    mesh_animation_system,
-                    skeletal_animation_system,
-                    transform_animation_system,
-                )
-                    .in_set(RoseAnimationSystem),
-            );
+        app.configure_set(
+            RoseAnimationSystem
+                .in_base_set(CoreSet::PostUpdate)
+                .before(TransformSystem::TransformPropagate),
+        )
+        .add_systems(
+            (
+                camera_animation_system,
+                mesh_animation_system,
+                skeletal_animation_system,
+                transform_animation_system,
+            )
+                .in_set(RoseAnimationSystem),
+        );
     }
 }
