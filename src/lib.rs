@@ -420,6 +420,7 @@ pub fn run_zone_viewer(config: &Config, zone_id: Option<ZoneId>) {
 enum GameStages {
     ZoneChange,
     ZoneChangeFlush,
+    AfterUpdate,
     DebugRenderPreFlush,
     DebugRender,
 }
@@ -711,13 +712,13 @@ fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsC
 
     // character_model_blink_system in PostUpdate to avoid any conflicts with model destruction
     // e.g. through the character select exit system.
-    app.add_system(character_model_blink_system.in_base_set(CoreSet::PostUpdate));
+    app.add_system(character_model_blink_system.in_base_set(GameStages::AfterUpdate));
 
     // vehicle_model_system in PostUpdate to avoid any conflicts with model destruction
-    app.add_system(vehicle_model_system.in_base_set(CoreSet::PostUpdate));
+    app.add_system(vehicle_model_system.in_base_set(GameStages::AfterUpdate));
     app.add_system(
         vehicle_sound_system
-            .in_base_set(CoreSet::PostUpdate)
+            .in_base_set(GameStages::AfterUpdate)
             .after(vehicle_model_system),
     );
 
@@ -928,6 +929,12 @@ fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsC
         "custom" => {}
         unknown => panic!("Unknown game data version {}", unknown),
     };
+
+    app.configure_sets(
+        (GameStages::AfterUpdate,)
+            .after(CoreSet::UpdateFlush)
+            .before(PhysicsSet::SyncBackend),
+    );
 
     app.configure_sets(
         (GameStages::ZoneChange, GameStages::ZoneChangeFlush)
