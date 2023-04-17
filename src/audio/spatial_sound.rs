@@ -5,9 +5,13 @@ use bevy::{
         AssetServer, Assets, Camera3d, Changed, Commands, Component, Entity, GlobalTransform,
         Handle, Local, Query, Res, ResMut, With,
     },
+    time::Time,
 };
 
-use super::{AudioSource, OddioContext, SoundGain, SoundRadius, SoundVelocity, StreamingSound};
+use crate::{
+    audio::{AudioSource, OddioContext, SoundGain, SoundRadius, StreamingSound},
+    components::PlayerCharacter,
+};
 
 struct SpatialControlHandle(
     oddio::Handle<oddio::SpatialBuffered<oddio::Stop<oddio::Gain<oddio::Stream<f32>>>>>,
@@ -38,6 +42,7 @@ pub struct SpatialSound {
     repeating: bool,
     control_handle: Option<SpatialControlHandle>,
     streaming_sound: Option<StreamingSound>,
+    last_position: Option<Vec3>,
 }
 
 #[allow(dead_code)]
@@ -48,6 +53,7 @@ impl SpatialSound {
             repeating: false,
             control_handle: None,
             streaming_sound: None,
+            last_position: None,
         }
     }
 
@@ -57,6 +63,7 @@ impl SpatialSound {
             repeating: true,
             control_handle: None,
             streaming_sound: None,
+            last_position: None,
         }
     }
 }
@@ -74,11 +81,6 @@ pub fn spatial_sound_gain_changed_system(
     }
 }
 
-#[derive(Default)]
-pub struct CameraLastPosition {
-    pub position: Option<Vec3>,
-}
-
 pub fn spatial_sound_system(
     mut commands: Commands,
     mut context: ResMut<OddioContext>,
@@ -90,40 +92,66 @@ pub fn spatial_sound_system(
         &mut SpatialSound,
         &GlobalTransform,
         Option<&SoundRadius>,
-        Option<&SoundVelocity>,
         Option<&SoundGain>,
     )>,
-    mut last_camera_position: Local<CameraLastPosition>,
+    mut last_listener_position: Local<Option<Vec3>>,
+    query_player: Query<&GlobalTransform, With<PlayerCharacter>>,
+    time: Res<Time>,
 ) {
     let player = &mut context.spatial;
-    let listener_transform = camera.single();
-    let (_, listener_rotation, listener_position) =
-        listener_transform.to_scale_rotation_translation();
+    let (_, camera_rotation, camera_position) = camera.single().to_scale_rotation_translation();
 
-    // We just guess velocity based on cameras last movement...
-    // TODO: This will be garbage on teleport
-    let listener_velocity = if let Some(last_listener_position) = last_camera_position.position {
+    // Use player position as listener position (fallback to camera if no player exists)
+    let listener_position = query_player
+        .get_single()
+        .map_or(camera_position, |player_transform| {
+            player_transform.translation()
+        });
+
+    // Guess listener velocity by distance between current and last position.
+    let listener_velocity = if let Some(last_listener_position) = *last_listener_position {
         listener_position - last_listener_position
     } else {
         Vec3::ZERO
     };
-    last_camera_position.position = Some(listener_position);
+    *last_listener_position = Some(listener_position);
 
     player
         .control()
-        .set_listener_rotation(listener_rotation.to_array().into());
+        .set_listener_rotation(camera_rotation.to_array().into());
 
-    for (entity, mut spatial_sound, global_transform, sound_radius, sound_velocity, sound_gain) in
+    for (entity, mut spatial_sound, global_transform, sound_radius, sound_gain) in
         query_spatial_sounds.iter_mut()
     {
-        let velocity = sound_velocity.map(|v| v.0).unwrap_or(Vec3::ZERO) - listener_velocity;
-        let position = global_transform.translation() - listener_position;
         let repeating = spatial_sound.repeating;
         let SpatialSound {
             control_handle,
             streaming_sound,
+            last_position,
             ..
         } = &mut *spatial_sound;
+
+        let sound_global_translation = global_transform.translation();
+
+        let spatial_velocity = {
+            // Guess sound velocity by distance between current and last position.
+            let sound_velocity = if let Some(last_position) = last_position {
+                sound_global_translation - *last_position
+            } else {
+                Vec3::ZERO
+            };
+            *last_position = Some(sound_global_translation);
+
+            // Velocity is relative to listener velocity
+            let relative_velocity = sound_velocity - listener_velocity;
+
+            // Velocity is in metres per second
+            relative_velocity / time.delta_seconds()
+        };
+
+        // Adjust spatial position to be in direction of camera, but distance from player
+        let spatial_position = (sound_global_translation - camera_position).normalize()
+            * (sound_global_translation - listener_position).length();
 
         if let Some(handle) = control_handle.as_mut() {
             let has_more_audio = if let Some(streaming_sound) = streaming_sound.as_mut() {
@@ -133,8 +161,8 @@ pub fn spatial_sound_system(
             };
 
             handle.spatial_control().set_motion(
-                position.to_array().into(),
-                velocity.to_array().into(),
+                spatial_position.to_array().into(),
+                spatial_velocity.to_array().into(),
                 false,
             );
 
@@ -159,8 +187,8 @@ pub fn spatial_sound_system(
             let mut handle = SpatialControlHandle(player.control().play_buffered(
                 gain_signal,
                 oddio::SpatialOptions {
-                    position: position.to_array().into(),
-                    velocity: velocity.to_array().into(),
+                    position: spatial_position.to_array().into(),
+                    velocity: spatial_velocity.to_array().into(),
                     radius: sound_radius.map(|x| x.0).unwrap_or(4.0),
                 },
                 500.0,
@@ -169,8 +197,8 @@ pub fn spatial_sound_system(
             ));
 
             handle.spatial_control().set_motion(
-                position.to_array().into(),
-                velocity.to_array().into(),
+                spatial_position.to_array().into(),
+                spatial_velocity.to_array().into(),
                 true,
             );
 

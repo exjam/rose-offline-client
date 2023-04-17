@@ -1,5 +1,5 @@
 use bevy::prelude::{
-    AddAsset, App, Component, CoreSet, IntoSystemConfig, IntoSystemConfigs, Plugin, Resource, Vec3,
+    AddAsset, App, Component, CoreSet, IntoSystemConfig, IntoSystemConfigs, Plugin, Resource,
 };
 
 mod audio_source;
@@ -15,16 +15,6 @@ pub struct SoundRadius(pub f32);
 impl SoundRadius {
     pub fn new(radius: f32) -> Self {
         Self(radius)
-    }
-}
-
-#[derive(Component)]
-pub struct SoundVelocity(pub Vec3);
-
-impl SoundVelocity {
-    #[allow(dead_code)]
-    pub fn new(velocity: Vec3) -> Self {
-        Self(velocity)
     }
 }
 
