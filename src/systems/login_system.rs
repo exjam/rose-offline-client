@@ -1,8 +1,6 @@
 use bevy::{
-    math::Vec3,
     prelude::{
-        AssetServer, Camera3d, Commands, Entity, EventReader, EventWriter, Query, Res, ResMut,
-        Transform, With,
+        AssetServer, Camera3d, Commands, Entity, EventReader, EventWriter, Query, Res, ResMut, With,
     },
     window::{CursorGrabMode, PrimaryWindow, Window},
 };
@@ -35,10 +33,6 @@ pub fn login_state_enter_system(
     for entity in query_cameras.iter() {
         commands
             .entity(entity)
-            .insert(
-                Transform::from_xyz(5240.0, 10.0, -5400.0)
-                    .looking_at(Vec3::new(5200.0, 35.0, -5300.0), Vec3::Y),
-            )
             .remove::<FreeCamera>()
             .remove::<OrbitCamera>()
             .insert(CameraAnimation::repeat(

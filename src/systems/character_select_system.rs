@@ -2,11 +2,10 @@ use std::time::{Duration, Instant};
 
 use bevy::{
     input::Input,
-    math::Vec3,
     prelude::{
         AssetServer, Camera, Camera3d, Commands, Component, ComputedVisibility,
         DespawnRecursiveExt, Entity, EventReader, EventWriter, GlobalTransform, Handle, Local,
-        MouseButton, NextState, Query, Res, ResMut, Resource, Transform, Visibility, With,
+        MouseButton, NextState, Query, Res, ResMut, Resource, Visibility, With,
     },
     render::{camera::Projection, mesh::skinning::SkinnedMesh},
     window::{CursorGrabMode, PrimaryWindow, Window},
@@ -62,10 +61,6 @@ pub fn character_select_enter_system(
     for entity in query_cameras.iter() {
         commands
             .entity(entity)
-            .insert(
-                Transform::from_xyz(5200.0, 3.4, -5220.0)
-                    .looking_at(Vec3::new(5200.0, 3.4, -5200.0), Vec3::Y),
-            )
             .remove::<FreeCamera>()
             .remove::<OrbitCamera>()
             .insert(CameraAnimation::once(
