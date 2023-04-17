@@ -343,7 +343,7 @@ pub fn animation_effect_system(
                     });
 
                 if skill_data.hit_effect_file_id.is_some() {
-                    hit_events.send(HitEvent::with_skill(
+                    hit_events.send(HitEvent::with_skill_damage(
                         event.entity,
                         target_entity.unwrap_or(event.entity),
                         skill_data.id,

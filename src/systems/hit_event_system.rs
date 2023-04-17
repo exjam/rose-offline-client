@@ -102,6 +102,7 @@ pub fn hit_event_system(
         if event.apply_damage {
             let mut i = 0;
             let mut is_killed = false;
+            let mut has_damage = false;
             while i < defender.pending_damage_list.len() {
                 if client_entity_list.get(defender.pending_damage_list[i].attacker)
                     == Some(event.attacker)
@@ -115,19 +116,22 @@ pub fn hit_event_system(
                     damage.is_critical |= pending_damage.damage.is_critical;
                     damage.apply_hit_stun |= pending_damage.damage.apply_hit_stun;
                     is_killed |= pending_damage.is_kill;
+                    has_damage = true;
                 } else {
                     i += 1;
                 }
             }
 
-            apply_damage(
-                &mut commands,
-                &mut defender,
-                damage,
-                is_killed,
-                &damage_digits_spawner,
-                &mut client_entity_list,
-            );
+            if has_damage || !event.ignore_miss {
+                apply_damage(
+                    &mut commands,
+                    &mut defender,
+                    damage,
+                    is_killed,
+                    &damage_digits_spawner,
+                    &mut client_entity_list,
+                );
+            }
         }
 
         if let Some(effect_data) = event

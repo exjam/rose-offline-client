@@ -8,6 +8,7 @@ pub struct HitEvent {
     pub effect_id: Option<EffectId>,
     pub skill_id: Option<SkillId>,
     pub apply_damage: bool,
+    pub ignore_miss: bool,
 }
 
 impl HitEvent {
@@ -18,16 +19,29 @@ impl HitEvent {
             effect_id,
             skill_id: None,
             apply_damage: true,
+            ignore_miss: false,
         }
     }
 
-    pub fn with_skill(attacker: Entity, defender: Entity, skill_id: SkillId) -> Self {
+    pub fn with_skill_damage(attacker: Entity, defender: Entity, skill_id: SkillId) -> Self {
         Self {
             attacker,
             defender,
             effect_id: None,
             skill_id: Some(skill_id),
             apply_damage: true,
+            ignore_miss: false,
+        }
+    }
+
+    pub fn with_skill_effect(attacker: Entity, defender: Entity, skill_id: SkillId) -> Self {
+        Self {
+            attacker,
+            defender,
+            effect_id: None,
+            skill_id: Some(skill_id),
+            apply_damage: true,
+            ignore_miss: true,
         }
     }
 

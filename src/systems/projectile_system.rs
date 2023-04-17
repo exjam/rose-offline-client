@@ -105,7 +105,7 @@ pub fn projectile_system(
             if let Some(target) = target {
                 if let Some(skill_id) = projectile.skill_id {
                     hit_events.send(
-                        HitEvent::with_skill(projectile.source, target.entity, skill_id)
+                        HitEvent::with_skill_damage(projectile.source, target.entity, skill_id)
                             .apply_damage(projectile.apply_damage),
                     );
                 } else {
