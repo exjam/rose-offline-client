@@ -82,6 +82,23 @@ impl DrawWidget for Scrollbar {
             }
 
             bindings.set_response(self.id, response);
+
+            if ui.rect_contains_pointer(rect) {
+                let scroll_delta = ui.input(|input| input.scroll_delta);
+                if let Some((scroll_index, scroll_range, extent)) = bindings
+                    .get_scroll(self.listbox_id)
+                    .as_mut()
+                    .map(|(scroll_index, scroll_range, extent)| {
+                        (scroll_index, scroll_range.clone(), *extent)
+                    })
+                {
+                    if scroll_delta.y > 0.0 && **scroll_index > scroll_range.start {
+                        **scroll_index -= 1;
+                    } else if scroll_delta.y < 0.0 && **scroll_index < (scroll_range.end - extent) {
+                        **scroll_index += 1;
+                    }
+                }
+            }
         }
     }
 }
