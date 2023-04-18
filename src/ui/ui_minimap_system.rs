@@ -13,7 +13,7 @@ use rose_data::ZoneId;
 use rose_game_common::components::{CharacterInfo, Team};
 
 use crate::{
-    components::{PlayerCharacter, Position},
+    components::{PartyInfo, PlayerCharacter, Position},
     resources::{CurrentZone, GameData, UiResources, UiSpriteSheetType},
     ui::{
         widgets::{DataBindings, Dialog, Widget},
@@ -87,8 +87,8 @@ pub fn ui_minimap_system(
     mut egui_context: EguiContexts,
     mut ui_state: Local<UiStateMinimap>,
     mut ui_sound_events: EventWriter<UiSoundEvent>,
-    query_player: Query<(&Position, &Team), With<PlayerCharacter>>,
-    query_characters: Query<(&Position, &Team), (Without<PlayerCharacter>, With<CharacterInfo>)>,
+    query_player: Query<(&Position, &Team, Option<&PartyInfo>), With<PlayerCharacter>>,
+    query_characters: Query<(&CharacterInfo, &Position, &Team), Without<PlayerCharacter>>,
     asset_server: Res<AssetServer>,
     query_camera: Query<&Transform, With<Camera3d>>,
     images: Res<Assets<Image>>,
@@ -180,11 +180,11 @@ pub fn ui_minimap_system(
         }
     }
 
-    let (player_position, player_team) =
-        if let Ok((player_position, player_team)) = query_player.get_single() {
-            (Some(player_position), Some(player_team))
+    let (player_position, player_team, player_party) =
+        if let Ok((player_position, player_team, player_party)) = query_player.get_single() {
+            (Some(player_position), Some(player_team), player_party)
         } else {
-            (None, None)
+            (None, None, None)
         };
     let player_position_changed = if let Some(player_position) = player_position {
         if ui_state.minimap_image_size.is_some()
@@ -336,13 +336,21 @@ pub fn ui_minimap_system(
             );
 
             if !minimised {
-                // Draw other players
-                for (character_position, character_team) in query_characters.iter() {
+                let enemy_character_icon = ui_resources.get_sprite_by_index(UiSpriteSheetType::StateIcon, 73);
+                let party_character_icon = ui_resources.get_sprite(UiSpriteSheetType::Ui as i32, "ID_MINIMAP_PARTYMEMBER");
+                let other_character_icon = ui_resources.get_sprite(UiSpriteSheetType::Ui as i32, "ID_OTHER_AVATAR");
+
+                // Draw other characters
+                for (character_info, character_position, character_team) in query_characters.iter() {
                     let icon_image = if player_team.map_or(false, |player_team| character_team.id != player_team.id) {
-                        ui_resources.get_sprite_by_index(UiSpriteSheetType::StateIcon, 73)
+                        enemy_character_icon.as_ref()
+                    } else if player_party.map_or(false, |player_party|
+                            player_party.members
+                                .iter()
+                                .any(|member| member.get_character_id() == character_info.unique_id)) {
+                        party_character_icon.as_ref()
                     } else {
-                        // TODO: Party member use image UiSpriteSheetType::Ui "ID_MINIMAP_PARTYMEMBER"
-                        ui_resources.get_sprite(UiSpriteSheetType::Ui as i32, "ID_OTHER_AVATAR")
+                        other_character_icon.as_ref()
                     };
                     let Some(icon_image) = icon_image else {
                         continue;
