@@ -29,7 +29,7 @@ use bevy_rapier3d::prelude::{
 use log::warn;
 use thiserror::Error;
 
-use rose_data::{SkyboxData, WarpGateId, ZoneId, ZoneList};
+use rose_data::{NpcId, SkyboxData, WarpGateId, ZoneId, ZoneList};
 use rose_file_readers::{
     HimFile, IfoEffectObject, IfoFile, IfoObject, IfoSoundObject, LitFile, LitObject, RoseFile,
     RoseFileReader, StbFile, TilFile, ZonFile, ZonTileRotation, ZscCollisionFlags, ZscEffectType,
@@ -74,6 +74,11 @@ pub struct ZoneLoaderBlock {
     pub lit_deco: Option<LitFile>,
 }
 
+pub struct ZoneNpc {
+    pub position: Vec3,
+    pub npc_id: NpcId,
+}
+
 #[derive(TypeUuid)]
 #[uuid = "596e2c17-f2dd-4276-8df4-1e94dc0d056b"]
 pub struct ZoneLoaderAsset {
@@ -83,6 +88,7 @@ pub struct ZoneLoaderAsset {
     pub zsc_cnst: ZscFile,
     pub zsc_deco: ZscFile,
     pub blocks: Vec<Option<Box<ZoneLoaderBlock>>>,
+    pub npcs: Vec<ZoneNpc>,
 }
 
 impl ZoneLoaderAsset {
@@ -223,10 +229,37 @@ async fn load_zone<'a, 'b>(
         .into_iter()
         .filter_map(|result| result.ok());
 
+    let mut npcs = Vec::new();
     let mut blocks = Vec::new();
     blocks.resize_with(64 * 64, || None);
     for block in zone_blocks_iterator {
         let index = block.block_x + block.block_y * 64;
+
+        if let Some(ifo) = &block.ifo {
+            let objects_offset = Vec3::new(
+                (64.0 / 2.0) * (zon.grid_size * zon.grid_per_patch * 16.0)
+                    + (zon.grid_size * zon.grid_per_patch * 16.0) / 2.0,
+                (64.0 / 2.0) * (zon.grid_size * zon.grid_per_patch * 16.0)
+                    + (zon.grid_size * zon.grid_per_patch * 16.0) / 2.0,
+                0.0,
+            );
+
+            for npc in ifo.npcs.iter() {
+                let Some(npc_id) = NpcId::new(npc.object.object_id as u16) else {
+                    continue;
+                };
+
+                npcs.push(ZoneNpc {
+                    npc_id,
+                    position: Vec3::new(
+                        npc.object.position.x,
+                        npc.object.position.y,
+                        npc.object.position.z,
+                    ) + objects_offset,
+                });
+            }
+        }
+
         blocks[index] = Some(block);
     }
 
@@ -237,6 +270,7 @@ async fn load_zone<'a, 'b>(
         zsc_cnst,
         zsc_deco,
         blocks,
+        npcs,
     }));
     Ok(())
 }

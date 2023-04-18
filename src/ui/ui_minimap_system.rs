@@ -4,21 +4,22 @@ use bevy::{
     math::{Vec2, Vec3Swizzles},
     prelude::{
         AssetServer, Assets, Camera3d, EventWriter, Handle, Image, Local, Query, Res, Transform,
-        With,
+        Vec3, With, Without,
     },
 };
 use bevy_egui::{egui, EguiContexts};
 
 use rose_data::ZoneId;
+use rose_game_common::components::{CharacterInfo, Team};
 
 use crate::{
     components::{PlayerCharacter, Position},
-    resources::{CurrentZone, GameData, UiResources},
+    resources::{CurrentZone, GameData, UiResources, UiSpriteSheetType},
     ui::{
         widgets::{DataBindings, Dialog, Widget},
         UiSoundEvent,
     },
-    zone_loader::ZoneLoaderAsset,
+    zone_loader::{ZoneLoaderAsset, ZoneNpc},
 };
 
 const MAP_BLOCK_PIXELS: f32 = 64.0;
@@ -86,7 +87,8 @@ pub fn ui_minimap_system(
     mut egui_context: EguiContexts,
     mut ui_state: Local<UiStateMinimap>,
     mut ui_sound_events: EventWriter<UiSoundEvent>,
-    player_position: Query<&Position, With<PlayerCharacter>>,
+    query_player: Query<(&Position, &Team), With<PlayerCharacter>>,
+    query_characters: Query<(&Position, &Team), (Without<PlayerCharacter>, With<CharacterInfo>)>,
     asset_server: Res<AssetServer>,
     query_camera: Query<&Transform, With<Camera3d>>,
     images: Res<Assets<Image>>,
@@ -178,7 +180,12 @@ pub fn ui_minimap_system(
         }
     }
 
-    let player_position = player_position.get_single().ok();
+    let (player_position, player_team) =
+        if let Ok((player_position, player_team)) = query_player.get_single() {
+            (Some(player_position), Some(player_team))
+        } else {
+            (None, None)
+        };
     let player_position_changed = if let Some(player_position) = player_position {
         if ui_state.minimap_image_size.is_some()
             && ui_state.last_player_position != player_position.xy()
@@ -210,6 +217,20 @@ pub fn ui_minimap_system(
     let mut response_small_minimise_button = None;
     let minimised = ui_state.minimap_image_size.is_none() || ui_state.is_minimised;
 
+    let map_relative_position = |ui_state: &mut UiStateMinimap, position: Vec3| -> Vec2 {
+        let minimap_player_x = MAP_OUTLINE_PIXELS
+            + f32::max(
+                0.0,
+                (position.x - ui_state.min_world_pos.x) / ui_state.distance_per_pixel,
+            );
+        let minimap_player_y = MAP_OUTLINE_PIXELS
+            + f32::max(
+                0.0,
+                (ui_state.min_world_pos.y - position.y) / ui_state.distance_per_pixel,
+            );
+        Vec2::new(minimap_player_x, minimap_player_y)
+    };
+
     egui::Window::new("Minimap")
         .anchor(egui::Align2::RIGHT_TOP, [0.0, 0.0])
         .frame(egui::Frame::none())
@@ -224,22 +245,9 @@ pub fn ui_minimap_system(
                 ui.min_rect().min + egui::vec2(1.0, 21.0),
                 egui::vec2(minimap_size.x, minimap_size.y),
             );
-            let minimap_player_pos = if let Some(player_position) = player_position {
-                let minimap_player_x = MAP_OUTLINE_PIXELS
-                    + f32::max(
-                        0.0,
-                        (player_position.x - ui_state.min_world_pos.x)
-                            / ui_state.distance_per_pixel,
-                    );
-                let minimap_player_y = MAP_OUTLINE_PIXELS
-                    + f32::max(
-                        0.0,
-                        (ui_state.min_world_pos.y - player_position.y)
-                            / ui_state.distance_per_pixel,
-                    );
-                Some(Vec2::new(minimap_player_x, minimap_player_y))
-            } else {
-                None
+            let minimap_player_pos = player_position.map(|p| map_relative_position(ui_state, p.position));
+            let map_absolute_position = |ui_state: &mut UiStateMinimap, position: Vec3| -> Vec2 {
+                Vec2::new(minimap_rect.min.x, minimap_rect.min.y) + map_relative_position(ui_state, position) - ui_state.scroll
             };
 
             if !minimised {
@@ -328,6 +336,61 @@ pub fn ui_minimap_system(
             );
 
             if !minimised {
+                // Draw other players
+                for (character_position, character_team) in query_characters.iter() {
+                    let icon_image = if player_team.map_or(false, |player_team| character_team.id != player_team.id) {
+                        ui_resources.get_sprite_by_index(UiSpriteSheetType::StateIcon, 73)
+                    } else {
+                        // TODO: Party member use image UiSpriteSheetType::Ui "ID_MINIMAP_PARTYMEMBER"
+                        ui_resources.get_sprite(UiSpriteSheetType::Ui as i32, "ID_OTHER_AVATAR")
+                    };
+                    let Some(icon_image) = icon_image else {
+                        continue;
+                    };
+                    let character_minimap_position = map_absolute_position(ui_state, character_position.position);
+                    let icon_size = Vec2::new(icon_image.width, icon_image.height);
+                    let icon_rect = egui::Rect::from_min_size(
+                        (character_minimap_position - icon_size / 2.0)
+                            .to_array()
+                            .into(),
+                            icon_size.to_array().into(),
+                    );
+
+                    if minimap_rect.contains_rect(icon_rect) {
+                        icon_image.draw(ui, icon_rect.min);
+                    }
+
+                }
+
+                // Draw NPC markers
+                for &ZoneNpc { npc_id, position: npc_position } in current_zone_data.npcs.iter() {
+                    let Some(npc_data) = game_data.npcs.get_npc(npc_id) else {
+                        continue;
+                    };
+                    let Some(icon_image) = ui_resources.get_sprite_by_index(UiSpriteSheetType::StateIcon, npc_data.npc_minimap_icon_index as usize) else {
+                        continue;
+                    };
+                    let npc_minimap_position = map_absolute_position(ui_state, npc_position);
+                    let icon_size = Vec2::new(icon_image.width, icon_image.height);
+                    let icon_rect = egui::Rect::from_min_size(
+                        (npc_minimap_position - icon_size / 2.0)
+                            .to_array()
+                            .into(),
+                            icon_size.to_array().into(),
+                    );
+
+                    if minimap_rect.contains_rect(icon_rect) {
+                        icon_image.draw(ui, icon_rect.min);
+
+                        let response = ui.allocate_rect(
+                            egui::Rect::from_min_size(
+                                icon_rect.min + egui::vec2(6.0, 6.0),
+                                egui::vec2(8.0, 8.0)),
+                            egui::Sense::hover());
+                        response.on_hover_text(npc_data.name);
+                    }
+                }
+
                 // Draw player position arrow texture on a rotated rectangle to face camera position
                 if let Some(minimap_player_pos) = minimap_player_pos {
                     let minimap_player_sprite = ui_resources.get_minimap_player_sprite().unwrap();
