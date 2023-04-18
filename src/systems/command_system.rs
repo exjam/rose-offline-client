@@ -280,7 +280,7 @@ fn update_active_motion(
     repeat: bool,
 ) {
     if let Some(active_motion) = active_motion.as_mut() {
-        if active_motion.motion().id() == motion.id() {
+        if active_motion.motion().id() == motion.id() && !active_motion.completed() {
             // Already playing this animation
             active_motion.set_animation_speed(animation_speed);
             return;
