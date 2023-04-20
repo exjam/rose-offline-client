@@ -333,6 +333,7 @@ pub fn command_system(
             &mut Command,
             &mut NextCommand,
             &mut FacingDirection,
+            Option<&Dead>,
         ),
         Or<(With<CharacterModel>, With<NpcModel>)>,
     >,
@@ -365,6 +366,7 @@ pub fn command_system(
         mut command,
         mut next_command,
         mut facing_direction,
+        dead,
     ) in query.iter_mut()
     {
         let (
@@ -397,6 +399,11 @@ pub fn command_system(
         } else {
             command.requires_animation_complete()
         };
+
+        if dead.is_some() && !command.is_die() && !next_command.is_die() {
+            // If we are dead, the NextCommand should always be Die
+            *next_command = NextCommand::with_die();
+        }
 
         let active_motion_completed = active_motion
             .as_ref()
