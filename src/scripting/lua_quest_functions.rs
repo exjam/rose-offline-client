@@ -100,9 +100,9 @@ fn QF_doQuestTrigger(
             if let Some(game_connection) = resources.game_connection.as_ref() {
                 game_connection
                     .client_message_tx
-                    .send(ClientMessage::QuestTrigger(
-                        quest_trigger_name.as_str().into(),
-                    ))
+                    .send(ClientMessage::QuestTrigger {
+                        trigger: quest_trigger_name.as_str().into(),
+                    })
                     .ok();
             }
 

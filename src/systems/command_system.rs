@@ -717,7 +717,9 @@ pub fn command_system(
                             if let Some(game_connection) = game_connection.as_ref() {
                                 game_connection
                                     .client_message_tx
-                                    .send(ClientMessage::PickupItemDrop(pickup_item_entity_id))
+                                    .send(ClientMessage::PickupItemDrop {
+                                        target_entity_id: pickup_item_entity_id,
+                                    })
                                     .ok();
                                 *next_command = NextCommand::with_pickup_item(pickup_item_entity);
                             }

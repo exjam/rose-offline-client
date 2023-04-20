@@ -210,10 +210,10 @@ pub fn ui_debug_skill_list_system(
                                         if let Some(game_connection) = game_connection.as_ref() {
                                             game_connection
                                                 .client_message_tx
-                                                .send(ClientMessage::Chat(format!(
+                                                .send(ClientMessage::Chat { text: format!(
                                                     "/skill add {}",
                                                     skill_data.id.get()
-                                                )))
+                                                ) })
                                                 .ok();
                                         }
                                     }

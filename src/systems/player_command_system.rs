@@ -11,7 +11,7 @@ use rose_data::{
 };
 use rose_game_common::{
     components::{Hotbar, HotbarSlot, Inventory, ItemDrop, SkillList, Team},
-    messages::client::{Attack, ChangeEquipment, ClientMessage, Move, SetHotbarSlot},
+    messages::client::ClientMessage,
 };
 
 use crate::{
@@ -136,12 +136,12 @@ pub fn player_command_system(
                                     if let Some(game_connection) = game_connection.as_ref() {
                                         game_connection
                                             .client_message_tx
-                                            .send(ClientMessage::Move(Move {
+                                            .send(ClientMessage::Move {
                                                 target_entity_id: Some(target_entity_id),
                                                 x: target_position.x,
                                                 y: target_position.y,
                                                 z: target_position.z as u16,
-                                            }))
+                                            })
                                             .ok();
                                     }
                                 }
@@ -158,9 +158,9 @@ pub fn player_command_system(
                                             {
                                                 game_connection
                                                     .client_message_tx
-                                                    .send(ClientMessage::Attack(Attack {
+                                                    .send(ClientMessage::Attack {
                                                         target_entity_id: target_client_entity.id,
-                                                    }))
+                                                    })
                                                     .ok();
                                             }
                                         }
@@ -172,7 +172,10 @@ pub fn player_command_system(
                                     if let Some(game_connection) = game_connection.as_ref() {
                                         game_connection
                                             .client_message_tx
-                                            .send(ClientMessage::UseEmote(action_motion_id, true))
+                                            .send(ClientMessage::UseEmote {
+                                                motion_id: action_motion_id,
+                                                is_stop: true,
+                                            })
                                             .ok();
                                     }
                                 }
@@ -186,13 +189,13 @@ pub fn player_command_system(
                                             if let Some(game_connection) = game_connection.as_ref()
                                             {
                                                 let message = if player.party_info.is_none() {
-                                                    ClientMessage::PartyCreate(
-                                                        target_client_entity.id,
-                                                    )
+                                                    ClientMessage::PartyCreate {
+                                                        invited_entity_id: target_client_entity.id,
+                                                    }
                                                 } else {
-                                                    ClientMessage::PartyInvite(
-                                                        target_client_entity.id,
-                                                    )
+                                                    ClientMessage::PartyInvite {
+                                                        invited_entity_id: target_client_entity.id,
+                                                    }
                                                 };
 
                                                 game_connection
@@ -234,7 +237,10 @@ pub fn player_command_system(
                                 if let Some(game_connection) = game_connection.as_ref() {
                                     game_connection
                                         .client_message_tx
-                                        .send(ClientMessage::UseEmote(motion_id, true))
+                                        .send(ClientMessage::UseEmote {
+                                            motion_id,
+                                            is_stop: true,
+                                        })
                                         .ok();
                                 }
                             }
@@ -252,7 +258,7 @@ pub fn player_command_system(
                             if let Some(game_connection) = game_connection.as_ref() {
                                 game_connection
                                     .client_message_tx
-                                    .send(ClientMessage::CastSkillSelf(skill_slot))
+                                    .send(ClientMessage::CastSkillSelf { skill_slot })
                                     .ok();
                             }
                         }
@@ -281,10 +287,10 @@ pub fn player_command_system(
                                 if let Some(game_connection) = game_connection.as_ref() {
                                     game_connection
                                         .client_message_tx
-                                        .send(ClientMessage::CastSkillTargetEntity(
+                                        .send(ClientMessage::CastSkillTargetEntity {
                                             skill_slot,
-                                            target_client_entity.id,
-                                        ))
+                                            target_entity_id: target_client_entity.id,
+                                        })
                                         .ok();
                                 }
                             } else {
@@ -390,7 +396,10 @@ pub fn player_command_system(
                             if let Some(game_connection) = game_connection.as_ref() {
                                 game_connection
                                     .client_message_tx
-                                    .send(ClientMessage::UseItem(item_slot, use_item_target))
+                                    .send(ClientMessage::UseItem {
+                                        item_slot,
+                                        target_entity_id: use_item_target,
+                                    })
                                     .ok();
                             }
                         }
@@ -418,7 +427,10 @@ pub fn player_command_system(
                         if let Some(game_connection) = game_connection.as_ref() {
                             game_connection
                                 .client_message_tx
-                                .send(ClientMessage::ChangeAmmo(ammo_index, Some(item_slot)))
+                                .send(ClientMessage::ChangeAmmo {
+                                    ammo_index,
+                                    item_slot: Some(item_slot),
+                                })
                                 .ok();
                         }
                     }
@@ -456,10 +468,10 @@ pub fn player_command_system(
                         if let Some(game_connection) = game_connection.as_ref() {
                             game_connection
                                 .client_message_tx
-                                .send(ClientMessage::ChangeEquipment(ChangeEquipment {
+                                .send(ClientMessage::ChangeEquipment {
                                     equipment_index,
                                     item_slot: Some(item_slot),
-                                }))
+                                })
                                 .ok();
                         }
                     }
@@ -493,10 +505,10 @@ pub fn player_command_system(
                         if let Some(game_connection) = game_connection.as_ref() {
                             game_connection
                                 .client_message_tx
-                                .send(ClientMessage::ChangeVehiclePart(
+                                .send(ClientMessage::ChangeVehiclePart {
                                     vehicle_part_index,
-                                    Some(item_slot),
-                                ))
+                                    item_slot: Some(item_slot),
+                                })
                                 .ok();
                         }
                     }
@@ -506,7 +518,10 @@ pub fn player_command_system(
                 if let Some(game_connection) = game_connection.as_ref() {
                     game_connection
                         .client_message_tx
-                        .send(ClientMessage::ChangeAmmo(ammo_index, None))
+                        .send(ClientMessage::ChangeAmmo {
+                            ammo_index,
+                            item_slot: None,
+                        })
                         .ok();
                 }
             }
@@ -514,10 +529,10 @@ pub fn player_command_system(
                 if let Some(game_connection) = game_connection.as_ref() {
                     game_connection
                         .client_message_tx
-                        .send(ClientMessage::ChangeEquipment(ChangeEquipment {
+                        .send(ClientMessage::ChangeEquipment {
                             equipment_index,
                             item_slot: None,
-                        }))
+                        })
                         .ok();
                 }
             }
@@ -525,7 +540,10 @@ pub fn player_command_system(
                 if let Some(game_connection) = game_connection.as_ref() {
                     game_connection
                         .client_message_tx
-                        .send(ClientMessage::ChangeVehiclePart(vehicle_part_index, None))
+                        .send(ClientMessage::ChangeVehiclePart {
+                            vehicle_part_index,
+                            item_slot: None,
+                        })
                         .ok();
                 }
             }
@@ -535,19 +553,19 @@ pub fn player_command_system(
                     if let Some(game_connection) = game_connection.as_ref() {
                         game_connection
                             .client_message_tx
-                            .send(ClientMessage::DropItem(
+                            .send(ClientMessage::DropItem {
                                 item_slot,
-                                item.get_quantity() as usize,
-                            ))
+                                quantity: item.get_quantity() as usize,
+                            })
                             .ok();
                     }
                 }
             }
-            PlayerCommandEvent::DropMoney(amount) => {
+            PlayerCommandEvent::DropMoney(quantity) => {
                 if let Some(game_connection) = game_connection.as_ref() {
                     game_connection
                         .client_message_tx
-                        .send(ClientMessage::DropMoney(amount))
+                        .send(ClientMessage::DropMoney { quantity })
                         .ok();
                 }
             }
@@ -559,9 +577,9 @@ pub fn player_command_system(
                         if let Some(game_connection) = game_connection.as_ref() {
                             game_connection
                                 .client_message_tx
-                                .send(ClientMessage::Attack(Attack {
+                                .send(ClientMessage::Attack {
                                     target_entity_id: target_client_entity.id,
-                                }))
+                                })
                                 .ok();
                         }
                     }
@@ -575,12 +593,12 @@ pub fn player_command_system(
                 if let Some(game_connection) = game_connection.as_ref() {
                     game_connection
                         .client_message_tx
-                        .send(ClientMessage::Move(Move {
+                        .send(ClientMessage::Move {
                             target_entity_id,
                             x: position.x,
                             y: position.y,
                             z: position.z as u16,
-                        }))
+                        })
                         .ok();
                 }
             }
@@ -594,10 +612,10 @@ pub fn player_command_system(
                 if let Some(game_connection) = game_connection.as_ref() {
                     game_connection
                         .client_message_tx
-                        .send(ClientMessage::SetHotbarSlot(SetHotbarSlot {
+                        .send(ClientMessage::SetHotbarSlot {
                             slot_index: page * player.hotbar.pages[0].len() + page_index,
                             slot: hotbar_slot,
-                        }))
+                        })
                         .ok();
                 }
             }

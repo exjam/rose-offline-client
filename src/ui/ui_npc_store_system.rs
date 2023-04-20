@@ -11,7 +11,7 @@ use rose_data::{Item, NpcData, NpcStoreTabData, NpcStoreTabId};
 use rose_game_common::{
     components::{AbilityValues, Inventory, ItemSlot, Npc},
     messages::{
-        client::{ClientMessage, NpcStoreBuyItem, NpcStoreTransaction},
+        client::{ClientMessage, NpcStoreBuyItem},
         ClientEntityId,
     },
 };
@@ -682,11 +682,11 @@ pub fn ui_npc_store_system(
             if let Some(game_connection) = game_connection {
                 game_connection
                     .client_message_tx
-                    .send(ClientMessage::NpcStoreTransaction(NpcStoreTransaction {
+                    .send(ClientMessage::NpcStoreTransaction {
                         npc_entity_id: ui_state.owner_entity.unwrap().1,
                         buy_items,
                         sell_items,
-                    }))
+                    })
                     .ok();
             }
         } else {

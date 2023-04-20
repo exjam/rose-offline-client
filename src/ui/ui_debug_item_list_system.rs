@@ -410,28 +410,32 @@ pub fn ui_debug_item_list_system(
                                                 ) {
                                                     game_connection
                                                         .client_message_tx
-                                                        .send(ClientMessage::Chat(format!(
-                                                            "{} {} {} {} {} {} {}",
-                                                            if ui_state_debug_item_list
-                                                                .spawn_as_drop
-                                                            {
-                                                                "/drop"
-                                                            } else {
-                                                                "/item"
-                                                            },
-                                                            item_type,
-                                                            item_reference.item_number,
-                                                            ui_state_debug_item_list.spawn_quantity,
-                                                            if ui_state_debug_item_list
-                                                                .spawn_has_socket
-                                                            {
-                                                                "1"
-                                                            } else {
-                                                                "0"
-                                                            },
-                                                            ui_state_debug_item_list.spawn_gem,
-                                                            ui_state_debug_item_list.spawn_grade
-                                                        )))
+                                                        .send(ClientMessage::Chat {
+                                                            text: format!(
+                                                                "{} {} {} {} {} {} {}",
+                                                                if ui_state_debug_item_list
+                                                                    .spawn_as_drop
+                                                                {
+                                                                    "/drop"
+                                                                } else {
+                                                                    "/item"
+                                                                },
+                                                                item_type,
+                                                                item_reference.item_number,
+                                                                ui_state_debug_item_list
+                                                                    .spawn_quantity,
+                                                                if ui_state_debug_item_list
+                                                                    .spawn_has_socket
+                                                                {
+                                                                    "1"
+                                                                } else {
+                                                                    "0"
+                                                                },
+                                                                ui_state_debug_item_list.spawn_gem,
+                                                                ui_state_debug_item_list
+                                                                    .spawn_grade
+                                                            ),
+                                                        })
                                                         .ok();
                                                 }
                                             }

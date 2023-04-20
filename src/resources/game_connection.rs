@@ -2,10 +2,7 @@ use bevy::prelude::Resource;
 
 use rose_game_common::{
     data::Password,
-    messages::{
-        client::{ClientMessage, ConnectionRequest},
-        server::ServerMessage,
-    },
+    messages::{client::ClientMessage, server::ServerMessage},
 };
 
 #[derive(Resource)]
@@ -22,10 +19,10 @@ impl GameConnection {
         password: Password,
     ) -> Self {
         client_message_tx
-            .send(ClientMessage::ConnectionRequest(ConnectionRequest {
+            .send(ClientMessage::ConnectionRequest {
                 login_token,
                 password,
-            }))
+            })
             .ok();
 
         Self {

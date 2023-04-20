@@ -7,7 +7,7 @@ use bevy::{
 use bevy_egui::{egui, EguiContexts};
 
 use rose_data::ZoneId;
-use rose_game_common::messages::client::{ClientMessage, JoinServer};
+use rose_game_common::messages::client::ClientMessage;
 
 use crate::{
     animation::CameraAnimation,
@@ -121,10 +121,10 @@ pub fn login_event_system(
                 if let Some(login_connection) = &login_connection {
                     login_connection
                         .client_message_tx
-                        .send(ClientMessage::JoinServer(JoinServer {
+                        .send(ClientMessage::JoinServer {
                             server_id,
                             channel_id,
-                        }))
+                        })
                         .ok();
                 }
                 *login_state = LoginState::JoiningServer;

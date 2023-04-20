@@ -238,7 +238,7 @@ pub fn ui_character_info_system(
                     if let Some(game_connection) = game_connection.as_ref() {
                         game_connection
                             .client_message_tx
-                            .send(ClientMessage::IncreaseBasicStat(basic_stat_type))
+                            .send(ClientMessage::IncreaseBasicStat { basic_stat_type })
                             .ok();
                     }
                 }

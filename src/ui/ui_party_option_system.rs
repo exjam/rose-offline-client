@@ -172,18 +172,18 @@ pub fn ui_party_option_system(
         if let Some(game_connection) = &game_connection {
             game_connection
                 .client_message_tx
-                .send(ClientMessage::PartyUpdateRules(
-                    if ui_state.item_sharing_rule == IID_RADIOBUTTON_ITEM_PICK {
+                .send(ClientMessage::PartyUpdateRules {
+                    item_sharing: if ui_state.item_sharing_rule == IID_RADIOBUTTON_ITEM_PICK {
                         PartyItemSharing::EqualLootDistribution
                     } else {
                         PartyItemSharing::AcquisitionOrder
                     },
-                    if ui_state.exp_sharing_rule == IID_RADIOBUTTON_EXP_EQUALITY {
+                    xp_sharing: if ui_state.exp_sharing_rule == IID_RADIOBUTTON_EXP_EQUALITY {
                         PartyXpSharing::EqualShare
                     } else {
                         PartyXpSharing::DistributedByLevel
                     },
-                ))
+                })
                 .ok();
         }
 

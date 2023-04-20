@@ -1,5 +1,8 @@
 use bevy::prelude::Resource;
-use rose_game_common::messages::{client::ClientMessage, server::ServerMessage};
+use rose_game_common::{
+    data::Password,
+    messages::{client::ClientMessage, server::ServerMessage},
+};
 
 #[derive(Resource)]
 pub struct LoginConnection {
@@ -13,7 +16,10 @@ impl LoginConnection {
         server_message_rx: crossbeam_channel::Receiver<ServerMessage>,
     ) -> Self {
         client_message_tx
-            .send(ClientMessage::ConnectionRequest(Default::default()))
+            .send(ClientMessage::ConnectionRequest {
+                login_token: 0,
+                password: Password::Md5(String::default()),
+            })
             .ok();
 
         Self {

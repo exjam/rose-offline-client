@@ -1,6 +1,6 @@
 use bevy::prelude::{Assets, EventWriter, Query, Res, With};
 use bevy_egui::{egui, EguiContexts};
-use rose_game_common::messages::client::{ClientMessage, ReviveRequestType};
+use rose_game_common::messages::client::ClientMessage;
 
 use crate::{
     components::{Dead, PlayerCharacter},
@@ -67,9 +67,7 @@ pub fn ui_respawn_system(
         if let Some(game_connection) = game_connection.as_ref() {
             game_connection
                 .client_message_tx
-                .send(ClientMessage::ReviveRequest(
-                    ReviveRequestType::SavePosition,
-                ))
+                .send(ClientMessage::ReviveSaveZone)
                 .ok();
         }
     }
@@ -78,9 +76,7 @@ pub fn ui_respawn_system(
         if let Some(game_connection) = game_connection.as_ref() {
             game_connection
                 .client_message_tx
-                .send(ClientMessage::ReviveRequest(
-                    ReviveRequestType::RevivePosition,
-                ))
+                .send(ClientMessage::ReviveCurrentZone)
                 .ok();
         }
     }

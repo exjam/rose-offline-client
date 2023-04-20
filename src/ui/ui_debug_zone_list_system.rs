@@ -133,10 +133,9 @@ pub fn ui_debug_zone_list_system(
                                         if let Some(game_connection) = game_connection.as_ref() {
                                             game_connection
                                                 .client_message_tx
-                                                .send(ClientMessage::Chat(format!(
-                                                    "/mm {}",
-                                                    zone_data.id.get()
-                                                )))
+                                                .send(ClientMessage::Chat {
+                                                    text: format!("/mm {}", zone_data.id.get()),
+                                                })
                                                 .ok();
                                         }
                                     }

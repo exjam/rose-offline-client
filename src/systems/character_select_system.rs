@@ -14,10 +14,7 @@ use bevy_egui::{egui, EguiContexts};
 use bevy_rapier3d::prelude::{CollisionGroups, QueryFilter, RapierContext};
 
 use rose_data::{CharacterMotionAction, ZoneId};
-use rose_game_common::messages::{
-    client::{ClientMessage, DeleteCharacter, SelectCharacter},
-    server::CreateCharacterError,
-};
+use rose_game_common::messages::{client::ClientMessage, server::CreateCharacterError};
 
 use crate::{
     animation::{CameraAnimation, SkeletalAnimation, ZmoAsset},
@@ -183,62 +180,76 @@ pub fn character_select_system(
 
     for event in world_connection_events.iter() {
         match event {
-            WorldConnectionEvent::CreateCharacterResponse(response) => match response {
-                Ok(_) => {
-                    let (camera_entity, _, _, _) = query_camera.single();
-                    commands.entity(camera_entity).insert(CameraAnimation::once(
-                        asset_server.load("3DDATA/TITLE/CAMERA01_OUTCREATE01.ZMO"),
-                    ));
-                    *character_select_state = CharacterSelectState::CharacterSelect(None);
+            WorldConnectionEvent::CreateCharacterSuccess { character_slot: _ } => {
+                let (camera_entity, _, _, _) = query_camera.single();
+                commands.entity(camera_entity).insert(CameraAnimation::once(
+                    asset_server.load("3DDATA/TITLE/CAMERA01_OUTCREATE01.ZMO"),
+                ));
+                *character_select_state = CharacterSelectState::CharacterSelect(None);
 
-                    world_connection
-                        .client_message_tx
-                        .send(ClientMessage::GetCharacterList)
-                        .ok();
-                }
-                Err(CreateCharacterError::Failed) => {
+                world_connection
+                    .client_message_tx
+                    .send(ClientMessage::GetCharacterList)
+                    .ok();
+            }
+            WorldConnectionEvent::CreateCharacterError { error } => match error {
+                CreateCharacterError::Failed => {
                     // TODO: Show modal error dialog with error message
                     // character_select_state.create_character_error_message =
                     //    "Unknown error creating character".into();
                     *character_select_state = CharacterSelectState::CharacterCreate;
                 }
-                Err(CreateCharacterError::AlreadyExists) => {
+                CreateCharacterError::AlreadyExists => {
                     // TODO: Show modal error dialog with error message
                     // character_select_state.create_character_error_message =
                     //    "Character name already exists".into();
                     *character_select_state = CharacterSelectState::CharacterCreate;
                 }
-                Err(CreateCharacterError::NoMoreSlots) => {
+                CreateCharacterError::NoMoreSlots => {
                     // TODO: Show modal error dialog with error message
                     //character_select_state.create_character_error_message =
                     //    "Cannot create more characters".into();
                     *character_select_state = CharacterSelectState::CharacterCreate;
                 }
-                Err(CreateCharacterError::InvalidValue) => {
+                CreateCharacterError::InvalidValue => {
                     // TODO: Show modal error dialog with error message
                     // character_select_state.create_character_error_message = "Invalid value".into();
                     *character_select_state = CharacterSelectState::CharacterCreate;
                 }
             },
-            WorldConnectionEvent::DeleteCharacterResponse(response) => match response {
-                Ok(response) => {
-                    if let Some(character_list) = character_list.as_mut() {
-                        for character in character_list.characters.iter_mut() {
-                            if character.info.name == response.name {
-                                character.delete_time = response.delete_time.clone();
-                            }
+            WorldConnectionEvent::DeleteCharacterStart { name, delete_time } => {
+                if let Some(character_list) = character_list.as_mut() {
+                    for character in character_list.characters.iter_mut() {
+                        if character.info.name == *name {
+                            character.delete_time = Some(*delete_time);
+                            break;
                         }
-                    } else {
-                        world_connection
-                            .client_message_tx
-                            .send(ClientMessage::GetCharacterList)
-                            .ok();
                     }
+                } else {
+                    world_connection
+                        .client_message_tx
+                        .send(ClientMessage::GetCharacterList)
+                        .ok();
                 }
-                Err(_) => {
-                    // TODO: Show delete character error message
+            }
+            WorldConnectionEvent::DeleteCharacterCancel { name } => {
+                if let Some(character_list) = character_list.as_mut() {
+                    for character in character_list.characters.iter_mut() {
+                        if character.info.name == *name {
+                            character.delete_time = None;
+                            break;
+                        }
+                    }
+                } else {
+                    world_connection
+                        .client_message_tx
+                        .send(ClientMessage::GetCharacterList)
+                        .ok();
                 }
-            },
+            }
+            WorldConnectionEvent::DeleteCharacterError { name: _ } => {
+                // TODO: Show delete character error message
+            }
         }
     }
 
@@ -325,10 +336,10 @@ pub fn character_select_event_system(
                                 if let Some(world_connection) = world_connection.as_ref() {
                                     world_connection
                                         .client_message_tx
-                                        .send(ClientMessage::SelectCharacter(SelectCharacter {
+                                        .send(ClientMessage::SelectCharacter {
                                             slot: selected_character_index as u8,
                                             name: selected_character.info.name.clone(),
-                                        }))
+                                        })
                                         .ok();
                                 }
 
@@ -350,11 +361,11 @@ pub fn character_select_event_system(
                             if let Some(world_connection) = world_connection.as_ref() {
                                 world_connection
                                     .client_message_tx
-                                    .send(ClientMessage::DeleteCharacter(DeleteCharacter {
+                                    .send(ClientMessage::DeleteCharacter {
                                         slot: selected_character_index as u8,
                                         name: selected_character.info.name.clone(),
                                         is_delete: selected_character.delete_time.is_none(),
-                                    }))
+                                    })
                                     .ok();
                             }
                         }

@@ -172,7 +172,9 @@ pub fn ui_debug_menu_system(
                     if let Some(game_connection) = game_connection.as_ref() {
                         game_connection
                             .client_message_tx
-                            .send(ClientMessage::Chat("/speed 4000".to_string()))
+                            .send(ClientMessage::Chat {
+                                text: "/speed 4000".to_string(),
+                            })
                             .ok();
                     }
                 }

@@ -201,7 +201,9 @@ pub fn collision_player_system(
                 if let Some(game_connection) = game_connection.as_ref() {
                     game_connection
                         .client_message_tx
-                        .send(ClientMessage::MoveCollision(position.position))
+                        .send(ClientMessage::MoveCollision {
+                            position: position.position,
+                        })
                         .ok();
                 }
             }
@@ -284,7 +286,9 @@ pub fn collision_player_system(
                         if let Some(game_connection) = game_connection.as_ref() {
                             game_connection
                                 .client_message_tx
-                                .send(ClientMessage::WarpGateRequest(hit_warp_object.warp_id))
+                                .send(ClientMessage::WarpGateRequest {
+                                    warp_gate_id: hit_warp_object.warp_id,
+                                })
                                 .ok();
                         }
 

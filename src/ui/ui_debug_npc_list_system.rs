@@ -149,6 +149,7 @@ pub fn ui_debug_npc_list_system(
                 .cell_layout(egui::Layout::left_to_right(egui::Align::Center))
                 .column(egui_extras::Column::initial(50.0).at_least(50.0))
                 .column(egui_extras::Column::remainder().at_least(80.0))
+                .column(egui_extras::Column::initial(50.0).at_least(50.0))
                 .column(egui_extras::Column::initial(60.0).at_least(60.0))
                 .header(20.0, |mut header| {
                     header.col(|ui| {
@@ -156,6 +157,9 @@ pub fn ui_debug_npc_list_system(
                     });
                     header.col(|ui| {
                         ui.heading("Name");
+                    });
+                    header.col(|ui| {
+                        ui.heading("Level");
                     });
                     header.col(|ui| {
                         ui.heading("Action");
@@ -177,6 +181,10 @@ pub fn ui_debug_npc_list_system(
 
                                 row.col(|ui| {
                                     ui.label(npc_data.name);
+                                });
+
+                                row.col(|ui| {
+                                    ui.label(format!("{}", npc_data.level));
                                 });
 
                                 row.col(|ui| match app_state.0 {
@@ -208,13 +216,15 @@ pub fn ui_debug_npc_list_system(
 
                                                 game_connection
                                                     .client_message_tx
-                                                    .send(ClientMessage::Chat(format!(
-                                                        "/mon {} {} {} {}",
-                                                        npc_data.id.get(),
-                                                        ui_state_debug_npc_list.spawn_count,
-                                                        ui_state_debug_npc_list.spawn_distance,
-                                                        team_id,
-                                                    )))
+                                                    .send(ClientMessage::Chat {
+                                                        text: format!(
+                                                            "/mon {} {} {} {}",
+                                                            npc_data.id.get(),
+                                                            ui_state_debug_npc_list.spawn_count,
+                                                            ui_state_debug_npc_list.spawn_distance,
+                                                            team_id,
+                                                        ),
+                                                    })
                                                     .ok();
                                             }
                                         }

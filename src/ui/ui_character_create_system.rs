@@ -7,7 +7,7 @@ use bevy_egui::{egui, EguiContexts};
 use rose_data::ZoneId;
 use rose_game_common::{
     components::{CharacterGender, CharacterInfo, Equipment},
-    messages::client::{ClientMessage, CreateCharacter},
+    messages::client::ClientMessage,
 };
 
 use crate::{
@@ -281,7 +281,7 @@ pub fn ui_character_create_system(
     if response_ok.map_or(false, |r| r.clicked()) && ui_state.name.len() > 3 {
         world_connection
             .client_message_tx
-            .send(ClientMessage::CreateCharacter(CreateCharacter {
+            .send(ClientMessage::CreateCharacter {
                 gender: ui_state.gender,
                 birth_stone: ui_state.birthstone_index as i32,
                 hair: CREATE_CHARACTER_HAIR_LIST[ui_state.hair_index],
@@ -290,7 +290,7 @@ pub fn ui_character_create_system(
                 start_point: ui_state.startpos_index as i32,
                 hair_color: 1,
                 weapon_type: 0,
-            }))
+            })
             .ok();
 
         *character_select_state = CharacterSelectState::CharacterCreating;

@@ -1,9 +1,6 @@
 use bevy::prelude::{Commands, EventWriter, NextState, Res, ResMut, State};
 
-use rose_game_common::messages::{
-    client::ClientMessage,
-    server::{JoinServerResponse, ServerMessage},
-};
+use rose_game_common::messages::{client::ClientMessage, server::ServerMessage};
 use rose_network_common::ConnectionError;
 
 use crate::{
@@ -34,50 +31,59 @@ pub fn world_connection_system(
 
     let result: Result<(), anyhow::Error> = loop {
         match world_connection.server_message_rx.try_recv() {
-            Ok(ServerMessage::ConnectionResponse(response)) => match response {
-                Ok(_) => {
-                    world_connection
-                        .client_message_tx
-                        .send(ClientMessage::GetCharacterList)
-                        .ok();
-                }
-                Err(_) => {
-                    break Err(ConnectionError::ConnectionLost.into());
-                }
-            },
-            Ok(ServerMessage::CharacterList(characters)) => {
+            Ok(ServerMessage::ConnectionRequestSuccess {
+                packet_sequence_id: _,
+            }) => {
+                world_connection
+                    .client_message_tx
+                    .send(ClientMessage::GetCharacterList)
+                    .ok();
+            }
+            Ok(ServerMessage::ConnectionRequestError { error: _ }) => {
+                break Err(ConnectionError::ConnectionLost.into());
+            }
+            Ok(ServerMessage::CharacterList {
+                character_list: characters,
+            }) => {
                 if !matches!(app_state_current.0, AppState::GameCharacterSelect) {
                     app_state_next.set(AppState::GameCharacterSelect);
                 }
 
                 commands.insert_resource(CharacterList { characters });
             }
-            Ok(ServerMessage::SelectCharacter(response)) => match response {
-                Ok(JoinServerResponse {
-                    login_token,
-                    packet_codec_seed,
+            Ok(ServerMessage::SelectCharacterSuccess {
+                login_token,
+                packet_codec_seed,
+                ip,
+                port,
+            }) => {
+                network_events.send(NetworkEvent::ConnectGame {
                     ip,
                     port,
-                }) => {
-                    network_events.send(NetworkEvent::ConnectGame {
-                        ip,
-                        port,
-                        packet_codec_seed,
-                        login_token,
-                        password: account.password.clone(),
-                    });
-                }
-                Err(_) => {
-                    break Err(ConnectionError::ConnectionLost.into());
-                }
-            },
-            Ok(ServerMessage::CreateCharacter(response)) => {
-                world_connection_events
-                    .send(WorldConnectionEvent::CreateCharacterResponse(response));
+                    packet_codec_seed,
+                    login_token,
+                    password: account.password.clone(),
+                });
             }
-            Ok(ServerMessage::DeleteCharacter(response)) => {
+            Ok(ServerMessage::SelectCharacterError) => {
+                break Err(ConnectionError::ConnectionLost.into());
+            }
+            Ok(ServerMessage::CreateCharacterSuccess { character_slot }) => {
                 world_connection_events
-                    .send(WorldConnectionEvent::DeleteCharacterResponse(response));
+                    .send(WorldConnectionEvent::CreateCharacterSuccess { character_slot });
+            }
+            Ok(ServerMessage::CreateCharacterError { error }) => {
+                world_connection_events.send(WorldConnectionEvent::CreateCharacterError { error });
+            }
+            Ok(ServerMessage::DeleteCharacterStart { name, delete_time }) => {
+                world_connection_events
+                    .send(WorldConnectionEvent::DeleteCharacterStart { name, delete_time });
+            }
+            Ok(ServerMessage::DeleteCharacterCancel { name }) => {
+                world_connection_events.send(WorldConnectionEvent::DeleteCharacterCancel { name });
+            }
+            Ok(ServerMessage::DeleteCharacterError { name }) => {
+                world_connection_events.send(WorldConnectionEvent::DeleteCharacterError { name });
             }
             // ServerMessage::ReturnToCharacterSelect
             Ok(message) => {

@@ -6,12 +6,8 @@ use tokio::net::TcpStream;
 use rose_game_common::{
     components::CharacterDeleteTime,
     messages::{
-        client::{ClientMessage, ConnectionRequest, CreateCharacter, DeleteCharacter},
-        server::{
-            ConnectionRequestError, ConnectionResponse, CreateCharacterError,
-            CreateCharacterResponse, DeleteCharacterError, DeleteCharacterResponse,
-            JoinServerResponse, ServerMessage,
-        },
+        client::ClientMessage,
+        server::{ConnectionRequestError, CreateCharacterError, ServerMessage},
     },
 };
 use rose_network_common::{Connection, Packet, PacketCodec};
@@ -57,64 +53,72 @@ impl WorldClient {
             Some(ServerPackets::ConnectReply) => {
                 let response = PacketConnectionReply::try_from(packet)?;
                 let message = match response.result {
-                    ConnectResult::Ok => Ok(ConnectionResponse {
+                    ConnectResult::Ok => ServerMessage::ConnectionRequestSuccess {
                         packet_sequence_id: response.packet_sequence_id,
-                    }),
-                    _ => Err(ConnectionRequestError::Failed),
+                    },
+                    _ => ServerMessage::ConnectionRequestError {
+                        error: ConnectionRequestError::Failed,
+                    },
                 };
-                self.server_message_tx
-                    .send(ServerMessage::ConnectionResponse(message))
-                    .ok();
+                self.server_message_tx.send(message).ok();
             }
             Some(ServerPackets::CharacterListReply) => {
                 self.server_message_tx
-                    .send(ServerMessage::CharacterList(
-                        PacketServerCharacterList::try_from(packet)?.characters,
-                    ))
+                    .send(ServerMessage::CharacterList {
+                        character_list: PacketServerCharacterList::try_from(packet)?.characters,
+                    })
                     .ok();
             }
             Some(ServerPackets::MoveServer) => {
                 let response = PacketServerMoveServer::try_from(packet)?;
                 self.server_message_tx
-                    .send(ServerMessage::SelectCharacter(Ok(JoinServerResponse {
+                    .send(ServerMessage::SelectCharacterSuccess {
                         login_token: response.login_token,
                         packet_codec_seed: response.packet_codec_seed,
                         ip: response.ip.to_string(),
                         port: response.port,
-                    })))
+                    })
                     .ok();
             }
             Some(ServerPackets::CreateCharacterReply) => {
                 let response = PacketServerCreateCharacterReply::try_from(packet)?;
                 let message = match response.result {
-                    CreateCharacterResult::Ok => Ok(CreateCharacterResponse { character_slot: 0 }),
-                    CreateCharacterResult::NameAlreadyExists => {
-                        Err(CreateCharacterError::AlreadyExists)
+                    CreateCharacterResult::Ok => {
+                        ServerMessage::CreateCharacterSuccess { character_slot: 0 }
                     }
-                    CreateCharacterResult::InvalidValue => Err(CreateCharacterError::InvalidValue),
-                    CreateCharacterResult::NoMoreSlots => Err(CreateCharacterError::NoMoreSlots),
-                    _ => Err(CreateCharacterError::Failed),
+                    CreateCharacterResult::NameAlreadyExists => {
+                        ServerMessage::CreateCharacterError {
+                            error: CreateCharacterError::AlreadyExists,
+                        }
+                    }
+
+                    CreateCharacterResult::InvalidValue => ServerMessage::CreateCharacterError {
+                        error: CreateCharacterError::InvalidValue,
+                    },
+                    CreateCharacterResult::NoMoreSlots => ServerMessage::CreateCharacterError {
+                        error: CreateCharacterError::NoMoreSlots,
+                    },
+                    _ => ServerMessage::CreateCharacterError {
+                        error: CreateCharacterError::Failed,
+                    },
                 };
-                self.server_message_tx
-                    .send(ServerMessage::CreateCharacter(message))
-                    .ok();
+                self.server_message_tx.send(message).ok();
             }
             Some(ServerPackets::DeleteCharacterReply) => {
                 let response = PacketServerDeleteCharacterReply::try_from(packet)?;
-                let result = match response.seconds_until_delete {
-                    Some(0) => Ok(DeleteCharacterResponse {
+                let message = match response.seconds_until_delete {
+                    Some(0) => ServerMessage::DeleteCharacterCancel {
                         name: response.name.into(),
-                        delete_time: None,
-                    }),
-                    Some(delete_time) => Ok(DeleteCharacterResponse {
+                    },
+                    Some(delete_time) => ServerMessage::DeleteCharacterStart {
                         name: response.name.into(),
-                        delete_time: Some(CharacterDeleteTime::from_seconds_remaining(delete_time)),
-                    }),
-                    None => Err(DeleteCharacterError::Failed("Failed".into())),
+                        delete_time: CharacterDeleteTime::from_seconds_remaining(delete_time),
+                    },
+                    None => ServerMessage::DeleteCharacterError {
+                        name: response.name.into(),
+                    },
                 };
-                self.server_message_tx
-                    .send(ServerMessage::DeleteCharacter(result))
-                    .ok();
+                self.server_message_tx.send(message).ok();
             }
             // ServerPackets::ReturnToCharacterSelect -> ServerMessage::ReturnToCharacterSelect
             _ => log::info!("Unhandled WorldClient packet {:?}", packet),
@@ -129,10 +133,10 @@ impl WorldClient {
         message: ClientMessage,
     ) -> Result<(), anyhow::Error> {
         match message {
-            ClientMessage::ConnectionRequest(ConnectionRequest {
+            ClientMessage::ConnectionRequest {
                 login_token,
                 ref password,
-            }) => {
+            } => {
                 connection
                     .write_packet(Packet::from(&PacketClientConnectRequest {
                         login_token,
@@ -145,15 +149,12 @@ impl WorldClient {
                     .write_packet(Packet::from(&PacketClientCharacterList {}))
                     .await?
             }
-            ClientMessage::SelectCharacter(message) => {
+            ClientMessage::SelectCharacter { slot, ref name } => {
                 connection
-                    .write_packet(Packet::from(&PacketClientSelectCharacter {
-                        slot: message.slot,
-                        name: &message.name,
-                    }))
+                    .write_packet(Packet::from(&PacketClientSelectCharacter { slot, name }))
                     .await?
             }
-            ClientMessage::CreateCharacter(CreateCharacter {
+            ClientMessage::CreateCharacter {
                 gender,
                 hair,
                 face,
@@ -161,7 +162,7 @@ impl WorldClient {
                 start_point,
                 birth_stone,
                 ..
-            }) => {
+            } => {
                 connection
                     .write_packet(Packet::from(&PacketClientCreateCharacter {
                         gender,
@@ -173,11 +174,11 @@ impl WorldClient {
                     }))
                     .await?
             }
-            ClientMessage::DeleteCharacter(DeleteCharacter {
+            ClientMessage::DeleteCharacter {
                 slot,
                 name,
                 is_delete,
-            }) => {
+            } => {
                 connection
                     .write_packet(Packet::from(&PacketClientDeleteCharacter {
                         slot,

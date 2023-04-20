@@ -186,16 +186,16 @@ pub fn ui_party_system(
                 if pending_invite.is_create {
                     game_connection
                         .client_message_tx
-                        .send(ClientMessage::PartyAcceptCreateInvite(
-                            pending_invite.client_entity_id,
-                        ))
+                        .send(ClientMessage::PartyAcceptCreateInvite {
+                            owner_entity_id: pending_invite.client_entity_id,
+                        })
                         .ok();
                 } else {
                     game_connection
                         .client_message_tx
-                        .send(ClientMessage::PartyAcceptJoinInvite(
-                            pending_invite.client_entity_id,
-                        ))
+                        .send(ClientMessage::PartyAcceptJoinInvite {
+                            owner_entity_id: pending_invite.client_entity_id,
+                        })
                         .ok();
                 }
             }
@@ -206,10 +206,10 @@ pub fn ui_party_system(
             if let Some(game_connection) = &game_connection {
                 game_connection
                     .client_message_tx
-                    .send(ClientMessage::PartyRejectInvite(
-                        PartyRejectInviteReason::Reject,
-                        pending_invite.client_entity_id,
-                    ))
+                    .send(ClientMessage::PartyRejectInvite {
+                        reason: PartyRejectInviteReason::Reject,
+                        owner_entity_id: pending_invite.client_entity_id,
+                    })
                     .ok();
             }
 
@@ -373,9 +373,9 @@ pub fn ui_party_system(
                         if let Some(game_connection) = &game_connection {
                             game_connection
                                 .client_message_tx
-                                .send(ClientMessage::PartyKick(
-                                    selected_party_member.get_character_id(),
-                                ))
+                                .send(ClientMessage::PartyKick {
+                                    character_id: selected_party_member.get_character_id(),
+                                })
                                 .ok();
                         }
                     }
@@ -390,9 +390,9 @@ pub fn ui_party_system(
                             if let Some(game_connection) = &game_connection {
                                 game_connection
                                     .client_message_tx
-                                    .send(ClientMessage::PartyChangeOwner(
-                                        selected_client_entity_id,
-                                    ))
+                                    .send(ClientMessage::PartyChangeOwner {
+                                        new_owner_entity_id: selected_client_entity_id,
+                                    })
                                     .ok();
                             }
                         }

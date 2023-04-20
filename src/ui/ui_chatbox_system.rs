@@ -299,7 +299,9 @@ pub fn ui_chatbox_system(
                     if let Some(game_connection) = game_connection.as_ref() {
                         game_connection
                             .client_message_tx
-                            .send(ClientMessage::Chat(ui_state_chatbox.textbox_text.clone()))
+                            .send(ClientMessage::Chat {
+                                text: ui_state_chatbox.textbox_text.clone(),
+                            })
                             .ok();
                         ui_state_chatbox.textbox_text.clear();
                     }

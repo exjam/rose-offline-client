@@ -25,7 +25,9 @@ pub fn quest_trigger_system(
                     if let Some(game_connection) = script_resources.game_connection.as_ref() {
                         game_connection
                             .client_message_tx
-                            .send(ClientMessage::QuestTrigger(trigger_hash))
+                            .send(ClientMessage::QuestTrigger {
+                                trigger: trigger_hash,
+                            })
                             .ok();
                     }
                 }

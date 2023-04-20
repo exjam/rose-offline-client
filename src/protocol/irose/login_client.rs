@@ -4,10 +4,9 @@ use std::net::SocketAddr;
 use tokio::net::TcpStream;
 
 use rose_game_common::messages::{
-    client::{ClientMessage, GetChannelList, JoinServer, LoginRequest},
+    client::ClientMessage,
     server::{
-        ChannelList, ChannelListError, ConnectionRequestError, ConnectionResponse, JoinServerError,
-        JoinServerResponse, LoginError, LoginResponse, ServerMessage,
+        ChannelListError, ConnectionRequestError, JoinServerError, LoginError, ServerMessage,
     },
 };
 use rose_network_common::{Connection, Packet, PacketCodec};
@@ -51,37 +50,45 @@ impl LoginClient {
             Some(ServerPackets::NetworkStatus) => {
                 let response = PacketConnectionReply::try_from(packet)?;
                 let message = match response.status {
-                    ConnectionResult::Accepted => Ok(ConnectionResponse {
+                    ConnectionResult::Accepted => ServerMessage::ConnectionRequestSuccess {
                         packet_sequence_id: response.packet_sequence_id,
-                    }),
-                    _ => Err(ConnectionRequestError::Failed),
+                    },
+                    _ => ServerMessage::ConnectionRequestError {
+                        error: ConnectionRequestError::Failed,
+                    },
                 };
-                self.server_message_tx
-                    .send(ServerMessage::ConnectionResponse(message))
-                    .ok();
+                self.server_message_tx.send(message).ok();
             }
             Some(ServerPackets::LoginReply) => {
                 let response = PacketServerLoginReply::try_from(packet)?;
                 let message = match response.result {
-                    LoginResult::Ok => Ok(LoginResponse {
+                    LoginResult::Ok => ServerMessage::LoginSuccess {
                         server_list: response.servers,
-                    }),
-                    LoginResult::UnknownAccount => Err(LoginError::InvalidAccount),
-                    LoginResult::InvalidPassword => Err(LoginError::InvalidPassword),
-                    LoginResult::AlreadyLoggedIn => Err(LoginError::AlreadyLoggedIn),
-                    _ => Err(LoginError::Failed),
+                    },
+                    LoginResult::UnknownAccount => ServerMessage::LoginError {
+                        error: LoginError::InvalidAccount,
+                    },
+                    LoginResult::InvalidPassword => ServerMessage::LoginError {
+                        error: LoginError::InvalidPassword,
+                    },
+                    LoginResult::AlreadyLoggedIn => ServerMessage::LoginError {
+                        error: LoginError::AlreadyLoggedIn,
+                    },
+                    _ => ServerMessage::LoginError {
+                        error: LoginError::Failed,
+                    },
                 };
-                self.server_message_tx
-                    .send(ServerMessage::LoginResponse(message))
-                    .ok();
+                self.server_message_tx.send(message).ok();
             }
             Some(ServerPackets::ChannelList) => {
                 let response = PacketServerChannelList::try_from(packet)?;
                 if response.channels.is_empty() {
                     self.server_message_tx
-                        .send(ServerMessage::ChannelList(Err(
-                            ChannelListError::InvalidServerId(response.server_id),
-                        )))
+                        .send(ServerMessage::ChannelListError {
+                            error: ChannelListError::InvalidServerId {
+                                server_id: response.server_id,
+                            },
+                        })
                         .ok();
                 } else {
                     let mut channels = Vec::with_capacity(response.channels.len());
@@ -89,28 +96,30 @@ impl LoginClient {
                         channels.push((channel.id, channel.name.to_string()));
                     }
                     self.server_message_tx
-                        .send(ServerMessage::ChannelList(Ok(ChannelList {
+                        .send(ServerMessage::ChannelList {
                             server_id: response.server_id,
                             channels,
-                        })))
+                        })
                         .ok();
                 }
             }
             Some(ServerPackets::SelectServer) => {
                 let response = PacketServerSelectServer::try_from(packet)?;
                 let message = match response.result {
-                    SelectServerResult::Ok => Ok(JoinServerResponse {
+                    SelectServerResult::Ok => ServerMessage::JoinServerSuccess {
                         login_token: response.login_token,
                         packet_codec_seed: response.packet_codec_seed,
                         ip: response.ip.into(),
                         port: response.port,
-                    }),
-                    SelectServerResult::InvalidChannel => Err(JoinServerError::InvalidChannelId),
-                    _ => Err(JoinServerError::InvalidServerId),
+                    },
+                    SelectServerResult::InvalidChannel => ServerMessage::JoinServerError {
+                        error: JoinServerError::InvalidChannelId,
+                    },
+                    _ => ServerMessage::JoinServerError {
+                        error: JoinServerError::InvalidServerId,
+                    },
                 };
-                self.server_message_tx
-                    .send(ServerMessage::JoinServer(message))
-                    .ok();
+                self.server_message_tx.send(message).ok();
             }
             _ => log::info!("Unhandled LoginClient packet {:?}", packet),
         }
@@ -124,12 +133,12 @@ impl LoginClient {
         message: ClientMessage,
     ) -> Result<(), anyhow::Error> {
         match message {
-            ClientMessage::ConnectionRequest(_) => {
+            ClientMessage::ConnectionRequest { .. } => {
                 connection
                     .write_packet(Packet::from(&PacketClientConnect {}))
                     .await?
             }
-            ClientMessage::LoginRequest(LoginRequest { username, password }) => {
+            ClientMessage::LoginRequest { username, password } => {
                 connection
                     .write_packet(Packet::from(&PacketClientLoginRequest {
                         username: &username,
@@ -137,15 +146,15 @@ impl LoginClient {
                     }))
                     .await?
             }
-            ClientMessage::GetChannelList(GetChannelList { server_id }) => {
+            ClientMessage::GetChannelList { server_id } => {
                 connection
                     .write_packet(Packet::from(&PacketClientChannelList { server_id }))
                     .await?
             }
-            ClientMessage::JoinServer(JoinServer {
+            ClientMessage::JoinServer {
                 server_id,
                 channel_id,
-            }) => {
+            } => {
                 connection
                     .write_packet(Packet::from(&PacketClientSelectServer {
                         server_id,

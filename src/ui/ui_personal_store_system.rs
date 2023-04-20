@@ -6,10 +6,7 @@ use bevy::{
 };
 use bevy_egui::{egui, EguiContexts};
 use rose_data::Item;
-use rose_game_common::{
-    components::Money,
-    messages::client::{ClientMessage, PersonalStoreBuyItem},
-};
+use rose_game_common::{components::Money, messages::client::ClientMessage};
 
 use crate::{
     components::{ClientEntity, PersonalStore, PlayerCharacter, Position},
@@ -150,25 +147,30 @@ pub fn ui_personal_store_system(
                     if let Some(game_connection) = game_connection.as_ref() {
                         game_connection
                             .client_message_tx
-                            .send(ClientMessage::PersonalStoreListItems(client_entity.id))
+                            .send(ClientMessage::PersonalStoreListItems {
+                                store_entity_id: client_entity.id,
+                            })
                             .ok();
                     }
 
                     ui_state.store_owner = Some(entity);
                 }
             }
-            PersonalStoreEvent::SetItemList(item_list) => {
+            PersonalStoreEvent::SetItemList {
+                sell_items,
+                buy_items,
+            } => {
                 ui_state.store_buy_items.fill(None);
                 ui_state.store_sell_items.fill(None);
 
-                for (slot_index, item, price) in item_list.buy_items.iter() {
+                for (slot_index, item, price) in buy_items.iter() {
                     if let Some(store_slot) = ui_state.store_buy_items.get_mut(*slot_index as usize)
                     {
                         *store_slot = Some((item.clone(), *price));
                     }
                 }
 
-                for (slot_index, item, price) in item_list.sell_items.iter() {
+                for (slot_index, item, price) in sell_items.iter() {
                     if let Some(store_slot) =
                         ui_state.store_sell_items.get_mut(*slot_index as usize)
                     {
@@ -184,11 +186,11 @@ pub fn ui_personal_store_system(
                     if let Some(game_connection) = &game_connection {
                         game_connection
                             .client_message_tx
-                            .send(ClientMessage::PersonalStoreBuyItem(PersonalStoreBuyItem {
+                            .send(ClientMessage::PersonalStoreBuyItem {
                                 store_entity_id: store_client_entity.id,
                                 store_slot_index: *slot_index,
                                 buy_item: item.clone(),
-                            }))
+                            })
                             .ok();
                     }
                 }
