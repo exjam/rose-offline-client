@@ -1,11 +1,11 @@
-use bevy::prelude::{Component, Deref, DerefMut};
+use bevy::prelude::{Component, Deref, DerefMut, Entity};
 
 use rose_data::SkillId;
-use rose_game_common::{data::Damage, messages::ClientEntityId};
+use rose_game_common::data::Damage;
 
 pub struct PendingDamage {
     pub age: f32,
-    pub attacker: ClientEntityId,
+    pub attacker: Option<Entity>,
     pub damage: Damage,
     pub is_kill: bool,
     pub is_immediate: bool,
@@ -14,7 +14,7 @@ pub struct PendingDamage {
 
 impl PendingDamage {
     pub fn new(
-        attacker: ClientEntityId,
+        attacker: Option<Entity>,
         damage: Damage,
         is_kill: bool,
         is_immediate: bool,

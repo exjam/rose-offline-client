@@ -1,6 +1,6 @@
 use bevy::{
     ecs::query::WorldQuery,
-    prelude::{Commands, Entity, Query, Res, ResMut, Time},
+    prelude::{Commands, Entity, Query, Res, ResMut, Time, With},
 };
 
 use rose_game_common::{components::HealthPoints, data::Damage};
@@ -48,6 +48,7 @@ fn apply_damage(
 pub fn pending_damage_system(
     mut commands: Commands,
     mut query_target: Query<DamageTarget>,
+    dead_entities: Query<(), With<Dead>>,
     time: Res<Time>,
     mut client_entity_list: ResMut<ClientEntityList>,
 ) {
@@ -59,10 +60,11 @@ pub fn pending_damage_system(
             let mut pending_damage = &mut target.pending_damage_list[i];
             pending_damage.age += delta_time;
 
-            let attacker_entity = client_entity_list.get(pending_damage.attacker);
             if pending_damage.is_immediate
                 || pending_damage.age > MAX_DAMAGE_AGE
-                || attacker_entity.is_none()
+                || pending_damage
+                    .attacker
+                    .map_or(true, |attacker| dead_entities.contains(attacker))
             {
                 let pending_damage = target.pending_damage_list.remove(i);
                 apply_damage(

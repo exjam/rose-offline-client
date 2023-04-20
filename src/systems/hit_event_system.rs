@@ -104,8 +104,7 @@ pub fn hit_event_system(
             let mut is_killed = false;
             let mut has_damage = false;
             while i < defender.pending_damage_list.len() {
-                if client_entity_list.get(defender.pending_damage_list[i].attacker)
-                    == Some(event.attacker)
+                if defender.pending_damage_list[i].attacker == Some(event.attacker)
                     && event.skill_id
                         == defender.pending_damage_list[i]
                             .from_skill

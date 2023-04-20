@@ -588,6 +588,7 @@ pub fn game_connection_system(
             }
             Ok(ServerMessage::DamageEntity { attacker_entity_id, defender_entity_id, damage, is_killed, is_immediate, from_skill }) => {
                 if let Some(defender_entity) = client_entity_list.get(defender_entity_id) {
+                    let attacker_entity =  client_entity_list.get(attacker_entity_id);
                     let killed_by_player = is_killed
                         && client_entity_list.player_entity
                             == client_entity_list.get(attacker_entity_id);
@@ -598,7 +599,7 @@ pub fn game_connection_system(
                             defender.get_mut::<PendingDamageList>()
                         {
                             pending_damage_list.push(PendingDamage::new(
-                                attacker_entity_id,
+                                attacker_entity,
                                 damage,
                                 is_killed,
                                 is_immediate,
