@@ -20,9 +20,9 @@ use rose_game_common::{
     },
     messages::{
         server::{
-            ClanCreateError, CommandState, LearnSkillError, LevelUpSkillError, PartyMemberInfo,
+            ClanCreateError, LearnSkillError, LevelUpSkillError, PartyMemberInfo,
             PartyMemberInfoOffline, PersonalStoreTransactionStatus, PickupItemDropError,
-            ServerMessage,
+            ServerMessage, SpawnCommandState,
         },
         PartyItemSharing, PartyXpSharing,
     },
@@ -44,6 +44,38 @@ use crate::{
     },
     resources::{AppState, ClientEntityList, GameConnection, GameData, WorldRates, WorldTime},
 };
+
+fn to_next_command(
+    command_state: &SpawnCommandState,
+    client_entity_list: &ClientEntityList,
+) -> NextCommand {
+    match *command_state {
+        SpawnCommandState::Move {
+            target_position,
+            target_entity_id,
+        } => NextCommand::with_move(
+            target_position,
+            target_entity_id.and_then(|id| client_entity_list.get(id)),
+            None,
+        ),
+        SpawnCommandState::RunAway { target_position } => {
+            NextCommand::with_move(target_position, None, Some(MoveMode::Run))
+        }
+        SpawnCommandState::Attack {
+            target_entity_id, ..
+        } => {
+            if let Some(target_entity) = client_entity_list.get(target_entity_id) {
+                NextCommand::with_attack(target_entity)
+            } else {
+                NextCommand::default()
+            }
+        }
+        SpawnCommandState::Sit => NextCommand::with_sitting(),
+        SpawnCommandState::PersonalStore => NextCommand::with_personal_store(),
+        SpawnCommandState::Die => NextCommand::with_die(),
+        _ => NextCommand::default(),
+    }
+}
 
 fn update_inventory_and_money(
     world: &mut World,
@@ -239,28 +271,7 @@ pub fn game_connection_system(
                     active: message.status_effects,
                     ..Default::default()
                 };
-                let target_entity = message
-                    .target_entity_id
-                    .and_then(|id| client_entity_list.get(id));
-                let next_command = match message.command {
-                    CommandState::Move => {
-                        if let Some(destination) = message.destination {
-                            NextCommand::with_move(destination, target_entity, None)
-                        } else {
-                            NextCommand::default()
-                        }
-                    }
-                    CommandState::Attack => {
-                        if let Some(target_entity) = target_entity {
-                            NextCommand::with_attack(target_entity)
-                        } else {
-                            NextCommand::default()
-                        }
-                    }
-                    CommandState::PersonalStore => NextCommand::with_personal_store(),
-                    CommandState::Die => NextCommand::with_die(),
-                    _ => NextCommand::default(),
-                };
+                let next_command = to_next_command(&message.spawn_command_state, &client_entity_list);
                 let mut ability_values = game_data.ability_value_calculator.calculate(
                     &message.character_info,
                     &message.level,
@@ -330,7 +341,17 @@ pub fn game_connection_system(
 
                 client_entity_list.add(message.entity_id, entity);
             }
-            Ok(ServerMessage::SpawnEntityNpc { entity_id, npc, direction, position, team, health, destination, command, target_entity_id, move_mode, status_effects }) => {
+            Ok(ServerMessage::SpawnEntityNpc {
+                entity_id,
+                npc,
+                direction,
+                position,
+                team,
+                health,
+                spawn_command_state,
+                move_mode,
+                status_effects,
+            }) => {
                 let status_effects = StatusEffects {
                     active: status_effects,
                     ..Default::default()
@@ -341,26 +362,7 @@ pub fn game_connection_system(
                     .unwrap();
                 let move_speed = MoveSpeed::new(ability_values.get_move_speed(&move_mode));
                 let level = Level::new(ability_values.get_level() as u32);
-                let target_entity = target_entity_id
-                    .and_then(|id| client_entity_list.get(id));
-                let next_command = match command {
-                    CommandState::Move => {
-                        if let Some(destination) = destination {
-                            NextCommand::with_move(destination, target_entity, None)
-                        } else {
-                            NextCommand::default()
-                        }
-                    }
-                    CommandState::Attack => {
-                        if let Some(target_entity) = target_entity {
-                            NextCommand::with_attack(target_entity)
-                        } else {
-                            NextCommand::default()
-                        }
-                    }
-                    CommandState::Die => NextCommand::with_die(),
-                    _ => NextCommand::default(),
-                };
+                let next_command = to_next_command(&spawn_command_state, &client_entity_list);
 
                 let entity = commands
                     .spawn((
@@ -402,7 +404,7 @@ pub fn game_connection_system(
 
                 client_entity_list.add(entity_id, entity);
             }
-            Ok(ServerMessage::SpawnEntityMonster { entity_id, npc, position, team, health, destination, command, target_entity_id, move_mode, status_effects }) => {
+            Ok(ServerMessage::SpawnEntityMonster { entity_id, npc, position, team, health, spawn_command_state, move_mode, status_effects }) => {
                 let status_effects = StatusEffects {
                     active: status_effects,
                     ..Default::default()
@@ -413,26 +415,8 @@ pub fn game_connection_system(
                     .unwrap();
                 let move_speed = MoveSpeed::new(ability_values.get_move_speed(&move_mode));
                 let level = Level::new(ability_values.get_level() as u32);
-                let target_entity = target_entity_id
-                    .and_then(|id| client_entity_list.get(id));
-                let next_command = match command {
-                    CommandState::Move => {
-                        if let Some(destination) = destination {
-                            NextCommand::with_move(destination, target_entity, None)
-                        } else {
-                            NextCommand::default()
-                        }
-                    }
-                    CommandState::Attack => {
-                        if let Some(target_entity) = target_entity {
-                            NextCommand::with_attack(target_entity)
-                        } else {
-                            NextCommand::default()
-                        }
-                    }
-                    CommandState::Die => NextCommand::with_die(),
-                    _ => NextCommand::default(),
-                };
+                let next_command = to_next_command(&spawn_command_state, &client_entity_list);
+
                 let mut equipment = Equipment::new();
                 if let Some(npc_data) = game_data.npcs.get_npc(npc.id) {
                     if npc_data.right_hand_part_index > 0 {

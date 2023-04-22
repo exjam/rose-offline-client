@@ -81,7 +81,7 @@ pub use pending_skill_effect_list::{
 pub use personal_store::{PersonalStore, PersonalStoreModel};
 pub use player_character::PlayerCharacter;
 pub use position::Position;
-pub use projectile::{Projectile, ProjectileParabola};
+pub use projectile::{Projectile, ProjectileParabola, ProjectileTarget};
 pub use sound_category::SoundCategory;
 pub use vehicle::Vehicle;
 pub use vehicle_model::VehicleModel;

@@ -6,7 +6,7 @@ use bevy::{
 };
 use bevy_rapier3d::prelude::{Collider, CollisionGroups, Group, QueryFilter, RapierContext};
 
-use rose_game_common::{components::Destination, messages::client::ClientMessage};
+use rose_game_common::messages::client::ClientMessage;
 
 use crate::{
     components::{
@@ -193,10 +193,7 @@ pub fn collision_player_system(
                 position.y = -(collision_translation.z * 100.0);
                 position.z = collision_translation.y * 100.0;
 
-                commands
-                    .entity(entity)
-                    .remove::<Destination>()
-                    .insert(NextCommand::with_stop());
+                commands.entity(entity).insert(NextCommand::with_stop());
 
                 if let Some(game_connection) = game_connection.as_ref() {
                     game_connection

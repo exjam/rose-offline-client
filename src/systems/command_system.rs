@@ -11,9 +11,7 @@ use rose_data::{
 };
 use rose_file_readers::VfsPathBuf;
 use rose_game_common::{
-    components::{
-        AbilityValues, CharacterGender, Destination, Equipment, MoveMode, MoveSpeed, Npc, Target,
-    },
+    components::{AbilityValues, CharacterGender, Equipment, MoveMode, MoveSpeed, Npc},
     messages::client::ClientMessage,
 };
 
@@ -606,11 +604,6 @@ pub fn command_system(
 
         match (*next_command).as_mut().unwrap() {
             Command::Stop => {
-                commands
-                    .entity(entity)
-                    .remove::<Destination>()
-                    .remove::<Target>();
-
                 if let Some(motion) = get_stop_animation(character_model, npc_model, vehicle) {
                     update_active_motion(
                         &mut commands.entity(active_motion_entity),
@@ -689,7 +682,6 @@ pub fn command_system(
                         }
                     } else {
                         *target = None;
-                        entity_commands.remove::<Target>();
                     }
                 }
 
@@ -774,11 +766,6 @@ pub fn command_system(
                 } else {
                     // Move towards destination
                     *command = Command::with_move(*destination, *target, *command_move_mode);
-                    entity_commands.insert(Destination::new(*destination));
-
-                    if let Some(target_entity) = *target {
-                        entity_commands.insert(Target::new(target_entity));
-                    }
 
                     if let Some(motion) =
                         get_move_animation(move_mode, character_model, npc_model, vehicle)
@@ -823,7 +810,6 @@ pub fn command_system(
                     continue;
                 }
 
-                let mut entity_commands = commands.entity(entity);
                 let distance = position.position.xy().distance(target.position.xy());
 
                 let attack_range = ability_values.get_attack_range() as f32;
@@ -844,8 +830,6 @@ pub fn command_system(
 
                         // Update command state
                         *command = Command::with_attack(target_entity);
-                        entity_commands.remove::<Destination>();
-                        entity_commands.insert(Target::new(target_entity));
 
                         // Start attack animation
                         if let Some(motion) = attack_animation {
@@ -880,8 +864,6 @@ pub fn command_system(
                             Some(target_entity),
                             Some(MoveMode::Run),
                         );
-                        entity_commands.insert(Destination::new(target.position.position));
-                        entity_commands.insert(Target::new(target_entity));
 
                         update_active_motion(
                             &mut commands.entity(active_motion_entity),
@@ -924,11 +906,7 @@ pub fn command_system(
 
                 *command = Command::with_die();
                 *next_command = NextCommand::default();
-                commands
-                    .entity(entity)
-                    .insert(Dead)
-                    .remove::<Destination>()
-                    .remove::<Target>();
+                commands.entity(entity).insert(Dead);
             }
             &mut Command::PickupItem(item_entity) => {
                 if let Ok((target_position, _)) = query_move_target.get(item_entity) {
@@ -975,10 +953,6 @@ pub fn command_system(
 
                 *command = Command::with_emote(motion_id, is_stop);
                 *next_command = NextCommand::default();
-                commands
-                    .entity(entity)
-                    .remove::<Destination>()
-                    .remove::<Target>();
             }
             Command::Sit(CommandSit::Sitting) => {
                 if let Some(motion) = get_sitting_animation(character_model, npc_model) {
@@ -993,10 +967,6 @@ pub fn command_system(
 
                 *command = Command::with_sitting();
                 *next_command = NextCommand::default();
-                commands
-                    .entity(entity)
-                    .remove::<Destination>()
-                    .remove::<Target>();
             }
             Command::Sit(CommandSit::Standing) => {
                 // The transition from Sit to Standing happens above
@@ -1009,10 +979,6 @@ pub fn command_system(
             Command::PersonalStore => {
                 *command = Command::with_personal_store();
                 *next_command = NextCommand::default();
-                commands
-                    .entity(entity)
-                    .remove::<Destination>()
-                    .remove::<Target>();
             }
             &mut Command::CastSkill(CommandCastSkill {
                 skill_id,
@@ -1119,11 +1085,7 @@ pub fn command_system(
                             CommandCastSkillState::Casting,
                             ready_action,
                         );
-
-                        // Remove our destination component, as we have reached it!
-                        commands.entity(entity).remove::<Destination>();
                     } else {
-                        let mut entity_commands = commands.entity(entity);
                         let target_position = target_position.unwrap();
 
                         // Not in range, move towards target
@@ -1135,11 +1097,6 @@ pub fn command_system(
                                 target_entity,
                                 Some(MoveMode::Run),
                             );
-                            entity_commands.insert(Destination::new(target_position));
-
-                            if let Some(target_entity) = target_entity {
-                                entity_commands.insert(Target::new(target_entity));
-                            }
 
                             update_active_motion(
                                 &mut commands.entity(active_motion_entity),

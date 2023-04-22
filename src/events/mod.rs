@@ -42,7 +42,7 @@ pub use personal_store_event::PersonalStoreEvent;
 pub use player_command_event::PlayerCommandEvent;
 pub use quest_trigger_event::QuestTriggerEvent;
 pub use spawn_effect_event::{SpawnEffect, SpawnEffectData, SpawnEffectEvent};
-pub use spawn_projectile_event::{SpawnProjectileEvent, SpawnProjectileTarget};
+pub use spawn_projectile_event::SpawnProjectileEvent;
 pub use system_func_event::SystemFuncEvent;
 pub use use_item_event::UseItemEvent;
 pub use world_connection_event::WorldConnectionEvent;

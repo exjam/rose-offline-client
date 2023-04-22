@@ -6,11 +6,9 @@ use bevy::{
     render::mesh::skinning::SkinnedMesh,
 };
 
-use rose_game_common::components::{Destination, Target};
-
 use crate::{
     components::{CharacterModel, CharacterModelPart, DummyBoneOffset, Projectile},
-    events::{SpawnEffectData, SpawnEffectEvent, SpawnProjectileEvent, SpawnProjectileTarget},
+    events::{SpawnEffectData, SpawnEffectEvent, SpawnProjectileEvent},
     resources::GameData,
 };
 
@@ -55,29 +53,24 @@ pub fn spawn_projectile_system(
         }
         let source_global_transform = source_global_transform.unwrap();
 
-        let mut entity_commands = commands.spawn((
-            Projectile::new(
-                event.source,
-                Some(event.effect_id),
-                event.source_skill_id,
-                event.move_type,
-                event.apply_damage,
-            ),
-            event.move_speed,
-            Transform::from_translation(source_global_transform.translation()),
-            GlobalTransform::default(),
-            Visibility::default(),
-            ComputedVisibility::default(),
-        ));
-
-        match event.target {
-            SpawnProjectileTarget::Entity(target_entity) => {
-                entity_commands.insert(Target::new(target_entity));
-            }
-            SpawnProjectileTarget::Position(target_position) => {
-                entity_commands.insert(Destination::new(target_position));
-            }
-        }
+        let projectile_entity = commands
+            .spawn((
+                Projectile {
+                    source: event.source,
+                    effect_id: Some(event.effect_id),
+                    skill_id: event.source_skill_id,
+                    move_type: event.move_type,
+                    move_speed: event.move_speed,
+                    apply_damage: event.apply_damage,
+                    parabola: None,
+                    target: event.target,
+                },
+                Transform::from_translation(source_global_transform.translation()),
+                GlobalTransform::default(),
+                Visibility::default(),
+                ComputedVisibility::default(),
+            ))
+            .id();
 
         if let Some(projectile_effect_file_id) = game_data
             .effect_database
@@ -85,7 +78,7 @@ pub fn spawn_projectile_system(
             .and_then(|x| x.bullet_effect)
         {
             spawn_effect_events.send(SpawnEffectEvent::OnEntity(
-                entity_commands.id(),
+                projectile_entity,
                 None,
                 SpawnEffectData::with_file_id(projectile_effect_file_id),
             ));

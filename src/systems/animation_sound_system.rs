@@ -8,7 +8,7 @@ use bevy::{
 use rose_data::{
     AmmoIndex, AnimationEventFlags, EquipmentIndex, ItemClass, SoundId, VehiclePartIndex,
 };
-use rose_game_common::components::{Equipment, MoveMode, Npc, Target};
+use rose_game_common::components::{Equipment, MoveMode, Npc};
 
 use crate::{
     animation::AnimationFrameEvent,
@@ -26,7 +26,6 @@ pub struct EventEntity<'w> {
     skinned_mesh: &'w SkinnedMesh,
     dummy_bone_offset: &'w DummyBoneOffset,
     equipment: Option<&'w Equipment>,
-    target: Option<&'w Target>,
     npc: Option<&'w Npc>,
     player: Option<&'w PlayerCharacter>,
 }

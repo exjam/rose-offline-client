@@ -7,14 +7,12 @@ use rose_data::{
     AmmoIndex, AnimationEventFlags, EffectBulletMoveType, EquipmentIndex, ItemClass, SkillData,
     SkillType, VehiclePartIndex,
 };
-use rose_game_common::components::{Equipment, MoveMode, MoveSpeed, Npc};
+use rose_game_common::components::{Equipment, MoveMode, Npc};
 
 use crate::{
     animation::AnimationFrameEvent,
-    components::{Command, PlayerCharacter},
-    events::{
-        HitEvent, SpawnEffectData, SpawnEffectEvent, SpawnProjectileEvent, SpawnProjectileTarget,
-    },
+    components::{Command, PlayerCharacter, ProjectileTarget},
+    events::{HitEvent, SpawnEffectData, SpawnEffectEvent, SpawnProjectileEvent},
     resources::GameData,
 };
 
@@ -158,13 +156,15 @@ pub fn animation_effect_system(
                             source: event.entity,
                             source_dummy_bone_id,
                             source_skill_id: None,
-                            target: SpawnProjectileTarget::Entity(target_entity),
+                            target: ProjectileTarget::Entity {
+                                entity: target_entity,
+                            },
                             move_type: projectile_effect_data
                                 .bullet_move_type
                                 .as_ref()
                                 .cloned()
                                 .unwrap_or(EffectBulletMoveType::Linear),
-                            move_speed: MoveSpeed::new(projectile_effect_data.bullet_speed / 100.0),
+                            move_speed: projectile_effect_data.bullet_speed / 100.0,
                             apply_damage: true,
                         });
                     }
@@ -194,13 +194,15 @@ pub fn animation_effect_system(
                                     skill_data.bullet_link_dummy_bone_id as usize,
                                 ),
                                 source_skill_id: Some(skill_data.id),
-                                target: SpawnProjectileTarget::Entity(target_entity),
+                                target: ProjectileTarget::Entity {
+                                    entity: target_entity,
+                                },
                                 move_type: effect_data
                                     .bullet_move_type
                                     .as_ref()
                                     .cloned()
                                     .unwrap_or(EffectBulletMoveType::Linear),
-                                move_speed: MoveSpeed::new(effect_data.bullet_speed / 100.0),
+                                move_speed: effect_data.bullet_speed / 100.0,
                                 apply_damage: !event
                                     .flags
                                     .contains(AnimationEventFlags::EFFECT_SKILL_FIRE_DUMMY_BULLET),
@@ -263,15 +265,16 @@ pub fn animation_effect_system(
                                             skill_data.bullet_link_dummy_bone_id as usize,
                                         ),
                                         source_skill_id: Some(skill_data.id),
-                                        target: SpawnProjectileTarget::Entity(target_entity),
+                                        target: ProjectileTarget::Entity {
+                                            entity: target_entity,
+                                        },
                                         move_type: effect_data
                                             .bullet_move_type
                                             .as_ref()
                                             .cloned()
                                             .unwrap_or(EffectBulletMoveType::Linear),
-                                        move_speed: MoveSpeed::new(
-                                            effect_data.bullet_speed / 100.0,
-                                        ),
+                                        move_speed: effect_data.bullet_speed / 100.0,
+
                                         apply_damage: true,
                                     });
                                 }
@@ -295,15 +298,15 @@ pub fn animation_effect_system(
                                             skill_data.bullet_link_dummy_bone_id as usize,
                                         ),
                                         source_skill_id: Some(skill_data.id),
-                                        target: SpawnProjectileTarget::Entity(target_entity),
+                                        target: ProjectileTarget::Entity {
+                                            entity: target_entity,
+                                        },
                                         move_type: effect_data
                                             .bullet_move_type
                                             .as_ref()
                                             .cloned()
                                             .unwrap_or(EffectBulletMoveType::Linear),
-                                        move_speed: MoveSpeed::new(
-                                            effect_data.bullet_speed / 100.0,
-                                        ),
+                                        move_speed: effect_data.bullet_speed / 100.0,
                                         apply_damage: false,
                                     });
                                 }

@@ -5,6 +5,12 @@ use bevy::{
 
 use rose_data::{EffectBulletMoveType, EffectId, SkillId};
 
+#[derive(Copy, Clone)]
+pub enum ProjectileTarget {
+    Entity { entity: Entity },
+    Position { position: Vec3 },
+}
+
 pub struct ProjectileParabola {
     pub start_y: f32,
     pub end_y: f32,
@@ -16,29 +22,15 @@ pub struct ProjectileParabola {
 
 #[derive(Component)]
 pub struct Projectile {
+    pub target: ProjectileTarget,
     pub source: Entity,
+
     pub effect_id: Option<EffectId>,
     pub skill_id: Option<SkillId>,
-    pub move_type: EffectBulletMoveType,
-    pub apply_damage: bool,
-    pub parabola: Option<ProjectileParabola>,
-}
 
-impl Projectile {
-    pub fn new(
-        source: Entity,
-        effect_id: Option<EffectId>,
-        skill_id: Option<SkillId>,
-        move_type: EffectBulletMoveType,
-        apply_damage: bool,
-    ) -> Self {
-        Self {
-            source,
-            effect_id,
-            skill_id,
-            move_type,
-            apply_damage,
-            parabola: None,
-        }
-    }
+    pub move_type: EffectBulletMoveType,
+    pub move_speed: f32,
+    pub parabola: Option<ProjectileParabola>,
+
+    pub apply_damage: bool,
 }
