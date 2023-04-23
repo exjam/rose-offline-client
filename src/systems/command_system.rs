@@ -896,13 +896,17 @@ pub fn command_system(
             Command::Die => {
                 let motion = get_die_animation(character_model, npc_model);
                 if let Some(motion) = motion {
-                    update_active_motion(
-                        &mut commands.entity(active_motion_entity),
-                        &mut active_motion,
-                        motion,
-                        1.0,
-                        false,
-                    );
+                    // Do not use update_active_motion here, as we want to ensure the
+                    // death animation is always played exactly once, and update_active_motion
+                    // will not reset the playback if the death motion matches the currently
+                    // playing motion - which is the case with some NPCs in ROSE which do not
+                    // have death animations.
+                    commands
+                        .entity(active_motion_entity)
+                        .insert(SkeletalAnimation::once(motion));
+                } else {
+                    // Remove previous animation so that this entity is deleted next frame.
+                    commands.entity(entity).remove::<SkeletalAnimation>();
                 }
 
                 client_entity_events.send(ClientEntityEvent::Die(entity));
