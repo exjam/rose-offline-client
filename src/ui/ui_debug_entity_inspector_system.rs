@@ -53,10 +53,7 @@ pub fn ui_debug_entity_inspector_system(world: &mut World) {
                         });
 
                         let mut enable_picking = debug_inspector_state.enable_picking;
-                        ui.checkbox(
-                            &mut enable_picking,
-                            "Enable Picking (with middle mouse button)",
-                        );
+                        ui.checkbox(&mut enable_picking, "Enable Picking (with P key)");
                         if enable_picking != debug_inspector_state.enable_picking {
                             debug_inspector_state.enable_picking = enable_picking;
                         }
