@@ -114,6 +114,10 @@ impl AnimationState {
         self.completed = true;
     }
 
+    pub fn set_max_loop_count(&mut self, max_loop_count: Option<usize>) {
+        self.max_loop_count = max_loop_count;
+    }
+
     pub fn set_start_delay(&mut self, start_delay: f32) {
         if start_delay > 0.0 {
             self.start_delay = Some(start_delay);
