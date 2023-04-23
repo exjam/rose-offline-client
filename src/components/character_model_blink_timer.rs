@@ -1,9 +1,12 @@
 use std::ops::Range;
 
-use bevy::prelude::Component;
+use bevy::{
+    prelude::Component,
+    reflect::{FromReflect, Reflect},
+};
 use rand::Rng;
 
-#[derive(Component)]
+#[derive(Component, Reflect, FromReflect)]
 pub struct CharacterBlinkTimer {
     pub timer: f32,
     pub is_open: bool,

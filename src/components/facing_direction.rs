@@ -1,6 +1,9 @@
-use bevy::prelude::{Component, Vec3};
+use bevy::{
+    prelude::{Component, Vec3},
+    reflect::{FromReflect, Reflect},
+};
 
-#[derive(Component, Default)]
+#[derive(Component, Default, Reflect, FromReflect)]
 pub struct FacingDirection {
     pub desired: f32,
     pub actual: f32,

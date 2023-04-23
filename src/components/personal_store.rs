@@ -1,6 +1,9 @@
-use bevy::prelude::{Component, Entity};
+use bevy::{
+    prelude::{Component, Entity},
+    reflect::{FromReflect, Reflect},
+};
 
-#[derive(Clone, Component)]
+#[derive(Clone, Component, Reflect, FromReflect)]
 pub struct PersonalStore {
     pub title: String,
     pub skin: usize,
@@ -12,7 +15,7 @@ impl PersonalStore {
     }
 }
 
-#[derive(Clone, Component)]
+#[derive(Clone, Component, Reflect, FromReflect)]
 pub struct PersonalStoreModel {
     pub skin: usize,
     pub model: Entity,

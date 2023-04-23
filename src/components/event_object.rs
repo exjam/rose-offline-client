@@ -1,6 +1,9 @@
-use bevy::prelude::Component;
+use bevy::{
+    prelude::Component,
+    reflect::{FromReflect, Reflect},
+};
 
-#[derive(Component)]
+#[derive(Component, Reflect, FromReflect)]
 pub struct EventObject {
     pub quest_trigger_name: String,
     pub script_function_name: String,

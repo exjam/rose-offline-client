@@ -1,44 +1,45 @@
 use bevy::{
     math::{Vec2, Vec3},
     prelude::{Component, Entity},
+    reflect::{FromReflect, Reflect},
 };
 use rose_data::{MotionId, SkillId};
 use std::ops::{Deref, DerefMut};
 
 use rose_game_common::components::MoveMode;
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Reflect, FromReflect)]
 pub struct CommandMove {
     pub destination: Vec3,
     pub target: Option<Entity>,
     pub move_mode: Option<MoveMode>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Reflect, FromReflect)]
 pub struct CommandAttack {
     pub target: Entity,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Reflect, FromReflect)]
 pub struct CommandEmote {
     pub motion_id: MotionId,
     pub is_stop: bool,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Reflect, FromReflect)]
 pub enum CommandSit {
     Sitting,
     Sit,
     Standing,
 }
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Reflect, FromReflect)]
 pub enum CommandCastSkillTarget {
     Entity(Entity),
     Position(Vec2),
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Reflect, FromReflect)]
 pub enum CommandCastSkillState {
     Starting,
     Casting,
@@ -46,7 +47,7 @@ pub enum CommandCastSkillState {
     Action,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Reflect, FromReflect)]
 pub struct CommandCastSkill {
     pub skill_id: SkillId,
     pub skill_target: Option<CommandCastSkillTarget>,
@@ -57,7 +58,7 @@ pub struct CommandCastSkill {
     pub ready_action: bool,
 }
 
-#[derive(Component, Clone, Debug, PartialEq)]
+#[derive(Component, Clone, Debug, PartialEq, Reflect, FromReflect)]
 pub enum Command {
     Stop,
     Move(CommandMove),
@@ -212,7 +213,7 @@ impl Command {
     }
 }
 
-#[derive(Component, Debug, Default)]
+#[derive(Component, Debug, Default, Reflect, FromReflect)]
 pub struct NextCommand(Option<Command>);
 
 impl NextCommand {

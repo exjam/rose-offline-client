@@ -1,6 +1,9 @@
-use bevy::prelude::Component;
+use bevy::{
+    prelude::Component,
+    reflect::{FromReflect, Reflect},
+};
 
-#[derive(Component)]
+#[derive(Component, Reflect, FromReflect)]
 pub struct Effect {
     pub manual_despawn: bool,
 }
@@ -11,8 +14,8 @@ impl Effect {
     }
 }
 
-#[derive(Component, Default)]
+#[derive(Component, Default, Reflect, FromReflect)]
 pub struct EffectMesh {}
 
-#[derive(Component, Default)]
+#[derive(Component, Default, Reflect, FromReflect)]
 pub struct EffectParticle {}

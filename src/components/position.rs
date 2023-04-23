@@ -1,6 +1,9 @@
-use bevy::prelude::{Component, Deref, DerefMut, Vec3};
+use bevy::{
+    prelude::{Component, Deref, DerefMut, Vec3},
+    reflect::{FromReflect, Reflect},
+};
 
-#[derive(Component, Clone, Debug, Deref, DerefMut)]
+#[derive(Component, Clone, Debug, Deref, DerefMut, Reflect, FromReflect)]
 pub struct Position {
     pub position: Vec3,
 }

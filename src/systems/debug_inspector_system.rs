@@ -7,12 +7,10 @@ use bevy::{
 use bevy_egui::EguiContexts;
 use bevy_rapier3d::prelude::{CollisionGroups, Group, QueryFilter, RapierContext};
 
+use rose_game_common::{components::*, messages::ClientEntityId};
+
 use crate::{
-    components::{
-        ColliderEntity, ColliderParent, ZoneObject, ZoneObjectAnimatedObject, ZoneObjectId,
-        ZoneObjectPart, ZoneObjectPartCollisionShape, ZoneObjectTerrain,
-        COLLISION_FILTER_INSPECTABLE,
-    },
+    components::*,
     ray_from_screenspace::ray_from_screenspace,
     render::{ObjectMaterialBlend, ObjectMaterialGlow},
     resources::DebugInspector,
@@ -25,16 +23,71 @@ impl Plugin for DebugInspectorPlugin {
         app.insert_resource(DebugInspector::default())
             .add_system(debug_inspector_picking_system);
 
-        app.register_type::<ColliderEntity>()
+        app.register_type::<rose_data::MotionId>()
+            .register_type::<rose_data::NpcId>()
+            .register_type::<rose_data::SkillId>()
+            .register_type::<rose_data::WarpGateId>()
+            .register_type::<rose_data::ZoneId>();
+
+        app.register_type::<AbilityValues>()
+            .register_type::<AbilityValuesAdjust>()
+            .register_type::<BasicStats>()
+            .register_type::<CharacterBlinkTimer>()
+            .register_type::<CharacterGender>()
+            .register_type::<CharacterInfo>()
+            .register_type::<ClientEntity>()
+            .register_type::<ClientEntityId>()
+            .register_type::<ClientEntityName>()
+            .register_type::<ClientEntityType>()
+            .register_type::<ColliderEntity>()
             .register_type::<ColliderParent>()
+            .register_type::<Command>()
+            .register_type::<CommandAttack>()
+            .register_type::<CommandCastSkill>()
+            .register_type::<CommandCastSkillState>()
+            .register_type::<CommandCastSkillTarget>()
+            .register_type::<CommandEmote>()
+            .register_type::<CommandMove>()
+            .register_type::<CommandSit>()
+            .register_type::<DamageCategory>()
+            .register_type::<DamageType>()
+            .register_type::<Dead>()
+            .register_type::<DummyBoneOffset>()
+            .register_type::<Effect>()
+            .register_type::<EffectMesh>()
+            .register_type::<EffectParticle>()
+            .register_type::<EventObject>()
+            .register_type::<ExperiencePoints>()
+            .register_type::<FacingDirection>()
+            .register_type::<HealthPoints>()
+            .register_type::<Level>()
+            .register_type::<ManaPoints>()
+            .register_type::<ModelHeight>()
+            .register_type::<MoveMode>()
+            .register_type::<MoveSpeed>()
+            .register_type::<NextCommand>()
+            .register_type::<NightTimeEffect>()
+            .register_type::<Npc>()
+            .register_type::<ObjectMaterialBlend>()
+            .register_type::<ObjectMaterialGlow>()
+            .register_type::<PassiveRecoveryTime>()
+            .register_type::<PersonalStore>()
+            .register_type::<PersonalStoreModel>()
+            .register_type::<PlayerCharacter>()
+            .register_type::<Position>()
+            .register_type::<SkillPoints>()
+            .register_type::<SoundCategory>()
+            .register_type::<Stamina>()
+            .register_type::<StatPoints>()
+            .register_type::<Team>()
+            .register_type::<UnionMembership>()
+            .register_type::<WarpObject>()
             .register_type::<ZoneObject>()
-            .register_type::<ZoneObjectTerrain>()
             .register_type::<ZoneObjectAnimatedObject>()
+            .register_type::<ZoneObjectId>()
             .register_type::<ZoneObjectPart>()
             .register_type::<ZoneObjectPartCollisionShape>()
-            .register_type::<ZoneObjectId>()
-            .register_type::<ObjectMaterialBlend>()
-            .register_type::<ObjectMaterialGlow>();
+            .register_type::<ZoneObjectTerrain>();
 
         app.add_plugin(bevy_inspector_egui::DefaultInspectorConfigPlugin);
     }

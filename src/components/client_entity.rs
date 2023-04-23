@@ -1,8 +1,11 @@
-use bevy::prelude::Component;
+use bevy::{
+    prelude::Component,
+    reflect::{FromReflect, Reflect},
+};
 
 pub use rose_game_common::messages::ClientEntityId;
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Reflect, FromReflect)]
 pub enum ClientEntityType {
     Character,
     Monster,
@@ -10,7 +13,7 @@ pub enum ClientEntityType {
     ItemDrop,
 }
 
-#[derive(Copy, Clone, Component)]
+#[derive(Copy, Clone, Component, Reflect, FromReflect)]
 pub struct ClientEntity {
     pub id: ClientEntityId,
     pub entity_type: ClientEntityType,

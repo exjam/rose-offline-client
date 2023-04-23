@@ -1,7 +1,11 @@
-use bevy::prelude::Component;
+use bevy::{
+    prelude::Component,
+    reflect::{FromReflect, Reflect},
+};
+
 use rose_data::WarpGateId;
 
-#[derive(Component)]
+#[derive(Component, Reflect, FromReflect)]
 pub struct WarpObject {
     pub warp_id: WarpGateId,
     pub last_collision: f64,

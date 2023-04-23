@@ -1,7 +1,11 @@
-use bevy::prelude::Component;
 use std::time::Duration;
 
-#[derive(Component, Default)]
+use bevy::{
+    prelude::Component,
+    reflect::{FromReflect, Reflect},
+};
+
+#[derive(Component, Default, Reflect, FromReflect)]
 pub struct PassiveRecoveryTime {
     pub time: Duration,
 }
