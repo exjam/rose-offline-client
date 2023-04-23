@@ -463,143 +463,146 @@ pub fn command_system(
             })
             .unwrap_or(0);
 
-        // Handle skill casting transitions
-        if let Command::CastSkill(CommandCastSkill {
-            cast_skill_state,
-            ready_action,
-            action_motion_id,
-            cast_repeat_motion_id,
-            ..
-        }) = command.as_mut()
-        {
-            if *ready_action
-                && matches!(
-                    *cast_skill_state,
-                    CommandCastSkillState::Casting | CommandCastSkillState::CastingRepeat
-                )
+        if !next_command.is_die() {
+            // Handle skill casting transitions
+            if let Command::CastSkill(CommandCastSkill {
+                cast_skill_state,
+                ready_action,
+                action_motion_id,
+                cast_repeat_motion_id,
+                ..
+            }) = command.as_mut()
             {
-                if let Some(action_motion_id) = action_motion_id {
-                    let motion_data = if let Some(npc_model) = npc_model {
-                        game_data
-                            .npcs
-                            .get_npc_motion(npc_model.npc_id, *action_motion_id)
-                    } else {
-                        game_data
-                            .character_motion_database
-                            .find_first_character_motion(
-                                *action_motion_id,
-                                weapon_motion_type,
-                                weapon_motion_gender,
-                            )
-                    };
+                if *ready_action
+                    && matches!(
+                        *cast_skill_state,
+                        CommandCastSkillState::Casting | CommandCastSkillState::CastingRepeat
+                    )
+                {
+                    if let Some(action_motion_id) = action_motion_id {
+                        let motion_data = if let Some(npc_model) = npc_model {
+                            game_data
+                                .npcs
+                                .get_npc_motion(npc_model.npc_id, *action_motion_id)
+                        } else {
+                            game_data
+                                .character_motion_database
+                                .find_first_character_motion(
+                                    *action_motion_id,
+                                    weapon_motion_type,
+                                    weapon_motion_gender,
+                                )
+                        };
 
-                    if let Some(motion_data) = motion_data {
-                        update_active_motion(
-                            &mut commands.entity(active_motion_entity),
-                            &mut active_motion,
-                            asset_server.load(motion_data.path.path()),
-                            1.0,
-                            false,
-                        );
+                        if let Some(motion_data) = motion_data {
+                            update_active_motion(
+                                &mut commands.entity(active_motion_entity),
+                                &mut active_motion,
+                                asset_server.load(motion_data.path.path()),
+                                1.0,
+                                false,
+                            );
+                        }
                     }
+
+                    *cast_skill_state = CommandCastSkillState::Action;
+                    continue;
+                } else if !*ready_action
+                    && matches!(*cast_skill_state, CommandCastSkillState::Casting)
+                {
+                    if let Some(cast_repeat_motion_id) = cast_repeat_motion_id {
+                        let motion_data = if let Some(npc_model) = npc_model {
+                            game_data
+                                .npcs
+                                .get_npc_motion(npc_model.npc_id, *cast_repeat_motion_id)
+                        } else {
+                            game_data
+                                .character_motion_database
+                                .find_first_character_motion(
+                                    *cast_repeat_motion_id,
+                                    weapon_motion_type,
+                                    weapon_motion_gender,
+                                )
+                        };
+
+                        if let Some(motion_data) = motion_data {
+                            update_active_motion(
+                                &mut commands.entity(active_motion_entity),
+                                &mut active_motion,
+                                asset_server.load(motion_data.path.path()),
+                                1.0,
+                                true,
+                            );
+                        }
+                    }
+
+                    *cast_skill_state = CommandCastSkillState::CastingRepeat;
+                    continue;
+                } else if !*ready_action
+                    && matches!(*cast_skill_state, CommandCastSkillState::CastingRepeat)
+                {
+                    // Repeat CastingRepeat motion until ready_action is true
+                    continue;
+                } else if matches!(cast_skill_state, CommandCastSkillState::Action)
+                    && next_command.is_none()
+                {
+                    *next_command = NextCommand::with_stop();
                 }
+            }
 
-                *cast_skill_state = CommandCastSkillState::Action;
-                continue;
-            } else if !*ready_action && matches!(*cast_skill_state, CommandCastSkillState::Casting)
-            {
-                if let Some(cast_repeat_motion_id) = cast_repeat_motion_id {
-                    let motion_data = if let Some(npc_model) = npc_model {
-                        game_data
-                            .npcs
-                            .get_npc_motion(npc_model.npc_id, *cast_repeat_motion_id)
+            if next_command.is_none() {
+                if !command.is_stop() {
+                    // If we have completed current command, and there is no next command, then clear current.
+                    // This does not apply for some commands which must be manually completed, such as Sit
+                    // where you need to stand after.
+                    if !command.is_manual_complete() {
+                        *next_command = NextCommand::with_stop();
                     } else {
-                        game_data
-                            .character_motion_database
-                            .find_first_character_motion(
-                                *cast_repeat_motion_id,
-                                weapon_motion_type,
-                                weapon_motion_gender,
-                            )
-                    };
-
-                    if let Some(motion_data) = motion_data {
+                        continue;
+                    }
+                } else {
+                    // Nothing to do, ensure we are using correct idle animation
+                    if let Some(motion) = get_stop_animation(character_model, npc_model, vehicle) {
                         update_active_motion(
                             &mut commands.entity(active_motion_entity),
                             &mut active_motion,
-                            asset_server.load(motion_data.path.path()),
+                            motion,
                             1.0,
                             true,
                         );
                     }
-                }
 
-                *cast_skill_state = CommandCastSkillState::CastingRepeat;
-                continue;
-            } else if !*ready_action
-                && matches!(*cast_skill_state, CommandCastSkillState::CastingRepeat)
-            {
-                // Repeat CastingRepeat motion until ready_action is true
-                continue;
-            } else if matches!(cast_skill_state, CommandCastSkillState::Action)
-                && next_command.is_none()
-            {
-                *next_command = NextCommand::with_stop();
-            }
-        }
+                    if let Some(motion) =
+                        get_vehicle_action_animation(vehicle_model, VehicleMotionAction::Stop)
+                    {
+                        update_active_motion(
+                            &mut commands.entity(vehicle_active_motion_entity),
+                            &mut vehicle_active_motion,
+                            motion,
+                            1.0,
+                            true,
+                        )
+                    }
 
-        if next_command.is_none() {
-            if !command.is_stop() {
-                // If we have completed current command, and there is no next command, then clear current.
-                // This does not apply for some commands which must be manually completed, such as Sit
-                // where you need to stand after.
-                if !command.is_manual_complete() {
-                    *next_command = NextCommand::with_stop();
-                } else {
                     continue;
                 }
-            } else {
-                // Nothing to do, ensure we are using correct idle animation
-                if let Some(motion) = get_stop_animation(character_model, npc_model, vehicle) {
+            }
+
+            if command.is_sit() {
+                // If current command is sit, we must stand before performing NextCommand
+                if let Some(motion) = get_standing_animation(character_model, npc_model) {
                     update_active_motion(
                         &mut commands.entity(active_motion_entity),
                         &mut active_motion,
                         motion,
                         1.0,
-                        true,
+                        false,
                     );
                 }
 
-                if let Some(motion) =
-                    get_vehicle_action_animation(vehicle_model, VehicleMotionAction::Stop)
-                {
-                    update_active_motion(
-                        &mut commands.entity(vehicle_active_motion_entity),
-                        &mut vehicle_active_motion,
-                        motion,
-                        1.0,
-                        true,
-                    )
-                }
-
+                *command = Command::with_standing();
                 continue;
             }
-        }
-
-        if command.is_sit() && !next_command.is_die() {
-            // If current command is sit, we must stand before performing NextCommand
-            if let Some(motion) = get_standing_animation(character_model, npc_model) {
-                update_active_motion(
-                    &mut commands.entity(active_motion_entity),
-                    &mut active_motion,
-                    motion,
-                    1.0,
-                    false,
-                );
-            }
-
-            *command = Command::with_standing();
-            continue;
         }
 
         match (*next_command).as_mut().unwrap() {
