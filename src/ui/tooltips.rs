@@ -232,7 +232,7 @@ fn add_item_equip_requirement(
         for union_id in item_data.equip_union_requirement.iter() {
             if let Some(player) = player {
                 if let Some(current_union) = player.union_membership.current_union {
-                    if current_union.get() == *union_id as usize {
+                    if current_union == *union_id  {
                         union_color = egui::Color32::GREEN;
                     }
                 }
