@@ -1,9 +1,11 @@
+use std::{collections::HashMap, time::Duration};
+
 use bevy::prelude::Component;
 use enum_map::{Enum, EnumMap};
+
 use rose_data::{
     ItemClass, ItemReference, ItemType, SkillCooldownGroup, SkillId, StatusEffectType,
 };
-use std::{collections::HashMap, time::Duration};
 
 use crate::resources::GameData;
 
@@ -95,11 +97,7 @@ impl Cooldowns {
     }
 
     pub fn get_skill_group_cooldown_percent(&self, group: SkillCooldownGroup) -> Option<f32> {
-        self.get_cooldown(
-            self.skill_groups
-                .get(&group.0.get())
-                .and_then(|x| x.as_ref()),
-        )
+        self.get_cooldown(self.skill_groups.get(&group.get()).and_then(|x| x.as_ref()))
     }
 
     pub fn set_global_cooldown(&mut self, duration: Duration) {

@@ -185,8 +185,8 @@ impl<'a> DragAndDropSlot<'a> {
 
         let cooldown_percent = if let Some(cooldowns) = cooldowns {
             skill_data.and_then(|skill_data| match &skill_data.cooldown {
-                SkillCooldown::Skill(_) => cooldowns.get_skill_cooldown_percent(skill_data.id),
-                SkillCooldown::Group(group, _) => {
+                SkillCooldown::Skill { .. } => cooldowns.get_skill_cooldown_percent(skill_data.id),
+                SkillCooldown::Group { group, .. } => {
                     cooldowns.get_skill_group_cooldown_percent(*group)
                 }
             })
