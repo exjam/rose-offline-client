@@ -814,7 +814,10 @@ fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsC
         (
             ability_values_system,
             clan_system,
-            command_system,
+            command_system
+                .after(npc_model_update_system)
+                .after(npc_model_add_collider_system)
+                .after(spawn_effect_system),
             facing_direction_system.after(command_system),
             update_position_system.before(directional_light_system),
             collision_player_system_join_zoin
