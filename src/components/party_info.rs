@@ -2,7 +2,7 @@ use bevy::prelude::Component;
 
 use rose_game_common::{
     components::CharacterUniqueId,
-    messages::{server::PartyMemberInfo, PartyItemSharing, PartyXpSharing},
+    messages::{server::PartyMemberInfo, ClientEntityId, PartyItemSharing, PartyXpSharing},
 };
 
 pub enum PartyOwner {
@@ -27,5 +27,13 @@ impl Default for PartyInfo {
             item_sharing: PartyItemSharing::EqualLootDistribution,
             xp_sharing: PartyXpSharing::EqualShare,
         }
+    }
+}
+
+impl PartyInfo {
+    pub fn contains_member(&self, client_entity_id: ClientEntityId) -> bool {
+        self.members
+            .iter()
+            .any(|member| member.get_client_entity_id() == Some(client_entity_id))
     }
 }

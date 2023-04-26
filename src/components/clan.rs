@@ -28,6 +28,10 @@ pub struct Clan {
 }
 
 impl Clan {
+    pub fn find_member(&self, name: &str) -> Option<&ClanMember> {
+        self.members.iter().find(|member| member.name == name)
+    }
+
     pub fn find_member_mut(&mut self, name: &str) -> Option<&mut ClanMember> {
         self.members.iter_mut().find(|member| member.name == name)
     }

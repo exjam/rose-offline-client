@@ -64,6 +64,18 @@ impl Cooldowns {
         self.global.is_some()
     }
 
+    pub fn has_skill_cooldown(&self, skill_id: SkillId) -> bool {
+        self.skills
+            .get(&skill_id.get())
+            .map_or(false, |cooldown| cooldown.is_some())
+    }
+
+    pub fn has_skill_group_cooldown(&self, skill_group: usize) -> bool {
+        self.skill_groups
+            .get(&skill_group)
+            .map_or(false, |cooldown| cooldown.is_some())
+    }
+
     pub fn get_global_cooldown_percent(&self) -> Option<f32> {
         if let Some((global_current, global_total)) = self.global.as_ref() {
             return Some(global_current.as_secs_f32() / global_total.as_secs_f32());
@@ -102,6 +114,16 @@ impl Cooldowns {
 
     pub fn set_global_cooldown(&mut self, duration: Duration) {
         self.global = Some((duration, duration));
+    }
+
+    pub fn set_skill_cooldown(&mut self, skill_id: SkillId, duration: Duration) {
+        self.skills
+            .insert(skill_id.get(), Some((duration, duration)));
+    }
+
+    pub fn set_skill_group_cooldown(&mut self, skill_group: usize, duration: Duration) {
+        self.skill_groups
+            .insert(skill_group, Some((duration, duration)));
     }
 
     pub fn set_consumable_cooldown(&mut self, group: ConsumableCooldownGroup, cooldown: Duration) {

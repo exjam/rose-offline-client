@@ -9,7 +9,8 @@ use bevy::{
 };
 
 use rose_data::{
-    AbilityType, EquipmentItem, Item, ItemReference, ItemSlotBehaviour, ItemType, StatusEffectType,
+    AbilityType, EquipmentItem, Item, ItemReference, ItemSlotBehaviour, ItemType, SkillCooldown,
+    StatusEffectType,
 };
 use rose_game_common::{
     components::{
@@ -1367,6 +1368,31 @@ pub fn game_connection_system(
                         None,
                         None,
                     ));
+
+                    if client_entity_list.player_entity == Some(entity) {
+                        if let Some(skill_data) = game_data.skills.get_skill(skill_id) {
+                            match skill_data.cooldown {
+                                SkillCooldown::Skill { duration } => {
+                                    commands.add(move |world: &mut World| {
+                                        let mut character = world.entity_mut(entity);
+
+                                        if let Some(mut cooldowns) = character.get_mut::<Cooldowns>() {
+                                            cooldowns.set_skill_cooldown(skill_id, duration);
+                                        }
+                                    });
+                                },
+                                SkillCooldown::Group { group, duration } => {
+                                    commands.add(move |world: &mut World| {
+                                        let mut character = world.entity_mut(entity);
+
+                                        if let Some(mut cooldowns) = character.get_mut::<Cooldowns>() {
+                                            cooldowns.set_skill_group_cooldown(group.get(), duration);
+                                        }
+                                    });
+                                },
+                            }
+                        }
+                    }
                 }
             }
             Ok(ServerMessage::CastSkillTargetEntity { entity_id, skill_id, target_entity_id, target_distance: _, target_position: _, cast_motion_id }) => {
@@ -1380,6 +1406,31 @@ pub fn game_connection_system(
                             None,
                         ));
                     }
+
+                    if client_entity_list.player_entity == Some(entity) {
+                        if let Some(skill_data) = game_data.skills.get_skill(skill_id) {
+                            match skill_data.cooldown {
+                                SkillCooldown::Skill { duration } => {
+                                    commands.add(move |world: &mut World| {
+                                        let mut character = world.entity_mut(entity);
+
+                                        if let Some(mut cooldowns) = character.get_mut::<Cooldowns>() {
+                                            cooldowns.set_skill_cooldown(skill_id, duration);
+                                        }
+                                    });
+                                },
+                                SkillCooldown::Group { group, duration } => {
+                                    commands.add(move |world: &mut World| {
+                                        let mut character = world.entity_mut(entity);
+
+                                        if let Some(mut cooldowns) = character.get_mut::<Cooldowns>() {
+                                            cooldowns.set_skill_group_cooldown(group.get(), duration);
+                                        }
+                                    });
+                                },
+                            }
+                        }
+                    }
                 }
             }
             Ok(ServerMessage::CastSkillTargetPosition { entity_id, skill_id, target_position, cast_motion_id }) => {
@@ -1391,6 +1442,31 @@ pub fn game_connection_system(
                         None,
                         None,
                     ));
+
+                    if client_entity_list.player_entity == Some(entity) {
+                        if let Some(skill_data) = game_data.skills.get_skill(skill_id) {
+                            match skill_data.cooldown {
+                                SkillCooldown::Skill { duration } => {
+                                    commands.add(move |world: &mut World| {
+                                        let mut character = world.entity_mut(entity);
+
+                                        if let Some(mut cooldowns) = character.get_mut::<Cooldowns>() {
+                                            cooldowns.set_skill_cooldown(skill_id, duration);
+                                        }
+                                    });
+                                },
+                                SkillCooldown::Group { group, duration } => {
+                                    commands.add(move |world: &mut World| {
+                                        let mut character = world.entity_mut(entity);
+
+                                        if let Some(mut cooldowns) = character.get_mut::<Cooldowns>() {
+                                            cooldowns.set_skill_group_cooldown(group.get(), duration);
+                                        }
+                                    });
+                                },
+                            }
+                        }
+                    }
                 }
             }
             Ok(ServerMessage::CancelCastingSkill { entity_id, reason: _ }) => {

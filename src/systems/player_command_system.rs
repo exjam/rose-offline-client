@@ -7,17 +7,18 @@ use bevy::{
 };
 
 use rose_data::{
-    AmmoIndex, EquipmentIndex, ItemClass, ItemType, SkillBasicCommand, SkillType, VehiclePartIndex,
+    AmmoIndex, EquipmentIndex, ItemClass, ItemType, SkillBasicCommand, SkillCooldown,
+    SkillTargetFilter, SkillType, VehiclePartIndex,
 };
 use rose_game_common::{
-    components::{Hotbar, HotbarSlot, Inventory, ItemDrop, SkillList, Team},
+    components::{CharacterInfo, Hotbar, HotbarSlot, Inventory, ItemDrop, SkillList, Team},
     messages::client::ClientMessage,
 };
 
 use crate::{
     components::{
-        Bank, ClientEntity, ConsumableCooldownGroup, Cooldowns, PartyInfo, PlayerCharacter,
-        Position,
+        Bank, Clan, ClientEntity, ClientEntityType, Command, ConsumableCooldownGroup, Cooldowns,
+        PartyInfo, PlayerCharacter, Position,
     },
     events::{ChatboxEvent, PlayerCommandEvent},
     resources::{GameConnection, GameData, SelectedTarget},
@@ -27,7 +28,9 @@ use crate::{
 #[world_query(mutable)]
 pub struct PlayerQuery<'w> {
     _player_character: With<PlayerCharacter>,
+
     entity: Entity,
+
     bank: Option<&'w Bank>,
     cooldowns: &'w mut Cooldowns,
     hotbar: &'w mut Hotbar,
@@ -35,7 +38,18 @@ pub struct PlayerQuery<'w> {
     position: &'w Position,
     skill_list: &'w SkillList,
     team: &'w Team,
+    clan: Option<&'w Clan>,
     party_info: Option<&'w PartyInfo>,
+}
+
+#[derive(WorldQuery)]
+pub struct SkillTargetQuery<'w> {
+    entity: Entity,
+
+    character_info: Option<&'w CharacterInfo>,
+    client_entity: &'w ClientEntity,
+    command: &'w Command,
+    team: &'w Team,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -45,6 +59,7 @@ pub fn player_command_system(
     query_client_entity: Query<&ClientEntity>,
     query_dropped_items: Query<(&ClientEntity, &Position), With<ItemDrop>>,
     query_team: Query<(&ClientEntity, &Team)>,
+    query_skill_target: Query<SkillTargetQuery>,
     mut chatbox_events: EventWriter<ChatboxEvent>,
     game_connection: Option<Res<GameConnection>>,
     game_data: Res<GameData>,
@@ -88,8 +103,16 @@ pub fn player_command_system(
                     .get_skill(skill_slot)
                     .and_then(|skill_id| game_data.skills.get_skill(skill_id))
                 {
-                    // TODO: Check skill cooldown
-                    if player.cooldowns.has_global_cooldown() {
+                    let has_skill_cooldown = match &skill_data.cooldown {
+                        SkillCooldown::Skill { .. } => {
+                            player.cooldowns.has_skill_cooldown(skill_data.id)
+                        }
+                        SkillCooldown::Group { group, .. } => {
+                            player.cooldowns.has_skill_group_cooldown(group.get())
+                        }
+                    };
+
+                    if has_skill_cooldown || player.cooldowns.has_global_cooldown() {
                         chatbox_events.send(ChatboxEvent::System("Waiting...".to_string()));
                         continue;
                     }
@@ -263,13 +286,6 @@ pub fn player_command_system(
                             }
                         }
 
-                        SkillType::AreaTarget => {
-                            log::warn!(
-                                "Unimplemented target position skill type: {:?}",
-                                skill_data.skill_type
-                            );
-                        }
-
                         SkillType::EnforceWeapon
                         | SkillType::Immediate
                         | SkillType::TargetBound
@@ -278,18 +294,118 @@ pub fn player_command_system(
                         | SkillType::SelfAndTarget
                         | SkillType::Resurrection
                         | SkillType::EnforceBullet
-                        | SkillType::FireBullet => {
-                            // TODO: Check target team
-                            if let Some((target_client_entity, _)) = selected_target
-                                .selected
-                                .and_then(|selected_entity| query_team.get(selected_entity).ok())
-                            {
+                        | SkillType::FireBullet
+                        | SkillType::AreaTarget => {
+                            let target_entity_id = {
+                                if let Ok(target) = query_skill_target
+                                    .get(selected_target.selected.unwrap_or(player.entity))
+                                {
+                                    let target_is_alive = !target.command.is_die();
+                                    let target_is_caster = target.entity == player.entity;
+                                    let target_is_valid = match skill_data.target_filter {
+                                        SkillTargetFilter::OnlySelf => {
+                                            target_is_alive && target_is_caster
+                                        }
+                                        SkillTargetFilter::Group => {
+                                            target_is_alive
+                                                && (target_is_caster
+                                                    || player.party_info.map_or(
+                                                        false,
+                                                        |party_info| {
+                                                            party_info.contains_member(
+                                                                target.client_entity.id,
+                                                            )
+                                                        },
+                                                    ))
+                                        }
+                                        SkillTargetFilter::Guild => {
+                                            target_is_alive
+                                                && (target_is_caster
+                                                    || target.character_info.map_or(
+                                                        false,
+                                                        |character_info| {
+                                                            player.clan.map_or(false, |clan| {
+                                                                clan.find_member(
+                                                                    &character_info.name,
+                                                                )
+                                                                .is_some()
+                                                            })
+                                                        },
+                                                    ))
+                                        }
+                                        SkillTargetFilter::Allied => {
+                                            target_is_alive && target.team.id == player.team.id
+                                        }
+                                        SkillTargetFilter::Monster => {
+                                            target_is_alive
+                                                && matches!(
+                                                    target.client_entity.entity_type,
+                                                    ClientEntityType::Monster
+                                                )
+                                        }
+                                        SkillTargetFilter::Enemy => {
+                                            target_is_alive
+                                                && target.team.id != Team::DEFAULT_NPC_TEAM_ID
+                                                && target.team.id != player.team.id
+                                        }
+                                        SkillTargetFilter::EnemyCharacter => {
+                                            target_is_alive
+                                                && target.team.id != player.team.id
+                                                && matches!(
+                                                    target.client_entity.entity_type,
+                                                    ClientEntityType::Character
+                                                )
+                                        }
+                                        SkillTargetFilter::Character => {
+                                            target_is_alive
+                                                && matches!(
+                                                    target.client_entity.entity_type,
+                                                    ClientEntityType::Character
+                                                )
+                                        }
+                                        SkillTargetFilter::CharacterOrMonster => {
+                                            target_is_alive
+                                                && matches!(
+                                                    target.client_entity.entity_type,
+                                                    ClientEntityType::Character
+                                                        | ClientEntityType::Monster
+                                                )
+                                        }
+                                        SkillTargetFilter::DeadAlliedCharacter => {
+                                            !target_is_alive
+                                                && target.team.id == player.team.id
+                                                && matches!(
+                                                    target.client_entity.entity_type,
+                                                    ClientEntityType::Character
+                                                )
+                                        }
+                                        SkillTargetFilter::EnemyMonster => {
+                                            target_is_alive
+                                                && target.team.id != player.team.id
+                                                && matches!(
+                                                    target.client_entity.entity_type,
+                                                    ClientEntityType::Monster
+                                                )
+                                        }
+                                    };
+
+                                    if target_is_valid {
+                                        Some(target.client_entity.id)
+                                    } else {
+                                        None
+                                    }
+                                } else {
+                                    None
+                                }
+                            };
+
+                            if let Some(target_entity_id) = target_entity_id {
                                 if let Some(game_connection) = game_connection.as_ref() {
                                     game_connection
                                         .client_message_tx
                                         .send(ClientMessage::CastSkillTargetEntity {
                                             skill_slot,
-                                            target_entity_id: target_client_entity.id,
+                                            target_entity_id,
                                         })
                                         .ok();
                                 }
