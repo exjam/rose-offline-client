@@ -1,5 +1,5 @@
-#import bevy_render::view
-#import rose_client::zone_lighting
+#import bevy_render::view View
+#import rose_client::zone_lighting apply_zone_lighting_fog
 
 @group(0) @binding(0)
 var<uniform> view: View;

@@ -262,7 +262,7 @@ pub fn game_connection_system(
                     client_entity_list.player_entity_id = Some(entity_id);
 
                     // Transition to in game state if we are not already
-                    if !matches!(app_state_current.0, AppState::Game) {
+                    if !matches!(app_state_current.get(), AppState::Game) {
                         app_state_next.set(AppState::Game);
                     }
                 }
@@ -772,14 +772,14 @@ pub fn game_connection_system(
                         match item_slot {
                             ItemSlot::Equipment(index) => {
                                 if let Some(mut equipment) = world.entity_mut(entity).get_mut::<Equipment>() {
-                                    if let Some(mut equipment_item) = equipment.get_equipment_item_mut(index) {
+                                    if let Some(equipment_item) = equipment.get_equipment_item_mut(index) {
                                         equipment_item.life = life;
                                     }
                                 }
                             },
                             ItemSlot::Vehicle(index) => {
                                 if let Some(mut equipment) = world.entity_mut(entity).get_mut::<Equipment>() {
-                                    if let Some(mut equipment_item) = equipment.get_vehicle_item_mut(index) {
+                                    if let Some(equipment_item) = equipment.get_vehicle_item_mut(index) {
                                         equipment_item.life = life;
                                     }
                                 }

@@ -1,8 +1,5 @@
-#import bevy_pbr::mesh_types
-#import bevy_pbr::mesh_view_bindings
-
-@group(2) @binding(0)
-var<uniform> mesh: Mesh;
+#import bevy_pbr::mesh_bindings mesh
+#import bevy_pbr::mesh_view_bindings view
 
 struct Vertex {
     @location(0) position: vec3<f32>,

@@ -58,7 +58,7 @@ pub fn ui_debug_zone_list_system(
                     }
                     ui.end_row();
 
-                    if matches!(app_state.0, AppState::ZoneViewer) {
+                    if matches!(app_state.get(), AppState::ZoneViewer) {
                         ui.label("Despawn other zones:");
                         ui.checkbox(&mut ui_state.despawn_other_zones, "Despawn");
                         ui.end_row();
@@ -127,7 +127,7 @@ pub fn ui_debug_zone_list_system(
                                 ui.label(zone_data.name);
                             });
 
-                            row.col(|ui| match app_state.0 {
+                            row.col(|ui| match app_state.get() {
                                 AppState::Game => {
                                     if ui.button("Teleport").clicked() {
                                         if let Some(game_connection) = game_connection.as_ref() {

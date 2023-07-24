@@ -16,7 +16,7 @@ use bevy::{
         GlobalTransform, Handle, HandleUntyped, Image, Local, Mesh, Res, ResMut, Transform,
         Visibility,
     },
-    reflect::TypeUuid,
+    reflect::{TypePath, TypeUuid},
     render::{
         mesh::{Indices, PrimitiveTopology},
         view::NoFrustumCulling,
@@ -79,7 +79,7 @@ pub struct ZoneNpc {
     pub npc_id: NpcId,
 }
 
-#[derive(TypeUuid)]
+#[derive(TypeUuid, TypePath)]
 #[uuid = "596e2c17-f2dd-4276-8df4-1e94dc0d056b"]
 pub struct ZoneLoaderAsset {
     pub zone_id: ZoneId,

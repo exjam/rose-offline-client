@@ -1,4 +1,5 @@
-use bevy::prelude::{Entity, Transform};
+use bevy::prelude::{Entity, Event, Transform};
+
 use rose_data::EffectFileId;
 use rose_file_readers::VfsPathBuf;
 
@@ -33,6 +34,7 @@ impl SpawnEffectData {
     }
 }
 
+#[derive(Event)]
 pub enum SpawnEffectEvent {
     // Spawns an effect at the same location than Entity, but does not attach to entity
     AtEntity(Entity, SpawnEffectData),

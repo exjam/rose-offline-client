@@ -24,7 +24,7 @@ use bevy::{
             ComputedVisibility, ExtractedView, ViewTarget, ViewUniform, ViewUniformOffset,
             ViewUniforms, VisibilitySystems,
         },
-        Extract, ExtractSchedule, RenderApp, RenderSet,
+        Extract, ExtractSchedule, Render, RenderApp, RenderSet,
     },
 };
 use bytemuck::Pod;
@@ -50,19 +50,30 @@ impl Plugin for ParticleRenderPlugin {
             Shader::from_wgsl
         );
 
-        app.add_system(compute_particles_aabb.in_set(VisibilitySystems::CalculateBounds));
+        app.add_systems(
+            PostUpdate,
+            compute_particles_aabb.in_set(VisibilitySystems::CalculateBounds),
+        );
 
         let render_app = app.sub_app_mut(RenderApp);
         render_app
-            .add_system(extract_particles.in_schedule(ExtractSchedule))
-            .add_system(prepare_particles.in_set(RenderSet::Prepare))
-            .add_system(queue_particles.in_set(RenderSet::Queue))
-            .init_resource::<ParticlePipeline>()
+            .add_systems(ExtractSchedule, extract_particles)
+            .add_systems(Render, prepare_particles.in_set(RenderSet::Prepare))
+            .add_systems(Render, queue_particles.in_set(RenderSet::Queue))
             .init_resource::<ParticleMeta>()
             .init_resource::<ExtractedParticles>()
             .init_resource::<MaterialBindGroups>()
             .init_resource::<SpecializedRenderPipelines<ParticlePipeline>>()
             .add_render_command::<Transparent3d, DrawParticle>();
+    }
+
+    fn finish(&self, app: &mut App) {
+        let render_app = match app.get_sub_app_mut(RenderApp) {
+            Ok(render_app) => render_app,
+            Err(_) => return,
+        };
+
+        render_app.init_resource::<ParticlePipeline>();
     }
 }
 
@@ -76,7 +87,7 @@ struct ParticlePipeline {
 
 impl FromWorld for ParticlePipeline {
     fn from_world(world: &mut World) -> Self {
-        let render_device = world.get_resource::<RenderDevice>().unwrap();
+        let render_device = world.resource::<RenderDevice>();
 
         let view_layout = render_device.create_bind_group_layout(&BindGroupLayoutDescriptor {
             entries: &[BindGroupLayoutEntry {
@@ -85,7 +96,7 @@ impl FromWorld for ParticlePipeline {
                 ty: BindingType::Buffer {
                     ty: BufferBindingType::Uniform,
                     has_dynamic_offset: true,
-                    min_binding_size: BufferSize::new(std::mem::size_of::<ViewUniform>() as u64),
+                    min_binding_size: Some(ViewUniform::min_size()),
                 },
                 count: None,
             }],
@@ -102,7 +113,7 @@ impl FromWorld for ParticlePipeline {
                     ty: BindingType::Buffer {
                         ty: BufferBindingType::Storage { read_only: true },
                         has_dynamic_offset: false,
-                        min_binding_size: BufferSize::new(std::mem::size_of::<Vec4>() as u64),
+                        min_binding_size: Some(Vec4::min_size()),
                     },
                     count: None,
                 },
@@ -113,7 +124,7 @@ impl FromWorld for ParticlePipeline {
                     ty: BindingType::Buffer {
                         ty: BufferBindingType::Storage { read_only: true },
                         has_dynamic_offset: false,
-                        min_binding_size: BufferSize::new(std::mem::size_of::<Vec2>() as u64),
+                        min_binding_size: Some(Vec2::min_size()),
                     },
                     count: None,
                 },
@@ -124,7 +135,7 @@ impl FromWorld for ParticlePipeline {
                     ty: BindingType::Buffer {
                         ty: BufferBindingType::Storage { read_only: true },
                         has_dynamic_offset: false,
-                        min_binding_size: BufferSize::new(std::mem::size_of::<Vec4>() as u64),
+                        min_binding_size: Some(Vec4::min_size()),
                     },
                     count: None,
                 },
@@ -135,7 +146,7 @@ impl FromWorld for ParticlePipeline {
                     ty: BindingType::Buffer {
                         ty: BufferBindingType::Storage { read_only: true },
                         has_dynamic_offset: false,
-                        min_binding_size: BufferSize::new(std::mem::size_of::<Vec4>() as u64),
+                        min_binding_size: Some(Vec4::min_size()),
                     },
                     count: None,
                 },
@@ -182,6 +193,7 @@ impl FromWorld for ParticlePipeline {
 }
 
 bitflags::bitflags! {
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
     #[repr(transparent)]
     pub struct ParticlePipelineKey: u32 {
         const NONE                        = 0;
@@ -237,7 +249,7 @@ impl ParticlePipelineKey {
 
     pub fn from_msaa_samples(msaa_samples: u32) -> Self {
         let msaa_bits = ((msaa_samples - 1) & Self::MSAA_MASK_BITS) << Self::MSAA_SHIFT_BITS;
-        ParticlePipelineKey::from_bits(msaa_bits).unwrap()
+        ParticlePipelineKey::from_bits_retain(msaa_bits)
     }
 
     pub fn from_hdr(hdr: bool) -> Self {
@@ -252,39 +264,39 @@ impl ParticlePipelineKey {
         let blend_bits = (blend_op as u32) << Self::BLEND_OP_SHIFT_BITS
             | (src_blend_factor as u32) << Self::SRC_BLEND_FACTOR_SHIFT_BITS
             | (dst_blend_factor as u32) << Self::DST_BLEND_FACTOR_SHIFT_BITS;
-        ParticlePipelineKey::from_bits(blend_bits).unwrap()
+        ParticlePipelineKey::from_bits_retain(blend_bits)
     }
 
     pub fn from_billboard(billboard_type: ParticleRenderBillboardType) -> Self {
         let billboard_bits = (billboard_type as u32) << Self::BILLBOARD_SHIFT_BITS;
-        ParticlePipelineKey::from_bits(billboard_bits).unwrap()
+        ParticlePipelineKey::from_bits_retain(billboard_bits)
     }
 
     pub fn billboard_type(&self) -> ParticleRenderBillboardType {
         FromPrimitive::from_u32(
-            (self.bits >> Self::BILLBOARD_SHIFT_BITS) & Self::BILLBOARD_MASK_BITS,
+            (self.bits() >> Self::BILLBOARD_SHIFT_BITS) & Self::BILLBOARD_MASK_BITS,
         )
         .unwrap()
     }
 
     pub fn blend_op(&self) -> BlendOperation {
-        decode_blend_op((self.bits >> Self::BLEND_OP_SHIFT_BITS) & Self::BLEND_OP_MASK_BITS)
+        decode_blend_op((self.bits() >> Self::BLEND_OP_SHIFT_BITS) & Self::BLEND_OP_MASK_BITS)
     }
 
     pub fn src_blend_factor(&self) -> BlendFactor {
         decode_blend_factor(
-            (self.bits >> Self::SRC_BLEND_FACTOR_SHIFT_BITS) & Self::BLEND_FACTOR_MASK_BITS,
+            (self.bits() >> Self::SRC_BLEND_FACTOR_SHIFT_BITS) & Self::BLEND_FACTOR_MASK_BITS,
         )
     }
 
     pub fn dst_blend_factor(&self) -> BlendFactor {
         decode_blend_factor(
-            (self.bits >> Self::DST_BLEND_FACTOR_SHIFT_BITS) & Self::BLEND_FACTOR_MASK_BITS,
+            (self.bits() >> Self::DST_BLEND_FACTOR_SHIFT_BITS) & Self::BLEND_FACTOR_MASK_BITS,
         )
     }
 
     pub fn msaa_samples(&self) -> u32 {
-        ((self.bits >> Self::MSAA_SHIFT_BITS) & Self::MSAA_MASK_BITS) + 1
+        ((self.bits() >> Self::MSAA_SHIFT_BITS) & Self::MSAA_MASK_BITS) + 1
     }
 }
 

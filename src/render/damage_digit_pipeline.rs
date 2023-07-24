@@ -23,7 +23,7 @@ use bevy::{
             ComputedVisibility, ExtractedView, ViewTarget, ViewUniform, ViewUniformOffset,
             ViewUniforms,
         },
-        Extract, ExtractSchedule, RenderApp, RenderSet,
+        Extract, ExtractSchedule, Render, RenderApp, RenderSet,
     },
 };
 use bytemuck::Pod;
@@ -47,15 +47,23 @@ impl Plugin for DamageDigitRenderPlugin {
 
         let render_app = app.sub_app_mut(RenderApp);
         render_app
-            .add_system(extract_damage_digits.in_schedule(ExtractSchedule))
-            .add_system(prepare_damage_digits.in_set(RenderSet::Prepare))
-            .add_system(queue_damage_digits.in_set(RenderSet::Queue))
-            .init_resource::<DamageDigitPipeline>()
+            .add_systems(ExtractSchedule, extract_damage_digits)
+            .add_systems(Render, prepare_damage_digits.in_set(RenderSet::Prepare))
+            .add_systems(Render, queue_damage_digits.in_set(RenderSet::Queue))
             .init_resource::<DamageDigitMeta>()
             .init_resource::<ExtractedDamageDigits>()
             .init_resource::<MaterialBindGroups>()
             .init_resource::<SpecializedRenderPipelines<DamageDigitPipeline>>()
             .add_render_command::<Transparent3d, DrawDamageDigit>();
+    }
+
+    fn finish(&self, app: &mut App) {
+        let render_app = match app.get_sub_app_mut(RenderApp) {
+            Ok(render_app) => render_app,
+            Err(_) => return,
+        };
+
+        render_app.init_resource::<DamageDigitPipeline>();
     }
 }
 
@@ -68,7 +76,7 @@ struct DamageDigitPipeline {
 
 impl FromWorld for DamageDigitPipeline {
     fn from_world(world: &mut World) -> Self {
-        let render_device = world.get_resource::<RenderDevice>().unwrap();
+        let render_device = world.resource::<RenderDevice>();
 
         let view_layout = render_device.create_bind_group_layout(&BindGroupLayoutDescriptor {
             entries: &[BindGroupLayoutEntry {
@@ -77,7 +85,7 @@ impl FromWorld for DamageDigitPipeline {
                 ty: BindingType::Buffer {
                     ty: BufferBindingType::Uniform,
                     has_dynamic_offset: true,
-                    min_binding_size: BufferSize::new(std::mem::size_of::<ViewUniform>() as u64),
+                    min_binding_size: Some(ViewUniform::min_size()),
                 },
                 count: None,
             }],
@@ -94,7 +102,7 @@ impl FromWorld for DamageDigitPipeline {
                     ty: BindingType::Buffer {
                         ty: BufferBindingType::Storage { read_only: true },
                         has_dynamic_offset: false,
-                        min_binding_size: BufferSize::new(std::mem::size_of::<Vec4>() as u64),
+                        min_binding_size: Some(Vec4::min_size()),
                     },
                     count: None,
                 },
@@ -105,7 +113,7 @@ impl FromWorld for DamageDigitPipeline {
                     ty: BindingType::Buffer {
                         ty: BufferBindingType::Storage { read_only: true },
                         has_dynamic_offset: false,
-                        min_binding_size: BufferSize::new(std::mem::size_of::<Vec2>() as u64),
+                        min_binding_size: Some(Vec2::min_size()),
                     },
                     count: None,
                 },
@@ -116,7 +124,7 @@ impl FromWorld for DamageDigitPipeline {
                     ty: BindingType::Buffer {
                         ty: BufferBindingType::Storage { read_only: true },
                         has_dynamic_offset: false,
-                        min_binding_size: BufferSize::new(std::mem::size_of::<Vec4>() as u64),
+                        min_binding_size: Some(Vec4::min_size()),
                     },
                     count: None,
                 },
@@ -156,6 +164,7 @@ impl FromWorld for DamageDigitPipeline {
 }
 
 bitflags::bitflags! {
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
     #[repr(transparent)]
     pub struct DamageDigitPipelineKey: u32 {
         const NONE                        = 0;
@@ -170,7 +179,7 @@ impl DamageDigitPipelineKey {
 
     pub fn from_msaa_samples(msaa_samples: u32) -> Self {
         let msaa_bits = ((msaa_samples - 1) & Self::MSAA_MASK_BITS) << Self::MSAA_SHIFT_BITS;
-        DamageDigitPipelineKey::from_bits(msaa_bits).unwrap()
+        DamageDigitPipelineKey::from_bits_retain(msaa_bits)
     }
 
     pub fn from_hdr(hdr: bool) -> Self {
@@ -182,7 +191,7 @@ impl DamageDigitPipelineKey {
     }
 
     pub fn msaa_samples(&self) -> u32 {
-        ((self.bits >> Self::MSAA_SHIFT_BITS) & Self::MSAA_MASK_BITS) + 1
+        ((self.bits() >> Self::MSAA_SHIFT_BITS) & Self::MSAA_MASK_BITS) + 1
     }
 }
 

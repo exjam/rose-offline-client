@@ -1,5 +1,7 @@
 use bevy::{
-    prelude::{AddAsset, App, CoreSet, IntoSystemConfigs, IntoSystemSetConfig, Plugin, SystemSet},
+    prelude::{
+        AddAsset, App, IntoSystemConfigs, IntoSystemSetConfig, Plugin, PostUpdate, SystemSet,
+    },
     transform::TransformSystem,
 };
 
@@ -49,11 +51,11 @@ impl Plugin for RoseAnimationPlugin {
             .register_type::<TransformAnimation>();
 
         app.configure_set(
-            RoseAnimationSystem
-                .in_base_set(CoreSet::PostUpdate)
-                .before(TransformSystem::TransformPropagate),
+            PostUpdate,
+            RoseAnimationSystem.before(TransformSystem::TransformPropagate),
         )
         .add_systems(
+            PostUpdate,
             (
                 camera_animation_system,
                 mesh_animation_system,

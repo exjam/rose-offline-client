@@ -1,18 +1,12 @@
-#import bevy_pbr::mesh_types
-#import bevy_pbr::mesh_view_bindings
-#import rose_client::zone_lighting
-
-@group(2) @binding(0)
-var<uniform> mesh: Mesh;
-
-#import bevy_pbr::utils
-#import bevy_pbr::mesh_functions
-#import bevy_pbr::shadows
+#import bevy_pbr::mesh_types Mesh, SkinnedMesh
+#import bevy_pbr::mesh_view_bindings view
+#import bevy_pbr::mesh_bindings mesh
+#import bevy_pbr::mesh_functions mesh_position_local_to_world, mesh_normal_local_to_world, mesh_position_world_to_clip
+#import bevy_pbr::shadows fetch_directional_shadow
+#import rose_client::zone_lighting apply_zone_lighting
 
 #ifdef SKINNED
-@group(2) @binding(1)
-var<uniform> joint_matrices: SkinnedMesh;
-#import bevy_pbr::skinning
+#import bevy_pbr::skinning skin_normals, skin_model
 #endif
 
 @group(1) @binding(0)
@@ -31,27 +25,39 @@ var specular_texture: texture_2d<f32>;
 var specular_sampler: sampler;
 
 struct Vertex {
+#ifdef VERTEX_POSITIONS
     @location(0) position: vec3<f32>,
-    @location(1) normal: vec3<f32>,
-    @location(2) uv: vec2<f32>,
+#endif
 
-#ifdef HAS_OBJECT_LIGHTMAP
+#ifdef VERTEX_NORMALS
+    @location(1) normal: vec3<f32>,
+#endif
+
+#ifdef VERTEX_UVS
+    @location(2) uv: vec2<f32>,
+#endif
+
+#ifdef VERTEX_UVS_LIGHTMAP
     @location(3) lightmap_uv: vec2<f32>,
 #endif
 
 #ifdef SKINNED
-    @location(4) joint_indexes: vec4<u32>,
+    @location(4) joint_indices: vec4<u32>,
     @location(5) joint_weights: vec4<f32>,
 #endif
 };
 
 struct VertexOutput {
     @builtin(position) clip_position: vec4<f32>,
+
     @location(0) world_position: vec4<f32>,
     @location(1) world_normal: vec3<f32>,
-    @location(2) uv: vec2<f32>,
 
-#ifdef HAS_OBJECT_LIGHTMAP
+#ifdef VERTEX_UVS
+    @location(2) uv: vec2<f32>,
+#endif
+
+#ifdef VERTEX_UVS_LIGHTMAP
     @location(3) lightmap_uv: vec2<f32>,
 #endif
 };
@@ -59,22 +65,34 @@ struct VertexOutput {
 @vertex
 fn vertex(vertex: Vertex) -> VertexOutput {
     var out: VertexOutput;
-    out.uv = vertex.uv;
 
-#ifdef HAS_OBJECT_LIGHTMAP
+#ifdef SKINNED
+    var model = skin_model(vertex.joint_indices, vertex.joint_weights);
+#else
+    var model = mesh.model;
+#endif
+
+#ifdef VERTEX_NORMALS
+#ifdef SKINNED
+    out.world_normal = skin_normals(model, vertex.normal);
+#else
+    out.world_normal = mesh_normal_local_to_world(vertex.normal);
+#endif
+#endif
+
+#ifdef VERTEX_POSITIONS
+    out.world_position = mesh_position_local_to_world(model, vec4<f32>(vertex.position, 1.0));
+    out.clip_position = mesh_position_world_to_clip(out.world_position);
+#endif
+
+#ifdef VERTEX_UVS
+    out.uv = vertex.uv;
+#endif
+
+#ifdef VERTEX_UVS_LIGHTMAP
     out.lightmap_uv = vertex.lightmap_uv;
 #endif
 
-#ifdef SKINNED
-    let skinned_model = skin_model(vertex.joint_indexes, vertex.joint_weights);
-    out.world_position = mesh_position_local_to_world(skinned_model, vec4<f32>(vertex.position, 1.0));
-    out.world_normal = skin_normals(skinned_model, vertex.normal);
-#else
-    out.world_position = mesh_position_local_to_world(mesh.model, vec4<f32>(vertex.position, 1.0));
-    out.world_normal = mesh_normal_local_to_world(vertex.normal);
-#endif // ifdef SKINNED
-
-    out.clip_position = view.view_proj * out.world_position;
     return out;
 }
 
@@ -96,13 +114,18 @@ struct FragmentInput {
     @builtin(position) frag_coord: vec4<f32>,
     @location(0) world_position: vec4<f32>,
     @location(1) world_normal: vec3<f32>,
+
+#ifdef VERTEX_UVS
     @location(2) uv: vec2<f32>,
-#ifdef HAS_OBJECT_LIGHTMAP
+#endif
+
+#ifdef VERTEX_UVS_LIGHTMAP
     @location(3) lightmap_uv: vec2<f32>,
 #endif
 };
 
 #ifdef DEPTH_PREPASS
+
 @fragment
 fn fragment(in: FragmentInput) {
     var output_color: vec4<f32> = textureSample(base_texture, base_sampler, in.uv);
@@ -112,7 +135,9 @@ fn fragment(in: FragmentInput) {
         }
     }
 }
+
 #else // ifdef DEPTH_PREPASS
+
 @fragment
 fn fragment(in: FragmentInput) -> @location(0) vec4<f32> {
     var output_color: vec4<f32> = textureSample(base_texture, base_sampler, in.uv);
@@ -123,8 +148,7 @@ fn fragment(in: FragmentInput) -> @location(0) vec4<f32> {
         view.inverse_view[3].z
     ), in.world_position);
 
-
-#ifdef HAS_OBJECT_LIGHTMAP
+#ifdef VERTEX_UVS_LIGHTMAP
     let shadow = fetch_directional_shadow(0u, in.world_position, in.world_normal, view_z);
     output_color = vec4<f32>(output_color.xyz * (shadow * 0.2 + 0.8), output_color.w);
 
@@ -157,4 +181,5 @@ fn fragment(in: FragmentInput) -> @location(0) vec4<f32> {
 
     return apply_zone_lighting(in.world_position, in.world_normal, output_color, view_z);
 }
+
 #endif  // else ifdef DEPTH_PREPASS

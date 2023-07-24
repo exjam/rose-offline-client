@@ -26,7 +26,7 @@ use bevy::{
             ComputedVisibility, ExtractedView, ViewTarget, ViewUniform, ViewUniformOffset,
             ViewUniforms,
         },
-        Extract, ExtractSchedule, RenderApp, RenderSet,
+        Extract, ExtractSchedule, Render, RenderApp, RenderSet,
     },
     time::Time,
 };
@@ -49,21 +49,28 @@ impl Plugin for TrailEffectRenderPlugin {
             Shader::from_wgsl
         );
 
-        app.add_systems(
-            (initialise_trail_effects, update_trail_effects).in_base_set(CoreSet::PostUpdate),
-        );
+        app.add_systems(Update, (initialise_trail_effects,));
+        app.add_systems(PostUpdate, (update_trail_effects,));
 
         let render_app = app.sub_app_mut(RenderApp);
         render_app
-            .add_system(extract_trail_effects.in_schedule(ExtractSchedule))
-            .add_system(prepare_trail_effects.in_set(RenderSet::Prepare))
-            .add_system(queue_trail_effects.in_set(RenderSet::Queue))
-            .init_resource::<TrailEffectPipeline>()
+            .add_systems(ExtractSchedule, extract_trail_effects)
+            .add_systems(Render, prepare_trail_effects.in_set(RenderSet::Prepare))
+            .add_systems(Render, queue_trail_effects.in_set(RenderSet::Queue))
             .init_resource::<TrailEffectMeta>()
             .init_resource::<ExtractedTrailEffects>()
             .init_resource::<MaterialBindGroups>()
             .init_resource::<SpecializedRenderPipelines<TrailEffectPipeline>>()
             .add_render_command::<Transparent3d, DrawTrailEffect>();
+    }
+
+    fn finish(&self, app: &mut App) {
+        let render_app = match app.get_sub_app_mut(RenderApp) {
+            Ok(render_app) => render_app,
+            Err(_) => return,
+        };
+
+        render_app.init_resource::<TrailEffectPipeline>();
     }
 }
 
@@ -298,7 +305,7 @@ struct TrailEffectPipeline {
 
 impl FromWorld for TrailEffectPipeline {
     fn from_world(world: &mut World) -> Self {
-        let render_device = world.get_resource::<RenderDevice>().unwrap();
+        let render_device = world.resource::<RenderDevice>();
 
         let view_layout = render_device.create_bind_group_layout(&BindGroupLayoutDescriptor {
             entries: &[BindGroupLayoutEntry {
@@ -307,7 +314,7 @@ impl FromWorld for TrailEffectPipeline {
                 ty: BindingType::Buffer {
                     ty: BufferBindingType::Uniform,
                     has_dynamic_offset: true,
-                    min_binding_size: BufferSize::new(std::mem::size_of::<ViewUniform>() as u64),
+                    min_binding_size: Some(ViewUniform::min_size()),
                 },
                 count: None,
             }],

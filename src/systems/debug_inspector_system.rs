@@ -1,7 +1,8 @@
 use bevy::{
     input::Input,
-    prelude::{App, Camera, Camera3d, GlobalTransform, KeyCode, Plugin, Query, Res, ResMut, With},
-    render::camera::Projection,
+    prelude::{
+        App, Camera, Camera3d, GlobalTransform, KeyCode, Plugin, Query, Res, ResMut, Update, With,
+    },
     window::{PrimaryWindow, Window},
 };
 use bevy_egui::EguiContexts;
@@ -11,7 +12,6 @@ use rose_game_common::{components::*, messages::ClientEntityId};
 
 use crate::{
     components::*,
-    ray_from_screenspace::ray_from_screenspace,
     render::{ObjectMaterialBlend, ObjectMaterialGlow},
     resources::DebugInspector,
 };
@@ -21,7 +21,7 @@ pub struct DebugInspectorPlugin;
 impl Plugin for DebugInspectorPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(DebugInspector::default())
-            .add_system(debug_inspector_picking_system);
+            .add_systems(Update, debug_inspector_picking_system);
 
         app.register_type::<rose_data::MotionId>()
             .register_type::<rose_data::NpcId>()
@@ -89,7 +89,7 @@ impl Plugin for DebugInspectorPlugin {
             .register_type::<ZoneObjectPartCollisionShape>()
             .register_type::<ZoneObjectTerrain>();
 
-        app.add_plugin(bevy_inspector_egui::DefaultInspectorConfigPlugin);
+        app.add_plugins(bevy_inspector_egui::DefaultInspectorConfigPlugin);
     }
 }
 
@@ -100,7 +100,7 @@ fn debug_inspector_picking_system(
     key_code_input: Res<Input<KeyCode>>,
     rapier_context: Res<RapierContext>,
     query_window: Query<&Window, With<PrimaryWindow>>,
-    query_camera: Query<(&Camera, &Projection, &GlobalTransform), With<Camera3d>>,
+    query_camera: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
 ) {
     if !debug_inspector_state.enable_picking {
         // Picking disabled
@@ -119,17 +119,11 @@ fn debug_inspector_picking_system(
     let cursor_position = cursor_position.unwrap();
 
     if key_code_input.just_pressed(KeyCode::P) {
-        for (camera, camera_projection, camera_transform) in query_camera.iter() {
-            if let Some((ray_origin, ray_direction)) = ray_from_screenspace(
-                cursor_position,
-                window,
-                camera,
-                camera_projection,
-                camera_transform,
-            ) {
+        for (camera, camera_transform) in query_camera.iter() {
+            if let Some(ray) = camera.viewport_to_world(camera_transform, cursor_position) {
                 if let Some((collider_entity, _distance)) = rapier_context.cast_ray(
-                    ray_origin,
-                    ray_direction,
+                    ray.origin,
+                    ray.direction,
                     10000000.0,
                     false,
                     QueryFilter::new().groups(CollisionGroups::new(

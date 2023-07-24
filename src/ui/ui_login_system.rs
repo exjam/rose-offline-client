@@ -44,7 +44,7 @@ pub fn ui_login_system(
         return;
     }
 
-    let mut ui_state = &mut *ui_state;
+    let ui_state = &mut *ui_state;
     let dialog = if let Some(dialog) = dialog_assets.get(&ui_resources.dialog_login) {
         dialog
     } else {

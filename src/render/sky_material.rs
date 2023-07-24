@@ -9,7 +9,7 @@ use bevy::{
         SetMeshViewBindGroup,
     },
     prelude::{App, HandleUntyped, Image, Material, MaterialPlugin, Mesh, Plugin},
-    reflect::TypeUuid,
+    reflect::{TypePath, TypeUuid},
     render::{
         extract_resource::ExtractResourcePlugin,
         mesh::MeshVertexBufferLayout,
@@ -43,18 +43,17 @@ impl Plugin for SkyMaterialPlugin {
             Shader::from_wgsl
         );
 
-        app.add_plugin(ExtractResourcePlugin::<ZoneTime>::default());
-
-        app.add_plugin(
+        app.add_plugins((
+            ExtractResourcePlugin::<ZoneTime>::default(),
             MaterialPlugin::<SkyMaterial, DrawSkyMaterial, DrawPrepass<SkyMaterial>> {
                 prepass_enabled: self.prepass_enabled,
                 ..Default::default()
             },
-        );
+        ));
     }
 }
 
-#[derive(Debug, Clone, TypeUuid, AsBindGroup)]
+#[derive(Debug, Clone, TypeUuid, TypePath, AsBindGroup)]
 #[uuid = "971a6c96-4516-4ea0-aeb6-349633e7934e"]
 pub struct SkyMaterial {
     #[texture(0)]

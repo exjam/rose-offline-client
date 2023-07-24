@@ -1,11 +1,11 @@
 use bevy::{
     prelude::{DirectionalLight, Local, Query, Res, ResMut, Vec3, With},
-    render::primitives::{CascadesFrusta, Frustum, Plane},
+    render::primitives::{CascadesFrusta, Frustum, HalfSpace},
 };
 
 use crate::resources::{DebugRenderConfig, DebugRenderDirectionalLightData};
 
-fn calculate_frustum_corner(plane1: &Plane, plane2: &Plane, plane3: &Plane) -> Vec3 {
+fn calculate_frustum_corner(plane1: &HalfSpace, plane2: &HalfSpace, plane3: &HalfSpace) -> Vec3 {
     let denominator = plane1.normal().dot(plane2.normal().cross(plane3.normal()));
     if denominator.abs() > 0.0 {
         let mut nominator = -plane1.d() * plane2.normal().cross(plane3.normal());
@@ -26,9 +26,9 @@ fn calculate_frustum_corners(frustum: &Frustum) -> [Vec3; 8] {
         for j in 2..4 {
             for k in 4..6 {
                 corners[index] = calculate_frustum_corner(
-                    &frustum.planes[i],
-                    &frustum.planes[j],
-                    &frustum.planes[k],
+                    &frustum.half_spaces[i],
+                    &frustum.half_spaces[j],
+                    &frustum.half_spaces[k],
                 );
                 index += 1;
             }

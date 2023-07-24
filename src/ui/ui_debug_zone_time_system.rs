@@ -61,10 +61,13 @@ pub fn ui_debug_zone_time_system(
                         &mut ui_state_debug_zone_time.overwrite_time_enabled,
                         "Overwrite Time",
                     );
-                    ui.add(egui::Slider::new(
-                        &mut ui_state_debug_zone_time.overwrite_time_value,
-                        0..=zone_data.day_cycle,
-                    ));
+                    ui.add(
+                        egui::Slider::new(
+                            &mut ui_state_debug_zone_time.overwrite_time_value,
+                            0..=zone_data.day_cycle,
+                        )
+                        .drag_value_speed(0.25),
+                    );
                     ui.end_row();
 
                     if ui_state_debug_zone_time.overwrite_time_enabled {

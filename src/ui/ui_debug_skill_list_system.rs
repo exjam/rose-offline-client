@@ -204,7 +204,7 @@ pub fn ui_debug_skill_list_system(
                                 });
 
                                 row.col(|ui| {
-                                    if matches!(app_state.0, AppState::Game)
+                                    if matches!(app_state.get(), AppState::Game)
                                         && ui.button("Learn").clicked()
                                     {
                                         if let Some(game_connection) = game_connection.as_ref() {
@@ -221,7 +221,7 @@ pub fn ui_debug_skill_list_system(
                                     if skill_data.casting_motion_id.is_some() {
                                         let player = query_player_command.get_single_mut().ok();
 
-                                        if matches!(app_state.0, AppState::Game) {
+                                        if matches!(app_state.get(), AppState::Game) {
                                             if let Some(mut player) = player {
                                                 if let Command::CastSkill(command_cast_skill) =
                                                     player.command.as_mut()
@@ -254,7 +254,7 @@ pub fn ui_debug_skill_list_system(
                                                 }
                                             }
                                         } else if matches!(
-                                            app_state.0,
+                                            app_state.get(),
                                             AppState::ModelViewer
                                         ) {
                                             if ui.button("Cast").clicked() {

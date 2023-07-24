@@ -1,6 +1,6 @@
-use bevy::prelude::Entity;
+use bevy::prelude::{Entity, Event};
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Event, Copy, Clone, Debug)]
 pub enum ClientEntityEvent {
     Die(Entity),
     LevelUp(Entity, Option<u32>),

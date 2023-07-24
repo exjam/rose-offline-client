@@ -8,10 +8,10 @@ use bevy::{
     pbr::CascadeShadowConfig,
     prelude::{
         AmbientLight, App, Color, Commands, DirectionalLight, DirectionalLightBundle, EulerRot,
-        FromWorld, HandleUntyped, IntoSystemAppConfig, IntoSystemConfig, Plugin, Quat,
-        ReflectResource, Res, ResMut, Resource, Shader, Transform, World,
+        FromWorld, HandleUntyped, IntoSystemConfigs, Plugin, Quat, ReflectResource, Res, ResMut,
+        Resource, Shader, Startup, Transform, World,
     },
-    reflect::{FromReflect, Reflect, TypeUuid},
+    reflect::{Reflect, TypeUuid},
     render::{
         render_phase::{PhaseItem, RenderCommand, RenderCommandResult, TrackedRenderPass},
         render_resource::{
@@ -21,7 +21,7 @@ use bevy::{
             ShaderType,
         },
         renderer::{RenderDevice, RenderQueue},
-        Extract, ExtractSchedule, RenderApp, RenderSet,
+        Extract, ExtractSchedule, Render, RenderApp, RenderSet,
     },
 };
 
@@ -54,12 +54,19 @@ impl Plugin for ZoneLightingPlugin {
 
         if let Ok(render_app) = app.get_sub_app_mut(RenderApp) {
             render_app
-                .init_resource::<ZoneLightingUniformMeta>()
-                .add_system(extract_uniform_data.in_schedule(ExtractSchedule))
-                .add_system(prepare_uniform_data.in_set(RenderSet::Prepare));
+                .add_systems(ExtractSchedule, extract_uniform_data)
+                .add_systems(Render, (prepare_uniform_data,).in_set(RenderSet::Prepare));
         }
 
-        app.add_startup_system(spawn_lights);
+        app.add_systems(Startup, spawn_lights);
+    }
+
+    fn finish(&self, app: &mut App) {
+        let render_app = match app.get_sub_app_mut(RenderApp) {
+            Ok(render_app) => render_app,
+            Err(_) => return,
+        };
+        render_app.init_resource::<ZoneLightingUniformMeta>();
     }
 }
 
@@ -85,7 +92,7 @@ fn spawn_lights(mut commands: Commands) {
     });
 }
 
-#[derive(Resource, Reflect, FromReflect)]
+#[derive(Resource, Reflect)]
 #[reflect(Resource)]
 pub struct ZoneLighting {
     pub map_ambient_color: Vec3,

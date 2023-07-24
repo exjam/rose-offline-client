@@ -1,11 +1,7 @@
-#import bevy_pbr::mesh_types
-#import bevy_pbr::mesh_view_bindings
-#import rose_client::zone_lighting
-
-@group(2) @binding(0)
-var<uniform> mesh: Mesh;
-
-#import bevy_pbr::mesh_functions
+#import bevy_pbr::mesh_bindings mesh
+#import bevy_pbr::mesh_view_bindings view
+#import bevy_pbr::mesh_functions mesh_position_local_to_world, mesh_normal_local_to_world
+#import rose_client::zone_lighting apply_zone_lighting
 
 struct Vertex {
     @location(0) position: vec3<f32>,

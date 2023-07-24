@@ -1,9 +1,9 @@
 use bevy::{
     prelude::{Component, Deref, DerefMut},
-    reflect::{FromReflect, Reflect},
+    reflect::Reflect,
 };
 
-#[derive(Component, Deref, DerefMut, Reflect, FromReflect)]
+#[derive(Component, Deref, DerefMut, Reflect)]
 pub struct ClientEntityName {
     pub name: String,
 }

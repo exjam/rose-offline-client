@@ -74,7 +74,7 @@ pub fn ui_debug_item_list_system(
                     }
                     ui.end_row();
 
-                    if matches!(app_state.0, AppState::Game) {
+                    if matches!(app_state.get(), AppState::Game) {
                         ui.label("Spawn Quantity:");
                         ui.add(
                             egui::DragValue::new(&mut ui_state_debug_item_list.spawn_quantity)
@@ -313,7 +313,7 @@ pub fn ui_debug_item_list_system(
                                 });
 
                                 row.col(|ui| {
-                                    if matches!(app_state.0, AppState::ModelViewer)
+                                    if matches!(app_state.get(), AppState::ModelViewer)
                                         && ui.button("Equip").clicked()
                                     {
                                         if let Some(equipment_index) = equipment_index {
@@ -326,7 +326,7 @@ pub fn ui_debug_item_list_system(
                                             ItemType::Gem
                                         ) {
                                             for mut equipment in query_set.p0().iter_mut() {
-                                                if let Some(mut weapon) = equipment.equipped_items
+                                                if let Some(weapon) = equipment.equipped_items
                                                     [EquipmentIndex::Weapon]
                                                     .as_mut()
                                                 {
@@ -334,8 +334,8 @@ pub fn ui_debug_item_list_system(
                                                     weapon.gem = 0;
                                                 }
 
-                                                if let Some(mut sub_weapon) = equipment
-                                                    .equipped_items[EquipmentIndex::SubWeapon]
+                                                if let Some(sub_weapon) = equipment.equipped_items
+                                                    [EquipmentIndex::SubWeapon]
                                                     .as_mut()
                                                 {
                                                     sub_weapon.has_socket = false;
@@ -400,7 +400,7 @@ pub fn ui_debug_item_list_system(
                                     ui.label(item_data.name);
                                 });
 
-                                row.col(|ui| match app_state.0 {
+                                row.col(|ui| match app_state.get() {
                                     AppState::Game => {
                                         if ui.button("Spawn").clicked() {
                                             if let Some(game_connection) = game_connection.as_ref()
@@ -467,7 +467,7 @@ pub fn ui_debug_item_list_system(
                                         ) && ui.button("Equip").clicked()
                                         {
                                             for mut equipment in query_set.p0().iter_mut() {
-                                                if let Some(mut weapon) = equipment.equipped_items
+                                                if let Some(weapon) = equipment.equipped_items
                                                     [EquipmentIndex::Weapon]
                                                     .as_mut()
                                                 {
@@ -475,8 +475,8 @@ pub fn ui_debug_item_list_system(
                                                     weapon.gem = item_reference.item_number as u16;
                                                 }
 
-                                                if let Some(mut sub_weapon) = equipment
-                                                    .equipped_items[EquipmentIndex::SubWeapon]
+                                                if let Some(sub_weapon) = equipment.equipped_items
+                                                    [EquipmentIndex::SubWeapon]
                                                     .as_mut()
                                                 {
                                                     sub_weapon.has_socket = true;

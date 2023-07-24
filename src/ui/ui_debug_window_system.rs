@@ -66,7 +66,7 @@ pub fn ui_debug_menu_system(
     mut debug_inspector: ResMut<DebugInspector>,
     mut app_state_next: ResMut<NextState<AppState>>,
 ) {
-    if keyboard.pressed(KeyCode::LControl) && keyboard.just_pressed(KeyCode::D) {
+    if keyboard.pressed(KeyCode::ControlLeft) && keyboard.just_pressed(KeyCode::D) {
         ui_state_debug_windows.debug_ui_open = !ui_state_debug_windows.debug_ui_open;
     }
 

@@ -1,13 +1,8 @@
-#import bevy_pbr::mesh_types
-#import bevy_pbr::mesh_view_bindings
-#import rose_client::zone_lighting
-
-@group(2) @binding(0)
-var<uniform> mesh: Mesh;
-
-#import bevy_pbr::utils
-#import bevy_pbr::mesh_functions
-#import bevy_pbr::shadows
+#import bevy_pbr::mesh_bindings mesh
+#import bevy_pbr::mesh_view_bindings view
+#import bevy_pbr::mesh_functions mesh_position_local_to_world, mesh_normal_local_to_world, mesh_position_local_to_clip
+#import bevy_pbr::shadows fetch_directional_shadow
+#import rose_client::zone_lighting apply_zone_lighting
 
 struct Vertex {
     @location(0) position: vec3<f32>,
@@ -28,13 +23,10 @@ struct VertexOutput {
 
 @vertex
 fn vertex(vertex: Vertex) -> VertexOutput {
-    let world_position = mesh_position_local_to_world(mesh.model, vec4<f32>(vertex.position, 1.0));
-    let world_normal = mesh_normal_local_to_world(vertex.normal);
-
     var out: VertexOutput;
-    out.clip_position = view.view_proj * world_position;
-    out.world_position = world_position;
-    out.world_normal = world_normal;
+    out.clip_position = mesh_position_local_to_clip(mesh.model, vec4<f32>(vertex.position, 1.0));
+    out.world_position = mesh_position_local_to_world(mesh.model, vec4<f32>(vertex.position, 1.0));
+    out.world_normal = mesh_normal_local_to_world(vertex.normal);
     out.uv0 = vertex.uv0;
     out.uv1 = vertex.uv1;
     out.tile_info = vertex.tile_info;

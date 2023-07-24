@@ -1,7 +1,8 @@
-use bevy::reflect::TypeUuid;
+use bevy::reflect::{TypePath, TypeUuid};
 use bevy_egui::egui;
-use rose_data::SoundId;
 use serde::{Deserialize, Deserializer};
+
+use rose_data::SoundId;
 
 use super::{DataBindings, DrawWidget, GetWidget, Widget};
 
@@ -34,7 +35,7 @@ where
     Ok(SoundId::new(sound_id))
 }
 
-#[derive(Clone, Default, Deserialize, TypeUuid)]
+#[derive(Clone, Default, Deserialize, TypeUuid, TypePath)]
 #[uuid = "95ddb227-6e9f-43ee-8026-28ddb6fc9634"]
 #[serde(rename = "Root_Element")]
 #[serde(default)]

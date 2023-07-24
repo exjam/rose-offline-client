@@ -9,7 +9,7 @@ use bevy::{
     prelude::{
         AlphaMode, App, FromWorld, HandleUntyped, Material, MaterialPlugin, Mesh, Plugin, World,
     },
-    reflect::TypeUuid,
+    reflect::{TypePath, TypeUuid},
     render::{
         mesh::{MeshVertexAttribute, MeshVertexBufferLayout},
         prelude::Shader,
@@ -55,7 +55,7 @@ impl Plugin for TerrainMaterialPlugin {
             Shader::from_wgsl
         );
 
-        app.add_plugin(MaterialPlugin::<
+        app.add_plugins(MaterialPlugin::<
             TerrainMaterial,
             DrawTerrainMaterial,
             DrawPrepass<TerrainMaterial>,
@@ -82,7 +82,7 @@ impl FromWorld for TerrainMaterialPipelineData {
     }
 }
 
-#[derive(Debug, Clone, TypeUuid)]
+#[derive(Debug, Clone, TypeUuid, TypePath)]
 #[uuid = "403e3628-46d2-4d2a-b74c-ce84be2b1ba2"]
 pub struct TerrainMaterial {
     pub textures: Vec<Handle<Image>>,
@@ -167,7 +167,7 @@ impl AsBindGroup for TerrainMaterial {
             }
         }
 
-        let mut textures = vec![&*fallback_image.texture_view; TERRAIN_MATERIAL_MAX_TEXTURES];
+        let mut textures = vec![&*fallback_image.d2.texture_view; TERRAIN_MATERIAL_MAX_TEXTURES];
         for (id, image) in images.into_iter().enumerate() {
             textures[id] = &*image.texture_view;
         }

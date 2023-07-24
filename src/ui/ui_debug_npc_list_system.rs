@@ -73,7 +73,7 @@ pub fn ui_debug_npc_list_system(
                     }
                     ui.end_row();
 
-                    if matches!(app_state.0, AppState::Game) {
+                    if matches!(app_state.get(), AppState::Game) {
                         ui.label("Spawn Count:");
                         ui.add(
                             egui::DragValue::new(&mut ui_state_debug_npc_list.spawn_count)
@@ -187,7 +187,7 @@ pub fn ui_debug_npc_list_system(
                                     ui.label(format!("{}", npc_data.level));
                                 });
 
-                                row.col(|ui| match app_state.0 {
+                                row.col(|ui| match app_state.get() {
                                     AppState::Game => {
                                         if ui
                                             .add_enabled(

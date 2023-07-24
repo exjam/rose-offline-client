@@ -13,8 +13,8 @@ use bevy::{
     pbr::MeshPipelineKey,
     prelude::{
         App, Assets, Color, Commands, Component, ComputedVisibility, FromWorld, GlobalTransform,
-        HandleUntyped, IntoSystemAppConfig, IntoSystemConfig, Msaa, Plugin, Query, Res, ResMut,
-        Resource, Vec2, Vec3, World,
+        HandleUntyped, IntoSystemConfigs, Msaa, Plugin, Query, Res, ResMut, Resource, Vec2, Vec3,
+        World,
     },
     reflect::TypeUuid,
     render::{
@@ -27,19 +27,19 @@ use bevy::{
         render_resource::{
             BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout,
             BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingResource, BindingType,
-            BlendComponent, BlendFactor, BlendOperation, BlendState, BufferBindingType, BufferSize,
+            BlendComponent, BlendFactor, BlendOperation, BlendState, BufferBindingType,
             BufferUsages, BufferVec, ColorTargetState, ColorWrites, CompareFunction,
             DepthBiasState, DepthStencilState, FragmentState, FrontFace, MultisampleState,
             PipelineCache, PolygonMode, PrimitiveState, PrimitiveTopology,
-            RenderPipelineDescriptor, SamplerBindingType, ShaderStages, SpecializedRenderPipeline,
-            SpecializedRenderPipelines, StencilFaceState, StencilState, TextureFormat,
-            TextureSampleType, TextureViewDimension, VertexAttribute, VertexBufferLayout,
-            VertexFormat, VertexState, VertexStepMode,
+            RenderPipelineDescriptor, SamplerBindingType, ShaderStages, ShaderType,
+            SpecializedRenderPipeline, SpecializedRenderPipelines, StencilFaceState, StencilState,
+            TextureFormat, TextureSampleType, TextureViewDimension, VertexAttribute,
+            VertexBufferLayout, VertexFormat, VertexState, VertexStepMode,
         },
         renderer::{RenderDevice, RenderQueue},
         texture::{BevyDefault, Image},
         view::{ExtractedView, ViewTarget, ViewUniform, ViewUniformOffset, ViewUniforms},
-        Extract, ExtractSchedule, RenderApp, RenderSet,
+        Extract, ExtractSchedule, Render, RenderApp, RenderSet,
     },
     utils::HashMap,
 };
@@ -68,11 +68,19 @@ impl Plugin for WorldUiRenderPlugin {
                 .init_resource::<WorldUiMeta>()
                 .init_resource::<ImageBindGroups>()
                 .add_render_command::<Transparent3d, DrawWorldUi>()
-                .init_resource::<WorldUiPipeline>()
                 .init_resource::<SpecializedRenderPipelines<WorldUiPipeline>>()
-                .add_system(extract_world_ui_rects.in_schedule(ExtractSchedule))
-                .add_system(queue_world_ui_meshes.in_set(RenderSet::Queue));
+                .add_systems(ExtractSchedule, extract_world_ui_rects)
+                .add_systems(Render, (queue_world_ui_meshes,).in_set(RenderSet::Queue));
         }
+    }
+
+    fn finish(&self, app: &mut App) {
+        let render_app = match app.get_sub_app_mut(RenderApp) {
+            Ok(render_app) => render_app,
+            Err(_) => return,
+        };
+
+        render_app.init_resource::<WorldUiPipeline>();
     }
 }
 
@@ -288,7 +296,7 @@ impl FromWorld for WorldUiPipeline {
                 ty: BindingType::Buffer {
                     ty: BufferBindingType::Uniform,
                     has_dynamic_offset: true,
-                    min_binding_size: BufferSize::new(std::mem::size_of::<ViewUniform>() as u64),
+                    min_binding_size: Some(ViewUniform::min_size()),
                 },
                 count: None,
             }],

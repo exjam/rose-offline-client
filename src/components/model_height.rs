@@ -1,9 +1,6 @@
-use bevy::{
-    prelude::Component,
-    reflect::{FromReflect, Reflect},
-};
+use bevy::{prelude::Component, reflect::Reflect};
 
-#[derive(Component, Reflect, FromReflect)]
+#[derive(Component, Reflect)]
 pub struct ModelHeight {
     pub height: f32,
 }

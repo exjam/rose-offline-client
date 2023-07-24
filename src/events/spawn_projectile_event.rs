@@ -1,9 +1,10 @@
-use bevy::prelude::Entity;
+use bevy::prelude::{Entity, Event};
 
 use rose_data::{EffectBulletMoveType, EffectId, SkillId};
 
 use crate::components::ProjectileTarget;
 
+#[derive(Event)]
 pub struct SpawnProjectileEvent {
     pub effect_id: EffectId,
 

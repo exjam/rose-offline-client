@@ -45,7 +45,7 @@ pub fn world_connection_system(
             Ok(ServerMessage::CharacterList {
                 character_list: characters,
             }) => {
-                if !matches!(app_state_current.0, AppState::GameCharacterSelect) {
+                if !matches!(app_state_current.get(), AppState::GameCharacterSelect) {
                     app_state_next.set(AppState::GameCharacterSelect);
                 }
 

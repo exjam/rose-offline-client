@@ -1,6 +1,4 @@
-use bevy::prelude::{
-    AddAsset, App, Component, CoreSet, IntoSystemConfig, IntoSystemConfigs, Plugin, Resource,
-};
+use bevy::prelude::{AddAsset, App, Component, IntoSystemConfigs, Last, Plugin, Resource};
 
 mod audio_source;
 mod global_sound;
@@ -98,13 +96,13 @@ impl Plugin for OddioPlugin {
             .init_asset_loader::<OggLoader>()
             .init_asset_loader::<WavLoader>()
             .add_systems(
+                Last,
                 (
                     spatial_sound_gain_changed_system.before(spatial_sound_system),
                     spatial_sound_system,
                     global_sound_gain_changed_system.before(global_sound_system),
                     global_sound_system,
-                )
-                    .in_base_set(CoreSet::Last),
+                ),
             );
     }
 }

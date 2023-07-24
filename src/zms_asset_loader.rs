@@ -6,7 +6,7 @@ use std::{
 use bevy::{
     asset::{AssetLoader, BoxedFuture, LoadContext, LoadedAsset},
     prelude::Mesh,
-    reflect::TypeUuid,
+    reflect::{TypePath, TypeUuid},
     render::{
         mesh::{Indices, VertexAttributeValues},
         render_resource::PrimitiveTopology,
@@ -16,7 +16,7 @@ use rose_file_readers::{RoseFile, ZmsFile};
 
 use crate::render::{MESH_ATTRIBUTE_UV_1, MESH_ATTRIBUTE_UV_2, MESH_ATTRIBUTE_UV_3};
 
-#[derive(Debug, TypeUuid, Clone)]
+#[derive(Debug, TypeUuid, TypePath, Clone)]
 #[uuid = "8688d5ed-b98b-4641-bab3-5fe83dfd4ecd"]
 pub struct ZmsMaterialNumFaces {
     pub material_num_faces: Vec<u16>,

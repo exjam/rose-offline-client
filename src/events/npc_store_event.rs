@@ -1,5 +1,8 @@
+use bevy::prelude::Event;
+
 use rose_game_common::messages::ClientEntityId;
 
+#[derive(Event)]
 pub enum NpcStoreEvent {
     OpenClientEntityStore(ClientEntityId),
     RemoveFromBuyList(usize),

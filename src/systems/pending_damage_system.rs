@@ -57,7 +57,7 @@ pub fn pending_damage_system(
     for mut target in query_target.iter_mut() {
         let mut i = 0;
         while i < target.pending_damage_list.len() {
-            let mut pending_damage = &mut target.pending_damage_list[i];
+            let pending_damage = &mut target.pending_damage_list[i];
             pending_damage.age += delta_time;
 
             if pending_damage.is_immediate

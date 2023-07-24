@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use bevy::reflect::TypeUuid;
+use bevy::reflect::{TypePath, TypeUuid};
 
 pub trait StreamingAudioSource {
     fn channel_count(&self) -> u32;
@@ -15,7 +15,7 @@ pub struct AudioSourceDecoded {
     pub sample_rate: u32,
 }
 
-#[derive(Clone, TypeUuid)]
+#[derive(Clone, TypeUuid, TypePath)]
 #[uuid = "f40c2d6a-d2ad-42cc-8f86-0147d3ddd68c"]
 pub struct AudioSource {
     pub bytes: Arc<[u8]>,

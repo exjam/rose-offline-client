@@ -16,7 +16,7 @@ use bevy::{
         AddAsset, App, Component, FromWorld, HandleUntyped, Material, MaterialPlugin, Mesh, Plugin,
         Vec3, With, World,
     },
-    reflect::{FromReflect, Reflect, TypeUuid},
+    reflect::{Reflect, TypeUuid},
     render::{
         extract_component::{ExtractComponent, ExtractComponentPlugin},
         mesh::{GpuBufferInfo, MeshVertexBufferLayout},
@@ -58,11 +58,11 @@ impl Plugin for ObjectMaterialPlugin {
             Shader::from_wgsl
         );
 
-        app.add_plugin(ExtractComponentPlugin::<ObjectMaterialClipFace>::extract_visible());
+        app.add_plugins(ExtractComponentPlugin::<ObjectMaterialClipFace>::extract_visible());
 
         app.register_type::<ObjectMaterial>();
 
-        app.add_plugin(MaterialPlugin::<
+        app.add_plugins(MaterialPlugin::<
             ObjectMaterial,
             DrawObjectMaterial,
             DrawPrepass<ObjectMaterial>,
@@ -128,9 +128,9 @@ impl<P: PhaseItem> RenderCommand<P> for DrawObjectMesh {
                     pass.set_index_buffer(buffer.slice(..), 0, *index_format);
                     pass.draw_indexed(start_index..end_index, 0, 0..1);
                 }
-                GpuBufferInfo::NonIndexed { vertex_count } => {
+                GpuBufferInfo::NonIndexed => {
                     let start_vertex = start_index_offset;
-                    let end_vertex = *vertex_count - end_index_offset;
+                    let end_vertex = gpu_mesh.vertex_count - end_index_offset;
                     pass.draw(start_vertex..end_vertex, 0..1);
                 }
             }
@@ -152,6 +152,7 @@ type DrawObjectMaterial = (
 
 // NOTE: These must match the bit flags in shaders/object_material.wgsl!
 bitflags::bitflags! {
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
     #[repr(transparent)]
     pub struct ObjectMaterialFlags: u32 {
         const ALPHA_MODE_OPAQUE          = (1 << 0);
@@ -213,7 +214,7 @@ impl From<&ObjectMaterial> for ObjectMaterialUniformData {
     }
 }
 
-#[derive(Copy, Clone, Debug, Default, Reflect, FromReflect)]
+#[derive(Copy, Clone, Debug, Default, Reflect)]
 pub enum ObjectMaterialBlend {
     #[default]
     Normal,
@@ -229,7 +230,7 @@ impl From<ZscMaterialBlend> for ObjectMaterialBlend {
     }
 }
 
-#[derive(Copy, Clone, Debug, Reflect, FromReflect)]
+#[derive(Copy, Clone, Debug, Reflect)]
 pub enum ObjectMaterialGlow {
     Simple(Vec3),
     Light(Vec3),
@@ -260,7 +261,7 @@ impl From<ZscMaterialGlow> for ObjectMaterialGlow {
     }
 }
 
-#[derive(Debug, Clone, TypeUuid, Reflect, FromReflect, AsBindGroup)]
+#[derive(Debug, Clone, TypeUuid, Reflect, AsBindGroup)]
 #[uniform(0, ObjectMaterialUniformData)]
 #[bind_group_data(ObjectMaterialKey)]
 #[uuid = "62a496fa-33e8-41a8-9a44-237d70214227"]
@@ -383,12 +384,12 @@ impl Material for ObjectMaterial {
             descriptor
                 .vertex
                 .shader_defs
-                .push(ShaderDefVal::Bool("HAS_OBJECT_LIGHTMAP".into(), true));
+                .push(ShaderDefVal::Bool("VERTEX_UVS_LIGHTMAP".into(), true));
 
             if let Some(fragment) = descriptor.fragment.as_mut() {
                 fragment
                     .shader_defs
-                    .push(ShaderDefVal::Bool("HAS_OBJECT_LIGHTMAP".into(), true));
+                    .push(ShaderDefVal::Bool("VERTEX_UVS_LIGHTMAP".into(), true));
             }
 
             vertex_attributes.push(MESH_ATTRIBUTE_UV_1.at_shader_location(3));
@@ -401,17 +402,6 @@ impl Material for ObjectMaterial {
         if layout.contains(Mesh::ATTRIBUTE_JOINT_INDEX)
             && layout.contains(Mesh::ATTRIBUTE_JOINT_WEIGHT)
         {
-            descriptor
-                .vertex
-                .shader_defs
-                .push(ShaderDefVal::Bool("SKINNED".into(), true));
-
-            if let Some(fragment) = descriptor.fragment.as_mut() {
-                fragment
-                    .shader_defs
-                    .push(ShaderDefVal::Bool("SKINNED".into(), true));
-            }
-
             vertex_attributes.push(Mesh::ATTRIBUTE_JOINT_INDEX.at_shader_location(4));
             vertex_attributes.push(Mesh::ATTRIBUTE_JOINT_WEIGHT.at_shader_location(5));
         }

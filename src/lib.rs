@@ -7,12 +7,13 @@ use bevy::{
     ecs::event::Events,
     log::Level,
     prelude::{
-        apply_system_buffers, in_state, AddAsset, App, AssetServer, Assets, Camera, Camera3dBundle,
-        Color, Commands, CoreSet, IntoSystemAppConfig, IntoSystemConfig, IntoSystemConfigs,
-        IntoSystemSetConfigs, Msaa, OnEnter, OnExit, OnUpdate, PluginGroup, Quat, Res, ResMut,
-        StartupSet, State, SystemSet, Transform, Vec3,
+        apply_deferred, in_state, AddAsset, App, AssetServer, Assets, Camera, Camera3dBundle,
+        Color, Commands, IntoSystemConfigs, IntoSystemSetConfigs, Msaa, OnEnter, OnExit,
+        PluginGroup, PostStartup, PostUpdate, PreUpdate, Quat, Res, ResMut, Startup, State,
+        SystemSet, Transform, Update, Vec3,
     },
     render::{render_resource::WgpuFeatures, settings::WgpuSettings},
+    transform::TransformSystem,
     window::{Window, WindowMode},
 };
 use bevy_egui::{egui, EguiContexts, EguiSet};
@@ -40,7 +41,6 @@ pub mod events;
 pub mod exe_resource_loader;
 pub mod model_loader;
 pub mod protocol;
-pub mod ray_from_screenspace;
 pub mod render;
 pub mod resources;
 pub mod scripting;
@@ -416,7 +416,6 @@ pub fn run_zone_viewer(config: &Config, zone_id: Option<ZoneId>) {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
-#[system_set(base)]
 enum GameStages {
     ZoneChange,
     ZoneChangeFlush,
@@ -465,13 +464,14 @@ fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsC
     .insert_resource(AssetServer::new(VfsAssetIo::new(virtual_filesystem)));
 
     // Initialise bevy engine
-    app.insert_resource(Msaa::default())
+    app.insert_resource(Msaa::Off)
         .insert_resource(ClearColor(Color::rgb(0.70, 0.90, 1.0)))
-        .add_plugins(
+        .add_plugins((
             bevy::prelude::DefaultPlugins
                 .set(bevy::render::RenderPlugin {
                     wgpu_settings: WgpuSettings {
                         features: WgpuFeatures::TEXTURE_COMPRESSION_BC,
+                        // backends: Some(Backends::DX12),
                         ..Default::default()
                     },
                 })
@@ -505,22 +505,27 @@ fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsC
                 .set(bevy::pbr::PbrPlugin {
                     prepass_enabled: false,
                 }),
-        )
-        .add_plugin(bevy::diagnostic::EntityCountDiagnosticsPlugin::default())
-        .add_plugin(bevy::diagnostic::FrameTimeDiagnosticsPlugin::default());
+            bevy::diagnostic::EntityCountDiagnosticsPlugin,
+            bevy::diagnostic::FrameTimeDiagnosticsPlugin,
+        ));
 
     // Initialise 3rd party bevy plugins
-    app.add_plugin(bevy_polyline::PolylinePlugin)
-        .add_plugin(bevy_egui::EguiPlugin)
-        .add_plugin(bevy_rapier3d::prelude::RapierPhysicsPlugin::<
-            bevy_rapier3d::prelude::NoUserData,
-        >::default())
-        .insert_resource(bevy_rapier3d::prelude::RapierConfiguration {
-            physics_pipeline_active: false,
-            query_pipeline_active: true,
+    app.insert_resource(bevy_rapier3d::prelude::RapierConfiguration {
+        physics_pipeline_active: false,
+        query_pipeline_active: true,
+        ..Default::default()
+    });
+    app.add_plugins((
+        bevy_polyline::PolylinePlugin,
+        bevy_egui::EguiPlugin,
+        bevy_rapier3d::prelude::RapierPhysicsPlugin::<bevy_rapier3d::prelude::NoUserData>::default(
+        ),
+        bevy_rapier3d::prelude::RapierDebugRenderPlugin {
+            enabled: false,
             ..Default::default()
-        })
-        .add_plugin(OddioPlugin);
+        },
+        OddioPlugin,
+    ));
 
     // Initialise rose stuff
     app.init_asset_loader::<ZmsAssetLoader>()
@@ -558,14 +563,16 @@ fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsC
                 SoundCategory::Ui => config.sound.volume.ui_sounds,
             },
         })
-        .add_plugin(RoseAnimationPlugin)
-        .add_plugin(RoseRenderPlugin)
-        .add_plugin(RoseScriptingPlugin)
-        .add_plugin(DebugInspectorPlugin);
+        .add_plugins((
+            RoseAnimationPlugin,
+            RoseRenderPlugin,
+            RoseScriptingPlugin,
+            DebugInspectorPlugin,
+        ));
 
     // Setup state
     app.add_state::<AppState>()
-        .insert_resource(State::<AppState>(app_state));
+        .insert_resource(State::new(app_state));
 
     app.add_event::<BankEvent>()
         .add_event::<ChatboxEvent>()
@@ -594,98 +601,110 @@ fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsC
         .add_event::<ZoneEvent>()
         .add_event::<UiSoundEvent>();
 
-    app.add_system(apply_system_buffers.in_base_set(GameStages::ZoneChangeFlush));
-
-    app.add_system(apply_system_buffers.in_base_set(GameStages::DebugRenderPreFlush));
-
-    app.add_systems((free_camera_system, orbit_camera_system).in_set(GameSystemSets::UpdateCamera));
-
-    app.add_system(auto_login_system)
-        .add_system(background_music_system)
-        .add_system(character_model_update_system)
-        .add_system(character_model_add_collider_system.after(character_model_update_system))
-        .add_system(personal_store_model_system)
-        .add_system(personal_store_model_add_collider_system.after(personal_store_model_system))
-        .add_system(npc_model_update_system)
-        .add_system(npc_model_add_collider_system.after(npc_model_update_system))
-        .add_system(item_drop_model_system)
-        .add_system(item_drop_model_add_collider_system.after(item_drop_model_system))
-        .add_system(particle_sequence_system)
-        .add_system(effect_system)
-        .add_system(animation_effect_system.before(spawn_effect_system))
-        .add_system(animation_sound_system)
-        .add_system(
-            projectile_system
-                .after(animation_effect_system)
-                .before(spawn_effect_system),
-        )
-        .add_system(visible_status_effects_system.before(spawn_effect_system))
-        .add_system(
-            spawn_projectile_system
-                .after(animation_effect_system)
-                .before(spawn_effect_system),
-        )
-        .add_system(
-            pending_damage_system
-                .after(animation_effect_system)
-                .after(projectile_system),
-        )
-        .add_system(
-            pending_skill_effect_system
-                .after(animation_effect_system)
-                .after(projectile_system),
-        )
-        .add_system(
-            hit_event_system
-                .after(animation_effect_system)
-                .after(pending_skill_effect_system)
-                .after(projectile_system)
-                .before(spawn_effect_system),
-        )
-        .add_system(
-            damage_digit_render_system
-                .after(pending_damage_system)
-                .after(hit_event_system),
-        )
-        .add_system(
-            name_tag_update_healthbar_system
-                .after(pending_damage_system)
-                .after(hit_event_system),
-        )
-        .add_system(update_ui_resources)
-        .add_system(spawn_effect_system)
-        .add_system(move_destination_effect_system.after(game_mouse_input_system))
-        .add_system(npc_idle_sound_system)
-        .add_system(name_tag_system)
-        .add_system(name_tag_visibility_system.after(game_mouse_input_system))
-        .add_system(name_tag_update_color_system)
-        .add_system(world_time_system)
-        .add_system(system_func_event_system)
-        .add_system(load_dialog_sprites_system)
-        .add_system(zone_time_system.after(world_time_system))
-        .add_system(directional_light_system);
-
-    app.add_system(
-        ui_requested_cursor_apply_system
-            .in_base_set(CoreSet::PostUpdate)
-            .after(EguiSet::ProcessOutput),
+    app.add_systems(
+        PostUpdate,
+        (apply_deferred,).in_set(GameStages::ZoneChangeFlush),
+    );
+    app.add_systems(
+        PostUpdate,
+        (apply_deferred,).in_set(GameStages::DebugRenderPreFlush),
     );
 
-    app.add_system(ui_item_drop_name_system.in_set(UiSystemSets::UiFirst));
+    app.add_systems(
+        Update,
+        (free_camera_system, orbit_camera_system).in_set(GameSystemSets::UpdateCamera),
+    );
+    app.add_systems(
+        Update,
+        (
+            (
+                auto_login_system,
+                background_music_system,
+                character_model_update_system,
+                character_model_add_collider_system.after(character_model_update_system),
+                personal_store_model_system,
+                personal_store_model_add_collider_system.after(personal_store_model_system),
+                npc_model_update_system,
+                npc_model_add_collider_system.after(npc_model_update_system),
+                item_drop_model_system,
+                item_drop_model_add_collider_system.after(item_drop_model_system),
+                particle_sequence_system,
+                effect_system,
+                animation_effect_system.before(spawn_effect_system),
+                animation_sound_system,
+            ),
+            (
+                projectile_system
+                    .after(animation_effect_system)
+                    .before(spawn_effect_system),
+                visible_status_effects_system.before(spawn_effect_system),
+                spawn_projectile_system
+                    .after(animation_effect_system)
+                    .before(spawn_effect_system),
+                pending_damage_system
+                    .after(animation_effect_system)
+                    .after(projectile_system),
+                pending_skill_effect_system
+                    .after(animation_effect_system)
+                    .after(projectile_system),
+                hit_event_system
+                    .after(animation_effect_system)
+                    .after(pending_skill_effect_system)
+                    .after(projectile_system)
+                    .before(spawn_effect_system),
+                damage_digit_render_system
+                    .after(pending_damage_system)
+                    .after(hit_event_system),
+                name_tag_update_healthbar_system
+                    .after(pending_damage_system)
+                    .after(hit_event_system),
+            ),
+            (
+                update_ui_resources,
+                spawn_effect_system,
+                move_destination_effect_system.after(game_mouse_input_system),
+                npc_idle_sound_system,
+                name_tag_system,
+                name_tag_visibility_system.after(game_mouse_input_system),
+                name_tag_update_color_system,
+                world_time_system,
+                system_func_event_system,
+                load_dialog_sprites_system,
+                zone_time_system.after(world_time_system),
+                directional_light_system,
+            ),
+        ),
+    );
 
     app.add_systems(
+        PostUpdate,
+        ui_requested_cursor_apply_system.after(EguiSet::ProcessOutput),
+    );
+
+    app.add_systems(
+        Update,
+        ui_item_drop_name_system.in_set(UiSystemSets::UiFirst),
+    );
+
+    app.add_systems(
+        Update,
         (ui_message_box_system, ui_number_input_dialog_system).in_set(UiSystemSets::UiLast),
     );
     app.add_systems(
+        Update,
         (
             ui_window_sound_system.before(ui_sound_event_system),
             ui_sound_event_system,
         )
             .after(UiSystemSets::UiLast),
     );
-    app.add_systems((ui_debug_menu_system,).in_set(UiSystemSets::UiDebugMenu));
+    app.add_systems(
+        Update,
+        (ui_debug_menu_system,).in_set(UiSystemSets::UiDebugMenu),
+    );
 
     app.add_systems(
+        Update,
         (
             ui_debug_camera_info_system,
             ui_debug_client_entity_list_system,
@@ -708,89 +727,103 @@ fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsC
 
     // character_model_blink_system in PostUpdate to avoid any conflicts with model destruction
     // e.g. through the character select exit system.
-    app.add_system(character_model_blink_system.in_base_set(CoreSet::PostUpdate));
+    app.add_systems(PostUpdate, character_model_blink_system);
 
     // vehicle_model_system in after ::Update but before ::PostUpdate to avoid any conflicts,
     // with model destruction but to also be before global transform is calculated.
-    app.add_system(vehicle_model_system.in_base_set(GameStages::AfterUpdate));
-    app.add_system(
-        vehicle_sound_system
-            .in_base_set(GameStages::AfterUpdate)
-            .after(vehicle_model_system),
+    app.add_systems(
+        PostUpdate,
+        (vehicle_model_system, vehicle_sound_system)
+            .chain()
+            .in_set(GameStages::AfterUpdate),
     );
 
     // Run zone change system just before physics sync which is after Update
     app.add_systems(
+        Update,
         (
             zone_loader_system,
             game_zone_change_system.after(zone_loader_system),
         )
-            .in_base_set(GameStages::ZoneChange),
+            .in_set(GameStages::ZoneChange),
     );
 
     // Run debug render stage last after physics update so it has accurate data
-    app.add_startup_system(debug_render_polylines_setup_system);
+    app.add_systems(Startup, debug_render_polylines_setup_system);
     app.add_systems(
+        Update,
         (
             debug_render_collider_system.before(debug_render_polylines_update_system),
             debug_render_skeleton_system.before(debug_render_polylines_update_system),
             debug_render_directional_light_system.before(debug_render_polylines_update_system),
             debug_render_polylines_update_system,
         )
-            .in_base_set(GameStages::DebugRender),
+            .in_set(GameStages::DebugRender),
     );
 
     // Zone Viewer
-    app.add_system(zone_viewer_enter_system.in_schedule(OnEnter(AppState::ZoneViewer)));
+    app.add_systems(OnEnter(AppState::ZoneViewer), zone_viewer_enter_system);
 
     // Model Viewer, we avoid deleting any entities during CoreStage::Update by using a custom
     // stage which runs after Update. We cannot run before Update because the on_enter system
     // below will have not run yet.
-    app.add_system(model_viewer_enter_system.in_schedule(OnEnter(AppState::ModelViewer)))
-        .add_system(model_viewer_exit_system.in_schedule(OnExit(AppState::ModelViewer)));
-    app.add_system(
+    app.add_systems(OnEnter(AppState::ModelViewer), model_viewer_enter_system);
+    app.add_systems(OnExit(AppState::ModelViewer), model_viewer_exit_system);
+    app.add_systems(
+        PostUpdate,
         model_viewer_system
             .run_if(in_state(AppState::ModelViewer))
-            .in_base_set(GameStages::ZoneChange),
+            .in_set(GameStages::ZoneChange)
+            .before(EguiSet::ProcessOutput), // model_viewer_system renders UI so must be before egui
     );
 
     // Game Login
-    app.add_system(login_state_enter_system.in_schedule(OnEnter(AppState::GameLogin)))
-        .add_system(login_state_exit_system.in_schedule(OnExit(AppState::GameLogin)));
-
-    app.add_systems((login_system, login_event_system).in_set(OnUpdate(AppState::GameLogin)));
+    app.add_systems(OnEnter(AppState::GameLogin), login_state_enter_system)
+        .add_systems(OnExit(AppState::GameLogin), login_state_exit_system);
 
     app.add_systems(
+        Update,
+        (login_system, login_event_system).run_if(in_state(AppState::GameLogin)),
+    );
+
+    app.add_systems(
+        Update,
         (ui_login_system, ui_server_select_system)
-            .in_set(OnUpdate(AppState::GameLogin))
+            .run_if(in_state(AppState::GameLogin))
             .in_set(UiSystemSets::Ui)
             .after(login_system)
             .before(login_event_system),
     );
 
     // Game Character Select
-    app.add_system(
-        character_select_enter_system.in_schedule(OnEnter(AppState::GameCharacterSelect)),
+    app.add_systems(
+        OnEnter(AppState::GameCharacterSelect),
+        character_select_enter_system,
     )
-    .add_system(character_select_exit_system.in_schedule(OnExit(AppState::GameCharacterSelect)));
+    .add_systems(
+        OnExit(AppState::GameCharacterSelect),
+        character_select_exit_system,
+    );
 
     app.add_systems(
+        Update,
         (
             character_select_system,
             character_select_input_system,
             character_select_models_system,
             character_select_event_system,
         )
-            .in_set(OnUpdate(AppState::GameCharacterSelect)),
+            .run_if(in_state(AppState::GameCharacterSelect)),
     );
 
     app.add_systems(
+        Update,
         (
             ui_character_create_system,
             ui_character_select_system,
             ui_character_select_name_tag_system,
         )
-            .in_set(OnUpdate(AppState::GameCharacterSelect))
+            .run_if(in_state(AppState::GameCharacterSelect))
             .in_set(UiSystemSets::Ui)
             .after(character_select_system)
             .after(character_select_input_system)
@@ -808,9 +841,10 @@ fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsC
         .init_resource::<SelectedTarget>()
         .init_resource::<NameTagSettings>();
 
-    app.add_system(game_state_enter_system.in_schedule(OnEnter(AppState::Game)));
+    app.add_systems(OnEnter(AppState::Game), game_state_enter_system);
 
     app.add_systems(
+        Update,
         (
             ability_values_system,
             clan_system,
@@ -831,58 +865,56 @@ fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsC
             status_effect_system,
             passive_recovery_system,
             quest_trigger_system,
+            game_mouse_input_system.after(GameSystemSets::Ui),
         )
-            .in_set(OnUpdate(AppState::Game)),
-    )
-    .add_systems(
-        (game_mouse_input_system.after(GameSystemSets::Ui),).in_set(OnUpdate(AppState::Game)),
+            .run_if(in_state(AppState::Game)),
     );
 
     app.add_systems(
+        Update,
         (
-            ui_bank_system,
-            ui_chatbox_system,
-            ui_character_info_system,
-            ui_clan_system,
-            ui_create_clan_system,
-            ui_inventory_system,
-            ui_game_menu_system.after(ui_character_info_system),
-            ui_hotbar_system,
-            ui_minimap_system,
-            ui_npc_store_system,
-            ui_party_system,
-            ui_party_option_system,
-            ui_personal_store_system,
-            ui_player_info_system,
-            ui_quest_list_system,
+            (
+                ui_bank_system,
+                ui_chatbox_system,
+                ui_character_info_system,
+                ui_clan_system,
+                ui_create_clan_system,
+                ui_inventory_system,
+                ui_game_menu_system.after(ui_character_info_system),
+                ui_hotbar_system,
+                ui_minimap_system,
+                ui_npc_store_system,
+                ui_party_system,
+                ui_party_option_system,
+                ui_personal_store_system,
+                ui_player_info_system,
+            ),
+            (
+                ui_quest_list_system,
+                ui_respawn_system,
+                ui_selected_target_system,
+                ui_skill_list_system,
+                ui_skill_tree_system,
+                ui_settings_system,
+                ui_status_effects_system,
+                conversation_dialog_system,
+            ),
         )
-            .in_set(OnUpdate(AppState::Game))
-            .in_set(UiSystemSets::Ui),
-    )
-    .add_systems(
-        (
-            ui_respawn_system,
-            ui_selected_target_system,
-            ui_skill_list_system,
-            ui_skill_tree_system,
-            ui_settings_system,
-            ui_status_effects_system,
-            conversation_dialog_system,
-        )
-            .in_set(OnUpdate(AppState::Game))
+            .run_if(in_state(AppState::Game))
             .in_set(UiSystemSets::Ui),
     );
 
     if !systems_config.disable_player_command_system {
         app.add_systems(
+            Update,
             (player_command_system
                 .after(cooldown_system)
                 .after(game_mouse_input_system),)
-                .in_set(OnUpdate(AppState::Game)),
+                .run_if(in_state(AppState::Game)),
         );
     }
 
-    app.add_system(ui_drag_and_drop_system.in_base_set(CoreSet::PostUpdate));
+    app.add_systems(PostUpdate, ui_drag_and_drop_system);
 
     // Setup network
     let (network_thread_tx, network_thread_rx) =
@@ -892,15 +924,15 @@ fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsC
 
     // Run network systems before Update, so we can add/remove entities
     app.add_systems(
+        PreUpdate,
         (
             login_connection_system,
             world_connection_system,
             game_connection_system,
-        )
-            .in_base_set(CoreSet::PreUpdate),
+        ),
     );
 
-    app.add_startup_system(load_common_game_data.in_base_set(StartupSet::PostStartup));
+    app.add_systems(PostStartup, load_common_game_data);
 
     if let Some(app_builder) = systems_config.add_custom_systems.take() {
         app_builder(&mut app);
@@ -908,7 +940,7 @@ fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsC
 
     match config.game.network_version.as_str() {
         "irose" => {
-            app.add_system(network_thread_system.in_base_set(CoreSet::PostUpdate));
+            app.add_systems(PostUpdate, network_thread_system);
         }
         "custom" => {}
         unknown => panic!("Unknown game network version {}", unknown),
@@ -916,7 +948,7 @@ fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsC
 
     match config.game.ui_version.as_str() {
         "irose" => {
-            app.add_startup_system(load_ui_resources);
+            app.add_systems(Startup, load_ui_resources);
         }
         "custom" => {}
         unknown => panic!("Unknown game ui version {}", unknown),
@@ -924,33 +956,37 @@ fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsC
 
     match config.game.data_version.as_str() {
         "irose" => {
-            app.add_startup_system(load_game_data_irose);
+            app.add_systems(Startup, load_game_data_irose);
         }
         "custom" => {}
         unknown => panic!("Unknown game data version {}", unknown),
     };
 
     app.configure_sets(
-        (GameStages::AfterUpdate,)
-            .after(CoreSet::UpdateFlush)
-            .before(PhysicsSet::SyncBackend),
+        PostUpdate,
+        (GameStages::AfterUpdate,).before(PhysicsSet::SyncBackend),
     );
 
     app.configure_sets(
-        (GameStages::ZoneChange, GameStages::ZoneChangeFlush)
+        PostUpdate,
+        (
+            GameStages::ZoneChange,
+            GameStages::ZoneChangeFlush,
+            GameStages::AfterUpdate,
+        )
             .chain()
-            .after(CoreSet::UpdateFlush)
             .before(PhysicsSet::SyncBackend),
     );
 
     app.configure_sets(
+        PostUpdate,
         (GameStages::DebugRenderPreFlush, GameStages::DebugRender)
             .chain()
-            .after(PhysicsSet::Writeback)
-            .before(CoreSet::PostUpdate),
+            .after(TransformSystem::TransformPropagate),
     );
 
     app.configure_sets(
+        Update,
         (
             UiSystemSets::UiDebugMenu,
             UiSystemSets::UiFirst,
@@ -962,7 +998,10 @@ fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsC
             .in_set(GameSystemSets::Ui),
     );
 
-    app.configure_sets((GameSystemSets::UpdateCamera, GameSystemSets::Ui).chain());
+    app.configure_sets(
+        Update,
+        (GameSystemSets::UpdateCamera, GameSystemSets::Ui).chain(),
+    );
 
     app.run();
 

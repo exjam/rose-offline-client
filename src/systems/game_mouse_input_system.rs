@@ -6,7 +6,6 @@ use bevy::{
         Camera, Camera3d, Entity, EventWriter, GlobalTransform, MouseButton, Query, Res, ResMut,
         With,
     },
-    render::camera::Projection,
     window::{CursorGrabMode, PrimaryWindow, Window},
 };
 use bevy_egui::EguiContexts;
@@ -20,7 +19,6 @@ use crate::{
         COLLISION_FILTER_CLICKABLE, COLLISION_GROUP_PHYSICS_TOY, COLLISION_GROUP_PLAYER,
     },
     events::{MoveDestinationEffectEvent, PlayerCommandEvent},
-    ray_from_screenspace::ray_from_screenspace,
     resources::{SelectedTarget, UiCursorType, UiRequestedCursor},
 };
 
@@ -34,7 +32,7 @@ pub struct PlayerQuery<'w> {
 pub fn game_mouse_input_system(
     mouse_button_input: Res<Input<MouseButton>>,
     query_window: Query<&Window, With<PrimaryWindow>>,
-    query_camera: Query<(&Camera, &Projection, &GlobalTransform), With<Camera3d>>,
+    query_camera: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
     rapier_context: Res<RapierContext>,
     mut egui_ctx: EguiContexts,
     query_collider_parent: Query<&ColliderParent>,
@@ -77,20 +75,14 @@ pub fn game_mouse_input_system(
     } else {
         return;
     };
-    let Ok((camera, camera_projection, camera_transform)) = query_camera.get_single() else {
+    let Ok((camera, camera_transform)) = query_camera.get_single() else {
         return;
     };
 
-    if let Some((ray_origin, ray_direction)) = ray_from_screenspace(
-        cursor_position,
-        window,
-        camera,
-        camera_projection,
-        camera_transform,
-    ) {
+    if let Some(ray) = camera.viewport_to_world(camera_transform, cursor_position) {
         if let Some((collider_entity, distance)) = rapier_context.cast_ray(
-            ray_origin,
-            ray_direction,
+            ray.origin,
+            ray.direction,
             10000000.0,
             false,
             QueryFilter::new().groups(CollisionGroups::new(
@@ -98,7 +90,7 @@ pub fn game_mouse_input_system(
                 !COLLISION_GROUP_PLAYER & !COLLISION_GROUP_PHYSICS_TOY,
             )),
         ) {
-            let hit_position = ray_origin + ray_direction * distance;
+            let hit_position = ray.get_point(distance);
             let hit_entity = query_collider_parent
                 .get(collider_entity)
                 .map_or(collider_entity, |collider_parent| collider_parent.entity);

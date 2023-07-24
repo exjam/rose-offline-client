@@ -1,6 +1,6 @@
 use bevy::{
     asset::{AssetLoader, LoadContext, LoadedAsset},
-    reflect::TypeUuid,
+    reflect::{TypePath, TypeUuid},
     utils::BoxedFuture,
     window::{CursorIcon, CursorIconCustom},
 };
@@ -8,7 +8,7 @@ use bevy::{
 #[derive(Clone, Default)]
 pub struct ExeResourceLoader;
 
-#[derive(Debug, TypeUuid, Clone)]
+#[derive(Debug, TypeUuid, TypePath, Clone)]
 #[uuid = "dda4ba39-576d-4863-a8b4-ca73cedcfbcd"]
 pub struct ExeResourceCursor {
     pub cursor: CursorIcon,

@@ -1,4 +1,4 @@
-use bevy::asset::{AssetIo, AssetIoError, BoxedFuture, Metadata};
+use bevy::asset::{AssetIo, AssetIoError, BoxedFuture, ChangeWatcher, Metadata};
 use std::{
     path::{Path, PathBuf},
     sync::Arc,
@@ -59,7 +59,7 @@ impl AssetIo for VfsAssetIo {
         Ok(())
     }
 
-    fn watch_for_changes(&self) -> Result<(), AssetIoError> {
+    fn watch_for_changes(&self, _configuration: &ChangeWatcher) -> Result<(), AssetIoError> {
         Ok(())
     }
 }

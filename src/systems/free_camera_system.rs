@@ -109,7 +109,7 @@ pub fn free_camera_system(
                 KeyCode::D => move_vec.x += 1.0,      // Right
                 KeyCode::Q => translate_vec.y -= 1.0, // Down
                 KeyCode::E => translate_vec.y += 1.0, // Up
-                KeyCode::LShift => speed_boost_multiplier = 4.0,
+                KeyCode::ShiftLeft => speed_boost_multiplier = 4.0,
                 _ => {}
             }
         }

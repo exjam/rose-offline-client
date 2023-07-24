@@ -7,7 +7,7 @@ use bevy::{
         DespawnRecursiveExt, Entity, EventReader, EventWriter, GlobalTransform, Handle, Local,
         MouseButton, NextState, Query, Res, ResMut, Resource, Visibility, With,
     },
-    render::{camera::Projection, mesh::skinning::SkinnedMesh},
+    render::mesh::skinning::SkinnedMesh,
     window::{CursorGrabMode, PrimaryWindow, Window},
 };
 use bevy_egui::{egui, EguiContexts};
@@ -23,7 +23,6 @@ use crate::{
         COLLISION_GROUP_PLAYER,
     },
     events::{CharacterSelectEvent, GameConnectionEvent, LoadZoneEvent, WorldConnectionEvent},
-    ray_from_screenspace::ray_from_screenspace,
     resources::{
         AppState, CharacterList, CharacterSelectState, GameData, ServerConfiguration,
         WorldConnection,
@@ -386,7 +385,7 @@ pub fn character_select_input_system(
     mouse_button_input: Res<Input<MouseButton>>,
     rapier_context: Res<RapierContext>,
     mut last_selected_time: Local<Option<Instant>>,
-    query_camera: Query<(&Camera, &Projection, &GlobalTransform), With<Camera3d>>,
+    query_camera: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
     query_collider_parent: Query<&ColliderParent>,
     query_select_character: Query<&CharacterSelectCharacter>,
     query_window: Query<&Window, With<PrimaryWindow>>,
@@ -415,17 +414,11 @@ pub fn character_select_input_system(
         };
 
     if mouse_button_input.just_pressed(MouseButton::Left) {
-        for (camera, camera_projection, camera_transform) in query_camera.iter() {
-            if let Some((ray_origin, ray_direction)) = ray_from_screenspace(
-                cursor_position,
-                window,
-                camera,
-                camera_projection,
-                camera_transform,
-            ) {
+        for (camera, camera_transform) in query_camera.iter() {
+            if let Some(ray) = camera.viewport_to_world(camera_transform, cursor_position) {
                 if let Some((collider_entity, _)) = rapier_context.cast_ray(
-                    ray_origin,
-                    ray_direction,
+                    ray.origin,
+                    ray.direction,
                     10000000.0,
                     false,
                     QueryFilter::new().groups(CollisionGroups::new(

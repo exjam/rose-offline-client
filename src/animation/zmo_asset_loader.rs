@@ -4,7 +4,7 @@ use bevy::{
     asset::{AssetLoader, BoxedFuture, LoadContext, LoadedAsset},
     math::{Quat, Vec3},
     prelude::{Handle, Image},
-    reflect::{FromReflect, Reflect, TypeUuid},
+    reflect::{Reflect, TypeUuid},
     render::render_resource::{Extent3d, TextureDimension, TextureFormat},
 };
 use rose_file_readers::{RoseFile, ZmoChannel, ZmoFile};
@@ -15,14 +15,14 @@ pub struct ZmoAssetLoader;
 #[derive(Default)]
 pub struct ZmoTextureAssetLoader;
 
-#[derive(Reflect, FromReflect, Clone, Default)]
+#[derive(Reflect, Clone, Default)]
 pub struct ZmoAssetBone {
     pub translation: Vec<Vec3>,
     pub rotation: Vec<Quat>,
     pub scale: Vec<f32>,
 }
 
-#[derive(Reflect, FromReflect, Clone, Default)]
+#[derive(Reflect, Clone, Default)]
 pub struct ZmoAssetAnimationTexture {
     pub texture: Handle<Image>,
     pub alphas: Vec<f32>,
@@ -32,7 +32,7 @@ pub struct ZmoAssetAnimationTexture {
     pub has_uv1_channel: bool,
 }
 
-#[derive(Reflect, FromReflect, TypeUuid)]
+#[derive(Reflect, TypeUuid)]
 #[uuid = "120cb5ff-e72d-4730-9756-648d0001fdfa"]
 pub struct ZmoAsset {
     pub num_frames: usize,

@@ -7,7 +7,6 @@ use bevy::{
         shape, Assets, Camera, Camera3d, Color, Commands, ComputedVisibility, GlobalTransform,
         Handle, KeyCode, Local, Mesh, Query, Res, ResMut, Time, Transform, Visibility, With,
     },
-    render::camera::Projection,
     window::{PrimaryWindow, Window},
 };
 use bevy_egui::{egui, EguiContexts};
@@ -21,7 +20,6 @@ use rose_game_common::components::Npc;
 
 use crate::{
     components::{ColliderEntity, COLLISION_FILTER_CLICKABLE, COLLISION_GROUP_PHYSICS_TOY},
-    ray_from_screenspace::ray_from_screenspace,
     ui::UiStateDebugWindows,
 };
 
@@ -104,7 +102,7 @@ pub fn ui_debug_physics_system(
     rapier_context: Res<RapierContext>,
     time: Res<Time>,
     query_primary_window: Query<&Window, With<PrimaryWindow>>,
-    query_camera: Query<(&Camera, &Projection, &GlobalTransform), With<Camera3d>>,
+    query_camera: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
 ) {
     if !ui_state_debug_windows.debug_ui_open {
         return;
@@ -183,18 +181,12 @@ pub fn ui_debug_physics_system(
 
         let cursor_position = window.cursor_position();
         if let Some(cursor_position) = cursor_position {
-            let (camera, camera_projection, camera_transform) = query_camera.single();
+            let (camera, camera_transform) = query_camera.single();
 
-            if let Some((ray_origin, ray_direction)) = ray_from_screenspace(
-                cursor_position,
-                window,
-                camera,
-                camera_projection,
-                camera_transform,
-            ) {
+            if let Some(ray) = camera.viewport_to_world(camera_transform, cursor_position) {
                 if let Some((_, distance)) = rapier_context.cast_ray(
-                    ray_origin,
-                    ray_direction,
+                    ray.origin,
+                    ray.direction,
                     10000000.0,
                     false,
                     QueryFilter::new().groups(CollisionGroups::new(
@@ -234,7 +226,7 @@ pub fn ui_debug_physics_system(
                             .unwrap()
                             .clone();
 
-                        let hit_position = ray_origin + ray_direction * distance;
+                        let hit_position = ray.get_point(distance);
 
                         let entity_id = commands
                             .spawn((

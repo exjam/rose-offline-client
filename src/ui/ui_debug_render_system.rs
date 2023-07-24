@@ -26,6 +26,7 @@ pub fn ui_debug_render_system(
     query_warp_objects: Query<&Children, With<WarpObject>>,
     query_object_material: Query<&Handle<ObjectMaterial>>,
     mut object_materials: ResMut<Assets<ObjectMaterial>>,
+    rapier_debug: Option<ResMut<bevy_rapier3d::prelude::DebugRenderContext>>,
 ) {
     if !ui_state_debug_windows.debug_ui_open {
         return;
@@ -35,6 +36,9 @@ pub fn ui_debug_render_system(
         .open(&mut ui_state_debug_windows.debug_render_open)
         .show(egui_context.ctx_mut(), |ui| {
             ui.checkbox(&mut debug_render_config.colliders, "Show Colliders");
+            if let Some(mut rapier_debug) = rapier_debug {
+                ui.checkbox(&mut rapier_debug.enabled, "Show Rapier Debug");
+            }
             ui.checkbox(&mut debug_render_config.skeleton, "Show Skeletons");
             ui.checkbox(&mut debug_render_config.bone_up, "Show Bone Up");
             ui.checkbox(
@@ -57,7 +61,7 @@ pub fn ui_debug_render_system(
                     for children in query_event_objects.iter() {
                         for child_entity in children.iter() {
                             if let Ok(handle) = query_object_material.get(*child_entity) {
-                                if let Some(mut material) = object_materials.get_mut(handle) {
+                                if let Some(material) = object_materials.get_mut(handle) {
                                     material.alpha_value = Some(0.75);
                                 }
                             }
@@ -67,7 +71,7 @@ pub fn ui_debug_render_system(
                     for children in query_event_objects.iter() {
                         for child_entity in children.iter() {
                             if let Ok(handle) = query_object_material.get(*child_entity) {
-                                if let Some(mut material) = object_materials.get_mut(handle) {
+                                if let Some(material) = object_materials.get_mut(handle) {
                                     material.alpha_value = None;
                                 }
                             }
@@ -87,7 +91,7 @@ pub fn ui_debug_render_system(
                     for children in query_warp_objects.iter() {
                         for child_entity in children.iter() {
                             if let Ok(handle) = query_object_material.get(*child_entity) {
-                                if let Some(mut material) = object_materials.get_mut(handle) {
+                                if let Some(material) = object_materials.get_mut(handle) {
                                     material.alpha_value = Some(0.75);
                                 }
                             }
@@ -97,7 +101,7 @@ pub fn ui_debug_render_system(
                     for children in query_warp_objects.iter() {
                         for child_entity in children.iter() {
                             if let Ok(handle) = query_object_material.get(*child_entity) {
-                                if let Some(mut material) = object_materials.get_mut(handle) {
+                                if let Some(material) = object_materials.get_mut(handle) {
                                     material.alpha_value = None;
                                 }
                             }

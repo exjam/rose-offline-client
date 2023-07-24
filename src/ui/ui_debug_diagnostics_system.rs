@@ -1,5 +1,5 @@
 use bevy::{
-    diagnostic::Diagnostics,
+    diagnostic::DiagnosticsStore,
     prelude::{Res, ResMut},
 };
 use bevy_egui::{egui, EguiContexts};
@@ -9,7 +9,7 @@ use crate::ui::UiStateDebugWindows;
 pub fn ui_debug_diagnostics_system(
     mut egui_context: EguiContexts,
     ui_state_debug_windows: ResMut<UiStateDebugWindows>,
-    diagnostics: Res<Diagnostics>,
+    diagnostics: Res<DiagnosticsStore>,
 ) {
     if !ui_state_debug_windows.debug_ui_open {
         return;

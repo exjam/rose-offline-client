@@ -11,10 +11,10 @@ use bevy::{
         SetMeshViewBindGroup,
     },
     prelude::{
-        AlphaMode, App, Commands, FromWorld, HandleUntyped, Image, IntoSystemAppConfig, Material,
-        MaterialPlugin, Mesh, Plugin, Res, Resource, Time, World,
+        AlphaMode, App, Commands, FromWorld, HandleUntyped, Image, Material, MaterialPlugin, Mesh,
+        Plugin, Res, Resource, Time, World,
     },
-    reflect::TypeUuid,
+    reflect::{TypePath, TypeUuid},
     render::{
         mesh::MeshVertexBufferLayout,
         prelude::Shader,
@@ -57,7 +57,7 @@ impl Plugin for WaterMaterialPlugin {
             Shader::from_wgsl
         );
 
-        app.add_plugin(MaterialPlugin::<
+        app.add_plugins(MaterialPlugin::<
             WaterMaterial,
             DrawWaterMaterial,
             DrawPrepass<WaterMaterial>,
@@ -67,7 +67,7 @@ impl Plugin for WaterMaterialPlugin {
         });
 
         if let Ok(render_app) = app.get_sub_app_mut(RenderApp) {
-            render_app.add_system(extract_water_push_constant_data.in_schedule(ExtractSchedule));
+            render_app.add_systems(ExtractSchedule, extract_water_push_constant_data);
         }
     }
 }
@@ -108,7 +108,7 @@ impl FromWorld for WaterMaterialPipelineData {
     }
 }
 
-#[derive(Debug, Clone, TypeUuid)]
+#[derive(Debug, Clone, TypeUuid, TypePath)]
 #[uuid = "e9e46dcc-94db-4b31-819f-d5ecffc732f0"]
 pub struct WaterMaterial {
     pub textures: Vec<Handle<Image>>,
@@ -208,7 +208,7 @@ impl AsBindGroup for WaterMaterial {
             }
         }
 
-        let mut textures = vec![&*fallback_image.texture_view; WATER_MATERIAL_NUM_TEXTURES];
+        let mut textures = vec![&*fallback_image.d2.texture_view; WATER_MATERIAL_NUM_TEXTURES];
         for (id, image) in images.into_iter().enumerate() {
             textures[id] = &*image.texture_view;
         }

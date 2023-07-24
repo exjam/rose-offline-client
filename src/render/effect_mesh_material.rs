@@ -12,7 +12,7 @@ use bevy::{
         MeshPipelineKey, SetMaterialBindGroup, SetMeshBindGroup, SetMeshViewBindGroup,
     },
     prelude::{App, Component, FromWorld, HandleUntyped, Mesh, Plugin, With, World},
-    reflect::{Reflect, TypeUuid},
+    reflect::{Reflect, TypePath, TypeUuid},
     render::{
         extract_component::{ExtractComponent, ExtractComponentPlugin},
         mesh::{GpuBufferInfo, MeshVertexBufferLayout},
@@ -51,10 +51,12 @@ impl Plugin for EffectMeshMaterialPlugin {
             Shader::from_wgsl
         );
 
-        app.add_plugin(ExtractComponentPlugin::<EffectMeshAnimationRenderState>::extract_visible());
+        app.add_plugins(
+            ExtractComponentPlugin::<EffectMeshAnimationRenderState>::extract_visible(),
+        );
         app.register_type::<EffectMeshAnimationRenderState>();
 
-        app.add_plugin(MaterialPlugin::<
+        app.add_plugins(MaterialPlugin::<
             EffectMeshMaterial,
             DrawEffectMeshMaterial,
             DrawPrepass<EffectMeshMaterial>,
@@ -67,6 +69,7 @@ impl Plugin for EffectMeshMaterialPlugin {
 }
 
 bitflags::bitflags! {
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
     #[repr(transparent)]
     pub struct EffectMeshMaterialFlags: u32 {
         const ALPHA_MODE_OPAQUE         = (1 << 0);
@@ -76,6 +79,7 @@ bitflags::bitflags! {
 }
 
 bitflags::bitflags! {
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
     #[repr(transparent)]
     pub struct EffectMeshAnimationFlags: u32 {
         const ANIMATE_POSITION          = (1 << 0);
@@ -110,7 +114,7 @@ pub struct EffectMeshMaterialUniformData {
     pub alpha_cutoff: f32,
 }
 
-#[derive(AsBindGroup, Debug, Clone, TypeUuid)]
+#[derive(AsBindGroup, Debug, Clone, TypeUuid, TypePath)]
 #[uuid = "9ac3266d-1aa6-4f67-ade4-e3765fd0b1a1"]
 #[bind_group_data(EffectMeshMaterialKey)]
 #[uniform(0, EffectMeshMaterialUniformData)]
@@ -342,6 +346,7 @@ impl<P: PhaseItem> RenderCommand<P> for DrawEffectMesh {
 
         if let Some(gpu_mesh) = meshes.into_inner().get(mesh_handle) {
             pass.set_vertex_buffer(0, gpu_mesh.vertex_buffer.slice(..));
+
             match &gpu_mesh.buffer_info {
                 GpuBufferInfo::Indexed {
                     buffer,
@@ -351,8 +356,8 @@ impl<P: PhaseItem> RenderCommand<P> for DrawEffectMesh {
                     pass.set_index_buffer(buffer.slice(..), 0, *index_format);
                     pass.draw_indexed(0..*count, 0, 0..1);
                 }
-                GpuBufferInfo::NonIndexed { vertex_count } => {
-                    pass.draw(0..*vertex_count, 0..1);
+                GpuBufferInfo::NonIndexed => {
+                    pass.draw(0..gpu_mesh.vertex_count, 0..1);
                 }
             }
             RenderCommandResult::Success

@@ -2,7 +2,7 @@ use bevy::{
     app::{App, Plugin},
     asset::{AddAsset, Handle},
     ecs::system::{lifetimeless::SRes, SystemParamItem},
-    reflect::TypeUuid,
+    reflect::{TypePath, TypeUuid},
     render::{
         render_asset::{PrepareAssetError, RenderAsset, RenderAssetPlugin},
         renderer::RenderDevice,
@@ -10,7 +10,7 @@ use bevy::{
     },
 };
 
-#[derive(Debug, Clone, TypeUuid)]
+#[derive(Debug, Clone, TypeUuid, TypePath)]
 #[uuid = "0078f73d-8715-427e-aa65-dc8e1f485d3d"]
 pub struct ParticleMaterial {
     pub texture: Handle<Image>,
@@ -20,7 +20,7 @@ pub struct ParticleMaterialPlugin;
 
 impl Plugin for ParticleMaterialPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugin(RenderAssetPlugin::<ParticleMaterial>::default())
+        app.add_plugins(RenderAssetPlugin::<ParticleMaterial>::default())
             .add_asset::<ParticleMaterial>();
     }
 }

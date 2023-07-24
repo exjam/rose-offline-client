@@ -113,7 +113,7 @@ pub fn ui_debug_client_entity_list_system(
 
             egui::ScrollArea::vertical()
                 .auto_shrink([false, false])
-                .always_show_scroll(true)
+                .scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::AlwaysVisible)
                 .show(ui, |ui| {
                     egui::Grid::new("client_entity_list_grid")
                         .num_columns(4)

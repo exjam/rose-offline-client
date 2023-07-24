@@ -1,10 +1,7 @@
-use bevy::{
-    prelude::Component,
-    reflect::{FromReflect, Reflect},
-};
+use bevy::{prelude::Component, reflect::Reflect};
 use enum_map::Enum;
 
-#[derive(Component, Enum, Copy, Clone, Debug, Reflect, FromReflect)]
+#[derive(Component, Enum, Copy, Clone, Debug, Reflect)]
 pub enum SoundCategory {
     BackgroundMusic,
     PlayerFootstep,

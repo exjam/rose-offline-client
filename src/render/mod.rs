@@ -66,17 +66,19 @@ impl Plugin for RoseRenderPlugin {
     fn build(&self, app: &mut App) {
         let prepass_enabled = false;
 
-        app.add_plugin(ZoneLightingPlugin)
-            .add_plugin(TerrainMaterialPlugin { prepass_enabled })
-            .add_plugin(EffectMeshMaterialPlugin { prepass_enabled })
-            .add_plugin(ObjectMaterialPlugin { prepass_enabled })
-            .add_plugin(WaterMaterialPlugin { prepass_enabled })
-            .add_plugin(ParticleMaterialPlugin)
-            .add_plugin(ParticleRenderPlugin)
-            .add_plugin(DamageDigitMaterialPlugin)
-            .add_plugin(DamageDigitRenderPlugin)
-            .add_plugin(SkyMaterialPlugin { prepass_enabled })
-            .add_plugin(TrailEffectRenderPlugin)
-            .add_plugin(WorldUiRenderPlugin);
+        app.add_plugins((
+            ZoneLightingPlugin,
+            TerrainMaterialPlugin { prepass_enabled },
+            EffectMeshMaterialPlugin { prepass_enabled },
+            ObjectMaterialPlugin { prepass_enabled },
+            WaterMaterialPlugin { prepass_enabled },
+            ParticleMaterialPlugin,
+            ParticleRenderPlugin,
+            DamageDigitMaterialPlugin,
+            DamageDigitRenderPlugin,
+            SkyMaterialPlugin { prepass_enabled },
+            TrailEffectRenderPlugin,
+            WorldUiRenderPlugin,
+        ));
     }
 }
