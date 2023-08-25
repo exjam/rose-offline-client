@@ -7,7 +7,6 @@ edition = "2021"
 anyhow = "1.0.4"
 arrayvec = "0.7"
 async-trait = "0.1"
-bevy = { version = "0.11.2", default-features = false, features = ["dds", "tga", "bevy_asset", "bevy_core_pipeline", "bevy_winit", "bevy_render", "bevy_pbr"] }
 bevy_egui = "0.21"
 bevy-inspector-egui = "0.19"
 bevy_polyline = "0.7"
@@ -48,6 +47,22 @@ rose-game-common = { git = "https://github.com/exjam/rose-offline", rev = "a499d
 rose-game-irose = { git = "https://github.com/exjam/rose-offline", rev = "a499d3850446c22516c0d3f9336ff80088ed7cb1" }
 rose-network-common = { git = "https://github.com/exjam/rose-offline", rev = "a499d3850446c22516c0d3f9336ff80088ed7cb1" }
 rose-network-irose = { git = "https://github.com/exjam/rose-offline", rev = "a499d3850446c22516c0d3f9336ff80088ed7cb1" }
+
+[dependencies.bevy]
+version = "0.11.2"
+default-features = false
+features = [
+  "bevy_asset",
+  "bevy_winit",
+  "bevy_core_pipeline",
+  "bevy_pbr",
+  "bevy_render",
+  "multi-threaded",
+  "dds",
+  "tga",
+  "x11",
+  "bevy_gizmos",
+]
 
 [patch.crates-io]
 bevy = { git = "https://github.com/exjam/bevy", rev = "04945fbacb297d3720049b7c89e3cb8eb19049c2" }
