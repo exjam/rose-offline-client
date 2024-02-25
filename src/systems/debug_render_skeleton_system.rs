@@ -1,25 +1,20 @@
 use bevy::{
     hierarchy::Parent,
-    math::Vec3,
-    prelude::{GlobalTransform, Query, Res, ResMut},
+    prelude::{Color, Gizmos, GlobalTransform, Query, Res},
     render::mesh::skinning::SkinnedMesh,
 };
 
-use crate::resources::{DebugRenderConfig, DebugRenderSkeletonData};
+use crate::resources::DebugRenderConfig;
 
 pub fn debug_render_skeleton_system(
     debug_render_config: Res<DebugRenderConfig>,
     query_skeleton: Query<&SkinnedMesh>,
     query_bone: Query<(&GlobalTransform, Option<&Parent>)>,
-    mut render_data: ResMut<DebugRenderSkeletonData>,
+    mut gizmos: Gizmos,
 ) {
     if !debug_render_config.skeleton && !debug_render_config.bone_up {
         return;
     }
-
-    let render_data = &mut *render_data;
-    let skeleton_vertices = &mut render_data.skeleton.vertices;
-    let bone_up_vertices = &mut render_data.bone_up.vertices;
 
     for skinned_mesh in query_skeleton.iter() {
         for bone_entity in skinned_mesh.joints.iter() {
@@ -30,17 +25,19 @@ pub fn debug_render_skeleton_system(
                     if let Some((parent_transform, _)) =
                         parent.and_then(|x| query_bone.get(x.get()).ok())
                     {
-                        skeleton_vertices.push(translation);
-                        skeleton_vertices.push(parent_transform.translation());
-                        skeleton_vertices.push(Vec3::new(f32::NAN, f32::NAN, f32::NAN));
+                        gizmos.line_gradient(
+                            translation,
+                            parent_transform.translation(),
+                            Color::WHITE,
+                            Color::GRAY,
+                        );
                     }
                 }
 
                 if debug_render_config.bone_up {
-                    // Our bones seem to be in -Z up space
-                    bone_up_vertices.push(translation);
-                    bone_up_vertices.push(translation + rotation.mul_vec3([0.0, 0.0, -0.2].into()));
-                    bone_up_vertices.push(Vec3::new(f32::NAN, f32::NAN, f32::NAN));
+                    let start = translation;
+                    let end = translation + rotation.mul_vec3([0.0, 0.0, -0.2].into());
+                    gizmos.line_gradient(start, end, Color::PINK, Color::PURPLE);
                 }
             }
         }

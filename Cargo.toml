@@ -9,7 +9,6 @@ arrayvec = "0.7"
 async-trait = "0.1"
 bevy_egui = "0.21"
 bevy-inspector-egui = "0.19"
-bevy_polyline = "0.7"
 bevy_rapier3d = "0.22"
 bitflags = "2.3"
 bytemuck = { version = "1.7.0", features = ["derive"] }

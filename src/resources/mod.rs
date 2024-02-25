@@ -36,10 +36,7 @@ pub use client_entity_list::ClientEntityList;
 pub use current_zone::CurrentZone;
 pub use damage_digits_spawner::DamageDigitsSpawner;
 pub use debug_inspector::DebugInspector;
-pub use debug_render::{
-    DebugRenderColliderData, DebugRenderConfig, DebugRenderDirectionalLightData,
-    DebugRenderPolyline, DebugRenderSkeletonData,
-};
+pub use debug_render::DebugRenderConfig;
 pub use game_connection::GameConnection;
 pub use game_data::GameData;
 pub use login_connection::LoginConnection;

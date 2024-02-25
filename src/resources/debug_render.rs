@@ -1,8 +1,15 @@
-use bevy::{
-    math::Vec3,
-    prelude::{Entity, Handle, Resource},
-};
-use bevy_polyline::prelude::Polyline;
+use bevy::prelude::{Color, Entity, Resource};
+
+const DEBUG_RENDER_COLOR_LIST: [Color; 8] = [
+    Color::RED,
+    Color::GREEN,
+    Color::BLUE,
+    Color::YELLOW,
+    Color::CYAN,
+    Color::FUCHSIA,
+    Color::WHITE,
+    Color::BLACK,
+];
 
 #[derive(Default, Resource)]
 pub struct DebugRenderConfig {
@@ -13,25 +20,8 @@ pub struct DebugRenderConfig {
     pub directional_light_frustum_freeze: bool,
 }
 
-#[derive(Resource)]
-pub struct DebugRenderPolyline {
-    pub entity: Entity,
-    pub polyline: Handle<Polyline>,
-    pub vertices: Vec<Vec3>,
-}
-
-#[derive(Resource)]
-pub struct DebugRenderColliderData {
-    pub collider: Vec<DebugRenderPolyline>,
-}
-
-#[derive(Resource)]
-pub struct DebugRenderSkeletonData {
-    pub skeleton: DebugRenderPolyline,
-    pub bone_up: DebugRenderPolyline,
-}
-
-#[derive(Resource)]
-pub struct DebugRenderDirectionalLightData {
-    pub frustum: DebugRenderPolyline,
+impl DebugRenderConfig {
+    pub fn color_for_entity(&self, entity: Entity) -> Color {
+        DEBUG_RENDER_COLOR_LIST[entity.index() as usize % DEBUG_RENDER_COLOR_LIST.len()]
+    }
 }

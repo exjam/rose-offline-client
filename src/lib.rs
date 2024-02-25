@@ -77,7 +77,6 @@ use systems::{
     collision_player_system, collision_player_system_join_zoin, command_system,
     conversation_dialog_system, cooldown_system, damage_digit_render_system,
     debug_render_collider_system, debug_render_directional_light_system,
-    debug_render_polylines_setup_system, debug_render_polylines_update_system,
     debug_render_skeleton_system, directional_light_system, effect_system, facing_direction_system,
     free_camera_system, game_connection_system, game_mouse_input_system, game_state_enter_system,
     game_zone_change_system, hit_event_system, item_drop_model_add_collider_system,
@@ -474,6 +473,10 @@ fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsC
     // Initialise bevy engine
     app.insert_resource(Msaa::Off)
         .insert_resource(ClearColor(Color::rgb(0.70, 0.90, 1.0)))
+        .insert_resource(bevy::gizmos::GizmoConfig {
+            depth_bias: -0.1,
+            ..Default::default()
+        })
         .add_plugins((
             bevy::prelude::DefaultPlugins
                 .set(bevy::render::RenderPlugin {
@@ -524,7 +527,6 @@ fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsC
         ..Default::default()
     });
     app.add_plugins((
-        bevy_polyline::PolylinePlugin,
         bevy_egui::EguiPlugin,
         bevy_rapier3d::prelude::RapierPhysicsPlugin::<bevy_rapier3d::prelude::NoUserData>::default(
         ),
@@ -757,14 +759,12 @@ fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsC
     );
 
     // Run debug render stage last after physics update so it has accurate data
-    app.add_systems(Startup, debug_render_polylines_setup_system);
     app.add_systems(
         Update,
         (
-            debug_render_collider_system.before(debug_render_polylines_update_system),
-            debug_render_skeleton_system.before(debug_render_polylines_update_system),
-            debug_render_directional_light_system.before(debug_render_polylines_update_system),
-            debug_render_polylines_update_system,
+            debug_render_collider_system,
+            debug_render_skeleton_system,
+            debug_render_directional_light_system,
         )
             .in_set(GameStages::DebugRender),
     );
