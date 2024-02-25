@@ -12,10 +12,7 @@ pub fn update_position_system(
     time: Res<Time>,
 ) {
     for (command, move_speed, mut facing_direction, mut position) in query.iter_mut() {
-        let Command::Move(CommandMove {
-            destination,
-            ..
-        }) = *command else {
+        let Command::Move(CommandMove { destination, .. }) = *command else {
             continue;
         };
 

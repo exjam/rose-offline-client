@@ -244,10 +244,9 @@ pub fn ui_create_clan_system(
             return;
         }
 
-        let (Some(mark_background), Some(mark_foreground)) =
-        (
+        let (Some(mark_background), Some(mark_foreground)) = (
             NonZeroU16::new(ui_state.selected_mark_background as u16),
-            NonZeroU16::new(ui_state.selected_mark_foreground as u16)
+            NonZeroU16::new(ui_state.selected_mark_foreground as u16),
         ) else {
             message_box_events.send(MessageBoxEvent::Show {
                 message: game_data.client_strings.clan_create_error.into(),

@@ -138,7 +138,9 @@ pub fn game_connection_system(
     mut quest_trigger_events: EventWriter<QuestTriggerEvent>,
     mut message_box_events: EventWriter<MessageBoxEvent>,
 ) {
-    let Some(game_connection) = game_connection else { return };
+    let Some(game_connection) = game_connection else {
+        return;
+    };
 
     let result: Result<(), anyhow::Error> = loop {
         match game_connection.server_message_rx.try_recv() {

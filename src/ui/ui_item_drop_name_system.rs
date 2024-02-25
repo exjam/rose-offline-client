@@ -38,7 +38,11 @@ pub fn ui_item_drop_name_system(
         let Some(dropped_item) = &item_drop.item else {
             continue;
         };
-        let Some(ndc_space_coords) = camera.world_to_ndc(camera_transform, global_transform.translation()) else { continue; };
+        let Some(ndc_space_coords) =
+            camera.world_to_ndc(camera_transform, global_transform.translation())
+        else {
+            continue;
+        };
         if ndc_space_coords.z < 0.0 || ndc_space_coords.z > 1.0 {
             // Outside near / far plane
             continue;

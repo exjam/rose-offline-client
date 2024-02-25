@@ -85,7 +85,7 @@ pub fn ui_clan_system(
         .default_height(dialog.height)
         .show(egui_context.ctx_mut(), |ui| {
             let Ok((clan, clan_membership)) = query_clan.get_single() else {
-                return
+                return;
             };
 
             let member_listbox_extent =

@@ -245,9 +245,12 @@ pub fn ui_minimap_system(
                 ui.min_rect().min + egui::vec2(1.0, 21.0),
                 egui::vec2(minimap_size.x, minimap_size.y),
             );
-            let minimap_player_pos = player_position.map(|p| map_relative_position(ui_state, p.position));
+            let minimap_player_pos =
+                player_position.map(|p| map_relative_position(ui_state, p.position));
             let map_absolute_position = |ui_state: &mut UiStateMinimap, position: Vec3| -> Vec2 {
-                Vec2::new(minimap_rect.min.x, minimap_rect.min.y) + map_relative_position(ui_state, position) - ui_state.scroll
+                Vec2::new(minimap_rect.min.x, minimap_rect.min.y)
+                    + map_relative_position(ui_state, position)
+                    - ui_state.scroll
             };
 
             if !minimised {
@@ -336,18 +339,26 @@ pub fn ui_minimap_system(
             );
 
             if !minimised {
-                let enemy_character_icon = ui_resources.get_sprite_by_index(UiSpriteSheetType::StateIcon, 73);
-                let party_character_icon = ui_resources.get_sprite(UiSpriteSheetType::Ui as i32, "ID_MINIMAP_PARTYMEMBER");
-                let other_character_icon = ui_resources.get_sprite(UiSpriteSheetType::Ui as i32, "ID_OTHER_AVATAR");
+                let enemy_character_icon =
+                    ui_resources.get_sprite_by_index(UiSpriteSheetType::StateIcon, 73);
+                let party_character_icon =
+                    ui_resources.get_sprite(UiSpriteSheetType::Ui as i32, "ID_MINIMAP_PARTYMEMBER");
+                let other_character_icon =
+                    ui_resources.get_sprite(UiSpriteSheetType::Ui as i32, "ID_OTHER_AVATAR");
 
                 // Draw other characters
-                for (character_info, character_position, character_team) in query_characters.iter() {
-                    let icon_image = if player_team.map_or(false, |player_team| character_team.id != player_team.id) {
+                for (character_info, character_position, character_team) in query_characters.iter()
+                {
+                    let icon_image = if player_team
+                        .map_or(false, |player_team| character_team.id != player_team.id)
+                    {
                         enemy_character_icon.as_ref()
-                    } else if player_party.map_or(false, |player_party|
-                            player_party.members
-                                .iter()
-                                .any(|member| member.get_character_id() == character_info.unique_id)) {
+                    } else if player_party.map_or(false, |player_party| {
+                        player_party
+                            .members
+                            .iter()
+                            .any(|member| member.get_character_id() == character_info.unique_id)
+                    }) {
                         party_character_icon.as_ref()
                     } else {
                         other_character_icon.as_ref()
@@ -355,36 +366,41 @@ pub fn ui_minimap_system(
                     let Some(icon_image) = icon_image else {
                         continue;
                     };
-                    let character_minimap_position = map_absolute_position(ui_state, character_position.position);
+                    let character_minimap_position =
+                        map_absolute_position(ui_state, character_position.position);
                     let icon_size = Vec2::new(icon_image.width, icon_image.height);
                     let icon_rect = egui::Rect::from_min_size(
                         (character_minimap_position - icon_size / 2.0)
                             .to_array()
                             .into(),
-                            icon_size.to_array().into(),
+                        icon_size.to_array().into(),
                     );
 
                     if minimap_rect.contains_rect(icon_rect) {
                         icon_image.draw(ui, icon_rect.min);
                     }
-
                 }
 
                 // Draw NPC markers
-                for &ZoneNpc { npc_id, position: npc_position } in current_zone_data.npcs.iter() {
+                for &ZoneNpc {
+                    npc_id,
+                    position: npc_position,
+                } in current_zone_data.npcs.iter()
+                {
                     let Some(npc_data) = game_data.npcs.get_npc(npc_id) else {
                         continue;
                     };
-                    let Some(icon_image) = ui_resources.get_sprite_by_index(UiSpriteSheetType::StateIcon, npc_data.npc_minimap_icon_index as usize) else {
+                    let Some(icon_image) = ui_resources.get_sprite_by_index(
+                        UiSpriteSheetType::StateIcon,
+                        npc_data.npc_minimap_icon_index as usize,
+                    ) else {
                         continue;
                     };
                     let npc_minimap_position = map_absolute_position(ui_state, npc_position);
                     let icon_size = Vec2::new(icon_image.width, icon_image.height);
                     let icon_rect = egui::Rect::from_min_size(
-                        (npc_minimap_position - icon_size / 2.0)
-                            .to_array()
-                            .into(),
-                            icon_size.to_array().into(),
+                        (npc_minimap_position - icon_size / 2.0).to_array().into(),
+                        icon_size.to_array().into(),
                     );
 
                     if minimap_rect.contains_rect(icon_rect) {
@@ -393,8 +409,10 @@ pub fn ui_minimap_system(
                         let response = ui.allocate_rect(
                             egui::Rect::from_min_size(
                                 icon_rect.min + egui::vec2(6.0, 6.0),
-                                egui::vec2(8.0, 8.0)),
-                            egui::Sense::hover());
+                                egui::vec2(8.0, 8.0),
+                            ),
+                            egui::Sense::hover(),
+                        );
                         response.on_hover_text(npc_data.name);
                     }
                 }

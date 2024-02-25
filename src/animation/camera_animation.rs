@@ -40,7 +40,10 @@ pub fn camera_animation_system(
 
         let zmo_handle = camera_animation.motion();
         let Some(zmo_asset) = motion_assets.get(zmo_handle) else {
-            if matches!(asset_server.get_load_state(zmo_handle), LoadState::Failed | LoadState::Unloaded) {
+            if matches!(
+                asset_server.get_load_state(zmo_handle),
+                LoadState::Failed | LoadState::Unloaded
+            ) {
                 // If the asset has failed to load, mark the animation as completed
                 camera_animation.set_completed();
             }

@@ -407,11 +407,11 @@ pub fn character_select_input_system(
         };
 
     let Ok(window) = query_window.get_single() else {
-    return;
-};
+        return;
+    };
     let Some(cursor_position) = window.cursor_position() else {
-            return;
-        };
+        return;
+    };
 
     if mouse_button_input.just_pressed(MouseButton::Left) {
         for (camera, camera_transform) in query_camera.iter() {

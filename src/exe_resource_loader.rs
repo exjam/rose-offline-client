@@ -38,7 +38,7 @@ impl AssetLoader for ExeResourceLoader {
                 reader.no_limits();
                 let dyn_img = reader.decode()?;
 
-                let image::DynamicImage::ImageRgba8(image_buffer) = dyn_img else  {
+                let image::DynamicImage::ImageRgba8(image_buffer) = dyn_img else {
                     return Err(anyhow::anyhow!("Unexpected .ico format"));
                 };
 
