@@ -33,6 +33,12 @@ fn main() {
                 .takes_value(true),
         )
         .arg(
+            clap::Arg::new("data-iroseph-idx")
+                .long("data-iroseph-idx")
+                .help("Path to iRosePH data.idx")
+                .takes_value(true),
+        )
+        .arg(
             clap::Arg::new("data-path")
                 .long("data-path")
                 .help("Optional path to extracted data, any files here override ones in data.idx")
@@ -207,32 +213,46 @@ fn main() {
         config.game.ui_version = version.to_string();
     }
 
-    if let Some(vfs_path) = matches.value_of("data-idx") {
-        config
-            .filesystem
-            .devices
-            .insert(0, FilesystemDeviceConfig::Vfs(vfs_path.into()));
-    }
-
     if let Some(aruavfs_path) = matches.value_of("data-aruavfs-idx") {
         config
             .filesystem
             .devices
-            .insert(0, FilesystemDeviceConfig::AruaVfs(aruavfs_path.into()));
+            .push(FilesystemDeviceConfig::AruaVfs(aruavfs_path.into()));
     }
 
     if let Some(titanvfs_path) = matches.value_of("data-titanvfs-idx") {
         config
             .filesystem
             .devices
-            .insert(0, FilesystemDeviceConfig::TitanVfs(titanvfs_path.into()));
+            .push(FilesystemDeviceConfig::TitanVfs(titanvfs_path.into()));
+    }
+
+    if let Some(iroseph_path) = matches.value_of("data-iroseph-idx") {
+        config
+            .filesystem
+            .devices
+            .push(FilesystemDeviceConfig::IrosePh(iroseph_path.into()));
+    }
+
+    if let Some(vfs_path) = matches.value_of("data-idx") {
+        config
+            .filesystem
+            .devices
+            .push(FilesystemDeviceConfig::Vfs(vfs_path.into()));
     }
 
     if let Some(directory_path) = matches.value_of("data-path") {
         config
             .filesystem
             .devices
-            .insert(0, FilesystemDeviceConfig::Directory(directory_path.into()));
+            .push(FilesystemDeviceConfig::Directory(directory_path.into()));
+    }
+
+    if config.filesystem.devices.is_empty() && Path::exists(Path::new("data.idx")) {
+        config
+            .filesystem
+            .devices
+            .push(FilesystemDeviceConfig::Vfs("data.idx".into()));
     }
 
     if matches.is_present("model-viewer") {

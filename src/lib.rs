@@ -28,7 +28,7 @@ use std::{
 
 use rose_data::{CharacterMotionDatabaseOptions, NpcDatabaseOptions, ZoneId};
 use rose_file_readers::{
-    AruaVfsIndex, HostFilesystemDevice, LtbFile, StbFile, TitanVfsIndex, VfsIndex,
+    AruaVfsIndex, HostFilesystemDevice, IrosePhVfsIndex, LtbFile, StbFile, TitanVfsIndex, VfsIndex,
     VirtualFilesystem, VirtualFilesystemDevice, ZscFile,
 };
 
@@ -146,24 +146,14 @@ pub enum FilesystemDeviceConfig {
     AruaVfs(String),
     #[serde(rename = "titanvfs")]
     TitanVfs(String),
+    #[serde(rename = "iroseph")]
+    IrosePh(String),
 }
 
-#[derive(Deserialize)]
+#[derive(Default, Deserialize)]
 #[serde(default)]
 pub struct FilesystemConfig {
     pub devices: Vec<FilesystemDeviceConfig>,
-}
-
-impl Default for FilesystemConfig {
-    fn default() -> Self {
-        let mut devices = Vec::new();
-
-        if Path::new("data.idx").exists() {
-            devices.push(FilesystemDeviceConfig::Vfs("data.idx".into()));
-        }
-
-        Self { devices }
-    }
 }
 
 impl FilesystemConfig {
@@ -220,6 +210,24 @@ impl FilesystemConfig {
                         .map(|path| path.into())
                         .unwrap_or_else(PathBuf::new);
                     log::info!("Loading game data from Vfs root path {}", path);
+                    vfs_devices.push(Box::new(HostFilesystemDevice::new(index_root_path)));
+                }
+                FilesystemDeviceConfig::IrosePh(path) => {
+                    let index_root_path = Path::new(path)
+                        .parent()
+                        .map(|path| path.into())
+                        .unwrap_or_else(PathBuf::new);
+
+                    log::info!("Loading game data from iRosePH {}", path);
+                    vfs_devices.push(Box::new(
+                        IrosePhVfsIndex::load(Path::new(path))
+                            .unwrap_or_else(|_| panic!("Failed to load iRosePH VFS at {}", path)),
+                    ));
+
+                    log::info!(
+                        "Loading game data from iRosePH root path {}",
+                        index_root_path.to_string_lossy()
+                    );
                     vfs_devices.push(Box::new(HostFilesystemDevice::new(index_root_path)));
                 }
             }
