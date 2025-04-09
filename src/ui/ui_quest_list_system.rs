@@ -130,7 +130,8 @@ pub fn ui_quest_list_system(
     let mut response_minimise_button = None;
     let mut response_maximise_button = None;
     let is_minimised = ui_state.minimised;
-
+    let current_scroll_index = ui_state.scroll_index;
+    
     egui::Window::new("Quest List")
         .frame(egui::Frame::none())
         .open(&mut ui_state_windows.quest_list_open)
@@ -156,27 +157,47 @@ pub fn ui_quest_list_system(
                     zlist: &mut [(
                         IID_ZLIST_QUEST,
                         (&mut ui_state.selected_index, &|ui, index, selected| {
-                            let (_rect, response) = ui
-                                .allocate_exact_size(egui::vec2(174.0, 24.0), egui::Sense::click());
+                            // Calculate a vertical offset to position each quest item
+                            let item_height = 24.0;
+                            let item_width = 174.0;
+                            let y_offset = index as f32 * item_height;
+                            
+                            // Allocate space for quest item at the correct position
+                            let rect = egui::Rect::from_min_size(
+                                ui.min_rect().min + egui::vec2(0.0, y_offset),
+                                egui::vec2(item_width, item_height)
+                            );
+                            
+                            let response = ui.allocate_rect(rect, egui::Sense::click());
 
                             if let Some(active_quest) = player_quest_state
                                 .active_quests
                                 .iter()
                                 .filter(|q| q.is_some())
-                                .nth(index as usize)
+                                .nth((index + current_scroll_index) as usize)
                                 .and_then(|x| x.as_ref())
                             {
                                 if let Some(quest_data) =
                                     game_data.quests.get_quest_data(active_quest.quest_id)
                                 {
+                                    let text_pos = rect.min + egui::vec2(28.0, 4.0);
+                                    
                                     if selected {
-                                        ui.add_label_at(
-                                            egui::pos2(28.0, 4.0),
-                                            egui::RichText::new(quest_data.name)
-                                                .color(egui::Color32::YELLOW),
+                                        ui.painter().text(
+                                            text_pos,
+                                            egui::Align2::LEFT_TOP,
+                                            quest_data.name,
+                                            egui::FontId::default(),
+                                            egui::Color32::YELLOW
                                         );
                                     } else {
-                                        ui.add_label_at(egui::pos2(28.0, 4.0), quest_data.name);
+                                        ui.painter().text(
+                                            text_pos,
+                                            egui::Align2::LEFT_TOP,
+                                            quest_data.name,
+                                            egui::FontId::default(),
+                                            egui::Color32::WHITE
+                                        );
                                     }
                                 }
                             }
