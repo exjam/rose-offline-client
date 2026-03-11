@@ -473,6 +473,7 @@ pub fn load_ui_resources(
     style.visuals.popup_shadow = egui::epaint::Shadow::NONE;
     style.visuals.window_shadow = egui::epaint::Shadow::NONE;
     style.visuals.widgets.noninteractive.fg_stroke.color = egui::Color32::WHITE;
+    style.interaction.show_tooltips_only_when_still = false;
     egui_context.ctx_mut().set_style(style);
 
     commands.init_resource::<UiRequestedCursor>();
