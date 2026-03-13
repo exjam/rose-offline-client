@@ -1,7 +1,6 @@
 use bevy::{
     ecs::query::WorldQuery,
-    input::Input,
-    prelude::{Assets, EventWriter, KeyCode, Local, Query, Res, ResMut, With},
+    prelude::{Assets, EventWriter, Local, Query, Res, ResMut, With},
 };
 use bevy_egui::{egui, EguiContexts};
 
@@ -20,6 +19,7 @@ use crate::{
         widgets::{DataBindings, Dialog, Widget},
         DialogInstance, DragAndDropId, DragAndDropSlot, UiSoundEvent, UiStateDragAndDrop,
     },
+    Config,
 };
 
 const IID_BG_VERTICAL: i32 = 5;
@@ -204,10 +204,10 @@ pub fn ui_hotbar_system(
     mut query_player: Query<PlayerQuery, With<PlayerCharacter>>,
     query_player_tooltip: Query<PlayerTooltipQuery, With<PlayerCharacter>>,
     mut player_command_events: EventWriter<PlayerCommandEvent>,
-    keyboard_input: Res<Input<KeyCode>>,
     game_data: Res<GameData>,
     ui_resources: Res<UiResources>,
     dialog_assets: Res<Assets<Dialog>>,
+    config: Res<Config>,
 ) {
     let ui_state_hot_bar = &mut *ui_state_hot_bar;
     let dialog = if let Some(dialog) = ui_state_hot_bar
@@ -227,25 +227,27 @@ pub fn ui_hotbar_system(
     let player_tooltip_data = query_player_tooltip.get_single().ok();
 
     let use_hotbar_index = if !egui_context.ctx_mut().wants_keyboard_input() {
-        if keyboard_input.just_pressed(KeyCode::F1) {
-            Some(0)
-        } else if keyboard_input.just_pressed(KeyCode::F2) {
-            Some(1)
-        } else if keyboard_input.just_pressed(KeyCode::F3) {
-            Some(2)
-        } else if keyboard_input.just_pressed(KeyCode::F4) {
-            Some(3)
-        } else if keyboard_input.just_pressed(KeyCode::F5) {
-            Some(4)
-        } else if keyboard_input.just_pressed(KeyCode::F6) {
-            Some(5)
-        } else if keyboard_input.just_pressed(KeyCode::F7) {
-            Some(6)
-        } else if keyboard_input.just_pressed(KeyCode::F8) {
-            Some(7)
-        } else {
-            None
-        }
+        egui_context.ctx_mut().input_mut(|input| {
+            if input.consume_shortcut(&config.hotkeys.hotbar_1) {
+                Some(0)
+            } else if input.consume_shortcut(&config.hotkeys.hotbar_2) {
+                Some(1)
+            } else if input.consume_shortcut(&config.hotkeys.hotbar_3) {
+                Some(2)
+            } else if input.consume_shortcut(&config.hotkeys.hotbar_4) {
+                Some(3)
+            } else if input.consume_shortcut(&config.hotkeys.hotbar_5) {
+                Some(4)
+            } else if input.consume_shortcut(&config.hotkeys.hotbar_6) {
+                Some(5)
+            } else if input.consume_shortcut(&config.hotkeys.hotbar_7) {
+                Some(6)
+            } else if input.consume_shortcut(&config.hotkeys.hotbar_8) {
+                Some(7)
+            } else {
+                None
+            }
+        })
     } else {
         None
     };

@@ -1,7 +1,3 @@
-use bevy::prelude::{Local, Query, ResMut};
-use bevy_egui::{egui, EguiContexts};
-use std::path::Path;
-
 use crate::{
     audio::SoundGain,
     components::{NameTagType, SoundCategory},
@@ -10,11 +6,16 @@ use crate::{
     ui::UiStateWindows,
     Config,
 };
+use bevy::prelude::{Local, Query, ResMut};
+use bevy_egui::{egui, EguiContexts};
+use egui::{vec2, KeyboardShortcut, Ui};
+use std::path::Path;
 
 #[derive(Copy, Clone, PartialEq, Debug)]
 enum SettingsPage {
     Sound,
     Interface,
+    Hotkeys,
 }
 
 pub struct UiStateSettings {
@@ -40,6 +41,7 @@ pub fn ui_settings_system(
     egui::Window::new("Settings")
         .open(&mut ui_state_windows.settings_open)
         .resizable(false)
+        .fixed_size(vec2(200.0, 200.0))
         .show(egui_context.ctx_mut(), |ui| {
             let mut save_settings = false;
 
@@ -49,6 +51,12 @@ pub fn ui_settings_system(
                     &mut ui_state_settings.page,
                     SettingsPage::Interface,
                     "Interface",
+                );
+
+                ui.selectable_value(
+                    &mut ui_state_settings.page,
+                    SettingsPage::Hotkeys,
+                    "Key Bindings",
                 );
             });
 
@@ -163,6 +171,65 @@ pub fn ui_settings_system(
                                 save_settings = true;
                                 name_tag_cache.dispose = true;
                             }
+                        });
+                }
+                SettingsPage::Hotkeys => {
+                    egui::Grid::new("hotkey_settings")
+                        .num_columns(2)
+                        .show(ui, |ui| {
+                            let mut add_shortcut_setting =
+                                |ui: &mut Ui, text: &str, value: &mut KeyboardShortcut| {
+                                    ui.label(text);
+
+                                    let mut shortcut_label =
+                                        ui.ctx().format_shortcut(&value.clone());
+                                    let response =
+                                        ui.add(egui::TextEdit::singleline(&mut shortcut_label));
+
+                                    if response.has_focus() {
+                                        let shortcut_option = ui.input_mut(|state| {
+                                            if state.keys_down.is_empty() {
+                                                return None;
+                                            }
+
+                                            let key = state.keys_down.iter().next()?;
+                                            let shortcut =
+                                                KeyboardShortcut::new(state.modifiers, *key);
+                                            state.consume_shortcut(&shortcut);
+
+                                            Some(shortcut)
+                                        });
+
+                                        if let Some(new_shortcut) = shortcut_option {
+                                            response.surrender_focus();
+                                            *value = new_shortcut;
+                                        }
+                                    }
+
+                                    if response.lost_focus() {
+                                        save_settings = true;
+                                    }
+
+                                    ui.end_row();
+                                };
+
+                            add_shortcut_setting(ui, "Inventory", &mut config.hotkeys.inventory);
+                            add_shortcut_setting(ui, "Skills", &mut config.hotkeys.skills);
+                            add_shortcut_setting(ui, "Character", &mut config.hotkeys.character);
+                            add_shortcut_setting(ui, "Quest Log", &mut config.hotkeys.quests);
+                            add_shortcut_setting(ui, "Clan", &mut config.hotkeys.clan);
+                            add_shortcut_setting(ui, "Settings", &mut config.hotkeys.settings);
+
+                            ui.end_row();
+
+                            add_shortcut_setting(ui, "Hotbar Slot 1", &mut config.hotkeys.hotbar_1);
+                            add_shortcut_setting(ui, "Hotbar Slot 2", &mut config.hotkeys.hotbar_2);
+                            add_shortcut_setting(ui, "Hotbar Slot 3", &mut config.hotkeys.hotbar_3);
+                            add_shortcut_setting(ui, "Hotbar Slot 4", &mut config.hotkeys.hotbar_4);
+                            add_shortcut_setting(ui, "Hotbar Slot 5", &mut config.hotkeys.hotbar_5);
+                            add_shortcut_setting(ui, "Hotbar Slot 6", &mut config.hotkeys.hotbar_6);
+                            add_shortcut_setting(ui, "Hotbar Slot 7", &mut config.hotkeys.hotbar_7);
+                            add_shortcut_setting(ui, "Hotbar Slot 8", &mut config.hotkeys.hotbar_8);
                         });
                 }
             };
