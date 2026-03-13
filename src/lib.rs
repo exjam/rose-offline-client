@@ -51,6 +51,7 @@ pub mod zms_asset_loader;
 pub mod zone_loader;
 
 use audio::OddioPlugin;
+use components::SoundCategory;
 use events::{
     BankEvent, CharacterSelectEvent, ChatboxEvent, ClanDialogEvent, ClientEntityEvent,
     ConversationDialogEvent, GameConnectionEvent, HitEvent, LoadZoneEvent, LoginEvent,
@@ -88,11 +89,11 @@ use systems::{
     npc_model_update_system, orbit_camera_system, particle_sequence_system,
     passive_recovery_system, pending_damage_system, pending_skill_effect_system,
     personal_store_model_add_collider_system, personal_store_model_system, player_command_system,
-    projectile_system, quest_trigger_system, spawn_effect_system, spawn_projectile_system,
-    status_effect_system, system_func_event_system, update_position_system, use_item_event_system,
-    vehicle_model_system, vehicle_sound_system, visible_status_effects_system,
-    world_connection_system, world_time_system, zone_time_system, zone_viewer_enter_system,
-    DebugInspectorPlugin,
+    projectile_system, quest_trigger_system, sound_trigger_system, spawn_effect_system,
+    spawn_projectile_system, status_effect_system, system_func_event_system,
+    update_position_system, use_item_event_system, vehicle_model_system, vehicle_sound_system,
+    visible_status_effects_system, world_connection_system, world_time_system, zone_time_system,
+    zone_viewer_enter_system, DebugInspectorPlugin,
 };
 use ui::{
     load_dialog_sprites_system, ui_bank_system, ui_character_create_system,
@@ -115,8 +116,6 @@ use ui::{
 use vfs_asset_io::VfsAssetIo;
 use zms_asset_loader::{ZmsAssetLoader, ZmsMaterialNumFaces, ZmsNoSkinAssetLoader};
 use zone_loader::{zone_loader_system, ZoneLoader, ZoneLoaderAsset};
-
-use crate::components::SoundCategory;
 
 #[derive(Default, Deserialize)]
 #[serde(default)]
@@ -874,6 +873,7 @@ fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsC
             passive_recovery_system,
             quest_trigger_system,
             game_mouse_input_system.after(GameSystemSets::Ui),
+            sound_trigger_system,
         )
             .run_if(in_state(AppState::Game)),
     );

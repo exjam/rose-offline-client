@@ -41,7 +41,8 @@ use crate::{
     },
     events::{
         BankEvent, ChatboxEvent, ClientEntityEvent, GameConnectionEvent, LoadZoneEvent,
-        MessageBoxEvent, PartyEvent, PersonalStoreEvent, QuestTriggerEvent, UseItemEvent,
+        MessageBoxEvent, PartyEvent, PersonalStoreEvent, PlayerCommandEvent, QuestTriggerEvent,
+        UseItemEvent,
     },
     resources::{AppState, ClientEntityList, GameConnection, GameData, WorldRates, WorldTime},
 };
@@ -137,6 +138,7 @@ pub fn game_connection_system(
     mut personal_store_events: EventWriter<PersonalStoreEvent>,
     mut quest_trigger_events: EventWriter<QuestTriggerEvent>,
     mut message_box_events: EventWriter<MessageBoxEvent>,
+    mut player_command_events: EventWriter<PlayerCommandEvent>,
 ) {
     let Some(game_connection) = game_connection else {
         return;
@@ -1089,39 +1091,12 @@ pub fn game_connection_system(
             }
             Ok(ServerMessage::PickupDropItem { drop_entity_id: _, item_slot, item }) => {
                 if let Some(player_entity) = client_entity_list.player_entity {
-                    if let Some(item_data) =
-                        game_data.items.get_base_item(item.get_item_reference())
-                    {
-                        chatbox_events.send(ChatboxEvent::System(format!(
-                            "You have earned {}.",
-                            item_data.name
-                        )));
-                    }
-
-                    commands.add(move |world: &mut World| {
-                        let mut player = world.entity_mut(player_entity);
-                        if let Some(mut inventory) = player.get_mut::<Inventory>() {
-                            if let Some(inventory_slot) = inventory.get_item_slot_mut(item_slot)
-                            {
-                                *inventory_slot = Some(item);
-                            }
-                        }
-                    });
+                    player_command_events.send(PlayerCommandEvent::PickupDropItem(item, player_entity, item_slot));
                 }
             }
             Ok(ServerMessage::PickupDropMoney { drop_entity_id: _, money }) => {
                 if let Some(player_entity) = client_entity_list.player_entity {
-                    chatbox_events.send(ChatboxEvent::System(format!(
-                        "You have earned {} Zuly.",
-                        money.0
-                    )));
-
-                    commands.add(move |world: &mut World| {
-                        let mut player = world.entity_mut(player_entity);
-                        if let Some(mut inventory) = player.get_mut::<Inventory>() {
-                            inventory.try_add_money(money).ok();
-                        }
-                    });
+                    player_command_events.send(PlayerCommandEvent::PickupDropMoney(money, player_entity));
                 }
             }
             Ok(ServerMessage::PickupDropError { drop_entity_id: _, error }) => match error{
