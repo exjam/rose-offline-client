@@ -14,8 +14,9 @@ use crate::{
     animation::AnimationFrameEvent,
     audio::SpatialSound,
     components::{Command, DummyBoneOffset, PlayerCharacter, SoundCategory},
-    resources::{CurrentZone, GameData, SoundCache, SoundSettings},
+    resources::{CurrentZone, GameData, SoundCache},
     zone_loader::ZoneLoaderAsset,
+    Config,
 };
 
 #[derive(WorldQuery)]
@@ -44,12 +45,14 @@ pub fn animation_sound_system(
     asset_server: Res<AssetServer>,
     current_zone: Option<Res<CurrentZone>>,
     zone_loader_assets: Res<Assets<ZoneLoaderAsset>>,
-    sound_settings: Res<SoundSettings>,
+    config: Res<Config>,
     query_event_entity: Query<EventEntity>,
     query_target_entity: Query<TargetEntity>,
     query_global_transform: Query<&GlobalTransform>,
     sound_cache: Res<SoundCache>,
 ) {
+    let sound_settings = &config.sound;
+
     for event in animation_frame_events.iter() {
         let event_entity = if let Ok(event_entity) = query_event_entity.get(event.entity) {
             event_entity

@@ -2,8 +2,9 @@ use crate::{
     audio::SpatialSound,
     components::SoundCategory,
     events::{ClientEntityEvent, PlayerCommandEvent, UseItemEvent},
-    resources::{GameData, SoundCache, SoundSettings},
+    resources::{GameData, SoundCache},
     ui::UiSoundEvent,
+    Config,
 };
 use bevy::{
     asset::AssetServer,
@@ -35,7 +36,7 @@ pub fn sound_trigger_system(
     game_data: Res<GameData>,
     sound_cache: Res<SoundCache>,
     asset_server: Res<AssetServer>,
-    sound_settings: Res<SoundSettings>,
+    config: Res<Config>,
 ) {
     let player = match query_player.get_single_mut() {
         Ok(player) => player,
@@ -51,7 +52,7 @@ pub fn sound_trigger_system(
 
             commands.spawn((
                 sound_category,
-                sound_settings.gain(sound_category),
+                config.sound.gain(sound_category),
                 SpatialSound::new(sound_cache.load(sound_data, &asset_server)),
                 Transform::from_translation(global_transform.translation()),
                 GlobalTransform::from_translation(global_transform.translation()),

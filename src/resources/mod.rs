@@ -19,7 +19,7 @@ mod selected_target;
 mod server_configuration;
 mod server_list;
 mod sound_cache;
-mod sound_settings;
+mod sound_config;
 mod specular_texture;
 mod ui_resources;
 mod virtual_filesystem;
@@ -48,7 +48,7 @@ pub use selected_target::SelectedTarget;
 pub use server_configuration::ServerConfiguration;
 pub use server_list::{ServerList, ServerListGameServer, ServerListWorldServer};
 pub use sound_cache::SoundCache;
-pub use sound_settings::SoundSettings;
+pub use sound_config::SoundConfig;
 pub use specular_texture::SpecularTexture;
 pub use ui_resources::{
     load_ui_resources, ui_requested_cursor_apply_system, update_ui_resources, UiCursorType,
