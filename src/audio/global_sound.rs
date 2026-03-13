@@ -14,14 +14,14 @@ enum ControlHandle {
 
 #[allow(dead_code)]
 impl ControlHandle {
-    pub fn gain_control(&mut self) -> oddio::GainControl {
+    pub fn gain_control(&mut self) -> oddio::GainControl<'_> {
         match self {
             ControlHandle::Stereo(handle) => handle.control::<oddio::Gain<_>, _>(),
             ControlHandle::Mono(handle) => handle.control::<oddio::Gain<_>, _>(),
         }
     }
 
-    pub fn stop_control(&mut self) -> oddio::StopControl {
+    pub fn stop_control(&mut self) -> oddio::StopControl<'_> {
         match self {
             ControlHandle::Stereo(handle) => handle.control::<oddio::Stop<_>, _>(),
             ControlHandle::Mono(handle) => handle.control::<oddio::Stop<_>, _>(),
