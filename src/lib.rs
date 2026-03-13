@@ -94,7 +94,7 @@ use systems::{
     zone_viewer_enter_system, DebugInspectorPlugin,
 };
 use ui::{
-    load_dialog_sprites_system, ui_bank_system, ui_character_create_system,
+    init_window_system, load_dialog_sprites_system, ui_bank_system, ui_character_create_system,
     ui_character_info_system, ui_character_select_name_tag_system, ui_character_select_system,
     ui_chatbox_system, ui_clan_system, ui_create_clan_system, ui_debug_camera_info_system,
     ui_debug_client_entity_list_system, ui_debug_command_viewer_system,
@@ -108,8 +108,8 @@ use ui::{
     ui_party_system, ui_personal_store_system, ui_player_info_system, ui_quest_list_system,
     ui_respawn_system, ui_selected_target_system, ui_server_select_system, ui_settings_system,
     ui_skill_list_system, ui_skill_tree_system, ui_sound_event_system, ui_status_effects_system,
-    ui_window_sound_system, widgets::Dialog, DialogLoader, UiSoundEvent, UiStateDebugWindows,
-    UiStateDragAndDrop, UiStateWindows,
+    ui_window_sound_system, ui_window_system, widgets::Dialog, DialogLoader, UiSoundEvent,
+    UiStateDebugWindows, UiStateDragAndDrop, UiStateWindows,
 };
 use vfs_asset_io::VfsAssetIo;
 use zms_asset_loader::{ZmsAssetLoader, ZmsMaterialNumFaces, ZmsNoSkinAssetLoader};
@@ -273,7 +273,7 @@ impl Default for GameConfig {
     }
 }
 
-#[derive(Deserialize, Serialize, Clone)]
+#[derive(Deserialize, Serialize, Clone, PartialEq)]
 #[serde(tag = "type")]
 pub enum GraphicsModeConfig {
     #[serde(rename = "window")]
@@ -285,6 +285,8 @@ pub enum GraphicsModeConfig {
 #[derive(Deserialize, Serialize, Clone)]
 #[serde(default)]
 pub struct GraphicsConfig {
+    #[serde(skip)]
+    pub resolutions: Vec<(u32, u32)>,
     pub mode: GraphicsModeConfig,
     pub passthrough_terrain_textures: bool,
     pub trail_effect_duration_multiplier: f32,
@@ -294,6 +296,7 @@ pub struct GraphicsConfig {
 impl Default for GraphicsConfig {
     fn default() -> Self {
         Self {
+            resolutions: Vec::default(),
             mode: GraphicsModeConfig::Window {
                 width: 1920.0,
                 height: 1080.0,
@@ -535,6 +538,8 @@ fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsC
             auto_login: config.auto_login.enabled,
         })
         .insert_resource(config.clone())
+        .add_systems(Startup, init_window_system)
+        .add_systems(Update, ui_window_system)
         .add_plugins((
             RoseAnimationPlugin,
             RoseRenderPlugin,

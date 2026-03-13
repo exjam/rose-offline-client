@@ -49,6 +49,7 @@ mod ui_skill_tree_system;
 mod ui_sound_event_system;
 mod ui_status_effects_system;
 mod ui_window_sound_system;
+mod ui_window_system;
 pub mod widgets;
 
 #[derive(Default, Resource)]
@@ -124,4 +125,5 @@ pub use ui_skill_tree_system::ui_skill_tree_system;
 pub use ui_sound_event_system::{ui_sound_event_system, UiSoundEvent};
 pub use ui_status_effects_system::ui_status_effects_system;
 pub use ui_window_sound_system::ui_window_sound_system;
+pub use ui_window_system::{init_window_system, ui_window_system};
 pub use widgets::DataBindings;
