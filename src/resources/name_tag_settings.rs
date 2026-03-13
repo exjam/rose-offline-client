@@ -1,9 +1,8 @@
-use bevy::prelude::Resource;
-use enum_map::{enum_map, EnumMap};
-
 use crate::components::NameTagType;
+use enum_map::{enum_map, EnumMap};
+use serde::{Deserialize, Serialize};
 
-#[derive(Resource)]
+#[derive(Deserialize, Serialize, Clone)]
 pub struct NameTagSettings {
     pub show_all: EnumMap<NameTagType, bool>,
     pub font_size: EnumMap<NameTagType, f32>,

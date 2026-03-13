@@ -24,7 +24,7 @@ use crate::{
     },
     events::{CharacterSelectEvent, GameConnectionEvent, LoadZoneEvent, WorldConnectionEvent},
     resources::{
-        AppState, CharacterList, CharacterSelectState, GameData, ServerConfiguration,
+        AppState, CharacterList, CharacterSelectState, GameData, NameTagCache, ServerConfiguration,
         WorldConnection,
     },
     systems::{FreeCamera, OrbitCamera},
@@ -90,6 +90,7 @@ pub fn character_select_enter_system(
 pub fn character_select_exit_system(
     mut commands: Commands,
     model_list: Res<CharacterSelectModelList>,
+    mut name_tag_cache: ResMut<NameTagCache>,
 ) {
     // Despawn character models
     for (_, entity) in model_list.models.iter() {
@@ -99,6 +100,9 @@ pub fn character_select_exit_system(
     commands.remove_resource::<CharacterList>();
     commands.remove_resource::<CharacterSelectState>();
     commands.remove_resource::<CharacterSelectModelList>();
+
+    // Dispose name tags so they can be checked for visibility again
+    name_tag_cache.dispose = true;
 }
 
 pub fn character_select_models_system(

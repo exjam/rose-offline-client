@@ -7,9 +7,10 @@ use rose_game_common::components::Npc;
 use crate::{
     components::{
         Dead, NameTag, NameTagEntity, NameTagHealthbarBackground, NameTagHealthbarForeground,
-        NameTagTargetMark,
+        NameTagTargetMark, NameTagType, PlayerCharacter,
     },
-    resources::{NameTagSettings, SelectedTarget},
+    resources::SelectedTarget,
+    Config,
 };
 
 #[derive(Default)]
@@ -23,6 +24,21 @@ pub struct NameTagVisibility {
 pub struct NameTagQuery<'w> {
     name_tag: &'w NameTag,
     children: &'w Children,
+}
+
+#[derive(WorldQuery)]
+pub struct PlayerQuery {
+    entity: Entity,
+}
+
+pub fn can_show_name_tag(
+    player_entity: Option<Entity>,
+    name_tag_entity: Entity,
+    name_tag_type: NameTagType,
+    config: &Config,
+) -> bool {
+    config.interface.name_tag_settings.show_all[name_tag_type]
+        || player_entity.is_some_and(|player| player == name_tag_entity)
 }
 
 pub fn name_tag_visibility_system(
@@ -40,8 +56,11 @@ pub fn name_tag_visibility_system(
         )>,
     >,
     query_npc_dead: Query<&Dead, With<Npc>>,
-    name_tag_settings: Res<NameTagSettings>,
+    query_player: Query<PlayerQuery, With<PlayerCharacter>>,
+    config: Res<Config>,
 ) {
+    let player = query_player.get_single().ok();
+
     if selected_target
         .selected
         .and_then(|entity| query_npc_dead.get(entity).ok())
@@ -74,7 +93,12 @@ pub fn name_tag_visibility_system(
             if let Ok(name_tag) = query_name_tag.get(previous_entity) {
                 // Restore unselected visibility
                 if let Ok(mut visibility) = query_visibility.get_mut(previous_entity) {
-                    if name_tag_settings.show_all[name_tag.name_tag.name_tag_type] {
+                    if can_show_name_tag(
+                        player.as_ref().map(|player| player.entity),
+                        previous_entity,
+                        name_tag.name_tag.name_tag_type,
+                        &config,
+                    ) {
                         *visibility = Visibility::Inherited;
                     } else {
                         *visibility = Visibility::Hidden;
@@ -98,7 +122,12 @@ pub fn name_tag_visibility_system(
             if let Ok(name_tag) = query_name_tag.get(previous_entity) {
                 // Restore unselected visibility
                 if let Ok(mut visibility) = query_visibility.get_mut(previous_entity) {
-                    if name_tag_settings.show_all[name_tag.name_tag.name_tag_type] {
+                    if can_show_name_tag(
+                        player.as_ref().map(|player| player.entity),
+                        previous_entity,
+                        name_tag.name_tag.name_tag_type,
+                        &config,
+                    ) {
                         *visibility = Visibility::Inherited;
                     } else {
                         *visibility = Visibility::Hidden;

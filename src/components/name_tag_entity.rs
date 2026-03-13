@@ -3,8 +3,9 @@ use bevy::{
     prelude::{despawn_with_children_recursive, Component, Deref, DerefMut, Entity, World},
 };
 use enum_map::Enum;
+use serde::{Deserialize, Serialize};
 
-#[derive(Copy, Clone, Enum)]
+#[derive(Deserialize, Serialize, Copy, Clone, Enum)]
 pub enum NameTagType {
     Character,
     Monster,

@@ -13,6 +13,7 @@ use crate::{
     components::PlayerCharacter,
     resources::{AppState, DebugInspector, GameConnection, WorldConnection},
     systems::{FreeCamera, OrbitCamera},
+    ui::UiStateWindows,
 };
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -57,6 +58,7 @@ pub fn ui_debug_menu_system(
     mut commands: Commands,
     mut egui_context: EguiContexts,
     mut ui_state_debug_windows: ResMut<UiStateDebugWindows>,
+    mut ui_state_windows: ResMut<UiStateWindows>,
     mut ui_state_debug_menu: Local<UiStateDebugMenu>,
     query_cameras: Query<(Entity, &Transform), With<Camera3d>>,
     query_player: Query<Entity, With<PlayerCharacter>>,
@@ -225,6 +227,7 @@ pub fn ui_debug_menu_system(
 
                 ui.checkbox(&mut ui_state_debug_windows.camera_info_open, "Camera Info");
                 ui.checkbox(&mut ui_state_debug_windows.physics_open, "Physics");
+                ui.checkbox(&mut ui_state_windows.settings_open, "Settings");
             });
         });
     });

@@ -21,8 +21,8 @@ use rose_game_common::components::{CharacterGender, CharacterInfo, Equipment, Np
 
 use crate::{
     animation::{CameraAnimation, SkeletalAnimation},
-    components::{CharacterModel, ClientEntityName, ModelHeight, NameTagType, NpcModel},
-    resources::{DamageDigitsSpawner, GameData, NameTagSettings},
+    components::{CharacterModel, ClientEntityName, ModelHeight, NpcModel},
+    resources::{DamageDigitsSpawner, GameData},
     systems::{FreeCamera, OrbitCamera},
     ui::UiStateDebugWindows,
 };
@@ -49,7 +49,6 @@ pub fn model_viewer_enter_system(
     query_cameras: Query<Entity, With<Camera3d>>,
     game_data: Res<GameData>,
     mut ui_state_debug_windows: ResMut<UiStateDebugWindows>,
-    mut name_tag_settings: ResMut<NameTagSettings>,
 ) {
     // Reset camera
     for entity in query_cameras.iter() {
@@ -103,17 +102,11 @@ pub fn model_viewer_enter_system(
     ui_state_debug_windows.debug_render_open = true;
     ui_state_debug_windows.npc_list_open = true;
     ui_state_debug_windows.item_list_open = true;
-
-    // Show only Monster & NPC name tags
-    name_tag_settings.show_all[NameTagType::Character] = false;
-    name_tag_settings.show_all[NameTagType::Npc] = true;
-    name_tag_settings.show_all[NameTagType::Monster] = true;
 }
 
 pub fn model_viewer_exit_system(
     mut commands: Commands,
     model_viewer_state: ResMut<ModelViewerState>,
-    mut name_tag_settings: ResMut<NameTagSettings>,
 ) {
     for entity in model_viewer_state.characters.iter() {
         commands.entity(*entity).despawn_recursive();
@@ -122,9 +115,6 @@ pub fn model_viewer_exit_system(
     for entity in model_viewer_state.npcs.iter() {
         commands.entity(*entity).despawn_recursive();
     }
-
-    // Restore default NameTagSettings
-    *name_tag_settings = NameTagSettings::default();
 }
 
 pub fn model_viewer_system(
