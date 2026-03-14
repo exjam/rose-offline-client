@@ -125,9 +125,22 @@ pub struct AccountConfig {
     pub password: String,
 }
 
-#[derive(Default, Deserialize, Serialize, Clone)]
+#[derive(Deserialize, Serialize, Clone)]
+#[serde(default)]
 pub struct CharacterConfig {
     slots: EnumMap<InventoryPageType, Vec<(InventoryPageType, usize)>>,
+}
+
+impl Default for CharacterConfig {
+    fn default() -> Self {
+        Self {
+            slots: enum_map! {
+                page_type => (0..INVENTORY_PAGE_SIZE)
+                .map(|index| (page_type, index))
+                .collect(),
+            },
+        }
+    }
 }
 
 #[derive(Default, Deserialize, Serialize, Clone)]
@@ -340,13 +353,7 @@ impl Config {
         &mut self
             .character
             .entry(username)
-            .or_insert_with(|| CharacterConfig {
-                slots: enum_map! {
-                    page_type => (0..INVENTORY_PAGE_SIZE)
-                    .map(|index| (page_type, index))
-                    .collect(),
-                },
-            })
+            .or_insert_with(|| CharacterConfig::default())
             .slots[page]
     }
 }
