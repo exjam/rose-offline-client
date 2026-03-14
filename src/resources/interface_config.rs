@@ -2,6 +2,7 @@ use crate::resources::NameTagSettings;
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize, Clone)]
+#[serde(default)]
 pub struct InterfaceConfig {
     pub targeting: TargetingType,
     pub name_tag_settings: NameTagSettings,

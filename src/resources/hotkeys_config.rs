@@ -2,6 +2,7 @@ use egui::{Key, KeyboardShortcut, Modifiers};
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize, Clone)]
+#[serde(default)]
 pub struct HotkeysConfig {
     #[serde(with = "KeyboardShortcutDef")]
     pub inventory: KeyboardShortcut,
