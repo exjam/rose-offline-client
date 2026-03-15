@@ -9,8 +9,8 @@ use bevy::{
     prelude::{
         apply_deferred, in_state, AddAsset, App, AssetServer, Assets, Camera, Camera3dBundle,
         Color, Commands, IntoSystemConfigs, IntoSystemSetConfigs, Msaa, OnEnter, OnExit,
-        PluginGroup, PostStartup, PostUpdate, PreUpdate, Quat, Res, ResMut, Resource, Startup,
-        State, SystemSet, Transform, Update, Vec3,
+        OnTransition, PluginGroup, PostStartup, PostUpdate, PreUpdate, Quat, Res, ResMut, Resource,
+        Startup, State, SystemSet, Transform, Update, Vec3,
     },
     render::{render_resource::WgpuFeatures, settings::WgpuSettings},
     transform::TransformSystem,
@@ -64,10 +64,10 @@ use model_loader::ModelLoader;
 use render::{DamageDigitMaterial, RoseRenderPlugin};
 use resources::{
     load_ui_resources, run_network_thread, ui_requested_cursor_apply_system, update_ui_resources,
-    AppState, ClientEntityList, DamageDigitsSpawner, DebugRenderConfig, GameData, HotkeysConfig,
-    InterfaceConfig, NameTagCache, NetworkThread, NetworkThreadMessage, RenderConfiguration,
-    SelectedTarget, ServerConfiguration, SoundCache, SoundConfig, SpecularTexture, VfsResource,
-    WorldTime, ZoneTime,
+    AppState, AutoLogin, ClientEntityList, DamageDigitsSpawner, DebugRenderConfig, GameData,
+    HotkeysConfig, InterfaceConfig, NameTagCache, NetworkThread, NetworkThreadMessage,
+    RenderConfiguration, SelectedTarget, ServerConfiguration, SoundCache, SoundConfig,
+    SpecularTexture, VfsResource, WorldTime, ZoneTime,
 };
 use scripting::RoseScriptingPlugin;
 use systems::{
@@ -81,20 +81,20 @@ use systems::{
     debug_render_collider_system, debug_render_directional_light_system,
     debug_render_skeleton_system, directional_light_system, effect_system, facing_direction_system,
     free_camera_system, game_connection_system, game_mouse_input_system, game_state_enter_system,
-    game_zone_change_system, hit_event_system, item_drop_model_add_collider_system,
-    item_drop_model_system, login_connection_system, login_event_system, login_state_enter_system,
-    login_state_exit_system, login_system, model_viewer_enter_system, model_viewer_exit_system,
-    model_viewer_system, move_destination_effect_system, name_tag_system,
-    name_tag_update_color_system, name_tag_update_healthbar_system, name_tag_visibility_system,
-    network_thread_system, npc_idle_sound_system, npc_model_add_collider_system,
-    npc_model_update_system, orbit_camera_system, particle_sequence_system,
-    passive_recovery_system, pending_damage_system, pending_skill_effect_system,
-    personal_store_model_add_collider_system, personal_store_model_system, player_command_system,
-    projectile_system, quest_trigger_system, sound_trigger_system, spawn_effect_system,
-    spawn_projectile_system, status_effect_system, system_func_event_system,
-    update_position_system, use_item_event_system, vehicle_model_system, vehicle_sound_system,
-    visible_status_effects_system, world_connection_system, world_time_system, zone_time_system,
-    zone_viewer_enter_system, DebugInspectorPlugin,
+    game_state_exit_system, game_zone_change_system, hit_event_system,
+    item_drop_model_add_collider_system, item_drop_model_system, login_connection_system,
+    login_event_system, login_state_enter_system, login_state_exit_system, login_system,
+    model_viewer_enter_system, model_viewer_exit_system, model_viewer_system,
+    move_destination_effect_system, name_tag_system, name_tag_update_color_system,
+    name_tag_update_healthbar_system, name_tag_visibility_system, network_thread_system,
+    npc_idle_sound_system, npc_model_add_collider_system, npc_model_update_system,
+    orbit_camera_system, particle_sequence_system, passive_recovery_system, pending_damage_system,
+    pending_skill_effect_system, personal_store_model_add_collider_system,
+    personal_store_model_system, player_command_system, projectile_system, quest_trigger_system,
+    sound_trigger_system, spawn_effect_system, spawn_projectile_system, status_effect_system,
+    system_func_event_system, update_position_system, use_item_event_system, vehicle_model_system,
+    vehicle_sound_system, visible_status_effects_system, world_connection_system,
+    world_time_system, zone_time_system, zone_viewer_enter_system, DebugInspectorPlugin,
 };
 use ui::{
     init_window_system, load_dialog_sprites_system, ui_bank_system, ui_character_create_system,
@@ -105,14 +105,14 @@ use ui::{
     ui_debug_entity_inspector_system, ui_debug_item_list_system, ui_debug_menu_system,
     ui_debug_npc_list_system, ui_debug_physics_system, ui_debug_render_system,
     ui_debug_skill_list_system, ui_debug_zone_lighting_system, ui_debug_zone_list_system,
-    ui_debug_zone_time_system, ui_drag_and_drop_system, ui_game_menu_system, ui_hotbar_system,
-    ui_inventory_system, ui_item_drop_name_system, ui_login_system, ui_message_box_system,
-    ui_minimap_system, ui_npc_store_system, ui_number_input_dialog_system, ui_party_option_system,
-    ui_party_system, ui_personal_store_system, ui_player_info_system, ui_quest_list_system,
-    ui_respawn_system, ui_selected_target_system, ui_server_select_system, ui_settings_system,
-    ui_skill_list_system, ui_skill_tree_system, ui_sound_event_system, ui_status_effects_system,
-    ui_window_sound_system, ui_window_system, widgets::Dialog, DialogLoader, UiSoundEvent,
-    UiStateDebugWindows, UiStateDragAndDrop, UiStateWindows,
+    ui_debug_zone_time_system, ui_drag_and_drop_system, ui_exit_system, ui_game_menu_system,
+    ui_hotbar_system, ui_inventory_system, ui_item_drop_name_system, ui_login_system,
+    ui_message_box_system, ui_minimap_system, ui_npc_store_system, ui_number_input_dialog_system,
+    ui_party_option_system, ui_party_system, ui_personal_store_system, ui_player_info_system,
+    ui_quest_list_system, ui_respawn_system, ui_selected_target_system, ui_server_select_system,
+    ui_settings_system, ui_skill_list_system, ui_skill_tree_system, ui_sound_event_system,
+    ui_status_effects_system, ui_window_sound_system, ui_window_system, widgets::Dialog,
+    DialogLoader, UiSoundEvent, UiStateDebugWindows, UiStateDragAndDrop, UiStateWindows,
 };
 use vfs_asset_io::VfsAssetIo;
 use zms_asset_loader::{ZmsAssetLoader, ZmsMaterialNumFaces, ZmsNoSkinAssetLoader};
@@ -568,10 +568,6 @@ fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsC
             port: format!("{}", config.server.port),
             preset_username: Some(config.account.username.clone()),
             preset_password: Some(config.account.password.clone()),
-            preset_server_id: config.auto_login.server_id,
-            preset_channel_id: config.auto_login.channel_id,
-            preset_character_name: config.auto_login.character_name.clone(),
-            auto_login: config.auto_login.enabled,
         })
         .insert_resource(config.clone())
         .add_systems(Startup, init_window_system)
@@ -582,6 +578,16 @@ fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsC
             RoseScriptingPlugin,
             DebugInspectorPlugin,
         ));
+
+    if config.auto_login.enabled {
+        app.insert_resource(AutoLogin {
+            preset_username: Some(config.account.username.clone()),
+            preset_password: Some(config.account.password.clone()),
+            preset_server_id: config.auto_login.server_id,
+            preset_channel_id: config.auto_login.channel_id,
+            preset_character_name: config.auto_login.character_name.clone(),
+        });
+    }
 
     // Setup state
     app.add_state::<AppState>()
@@ -627,6 +633,7 @@ fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsC
         Update,
         (free_camera_system, orbit_camera_system).in_set(GameSystemSets::UpdateCamera),
     );
+
     app.insert_resource(NameTagCache::default()).add_systems(
         Update,
         (
@@ -708,6 +715,7 @@ fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsC
         (
             ui_window_sound_system.before(ui_sound_event_system),
             ui_sound_event_system,
+            ui_exit_system,
         )
             .after(UiSystemSets::UiLast),
     );
@@ -856,7 +864,22 @@ fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsC
         .init_resource::<ZoneTime>()
         .init_resource::<SelectedTarget>();
 
-    app.add_systems(OnEnter(AppState::Game), game_state_enter_system);
+    app.add_systems(OnEnter(AppState::Game), game_state_enter_system)
+        // Don't run exit when transitioning from model or zone viewer
+        .add_systems(
+            OnTransition {
+                from: AppState::Game,
+                to: AppState::GameLogin,
+            },
+            game_state_exit_system,
+        )
+        .add_systems(
+            OnTransition {
+                from: AppState::Game,
+                to: AppState::GameCharacterSelect,
+            },
+            game_state_exit_system,
+        );
 
     app.add_systems(
         Update,
