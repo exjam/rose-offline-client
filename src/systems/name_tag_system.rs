@@ -1,5 +1,19 @@
 use std::num::NonZeroU16;
 
+use crate::{
+    components::{
+        ClientEntity, ClientEntityName, ModelHeight, NameTag, NameTagEntity, NameTagHealthbar,
+        NameTagHealthbarBackground, NameTagHealthbarForeground, NameTagName, NameTagTargetMark,
+        NameTagType, PartyInfo, PlayerCharacter,
+    },
+    events::{LoadZoneEvent, PartyEvent},
+    render::WorldUiRect,
+    resources::{
+        GameData, NameTagCache, NameTagData, NameTagPendingData, UiResources, UiSpriteSheetType,
+    },
+    systems::name_tag_visibility_system::{can_show_full_name_tag, can_show_name_tag},
+    Config,
+};
 use arrayvec::ArrayVec;
 use bevy::{
     ecs::query::WorldQuery,
@@ -16,22 +30,7 @@ use bevy::{
     window::PrimaryWindow,
 };
 use bevy_egui::{egui, EguiContexts};
-
 use rose_game_common::components::{Level, Npc, Team};
-
-use crate::{
-    components::{
-        ClientEntityName, ModelHeight, NameTag, NameTagEntity, NameTagHealthbarBackground,
-        NameTagHealthbarForeground, NameTagName, NameTagTargetMark, NameTagType, PlayerCharacter,
-    },
-    events::LoadZoneEvent,
-    render::WorldUiRect,
-    resources::{
-        GameData, NameTagCache, NameTagData, NameTagPendingData, UiResources, UiSpriteSheetType,
-    },
-    systems::name_tag_visibility_system::can_show_name_tag,
-    Config,
-};
 
 const ORDER_HEALTH_BACKGROUND: u8 = 0;
 const ORDER_HEALTH_FOREGROUND: u8 = 1;
@@ -44,6 +43,7 @@ pub struct PlayerQuery<'w> {
     entity: Entity,
     level: &'w Level,
     team: &'w Team,
+    party_info: Option<&'w PartyInfo>,
 }
 
 #[derive(WorldQuery)]
@@ -376,12 +376,14 @@ pub fn name_tag_system(
     query_player: Query<PlayerQuery, With<PlayerCharacter>>,
     query_nametags: Query<(Entity, &NameTagEntity)>,
     query_window: Query<Entity, With<PrimaryWindow>>,
+    query_client_entity: Query<&ClientEntity>,
     egui_managed_textures: Res<bevy_egui::EguiManagedTextures>,
     mut egui_context: EguiContexts,
     mut images: ResMut<Assets<Image>>,
     game_data: Res<GameData>,
     ui_resources: Res<UiResources>,
     mut load_zone_events: EventReader<LoadZoneEvent>,
+    mut party_events: EventReader<PartyEvent>,
     config: Res<Config>,
 ) {
     let player = query_player.get_single().ok();
@@ -402,6 +404,12 @@ pub fn name_tag_system(
 
         name_tag_cache.dispose = false;
         return;
+    }
+
+    for party_event in party_events.iter() {
+        if matches!(party_event, PartyEvent::Delete) {
+            name_tag_cache.dispose = true;
+        }
     }
 
     if load_zone_events.iter().last().is_some()
@@ -519,6 +527,8 @@ pub fn name_tag_system(
 
         let mut healthbar_fg_rect = None;
         let mut healthbar_bg_rect = None;
+        let mut healthbar = None;
+
         let (health_foreground, health_background) = match name_tag_type {
             NameTagType::Character => (
                 ui_resources
@@ -593,6 +603,15 @@ pub fn name_tag_system(
                 color: Color::WHITE,
                 order: ORDER_HEALTH_FOREGROUND,
             });
+
+            healthbar = Some(NameTagHealthbar {
+                foreground: NameTagHealthbarForeground {
+                    full_width: health_bar_size.x,
+                    uv_min_x: health_bar_foreground_uv_x_bounds.0,
+                    uv_max_x: health_bar_foreground_uv_x_bounds.1,
+                },
+                background: NameTagHealthbarBackground,
+            });
         }
 
         let mut target_marks: ArrayVec<WorldUiRect, 2> = ArrayVec::default();
@@ -662,36 +681,40 @@ pub fn name_tag_system(
                 .set_parent(name_tag_entity);
         }
 
-        if let Some(rect) = healthbar_bg_rect.take() {
+        let mut spawn_healthbar_rect = |rect, healthbar: &NameTagHealthbar| {
             commands
                 .spawn((
-                    NameTagHealthbarBackground,
+                    healthbar.clone(),
                     rect,
                     Transform::default(),
                     GlobalTransform::default(),
-                    Visibility::Hidden,
-                    ComputedVisibility::default(),
-                    NoFrustumCulling,
-                ))
-                .set_parent(name_tag_entity);
-        }
-
-        if let Some(rect) = healthbar_fg_rect.take() {
-            commands
-                .spawn((
-                    NameTagHealthbarForeground {
-                        full_width: health_bar_size.x,
-                        uv_min_x: health_bar_foreground_uv_x_bounds.0,
-                        uv_max_x: health_bar_foreground_uv_x_bounds.1,
+                    if can_show_full_name_tag(
+                        player.as_ref().map(|it| it.entity),
+                        player.as_ref().and_then(|it| it.party_info),
+                        object.entity,
+                        query_client_entity.get(object.entity).ok(),
+                        false,
+                        name_tag_type,
+                        Some(healthbar),
+                    ) {
+                        Visibility::Inherited
+                    } else {
+                        Visibility::Hidden
                     },
-                    rect,
-                    Transform::default(),
-                    GlobalTransform::default(),
-                    Visibility::Hidden,
                     ComputedVisibility::default(),
                     NoFrustumCulling,
                 ))
                 .set_parent(name_tag_entity);
+        };
+
+        if let Some(healthbar) = healthbar {
+            if let Some(foreground_rect) = healthbar_fg_rect {
+                spawn_healthbar_rect(foreground_rect, &healthbar);
+            }
+
+            if let Some(background_rect) = healthbar_bg_rect {
+                spawn_healthbar_rect(background_rect, &healthbar);
+            }
         }
 
         commands

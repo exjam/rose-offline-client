@@ -1687,6 +1687,7 @@ pub fn game_connection_system(
             }
             Ok(ServerMessage::PartyDelete) => {
                 if let Some(player_entity) = client_entity_list.player_entity {
+                    party_events.send(PartyEvent::Delete);
                     commands.entity(player_entity).remove::<PartyInfo>();
                     chatbox_events.send(ChatboxEvent::System("You have left the party.".into()));
                 }

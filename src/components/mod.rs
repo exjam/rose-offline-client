@@ -66,8 +66,8 @@ pub use facing_direction::FacingDirection;
 pub use item_drop_model::ItemDropModel;
 pub use model_height::ModelHeight;
 pub use name_tag_entity::{
-    NameTag, NameTagEntity, NameTagHealthbarBackground, NameTagHealthbarForeground, NameTagName,
-    NameTagTargetMark, NameTagType, RemoveNameTagCommand,
+    NameTag, NameTagEntity, NameTagHealthbar, NameTagHealthbarBackground,
+    NameTagHealthbarForeground, NameTagName, NameTagTargetMark, NameTagType, RemoveNameTagCommand,
 };
 pub use night_time_effect::NightTimeEffect;
 pub use npc_model::NpcModel;

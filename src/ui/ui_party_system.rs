@@ -136,6 +136,7 @@ pub fn ui_party_system(
                     });
                 }
             }
+            PartyEvent::Delete => {}
         }
     }
 
