@@ -1,18 +1,20 @@
 use bevy::prelude::{Assets, EventWriter, Local, Query, Res, ResMut, With};
 use bevy_egui::{egui, EguiContexts};
+use std::path::Path;
 
 use rose_game_common::messages::{client::ClientMessage, PartyItemSharing, PartyXpSharing};
 
+use super::widgets::Widget;
 use crate::{
     components::{PartyInfo, PartyOwner, PlayerCharacter},
-    resources::{GameConnection, UiResources},
+    resources::{GameConnection, NameTagCache, UiResources},
+    save_config,
     ui::{
         widgets::{DataBindings, Dialog, DrawText},
         UiSoundEvent, UiStateWindows,
     },
+    Config,
 };
-
-use super::widgets::Widget;
 
 const IID_BTN_CLOSE: i32 = 10;
 const IID_BTN_CONFIRM: i32 = 11;
@@ -46,6 +48,8 @@ pub fn ui_party_option_system(
     mut ui_sound_events: EventWriter<UiSoundEvent>,
     mut egui_context: EguiContexts,
     mut query_party_info: Query<&PartyInfo, With<PlayerCharacter>>,
+    mut config: ResMut<Config>,
+    mut name_tag_cache: ResMut<NameTagCache>,
     ui_resources: Res<UiResources>,
     dialog_assets: Res<Assets<Dialog>>,
     game_connection: Option<Res<GameConnection>>,
@@ -79,6 +83,8 @@ pub fn ui_party_option_system(
             PartyXpSharing::EqualShare => IID_RADIOBUTTON_EXP_EQUALITY,
             PartyXpSharing::DistributedByLevel => IID_RADIOBUTTON_EXP_RATIO_LEVEL,
         };
+
+        ui_state.show_party_member_hp_gauge = config.interface.party_hp_gauge;
         return;
     }
 
@@ -107,7 +113,7 @@ pub fn ui_party_option_system(
                         (IID_RADIOBUTTON_ITEM_SEQUENCE, player_is_owner),
                         (IID_RADIOBUTTON_EXP_EQUALITY, player_is_owner),
                         (IID_RADIOBUTTON_EXP_RATIO_LEVEL, player_is_owner),
-                        (IID_CHECKBOX_SHOW_PARTYMEMBER_HPGUAGE, player_is_owner),
+                        (IID_CHECKBOX_SHOW_PARTYMEMBER_HPGUAGE, true),
                     ],
                     radio: &mut [
                         (IID_RADIOBOX_ITEM, &mut ui_state.item_sharing_rule),
@@ -117,7 +123,7 @@ pub fn ui_party_option_system(
                         (IID_BTN_CLOSE, &mut response_close_button),
                         (IID_BTN_CONFIRM, &mut response_confirm_button),
                     ],
-                    visible: &mut [(IID_BTN_CONFIRM, player_is_owner)],
+                    visible: &mut [(IID_BTN_CONFIRM, true)],
                     ..Default::default()
                 },
                 |ui, _bindings| {
@@ -169,22 +175,36 @@ pub fn ui_party_option_system(
     }
 
     if response_confirm_button.map_or(false, |x| x.clicked()) {
-        if let Some(game_connection) = &game_connection {
-            game_connection
-                .client_message_tx
-                .send(ClientMessage::PartyUpdateRules {
-                    item_sharing: if ui_state.item_sharing_rule == IID_RADIOBUTTON_ITEM_PICK {
-                        PartyItemSharing::EqualLootDistribution
-                    } else {
-                        PartyItemSharing::AcquisitionOrder
-                    },
-                    xp_sharing: if ui_state.exp_sharing_rule == IID_RADIOBUTTON_EXP_EQUALITY {
-                        PartyXpSharing::EqualShare
-                    } else {
-                        PartyXpSharing::DistributedByLevel
-                    },
-                })
-                .ok();
+        if config.interface.party_hp_gauge != ui_state.show_party_member_hp_gauge {
+            config.interface.party_hp_gauge = ui_state.show_party_member_hp_gauge;
+            name_tag_cache.dispose = true;
+
+            let path = config.filesystem.config_path.clone();
+            save_config(config.into_inner(), Path::new(&path));
+        }
+
+        let item_sharing = if ui_state.item_sharing_rule == IID_RADIOBUTTON_ITEM_PICK {
+            PartyItemSharing::EqualLootDistribution
+        } else {
+            PartyItemSharing::AcquisitionOrder
+        };
+
+        let xp_sharing = if ui_state.exp_sharing_rule == IID_RADIOBUTTON_EXP_EQUALITY {
+            PartyXpSharing::EqualShare
+        } else {
+            PartyXpSharing::DistributedByLevel
+        };
+
+        if party_info.item_sharing != item_sharing || party_info.xp_sharing != xp_sharing {
+            if let Some(game_connection) = &game_connection {
+                game_connection
+                    .client_message_tx
+                    .send(ClientMessage::PartyUpdateRules {
+                        item_sharing,
+                        xp_sharing,
+                    })
+                    .ok();
+            }
         }
 
         ui_state_windows.party_options_open = false;

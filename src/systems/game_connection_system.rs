@@ -1596,6 +1596,7 @@ pub fn game_connection_system(
                         owner: PartyOwner::Player,
                         ..Default::default()
                     });
+                    party_events.send(PartyEvent::Created);
                 }
             }
             Ok(ServerMessage::PartyAcceptInvite { .. }) => {
@@ -1604,6 +1605,7 @@ pub fn game_connection_system(
                         owner: PartyOwner::Unknown,
                         ..Default::default()
                     });
+                    party_events.send(PartyEvent::Created);
 
                     commands.add(move |world: &mut World| {
                         if let Some(player_entity_name) =
@@ -1687,7 +1689,7 @@ pub fn game_connection_system(
             }
             Ok(ServerMessage::PartyDelete) => {
                 if let Some(player_entity) = client_entity_list.player_entity {
-                    party_events.send(PartyEvent::Delete);
+                    party_events.send(PartyEvent::Deleted);
                     commands.entity(player_entity).remove::<PartyInfo>();
                     chatbox_events.send(ChatboxEvent::System("You have left the party.".into()));
                 }
@@ -1702,13 +1704,17 @@ pub fn game_connection_system(
                     commands.add(move |world: &mut World| {
                         let mut player = world.entity_mut(player_entity);
 
-                        if !player.contains::<PartyInfo>() {
+                        let joined = if !player.contains::<PartyInfo>() {
                             player.insert(PartyInfo {
                                 item_sharing,
                                 xp_sharing,
                                 ..Default::default()
                             });
-                        }
+
+                            true
+                        } else {
+                            false
+                        };
 
                         let mut party_info = player.get_mut::<PartyInfo>().unwrap();
                         if matches!(party_info.owner, PartyOwner::Unknown) {
@@ -1725,6 +1731,12 @@ pub fn game_connection_system(
                         let mut chatbox_events = world.resource_mut::<Events<ChatboxEvent>>();
                         for message in messages {
                             chatbox_events.send(ChatboxEvent::System(message));
+                        }
+
+                        if joined {
+                            world
+                                .resource_mut::<Events<PartyEvent>>()
+                                .send(PartyEvent::Joined);
                         }
                     });
                 }

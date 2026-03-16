@@ -2,7 +2,7 @@ use std::num::NonZeroU16;
 
 use crate::{
     components::{
-        ClientEntity, ClientEntityName, ModelHeight, NameTag, NameTagEntity, NameTagHealthbar,
+        ClientEntity, ClientEntityName, ModelHeight, NameTag, NameTagEntity,
         NameTagHealthbarBackground, NameTagHealthbarForeground, NameTagName, NameTagTargetMark,
         NameTagType, PartyInfo, PlayerCharacter,
     },
@@ -11,22 +11,25 @@ use crate::{
     resources::{
         GameData, NameTagCache, NameTagData, NameTagPendingData, UiResources, UiSpriteSheetType,
     },
-    systems::name_tag_visibility_system::{can_show_full_name_tag, can_show_name_tag},
+    systems::name_tag_visibility_system::{
+        can_show_full_name_tag, can_show_name_tag, HealthBarQueryItem,
+    },
     Config,
 };
 use arrayvec::ArrayVec;
 use bevy::{
     ecs::query::WorldQuery,
     prelude::{
-        Assets, BuildChildren, Changed, Color, Commands, ComputedVisibility, DespawnRecursiveExt,
-        Entity, EventReader, GlobalTransform, Image, Query, Res, ResMut, Transform, Vec2, Vec3,
-        Visibility, With, Without,
+        Assets, BuildChildren, Bundle, Changed, Color, Commands, ComputedVisibility,
+        DespawnRecursiveExt, Entity, EventReader, GlobalTransform, Image, Query, Res, ResMut,
+        Transform, Vec2, Vec3, Visibility, With, Without,
     },
     render::{
         render_resource::{Extent3d, TextureDimension, TextureFormat},
         texture::ImageSampler,
         view::NoFrustumCulling,
     },
+    utils::default,
     window::PrimaryWindow,
 };
 use bevy_egui::{egui, EguiContexts};
@@ -49,11 +52,21 @@ pub struct PlayerQuery<'w> {
 #[derive(WorldQuery)]
 pub struct NameTagObjectQuery<'w> {
     entity: Entity,
+    client_entity: &'w ClientEntity,
     name: &'w ClientEntityName,
     model_height: &'w ModelHeight,
     npc: Option<&'w Npc>,
     level: Option<&'w Level>,
     team: Option<&'w Team>,
+}
+
+#[derive(Bundle, Default)]
+struct NameTagBundle {
+    transform: Transform,
+    global_transform: GlobalTransform,
+    visibility: Visibility,
+    computed_visibility: ComputedVisibility,
+    no_frustum_culling: NoFrustumCulling,
 }
 
 pub fn get_monster_name_tag_color(
@@ -376,7 +389,6 @@ pub fn name_tag_system(
     query_player: Query<PlayerQuery, With<PlayerCharacter>>,
     query_nametags: Query<(Entity, &NameTagEntity)>,
     query_window: Query<Entity, With<PrimaryWindow>>,
-    query_client_entity: Query<&ClientEntity>,
     egui_managed_textures: Res<bevy_egui::EguiManagedTextures>,
     mut egui_context: EguiContexts,
     mut images: ResMut<Assets<Image>>,
@@ -407,8 +419,11 @@ pub fn name_tag_system(
     }
 
     for party_event in party_events.iter() {
-        if matches!(party_event, PartyEvent::Delete) {
-            name_tag_cache.dispose = true;
+        match party_event {
+            PartyEvent::Created | PartyEvent::Joined | PartyEvent::Deleted => {
+                name_tag_cache.dispose = true;
+            }
+            _ => {}
         }
     }
 
@@ -488,20 +503,24 @@ pub fn name_tag_system(
         let name_tag_entity = commands
             .spawn((
                 NameTag { name_tag_type },
-                if can_show_name_tag(
-                    player.as_ref().map(|player| player.entity),
-                    object.entity,
-                    name_tag_type,
-                    &config,
-                ) {
-                    Visibility::Inherited
-                } else {
-                    Visibility::Hidden
+                NameTagBundle {
+                    visibility: if can_show_name_tag(
+                        player.as_ref().map(|player| player.entity),
+                        object.entity,
+                        name_tag_type,
+                        &config,
+                    ) {
+                        Visibility::Inherited
+                    } else {
+                        Visibility::Hidden
+                    },
+                    transform: Transform::from_translation(Vec3::new(
+                        0.0,
+                        object.model_height.height,
+                        0.0,
+                    )),
+                    ..default()
                 },
-                ComputedVisibility::default(),
-                Transform::from_translation(Vec3::new(0.0, object.model_height.height, 0.0)),
-                GlobalTransform::default(),
-                NoFrustumCulling,
             ))
             .id();
 
@@ -527,7 +546,6 @@ pub fn name_tag_system(
 
         let mut healthbar_fg_rect = None;
         let mut healthbar_bg_rect = None;
-        let mut healthbar = None;
 
         let (health_foreground, health_background) = match name_tag_type {
             NameTagType::Character => (
@@ -603,15 +621,6 @@ pub fn name_tag_system(
                 color: Color::WHITE,
                 order: ORDER_HEALTH_FOREGROUND,
             });
-
-            healthbar = Some(NameTagHealthbar {
-                foreground: NameTagHealthbarForeground {
-                    full_width: health_bar_size.x,
-                    uv_min_x: health_bar_foreground_uv_x_bounds.0,
-                    uv_max_x: health_bar_foreground_uv_x_bounds.1,
-                },
-                background: NameTagHealthbarBackground,
-            });
         }
 
         let mut target_marks: ArrayVec<WorldUiRect, 2> = ArrayVec::default();
@@ -655,15 +664,7 @@ pub fn name_tag_system(
 
         for rect in name_tag_data.rects.iter() {
             commands
-                .spawn((
-                    NameTagName,
-                    rect.clone(),
-                    Transform::default(),
-                    GlobalTransform::default(),
-                    Visibility::default(),
-                    ComputedVisibility::default(),
-                    NoFrustumCulling,
-                ))
+                .spawn((NameTagName, rect.clone(), NameTagBundle::default()))
                 .set_parent(name_tag_entity);
         }
 
@@ -672,49 +673,78 @@ pub fn name_tag_system(
                 .spawn((
                     NameTagTargetMark,
                     rect,
-                    Transform::default(),
-                    GlobalTransform::default(),
-                    Visibility::Hidden,
-                    ComputedVisibility::default(),
-                    NoFrustumCulling,
+                    NameTagBundle {
+                        visibility: Visibility::Hidden,
+                        ..default()
+                    },
                 ))
                 .set_parent(name_tag_entity);
         }
 
-        let mut spawn_healthbar_rect = |rect, healthbar: &NameTagHealthbar| {
+        if let Some(rect) = healthbar_bg_rect.take() {
+            let healthbar = NameTagHealthbarBackground;
+
             commands
                 .spawn((
                     healthbar.clone(),
                     rect,
-                    Transform::default(),
-                    GlobalTransform::default(),
-                    if can_show_full_name_tag(
-                        player.as_ref().map(|it| it.entity),
-                        player.as_ref().and_then(|it| it.party_info),
-                        object.entity,
-                        query_client_entity.get(object.entity).ok(),
-                        false,
-                        name_tag_type,
-                        Some(healthbar),
-                    ) {
-                        Visibility::Inherited
-                    } else {
-                        Visibility::Hidden
+                    NameTagBundle {
+                        visibility: if can_show_full_name_tag(
+                            player.as_ref().map(|it| it.entity),
+                            player.as_ref().and_then(|it| it.party_info),
+                            object.entity,
+                            Some(object.client_entity),
+                            false,
+                            name_tag_type,
+                            Some(HealthBarQueryItem {
+                                foreground: None,
+                                background: Some(&healthbar),
+                            }),
+                            &config,
+                        ) {
+                            Visibility::Inherited
+                        } else {
+                            Visibility::Hidden
+                        },
+                        ..default()
                     },
-                    ComputedVisibility::default(),
-                    NoFrustumCulling,
                 ))
                 .set_parent(name_tag_entity);
-        };
+        }
 
-        if let Some(healthbar) = healthbar {
-            if let Some(foreground_rect) = healthbar_fg_rect {
-                spawn_healthbar_rect(foreground_rect, &healthbar);
-            }
+        if let Some(rect) = healthbar_fg_rect.take() {
+            let healthbar = NameTagHealthbarForeground {
+                full_width: health_bar_size.x,
+                uv_min_x: health_bar_foreground_uv_x_bounds.0,
+                uv_max_x: health_bar_foreground_uv_x_bounds.1,
+            };
 
-            if let Some(background_rect) = healthbar_bg_rect {
-                spawn_healthbar_rect(background_rect, &healthbar);
-            }
+            commands
+                .spawn((
+                    healthbar.clone(),
+                    rect,
+                    NameTagBundle {
+                        visibility: if can_show_full_name_tag(
+                            player.as_ref().map(|it| it.entity),
+                            player.as_ref().and_then(|it| it.party_info),
+                            object.entity,
+                            Some(object.client_entity),
+                            false,
+                            name_tag_type,
+                            Some(HealthBarQueryItem {
+                                foreground: Some(&healthbar),
+                                background: None,
+                            }),
+                            &config,
+                        ) {
+                            Visibility::Inherited
+                        } else {
+                            Visibility::Hidden
+                        },
+                        ..default()
+                    },
+                ))
+                .set_parent(name_tag_entity);
         }
 
         commands
