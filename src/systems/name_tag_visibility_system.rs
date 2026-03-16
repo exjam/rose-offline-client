@@ -1,7 +1,7 @@
 use crate::{
     components::{
-        ClientEntity, Dead, NameTag, NameTagEntity, NameTagHealthbar, NameTagTargetMark,
-        NameTagType, PartyInfo, PlayerCharacter,
+        ClientEntity, Dead, NameTag, NameTagEntity, NameTagHealthbarBackground,
+        NameTagHealthbarForeground, NameTagTargetMark, NameTagType, PartyInfo, PlayerCharacter,
     },
     resources::SelectedTarget,
     Config,
@@ -10,7 +10,6 @@ use bevy::{
     ecs::query::WorldQuery,
     prelude::{Children, Entity, Local, Or, Query, Res, ResMut, Visibility, With},
 };
-use oddio::FilterHaving;
 use rose_game_common::components::Npc;
 
 #[derive(Default)]
@@ -32,6 +31,12 @@ pub struct NameTagQuery<'w> {
 pub struct PlayerQuery<'w> {
     entity: Entity,
     party_info: Option<&'w PartyInfo>,
+}
+
+#[derive(WorldQuery)]
+pub struct HealthBarQuery<'w> {
+    pub foreground: Option<&'w NameTagHealthbarForeground>,
+    pub background: Option<&'w NameTagHealthbarBackground>,
 }
 
 pub fn can_show_name_tag(
@@ -69,22 +74,25 @@ fn is_party_member(
 pub fn can_show_full_name_tag(
     player_entity: Option<Entity>,
     party_info: Option<&PartyInfo>,
-    name_tag_entity: Entity,
-    name_tag_client_entity: Option<&ClientEntity>,
+    entity: Entity,
+    client_entity: Option<&ClientEntity>,
     selected: bool,
     name_tag_type: NameTagType,
-    name_tag_healthbar: Option<&NameTagHealthbar>,
+    healthbar: Option<HealthBarQueryItem>,
+    config: &Config,
 ) -> bool {
-    if name_tag_healthbar.is_none() {
-        return selected;
+    if let Some(healthbar) = healthbar {
+        if healthbar.foreground.is_none() && healthbar.background.is_none() {
+            return selected;
+        }
     }
 
-    if player_entity.is_some_and(|it| it == name_tag_entity) {
+    if player_entity.is_some_and(|it| it == entity) {
         return true;
     }
 
     if matches!(name_tag_type, NameTagType::Character) {
-        return is_party_member(party_info, name_tag_client_entity);
+        return is_party_member(party_info, client_entity) && config.interface.party_hp_gauge;
     }
 
     selected
@@ -94,10 +102,17 @@ pub fn name_tag_visibility_system(
     mut state: Local<NameTagVisibility>,
     mut selected_target: ResMut<SelectedTarget>,
     mut query_visibility: Query<&mut Visibility>,
-    query_healthbar: Query<&NameTagHealthbar>,
+    query_healthbar: Query<HealthBarQuery>,
     query_name_tag: Query<NameTagQuery>,
     query_name_tag_entity: Query<&NameTagEntity>,
-    query_name_tag_selected: Query<Entity, Or<(With<NameTagTargetMark>, With<NameTagHealthbar>)>>,
+    query_name_tag_selected: Query<
+        Entity,
+        Or<(
+            With<NameTagTargetMark>,
+            With<NameTagHealthbarForeground>,
+            With<NameTagHealthbarBackground>,
+        )>,
+    >,
     query_npc_dead: Query<&Dead, With<Npc>>,
     query_player: Query<PlayerQuery, With<PlayerCharacter>>,
     query_client_entity: Query<&ClientEntity>,
@@ -221,6 +236,7 @@ pub fn name_tag_visibility_system(
                     false,
                     name_tag.name_tag.name_tag_type,
                     query_healthbar.get(child).ok(),
+                    &config,
                 ) {
                     *visibility = Visibility::Inherited;
                 } else {
@@ -262,6 +278,7 @@ pub fn name_tag_visibility_system(
                     true,
                     name_tag.name_tag.name_tag_type,
                     query_healthbar.get(child).ok(),
+                    &config,
                 ) {
                     *visibility = Visibility::Inherited;
                 } else {

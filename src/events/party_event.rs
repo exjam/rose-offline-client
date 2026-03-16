@@ -4,5 +4,7 @@ use bevy::prelude::{Entity, Event};
 pub enum PartyEvent {
     InvitedCreate(Entity),
     InvitedJoin(Entity),
-    Delete,
+    Created,
+    Joined,
+    Deleted,
 }
