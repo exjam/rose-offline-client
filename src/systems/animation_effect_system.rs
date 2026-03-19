@@ -84,6 +84,7 @@ pub fn animation_effect_system(
                     event.entity,
                     target_entity,
                     effect_id,
+                    None,
                 ));
             }
         }
@@ -153,6 +154,7 @@ pub fn animation_effect_system(
                     if projectile_effect_data.bullet_effect.is_some() {
                         spawn_projectile_events.send(SpawnProjectileEvent {
                             effect_id: projectile_effect_data.id,
+                            hit_sound_id: projectile_effect_data.hit_sound_id,
                             source: event.entity,
                             source_dummy_bone_id,
                             source_skill_id: None,
@@ -189,6 +191,7 @@ pub fn animation_effect_system(
                         if effect_data.bullet_effect.is_some() {
                             spawn_projectile_events.send(SpawnProjectileEvent {
                                 effect_id: effect_data.id,
+                                hit_sound_id: effect_data.hit_sound_id,
                                 source: event.entity,
                                 source_dummy_bone_id: Some(
                                     skill_data.bullet_link_dummy_bone_id as usize,
@@ -260,6 +263,7 @@ pub fn animation_effect_system(
                                 if effect_data.bullet_effect.is_some() {
                                     spawn_projectile_events.send(SpawnProjectileEvent {
                                         effect_id: effect_data.id,
+                                        hit_sound_id: effect_data.hit_sound_id,
                                         source: event.entity,
                                         source_dummy_bone_id: Some(
                                             skill_data.bullet_link_dummy_bone_id as usize,
@@ -293,6 +297,7 @@ pub fn animation_effect_system(
                                 if effect_data.bullet_effect.is_some() {
                                     spawn_projectile_events.send(SpawnProjectileEvent {
                                         effect_id: effect_data.id,
+                                        hit_sound_id: effect_data.hit_sound_id,
                                         source: event.entity,
                                         source_dummy_bone_id: Some(
                                             skill_data.bullet_link_dummy_bone_id as usize,
@@ -350,12 +355,14 @@ pub fn animation_effect_system(
                         event.entity,
                         target_entity.unwrap_or(event.entity),
                         skill_data.id,
+                        skill_data.hit_sound_id,
                     ));
                 } else {
                     hit_events.send(HitEvent::with_weapon(
                         event.entity,
                         target_entity.unwrap_or(event.entity),
                         weapon_effect_id,
+                        skill_data.hit_sound_id,
                     ));
                 }
             }
