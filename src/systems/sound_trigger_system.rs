@@ -1,7 +1,7 @@
 use crate::{
     audio::SpatialSound,
     components::SoundCategory,
-    events::{ClientEntityEvent, PlayerCommandEvent, UseItemEvent},
+    events::{ClientEntityEvent, HitEvent, PlayerCommandEvent, UseItemEvent},
     resources::{GameData, SoundCache},
     ui::UiSoundEvent,
     Config,
@@ -30,6 +30,7 @@ pub fn sound_trigger_system(
     mut player_command_events: EventReader<PlayerCommandEvent>,
     mut client_entity_events: EventReader<ClientEntityEvent>,
     mut use_item_events: EventReader<UseItemEvent>,
+    mut hit_events: EventReader<HitEvent>,
     mut query_player: Query<PlayerQuery>,
     query_global_transform: Query<&GlobalTransform>,
     query_npc: Query<(&Npc, &GlobalTransform)>,
@@ -144,5 +145,17 @@ pub fn sound_trigger_system(
         if let Some((sound_category, global_transform)) = get_entity_sound(entity) {
             play_sound(sound_id, sound_category, global_transform);
         }
+    }
+
+    for event in hit_events.iter() {
+        let Some(sound_id) = event.sound_id else {
+            continue;
+        };
+
+        let Some((sound_category, global_transform)) = get_entity_sound(event.defender) else {
+            continue;
+        };
+
+        play_sound(sound_id, sound_category, global_transform);
     }
 }
