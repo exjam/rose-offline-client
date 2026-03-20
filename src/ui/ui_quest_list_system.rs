@@ -1,12 +1,14 @@
 use bevy::prelude::{Assets, EventWriter, Local, Query, Res, ResMut, With};
 use bevy_egui::{egui, EguiContexts};
+use std::time::Duration;
 
 use rose_data::Item;
 use rose_game_common::components::QuestState;
 
+use super::DialogInstance;
 use crate::{
     components::PlayerCharacter,
-    resources::{GameData, UiResources},
+    resources::{GameData, UiResources, WorldTime},
     ui::{
         tooltips::{PlayerTooltipQuery, PlayerTooltipQueryItem},
         ui_add_item_tooltip,
@@ -14,8 +16,6 @@ use crate::{
         DragAndDropId, DragAndDropSlot, UiSoundEvent, UiStateWindows,
     },
 };
-
-use super::DialogInstance;
 
 // const IID_BTN_ABANDON: i32 = 50;
 const IID_BTN_CLOSE: i32 = 10;
@@ -96,6 +96,7 @@ pub fn ui_quest_list_system(
     game_data: Res<GameData>,
     ui_resources: Res<UiResources>,
     dialog_assets: Res<Assets<Dialog>>,
+    world_time: Res<WorldTime>,
 ) {
     let ui_state = &mut *ui_state;
     let dialog = if let Some(dialog) = ui_state
@@ -283,6 +284,25 @@ pub fn ui_quest_list_system(
                                 &game_data,
                                 &ui_resources,
                             );
+                        }
+
+                        let duration = selected_quest
+                            .expire_time
+                            .map(|it| it - world_time.ticks)
+                            .map(|it| Duration::from(it) - world_time.time_since_last_tick);
+
+                        if let Some(duration) = duration {
+                            let total_seconds = duration.as_secs();
+
+                            let hours = total_seconds / 3600;
+                            let minutes = (total_seconds % 3600) / 60;
+                            let seconds = total_seconds % 60;
+
+                            ui.add_space(3.5);
+                            ui.horizontal(|ui| {
+                                ui.add_space(40.0);
+                                ui.label(format!("{:02}:{:02}:{:02}", hours, minutes, seconds));
+                            });
                         }
                     }
                 },
