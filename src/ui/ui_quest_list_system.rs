@@ -286,22 +286,34 @@ pub fn ui_quest_list_system(
                             );
                         }
 
-                        let duration = selected_quest
+                        let expire_time: Option<String> = if let Some(expire_time) =
+                            selected_quest.expire_time
+                        {
+                            if expire_time.0 <= world_time.ticks.0 {
+                                Some(game_data.client_strings.timeout.to_string())
+                            } else {
+                                let total_seconds = selected_quest
                             .expire_time
                             .map(|it| it - world_time.ticks)
-                            .map(|it| Duration::from(it) - world_time.time_since_last_tick);
-
-                        if let Some(duration) = duration {
-                            let total_seconds = duration.as_secs();
+                                    .map(|it| Duration::from(it) - world_time.time_since_last_tick)
+                                    .map(|it| it.as_secs())
+                                    .unwrap_or(0);
 
                             let hours = total_seconds / 3600;
                             let minutes = (total_seconds % 3600) / 60;
                             let seconds = total_seconds % 60;
 
+                                Some(format!("{:02}:{:02}:{:02}", hours, minutes, seconds))
+                            }
+                        } else {
+                            None
+                        };
+
+                        if let Some(expire_time) = expire_time {
                             ui.add_space(3.5);
                             ui.horizontal(|ui| {
                                 ui.add_space(40.0);
-                                ui.label(format!("{:02}:{:02}:{:02}", hours, minutes, seconds));
+                                ui.label(expire_time);
                             });
                         }
                     }
