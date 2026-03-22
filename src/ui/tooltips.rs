@@ -6,7 +6,8 @@ use bevy_egui::egui;
 
 use rose_data::{
     AbilityType, BaseItemData, EquipmentItem, Item, ItemClass, ItemGradeData, ItemType, JobId,
-    SkillAddAbility, SkillData, SkillId, SkillType, StackableItem, StatusEffectType,
+    SkillAddAbility, SkillDamageType, SkillData, SkillId, SkillType, StackableItem,
+    StatusEffectType,
 };
 use rose_game_common::components::{
     AbilityValues, CharacterInfo, Equipment, ExperiencePoints, HealthPoints, Inventory, Level,
@@ -553,34 +554,30 @@ pub fn ui_add_item_tooltip(
                     add_equipment_item_life_durability(ui, game_data, equipment_item);
                     add_item_defence(ui, game_data, item_data, grade_data);
 
-                    if matches!(equipment_item.item.item_type, ItemType::Feet) {
-                        if let Some(move_speed) = game_data
+                    let move_speed = if matches!(equipment_item.item.item_type, ItemType::Feet) {
+                        game_data
                             .items
                             .get_feet_item(equipment_item.item.item_number)
                             .map(|feet_item_data| feet_item_data.move_speed)
-                        {
-                            ui.colored_label(
-                                POSITIVE_EFFECT_COLOR,
-                                format!(
-                                    "[{} {}]",
-                                    game_data.client_strings.item_move_speed, move_speed
-                                ),
-                            );
-                        }
+                            .unwrap_or(0)
                     } else if matches!(equipment_item.item.item_type, ItemType::Back) {
-                        if let Some(move_speed) = game_data
+                        game_data
                             .items
                             .get_back_item(equipment_item.item.item_number)
                             .map(|back_item_data| back_item_data.move_speed)
-                        {
-                            ui.colored_label(
-                                POSITIVE_EFFECT_COLOR,
-                                format!(
-                                    "[{} {}]",
-                                    game_data.client_strings.item_move_speed, move_speed
-                                ),
-                            );
-                        }
+                            .unwrap_or(0)
+                    } else {
+                        0
+                    };
+
+                    if move_speed > 0 {
+                        ui.colored_label(
+                            POSITIVE_EFFECT_COLOR,
+                            format!(
+                                "[{} {}]",
+                                game_data.client_strings.item_move_speed, move_speed
+                            ),
+                        );
                     }
 
                     add_item_add_ability(ui, game_data, item_data);
@@ -833,11 +830,10 @@ fn add_skill_description(ui: &mut egui::Ui, skill_data: &SkillData) {
 
 fn add_skill_power(ui: &mut egui::Ui, game_data: &GameData, skill_data: &SkillData) {
     let damage_type = match skill_data.damage_type {
-        0 => game_data.client_strings.skill_damage_type_0,
-        1 => game_data.client_strings.skill_damage_type_1,
-        2 => game_data.client_strings.skill_damage_type_2,
-        3 => game_data.client_strings.skill_damage_type_3,
-        _ => "",
+        SkillDamageType::ContinuousAttack => game_data.client_strings.skill_damage_type_continuous,
+        SkillDamageType::WeaponAttack => game_data.client_strings.skill_damage_type_weapon,
+        SkillDamageType::MagicAttack => game_data.client_strings.skill_damage_type_magic,
+        SkillDamageType::NaturalMagic => game_data.client_strings.skill_damage_type_natural_magic,
     };
 
     ui.horizontal(|ui| {
