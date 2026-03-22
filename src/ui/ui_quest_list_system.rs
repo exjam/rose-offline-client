@@ -1,21 +1,20 @@
-use bevy::prelude::{Assets, EventWriter, Local, Query, Res, ResMut, With};
-use bevy_egui::{egui, EguiContexts};
-
 use rose_data::Item;
 use rose_game_common::components::QuestState;
 
+use super::DialogInstance;
 use crate::{
     components::PlayerCharacter,
+    events::{MessageBoxEvent, PlayerCommandEvent},
     resources::{GameData, UiResources},
     ui::{
         tooltips::{PlayerTooltipQuery, PlayerTooltipQueryItem},
         ui_add_item_tooltip,
-        widgets::{DataBindings, Dialog, DrawText, Widget},
+        widgets::{DataBindings, Dialog, Widget},
         DragAndDropId, DragAndDropSlot, UiSoundEvent, UiStateWindows,
     },
 };
-
-use super::DialogInstance;
+use bevy::prelude::{Assets, EventWriter, Events, Local, Query, Res, ResMut, With, World};
+use bevy_egui::{egui, EguiContexts};
 
 const IID_BTN_DELETE: i32 = 50;
 const IID_BTN_CLOSE: i32 = 10;
@@ -179,13 +178,13 @@ pub fn ui_quest_list_system(
                             let item_height = 24.0;
                             let item_width = 174.0;
                             let y_offset = index as f32 * item_height;
-                            
+
                             // Allocate space for quest item at the correct position
                             let rect = egui::Rect::from_min_size(
                                 ui.min_rect().min + egui::vec2(0.0, y_offset),
-                                egui::vec2(item_width, item_height)
+                                egui::vec2(item_width, item_height),
                             );
-                            
+
                             let response = ui.allocate_rect(rect, egui::Sense::click());
 
                             if let Some(active_quest) = player_quest_state
@@ -199,14 +198,14 @@ pub fn ui_quest_list_system(
                                     game_data.quests.get_quest_data(active_quest.quest_id)
                                 {
                                     let text_pos = rect.min + egui::vec2(28.0, 4.0);
-                                    
+
                                     if selected {
                                         ui.painter().text(
                                             text_pos,
                                             egui::Align2::LEFT_TOP,
                                             quest_data.name,
                                             egui::FontId::default(),
-                                            egui::Color32::YELLOW
+                                            egui::Color32::YELLOW,
                                         );
                                     } else {
                                         ui.painter().text(
@@ -214,7 +213,7 @@ pub fn ui_quest_list_system(
                                             egui::Align2::LEFT_TOP,
                                             quest_data.name,
                                             egui::FontId::default(),
-                                            egui::Color32::WHITE
+                                            egui::Color32::WHITE,
                                         );
                                     }
                                 }
@@ -295,6 +294,36 @@ pub fn ui_quest_list_system(
                 },
             );
         });
+
+    if response_delete_button.map_or(false, |it| it.clicked()) {
+        if let Some(selected_quest_data) = selected_quest_data {
+            let quest_id = selected_quest_data.id;
+
+            let message = game_data
+                .client_strings
+                .quest_delete_confirm(selected_quest_data.name);
+
+            message_box_events.send(MessageBoxEvent::Show {
+                message,
+                modal: false,
+                ok: Some(Box::new(move |commands| {
+                    commands.add(move |world: &mut World| {
+                        let Some(mut player_command_events) =
+                            world.get_resource_mut::<Events<PlayerCommandEvent>>()
+                        else {
+                            return;
+                        };
+
+                        player_command_events.send(PlayerCommandEvent::QuestDelete(
+                            selected_index as usize,
+                            quest_id,
+                        ));
+                    });
+                })),
+                cancel: Some(Box::new(|_| {})),
+            });
+        }
+    }
 
     if response_close_button.map_or(false, |r| r.clicked()) {
         ui_state_windows.quest_list_open = false;
