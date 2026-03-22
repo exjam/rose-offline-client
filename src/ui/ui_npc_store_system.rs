@@ -375,9 +375,11 @@ fn ui_add_sell_item_slot(
     }
 
     if let Some(DragAndDropId::Inventory(item_slot)) = dropped_item {
+        let item = player.and_then(|it| it.inventory.get_item(item_slot));
+
         *pending_sell_item = Some(PendingSellItem {
             item_slot,
-            quantity: 1,
+            quantity: item.map(|it| it.get_quantity()).unwrap_or(1) as usize,
         });
     }
 
