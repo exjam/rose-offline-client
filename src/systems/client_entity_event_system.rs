@@ -1,6 +1,4 @@
-use bevy::prelude::{
-    EventReader, EventWriter, GlobalTransform, Query, Res,
-};
+use bevy::prelude::{EventReader, EventWriter, GlobalTransform, Query, Res, ResMut};
 
 use rose_file_readers::VfsPathBuf;
 use rose_game_common::components::Npc;
@@ -8,13 +6,14 @@ use rose_game_common::components::Npc;
 use crate::{
     components::PlayerCharacter,
     events::{ChatboxEvent, ClientEntityEvent, SpawnEffectData, SpawnEffectEvent},
-    resources::GameData,
+    resources::{GameData, NameTagCache},
 };
 
 pub fn client_entity_event_system(
     mut client_entity_events: EventReader<ClientEntityEvent>,
     mut chatbox_events: EventWriter<ChatboxEvent>,
     mut spawn_effect_events: EventWriter<SpawnEffectEvent>,
+    mut name_tag_cache: ResMut<NameTagCache>,
     query_player: Query<&PlayerCharacter>,
     query_npc: Query<(&Npc, &GlobalTransform)>,
     game_data: Res<GameData>,
@@ -44,6 +43,8 @@ pub fn client_entity_event_system(
                             level
                         )));
                     }
+
+                    name_tag_cache.dispose = true;
                 };
 
                 spawn_effect_events.send(SpawnEffectEvent::OnEntity(
