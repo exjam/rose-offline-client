@@ -19,7 +19,8 @@ use crate::{
         COLLISION_FILTER_CLICKABLE, COLLISION_GROUP_PHYSICS_TOY, COLLISION_GROUP_PLAYER,
     },
     events::{MoveDestinationEffectEvent, PlayerCommandEvent},
-    resources::{SelectedTarget, UiCursorType, UiRequestedCursor},
+    resources::{SelectedTarget, TargetingType, UiCursorType, UiRequestedCursor},
+    Config,
 };
 
 #[derive(WorldQuery)]
@@ -48,6 +49,7 @@ pub fn game_mouse_input_system(
     mut move_destination_effect_events: EventWriter<MoveDestinationEffectEvent>,
     mut selected_target: ResMut<SelectedTarget>,
     mut ui_requested_cursor: ResMut<UiRequestedCursor>,
+    config: Res<Config>,
 ) {
     selected_target.hover = None;
     ui_requested_cursor.world_cursor = UiCursorType::Default;
@@ -158,6 +160,10 @@ pub fn game_mouse_input_system(
                     selected_target.hover = Some(hit_entity);
 
                     if mouse_button_input.just_pressed(MouseButton::Left) {
+                        if config.interface.targeting == TargetingType::SingleClick {
+                            selected_target.selected = Some(hit_entity);
+                        }
+
                         if selected_target
                             .selected
                             .map_or(false, |selected_entity| selected_entity == hit_entity)

@@ -1,7 +1,7 @@
 use bevy::prelude::{Entity, Event};
 
-use rose_data::{AmmoIndex, EquipmentIndex, VehiclePartIndex};
-use rose_game_common::components::{HotbarSlot, ItemSlot, SkillSlot};
+use rose_data::{AmmoIndex, EquipmentIndex, Item, VehiclePartIndex};
+use rose_game_common::components::{HotbarSlot, ItemSlot, Money, SkillSlot};
 
 use crate::components::Position;
 
@@ -23,4 +23,6 @@ pub enum PlayerCommandEvent {
     DropMoney(usize),
     BankDepositItem(ItemSlot),
     BankWithdrawItem(usize),
+    PickupDropItem(Item, Entity, ItemSlot),
+    PickupDropMoney(Money, Entity),
 }

@@ -19,19 +19,19 @@ struct SpatialControlHandle(
 
 #[allow(dead_code)]
 impl SpatialControlHandle {
-    pub fn gain_control(&mut self) -> oddio::GainControl {
+    pub fn gain_control(&mut self) -> oddio::GainControl<'_> {
         self.0.control::<oddio::Gain<_>, _>()
     }
 
-    pub fn stop_control(&mut self) -> oddio::StopControl {
+    pub fn stop_control(&mut self) -> oddio::StopControl<'_> {
         self.0.control::<oddio::Stop<_>, _>()
     }
 
-    pub fn stream_control(&mut self) -> oddio::StreamControl<f32> {
+    pub fn stream_control(&mut self) -> oddio::StreamControl<'_, f32> {
         self.0.control::<oddio::Stream<_>, _>()
     }
 
-    pub fn spatial_control(&mut self) -> oddio::SpatialControl {
+    pub fn spatial_control(&mut self) -> oddio::SpatialControl<'_> {
         self.0.control::<oddio::SpatialBuffered<_>, _>()
     }
 }

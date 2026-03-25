@@ -2,8 +2,7 @@ use std::path::Path;
 
 use rose_data::ZoneId;
 use rose_offline_client::{
-    load_config, run_game, run_model_viewer, run_zone_viewer, Config, FilesystemDeviceConfig,
-    SystemsConfig,
+    load_config, run_game, run_model_viewer, run_zone_viewer, FilesystemDeviceConfig, SystemsConfig,
 };
 
 fn main() {
@@ -146,10 +145,9 @@ fn main() {
         );
     let matches = command.get_matches();
 
-    let mut config = matches
-        .value_of("config")
-        .map(Path::new)
-        .map_or_else(Config::default, load_config);
+    let config_path = matches.value_of("config").unwrap_or("./config.toml");
+    let mut config = load_config(Path::new(config_path));
+    config.filesystem.config_path = String::from(config_path);
 
     if let Some(ip) = matches.value_of("ip") {
         config.server.ip = ip.into();

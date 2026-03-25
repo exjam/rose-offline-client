@@ -10,7 +10,8 @@ use crate::{
     animation::SkeletalAnimation,
     audio::{SoundRadius, SpatialSound},
     components::{Command, SoundCategory},
-    resources::{GameData, SoundCache, SoundSettings},
+    resources::{GameData, SoundCache},
+    Config,
 };
 
 #[derive(Component, Default)]
@@ -30,11 +31,11 @@ pub fn npc_idle_sound_system(
     )>,
     asset_server: Res<AssetServer>,
     game_data: Res<GameData>,
-    sound_settings: Res<SoundSettings>,
+    config: Res<Config>,
     sound_cache: Res<SoundCache>,
 ) {
     let mut rng = rand::thread_rng();
-    let gain = sound_settings.gain(SoundCategory::NpcSounds);
+    let gain = config.sound.gain(SoundCategory::NpcSounds);
 
     for (entity, npc, skeletal_animation, command, global_transform, idle_sound_state) in
         query.iter_mut()

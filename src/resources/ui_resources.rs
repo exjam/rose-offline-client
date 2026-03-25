@@ -128,6 +128,7 @@ pub struct UiResources {
     pub dialog_quest_list: Handle<Dialog>,
     pub dialog_respawn: Handle<Dialog>,
     pub dialog_select_server: Handle<Dialog>,
+    pub dialog_exit: Handle<Dialog>,
     pub dialog_skill_list: Handle<Dialog>,
     pub dialog_skill_tree: Handle<Dialog>,
     pub skill_tree_dealer: Handle<Dialog>,
@@ -473,6 +474,7 @@ pub fn load_ui_resources(
     style.visuals.popup_shadow = egui::epaint::Shadow::NONE;
     style.visuals.window_shadow = egui::epaint::Shadow::NONE;
     style.visuals.widgets.noninteractive.fg_stroke.color = egui::Color32::WHITE;
+    style.interaction.show_tooltips_only_when_still = false;
     egui_context.ctx_mut().set_style(style);
 
     commands.init_resource::<UiRequestedCursor>();
@@ -540,6 +542,7 @@ pub fn load_ui_resources(
         dialog_quest_list: dialog_files["DLGQUEST.XML"].clone(),
         dialog_respawn: dialog_files["DLGRESTART.XML"].clone(),
         dialog_select_server: dialog_files["DLGSELSVR.XML"].clone(),
+        dialog_exit: dialog_files["DLGSYSTEM.XML"].clone(),
         dialog_skill_list: dialog_files["DLGSKILL.XML"].clone(),
         dialog_skill_tree: dialog_files["DLGSKILLTREE.XML"].clone(),
         skill_tree_dealer: dialog_files["SKILLTREE_DEALER.XML"].clone(),

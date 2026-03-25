@@ -1,4 +1,4 @@
-use bevy::prelude::{Assets, EventWriter, Local, Res, ResMut};
+use bevy::prelude::{Assets, EventWriter, Res, ResMut};
 use bevy_egui::{egui, EguiContexts};
 
 use crate::{
@@ -7,6 +7,7 @@ use crate::{
         widgets::{DataBindings, Dialog},
         UiSoundEvent, UiStateWindows,
     },
+    Config,
 };
 
 const IID_BTN_CHAR: i32 = 10;
@@ -20,19 +21,13 @@ const IID_BTN_INFO: i32 = 17;
 const IID_BTN_OPTION: i32 = 18;
 const IID_BTN_EXIT: i32 = 19;
 
-#[derive(Default)]
-pub struct UiGameMenuState {
-    pub was_open: bool,
-    pub mouse_up_after_open: bool,
-}
-
 pub fn ui_game_menu_system(
     mut egui_context: EguiContexts,
     mut ui_state_windows: ResMut<UiStateWindows>,
-    mut ui_state: Local<UiGameMenuState>,
     ui_resources: Res<UiResources>,
     mut ui_sound_events: EventWriter<UiSoundEvent>,
     dialog_assets: Res<Assets<Dialog>>,
+    config: Res<Config>,
 ) {
     let dialog = if let Some(dialog) = dialog_assets.get(&ui_resources.dialog_game_menu) {
         dialog
@@ -51,7 +46,7 @@ pub fn ui_game_menu_system(
     let mut response_button_help = None;
     let mut response_button_info = None;
 
-    let response = egui::Window::new("Game Menu")
+    egui::Window::new("Game Menu")
         .frame(egui::Frame::none())
         .open(&mut ui_state_windows.menu_open)
         .title_bar(false)
@@ -82,101 +77,74 @@ pub fn ui_game_menu_system(
             );
         });
 
-    if let Some(response) = response {
-        // To avoid clicked_elsewhere being triggered as soon as we open menu,
-        // we will only look for it after we have detected all mouse buttons
-        // have been released after opening
-        if ui_state.mouse_up_after_open {
-            if response.response.clicked_elsewhere() {
-                ui_state_windows.menu_open = false;
-            }
-        } else if !response
-            .response
-            .ctx
-            .input(|input| input.pointer.any_down())
-        {
-            ui_state.mouse_up_after_open = true;
-        }
-    } else {
-        ui_state.mouse_up_after_open = false;
-    }
-
     if response_button_character_info.map_or(false, |r| r.clicked()) {
         ui_state_windows.character_info_open = !ui_state_windows.character_info_open;
-        ui_state_windows.menu_open = false;
     }
 
     if response_button_inventory.map_or(false, |r| r.clicked()) {
         ui_state_windows.inventory_open = !ui_state_windows.inventory_open;
-        ui_state_windows.menu_open = false;
     }
 
     if response_button_skill_list.map_or(false, |r| r.clicked()) {
         ui_state_windows.skill_list_open = !ui_state_windows.skill_list_open;
-        ui_state_windows.menu_open = false;
     }
 
     if response_button_quest_list.map_or(false, |r| r.clicked()) {
         ui_state_windows.quest_list_open = !ui_state_windows.quest_list_open;
-        ui_state_windows.menu_open = false;
     }
 
     if response_button_options.map_or(false, |r| r.clicked()) {
         ui_state_windows.settings_open = !ui_state_windows.settings_open;
-        ui_state_windows.menu_open = false;
     }
 
     if response_button_community.map_or(false, |r| r.clicked()) {
         // TODO: Community dialog
-        ui_state_windows.menu_open = false;
     }
 
     if response_button_clan.map_or(false, |r| r.clicked()) {
         ui_state_windows.clan_open = !ui_state_windows.clan_open;
-        ui_state_windows.menu_open = false;
     }
 
     if response_button_help.map_or(false, |r| r.clicked()) {
         // TODO: Help dialog
-        ui_state_windows.menu_open = false;
     }
 
     if response_button_info.map_or(false, |r| r.clicked()) {
         // TODO: Info dialog
-        ui_state_windows.menu_open = false;
     }
 
     if response_button_exit.map_or(false, |r| r.clicked()) {
-        // TODO: Exit dialog
-        ui_state_windows.menu_open = false;
+        ui_state_windows.exit_open = !ui_state_windows.exit_open;
     }
 
     if !egui_context.ctx_mut().wants_keyboard_input() {
         egui_context.ctx_mut().input_mut(|input| {
-            if input.consume_key(egui::Modifiers::ALT, egui::Key::A) {
+            if input.consume_shortcut(&config.hotkeys.character) {
                 ui_state_windows.character_info_open = !ui_state_windows.character_info_open;
             }
 
-            if input.consume_key(egui::Modifiers::ALT, egui::Key::I)
-                || input.consume_key(egui::Modifiers::ALT, egui::Key::V)
-            {
+            if input.consume_shortcut(&config.hotkeys.inventory) {
                 ui_state_windows.inventory_open = !ui_state_windows.inventory_open;
             }
 
-            if input.consume_key(egui::Modifiers::ALT, egui::Key::N) {
+            if input.consume_shortcut(&config.hotkeys.clan) {
                 ui_state_windows.clan_open = !ui_state_windows.clan_open;
             }
 
-            if input.consume_key(egui::Modifiers::ALT, egui::Key::S) {
+            if input.consume_shortcut(&config.hotkeys.skills) {
                 ui_state_windows.skill_list_open = !ui_state_windows.skill_list_open;
             }
 
-            if input.consume_key(egui::Modifiers::ALT, egui::Key::Q) {
+            if input.consume_shortcut(&config.hotkeys.quests) {
                 ui_state_windows.quest_list_open = !ui_state_windows.quest_list_open;
             }
 
-            if input.consume_key(egui::Modifiers::ALT, egui::Key::O) {
+            if input.consume_shortcut(&config.hotkeys.settings) {
                 ui_state_windows.settings_open = !ui_state_windows.settings_open;
+            }
+
+            if input.consume_shortcut(&config.hotkeys.exit) {
+                ui_state_windows.exit_open = !ui_state_windows.exit_open;
             }
         });
     }

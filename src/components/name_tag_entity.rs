@@ -3,8 +3,9 @@ use bevy::{
     prelude::{despawn_with_children_recursive, Component, Deref, DerefMut, Entity, World},
 };
 use enum_map::Enum;
+use serde::{Deserialize, Serialize};
 
-#[derive(Copy, Clone, Enum)]
+#[derive(Deserialize, Serialize, Copy, Clone, Enum)]
 pub enum NameTagType {
     Character,
     Monster,
@@ -22,14 +23,14 @@ pub struct NameTagName;
 #[derive(Component)]
 pub struct NameTagTargetMark;
 
-#[derive(Component)]
+#[derive(Clone, Component)]
 pub struct NameTagHealthbarForeground {
     pub uv_min_x: f32,
     pub uv_max_x: f32,
     pub full_width: f32,
 }
 
-#[derive(Component)]
+#[derive(Clone, Component)]
 pub struct NameTagHealthbarBackground;
 
 #[derive(Component, Deref, DerefMut)]
