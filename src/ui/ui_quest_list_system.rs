@@ -10,7 +10,7 @@ use crate::{
     ui::{
         tooltips::{PlayerTooltipQuery, PlayerTooltipQueryItem},
         ui_add_item_tooltip,
-        widgets::{DataBindings, Dialog, DrawText, Widget},
+        widgets::{DataBindings, Dialog, Widget},
         DragAndDropId, DragAndDropSlot, UiSoundEvent, UiStateWindows,
     },
 };
@@ -131,7 +131,7 @@ pub fn ui_quest_list_system(
     let mut response_maximise_button = None;
     let is_minimised = ui_state.minimised;
     let current_scroll_index = ui_state.scroll_index;
-    
+
     egui::Window::new("Quest List")
         .frame(egui::Frame::none())
         .open(&mut ui_state_windows.quest_list_open)
@@ -161,13 +161,13 @@ pub fn ui_quest_list_system(
                             let item_height = 24.0;
                             let item_width = 174.0;
                             let y_offset = index as f32 * item_height;
-                            
+
                             // Allocate space for quest item at the correct position
                             let rect = egui::Rect::from_min_size(
                                 ui.min_rect().min + egui::vec2(0.0, y_offset),
-                                egui::vec2(item_width, item_height)
+                                egui::vec2(item_width, item_height),
                             );
-                            
+
                             let response = ui.allocate_rect(rect, egui::Sense::click());
 
                             if let Some(active_quest) = player_quest_state
@@ -181,14 +181,14 @@ pub fn ui_quest_list_system(
                                     game_data.quests.get_quest_data(active_quest.quest_id)
                                 {
                                     let text_pos = rect.min + egui::vec2(28.0, 4.0);
-                                    
+
                                     if selected {
                                         ui.painter().text(
                                             text_pos,
                                             egui::Align2::LEFT_TOP,
                                             quest_data.name,
                                             egui::FontId::default(),
-                                            egui::Color32::YELLOW
+                                            egui::Color32::YELLOW,
                                         );
                                     } else {
                                         ui.painter().text(
@@ -196,7 +196,7 @@ pub fn ui_quest_list_system(
                                             egui::Align2::LEFT_TOP,
                                             quest_data.name,
                                             egui::FontId::default(),
-                                            egui::Color32::WHITE
+                                            egui::Color32::WHITE,
                                         );
                                     }
                                 }

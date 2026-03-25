@@ -211,7 +211,13 @@ pub fn ui_player_info_system(
         }
     }
 
-    if response_menu_button.map_or(false, |r| r.clicked()) {
-        ui_state_windows.menu_open = !ui_state_windows.menu_open;
+    if let Some(response_menu_button) = response_menu_button {
+        if response_menu_button.clicked() {
+            ui_state_windows.menu_open = !ui_state_windows.menu_open;
+        }
+
+        if response_menu_button.clicked_elsewhere() {
+            ui_state_windows.menu_open = false;
+        }
     }
 }

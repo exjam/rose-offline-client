@@ -14,8 +14,9 @@ use crate::{
     animation::AnimationFrameEvent,
     audio::SpatialSound,
     components::{Command, DummyBoneOffset, PlayerCharacter, SoundCategory},
-    resources::{CurrentZone, GameData, SoundCache, SoundSettings},
+    resources::{CurrentZone, GameData, SoundCache},
     zone_loader::ZoneLoaderAsset,
+    Config,
 };
 
 #[derive(WorldQuery)]
@@ -44,12 +45,14 @@ pub fn animation_sound_system(
     asset_server: Res<AssetServer>,
     current_zone: Option<Res<CurrentZone>>,
     zone_loader_assets: Res<Assets<ZoneLoaderAsset>>,
-    sound_settings: Res<SoundSettings>,
+    config: Res<Config>,
     query_event_entity: Query<EventEntity>,
     query_target_entity: Query<TargetEntity>,
     query_global_transform: Query<&GlobalTransform>,
     sound_cache: Res<SoundCache>,
 ) {
+    let sound_settings = &config.sound;
+
     for event in animation_frame_events.iter() {
         let event_entity = if let Ok(event_entity) = query_event_entity.get(event.entity) {
             event_entity
@@ -294,40 +297,40 @@ pub fn animation_sound_system(
                         .and_then(|id| game_data.effect_database.get_effect(id))
                         .and_then(|projectile_effect_data| projectile_effect_data.fire_sound_id)
                 } else {
-                    event_entity
-                        .equipment
-                        .and_then(|equipment| {
-                            game_data
-                                .items
-                                .get_weapon_item(
-                                    equipment
-                                        .get_equipment_item(EquipmentIndex::Weapon)
-                                        .map(|weapon| weapon.item.item_number)
-                                        .unwrap_or(0),
-                                )
-                                .and_then(|weapon_item_data| {
-                                    match weapon_item_data.item_data.class {
-                                        ItemClass::Bow | ItemClass::Crossbow => {
-                                            Some(AmmoIndex::Arrow)
-                                        }
-                                        ItemClass::Gun | ItemClass::DualGuns => {
-                                            Some(AmmoIndex::Bullet)
-                                        }
-                                        ItemClass::Launcher => Some(AmmoIndex::Throw),
-                                        _ => None,
-                                    }
-                                    .and_then(|ammo_index| equipment.get_ammo_item(ammo_index))
-                                    .and_then(|ammo_item| {
-                                        game_data
-                                            .items
-                                            .get_material_item(ammo_item.item.item_number)
-                                    })
-                                    .and_then(|ammo_item_data| ammo_item_data.bullet_effect_id)
-                                    .or(weapon_item_data.bullet_effect_id)
-                                })
-                        })
-                        .and_then(|id| game_data.effect_database.get_effect(id))
-                        .and_then(|projectile_effect_data| projectile_effect_data.fire_sound_id)
+                    let get_sound_id = || -> Option<SoundId> {
+                        let equipment = event_entity.equipment?;
+                        let weapon_item_data = game_data.items.get_weapon_item(
+                            equipment
+                                .get_equipment_item(EquipmentIndex::Weapon)
+                                .map(|weapon| weapon.item.item_number)
+                                .unwrap_or(0),
+                        )?;
+
+                        if weapon_item_data.attack_fire_sound_id.is_some() {
+                            return weapon_item_data.attack_fire_sound_id;
+                        }
+
+                        let ammo_index = match weapon_item_data.item_data.class {
+                            ItemClass::Bow | ItemClass::Crossbow => Some(AmmoIndex::Arrow),
+                            ItemClass::Gun | ItemClass::DualGuns => Some(AmmoIndex::Bullet),
+                            ItemClass::Launcher => Some(AmmoIndex::Throw),
+                            _ => None,
+                        }?;
+
+                        let ammo_item = equipment.get_ammo_item(ammo_index)?;
+                        let ammo_item_data = game_data
+                            .items
+                            .get_material_item(ammo_item.item.item_number)?;
+                        let effect_id = ammo_item_data
+                            .bullet_effect_id
+                            .or(weapon_item_data.bullet_effect_id)?;
+                        let projectile_effect_data =
+                            game_data.effect_database.get_effect(effect_id)?;
+
+                        projectile_effect_data.fire_sound_id
+                    };
+
+                    get_sound_id()
                 };
 
                 if let Some(sound_data) =

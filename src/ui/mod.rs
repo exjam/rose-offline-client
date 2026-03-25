@@ -26,6 +26,7 @@ mod ui_debug_zone_lighting_system;
 mod ui_debug_zone_list_system;
 mod ui_debug_zone_time_system;
 mod ui_drag_and_drop_system;
+mod ui_exit_system;
 mod ui_game_menu_system;
 mod ui_hotbar_system;
 mod ui_inventory_system;
@@ -49,6 +50,7 @@ mod ui_skill_tree_system;
 mod ui_sound_event_system;
 mod ui_status_effects_system;
 mod ui_window_sound_system;
+mod ui_window_system;
 pub mod widgets;
 
 #[derive(Default, Resource)]
@@ -63,6 +65,7 @@ pub struct UiStateWindows {
     pub menu_open: bool,
     pub party_open: bool,
     pub party_options_open: bool,
+    pub exit_open: bool,
 
     // Below are only opened via in game events rather than directly
     pub bank_open: bool,
@@ -101,6 +104,7 @@ pub use ui_debug_zone_lighting_system::ui_debug_zone_lighting_system;
 pub use ui_debug_zone_list_system::ui_debug_zone_list_system;
 pub use ui_debug_zone_time_system::ui_debug_zone_time_system;
 pub use ui_drag_and_drop_system::{ui_drag_and_drop_system, UiStateDragAndDrop};
+pub use ui_exit_system::ui_exit_system;
 pub use ui_game_menu_system::ui_game_menu_system;
 pub use ui_hotbar_system::ui_hotbar_system;
 pub use ui_inventory_system::ui_inventory_system;
@@ -124,4 +128,5 @@ pub use ui_skill_tree_system::ui_skill_tree_system;
 pub use ui_sound_event_system::{ui_sound_event_system, UiSoundEvent};
 pub use ui_status_effects_system::ui_status_effects_system;
 pub use ui_window_sound_system::ui_window_sound_system;
+pub use ui_window_system::{init_window_system, ui_window_system};
 pub use widgets::DataBindings;

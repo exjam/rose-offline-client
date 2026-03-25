@@ -1,74 +1,72 @@
-use std::{num::NonZeroU16, sync::Arc};
+use std::num::NonZeroU16;
 
+use crate::{
+    components::{
+        ClientEntity, ClientEntityName, ModelHeight, NameTag, NameTagEntity,
+        NameTagHealthbarBackground, NameTagHealthbarForeground, NameTagName, NameTagTargetMark,
+        NameTagType, PartyInfo, PlayerCharacter,
+    },
+    events::{LoadZoneEvent, PartyEvent},
+    render::WorldUiRect,
+    resources::{
+        GameData, NameTagCache, NameTagData, NameTagPendingData, UiResources, UiSpriteSheetType,
+    },
+    systems::name_tag_visibility_system::{
+        can_show_full_name_tag, can_show_name_tag, HealthBarQueryItem,
+    },
+    Config,
+};
 use arrayvec::ArrayVec;
 use bevy::{
     ecs::query::WorldQuery,
     prelude::{
-        Assets, BuildChildren, Changed, Color, Commands, ComputedVisibility, DespawnRecursiveExt,
-        Entity, EventReader, GlobalTransform, Handle, Image, Local, Query, Res, ResMut, Transform,
-        Vec2, Vec3, Visibility, With, Without,
+        Assets, BuildChildren, Bundle, Changed, Color, Commands, ComputedVisibility,
+        DespawnRecursiveExt, Entity, EventReader, GlobalTransform, Image, Query, Res, ResMut,
+        Transform, Vec2, Vec3, Visibility, With, Without,
     },
     render::{
         render_resource::{Extent3d, TextureDimension, TextureFormat},
         texture::ImageSampler,
         view::NoFrustumCulling,
     },
-    utils::HashMap,
+    utils::default,
     window::PrimaryWindow,
 };
 use bevy_egui::{egui, EguiContexts};
-
 use rose_game_common::components::{Level, Npc, Team};
-
-use crate::{
-    components::{
-        ClientEntityName, ModelHeight, NameTag, NameTagEntity, NameTagHealthbarBackground,
-        NameTagHealthbarForeground, NameTagName, NameTagTargetMark, NameTagType, PlayerCharacter,
-    },
-    events::LoadZoneEvent,
-    render::WorldUiRect,
-    resources::{GameData, NameTagSettings, UiResources, UiSpriteSheetType},
-};
 
 const ORDER_HEALTH_BACKGROUND: u8 = 0;
 const ORDER_HEALTH_FOREGROUND: u8 = 1;
 const ORDER_NAME: u8 = 2;
 const ORDER_TARGET_MARK: u8 = 2;
-const MAX_NAME_ROWS: usize = 2;
-
-pub struct NameTagData {
-    pub image: Handle<Image>,
-    pub size: Vec2,
-    pub rects: ArrayVec<WorldUiRect, MAX_NAME_ROWS>,
-}
-
-pub struct NameTagPendingData {
-    pub galley: Arc<egui::Galley>,
-    pub colors: ArrayVec<Color, MAX_NAME_ROWS>,
-    pub name_tag_type: NameTagType,
-}
-
-#[derive(Default)]
-pub struct NameTagCache {
-    pub cache: HashMap<String, NameTagData>,
-    pub pending: HashMap<Entity, NameTagPendingData>,
-    pub pixels_per_point: f32,
-}
+pub const MAX_NAME_ROWS: usize = 2;
 
 #[derive(WorldQuery)]
 pub struct PlayerQuery<'w> {
+    entity: Entity,
     level: &'w Level,
     team: &'w Team,
+    party_info: Option<&'w PartyInfo>,
 }
 
 #[derive(WorldQuery)]
 pub struct NameTagObjectQuery<'w> {
     entity: Entity,
+    client_entity: &'w ClientEntity,
     name: &'w ClientEntityName,
     model_height: &'w ModelHeight,
     npc: Option<&'w Npc>,
     level: Option<&'w Level>,
     team: Option<&'w Team>,
+}
+
+#[derive(Bundle, Default)]
+struct NameTagBundle {
+    transform: Transform,
+    global_transform: GlobalTransform,
+    visibility: Visibility,
+    computed_visibility: ComputedVisibility,
+    no_frustum_culling: NoFrustumCulling,
 }
 
 pub fn get_monster_name_tag_color(
@@ -103,12 +101,13 @@ pub fn get_monster_name_tag_color(
 }
 
 fn create_pending_nametag(
-    name_tag_settings: &NameTagSettings,
     egui_context: &mut EguiContexts,
     object: &NameTagObjectQueryItem,
     player: Option<&PlayerQueryItem>,
     name_tag_type: NameTagType,
+    config: &Config,
 ) -> NameTagPendingData {
+    let name_tag_settings = &config.interface.name_tag_settings;
     let layout_job = match name_tag_type {
         NameTagType::Character => egui::epaint::text::LayoutJob::single_section(
             object.name.name.clone(),
@@ -384,7 +383,7 @@ fn create_nametag_data(
 
 pub fn name_tag_system(
     mut commands: Commands,
-    mut name_tag_cache: Local<NameTagCache>,
+    mut name_tag_cache: ResMut<NameTagCache>,
     query_add: Query<NameTagObjectQuery, Without<NameTagEntity>>,
     query_changed: Query<(Entity, Option<&NameTagEntity>), Changed<ClientEntityName>>,
     query_player: Query<PlayerQuery, With<PlayerCharacter>>,
@@ -395,8 +394,9 @@ pub fn name_tag_system(
     mut images: ResMut<Assets<Image>>,
     game_data: Res<GameData>,
     ui_resources: Res<UiResources>,
-    name_tag_settings: Res<NameTagSettings>,
     mut load_zone_events: EventReader<LoadZoneEvent>,
+    mut party_events: EventReader<PartyEvent>,
+    config: Res<Config>,
 ) {
     let player = query_player.get_single().ok();
     let pixels_per_point = egui_context.ctx_mut().pixels_per_point();
@@ -404,11 +404,7 @@ pub fn name_tag_system(
         return;
     };
 
-    if load_zone_events.iter().last().is_some()
-        || pixels_per_point != name_tag_cache.pixels_per_point
-    {
-        // When the zone changes, we flush all cached name tag textures to avoid leaking
-        // If pixels_per_point has changed then we need to regenerate name tags using new DPI
+    if name_tag_cache.dispose {
         for (entity, name_tag_entity) in query_nametags.iter() {
             commands.entity(entity).remove::<NameTagEntity>();
             commands.entity(name_tag_entity.0).despawn_recursive();
@@ -417,7 +413,26 @@ pub fn name_tag_system(
         name_tag_cache.cache.clear();
         name_tag_cache.pending.clear();
         name_tag_cache.pixels_per_point = pixels_per_point;
+
+        name_tag_cache.dispose = false;
         return;
+    }
+
+    for party_event in party_events.iter() {
+        match party_event {
+            PartyEvent::Created | PartyEvent::Joined | PartyEvent::Deleted => {
+                name_tag_cache.dispose = true;
+            }
+            _ => {}
+        }
+    }
+
+    if load_zone_events.iter().last().is_some()
+        || pixels_per_point != name_tag_cache.pixels_per_point
+    {
+        // When the zone changes, we flush all cached name tag textures to avoid leaking
+        // If pixels_per_point has changed then we need to regenerate name tags using new DPI
+        name_tag_cache.dispose = true;
     }
 
     for (entity, name_tag_entity) in query_changed.iter() {
@@ -474,11 +489,11 @@ pub fn name_tag_system(
             name_tag_cache.pending.insert(
                 object.entity,
                 create_pending_nametag(
-                    &name_tag_settings,
                     &mut egui_context,
                     &object,
                     player.as_ref(),
                     name_tag_type,
+                    &config,
                 ),
             );
             continue;
@@ -488,15 +503,24 @@ pub fn name_tag_system(
         let name_tag_entity = commands
             .spawn((
                 NameTag { name_tag_type },
-                if name_tag_settings.show_all[name_tag_type] {
-                    Visibility::Inherited
-                } else {
-                    Visibility::Hidden
+                NameTagBundle {
+                    visibility: if can_show_name_tag(
+                        player.as_ref().map(|player| player.entity),
+                        object.entity,
+                        name_tag_type,
+                        &config,
+                    ) {
+                        Visibility::Inherited
+                    } else {
+                        Visibility::Hidden
+                    },
+                    transform: Transform::from_translation(Vec3::new(
+                        0.0,
+                        object.model_height.height,
+                        0.0,
+                    )),
+                    ..default()
                 },
-                ComputedVisibility::default(),
-                Transform::from_translation(Vec3::new(0.0, object.model_height.height, 0.0)),
-                GlobalTransform::default(),
-                NoFrustumCulling,
             ))
             .id();
 
@@ -522,6 +546,7 @@ pub fn name_tag_system(
 
         let mut healthbar_fg_rect = None;
         let mut healthbar_bg_rect = None;
+
         let (health_foreground, health_background) = match name_tag_type {
             NameTagType::Character => (
                 ui_resources
@@ -639,15 +664,7 @@ pub fn name_tag_system(
 
         for rect in name_tag_data.rects.iter() {
             commands
-                .spawn((
-                    NameTagName,
-                    rect.clone(),
-                    Transform::default(),
-                    GlobalTransform::default(),
-                    Visibility::default(),
-                    ComputedVisibility::default(),
-                    NoFrustumCulling,
-                ))
+                .spawn((NameTagName, rect.clone(), NameTagBundle::default()))
                 .set_parent(name_tag_entity);
         }
 
@@ -656,43 +673,76 @@ pub fn name_tag_system(
                 .spawn((
                     NameTagTargetMark,
                     rect,
-                    Transform::default(),
-                    GlobalTransform::default(),
-                    Visibility::Hidden,
-                    ComputedVisibility::default(),
-                    NoFrustumCulling,
+                    NameTagBundle {
+                        visibility: Visibility::Hidden,
+                        ..default()
+                    },
                 ))
                 .set_parent(name_tag_entity);
         }
 
         if let Some(rect) = healthbar_bg_rect.take() {
+            let healthbar = NameTagHealthbarBackground;
+
             commands
                 .spawn((
-                    NameTagHealthbarBackground,
+                    healthbar.clone(),
                     rect,
-                    Transform::default(),
-                    GlobalTransform::default(),
-                    Visibility::Hidden,
-                    ComputedVisibility::default(),
-                    NoFrustumCulling,
+                    NameTagBundle {
+                        visibility: if can_show_full_name_tag(
+                            player.as_ref().map(|it| it.entity),
+                            player.as_ref().and_then(|it| it.party_info),
+                            object.entity,
+                            Some(object.client_entity),
+                            false,
+                            name_tag_type,
+                            Some(HealthBarQueryItem {
+                                foreground: None,
+                                background: Some(&healthbar),
+                            }),
+                            &config,
+                        ) {
+                            Visibility::Inherited
+                        } else {
+                            Visibility::Hidden
+                        },
+                        ..default()
+                    },
                 ))
                 .set_parent(name_tag_entity);
         }
 
         if let Some(rect) = healthbar_fg_rect.take() {
+            let healthbar = NameTagHealthbarForeground {
+                full_width: health_bar_size.x,
+                uv_min_x: health_bar_foreground_uv_x_bounds.0,
+                uv_max_x: health_bar_foreground_uv_x_bounds.1,
+            };
+
             commands
                 .spawn((
-                    NameTagHealthbarForeground {
-                        full_width: health_bar_size.x,
-                        uv_min_x: health_bar_foreground_uv_x_bounds.0,
-                        uv_max_x: health_bar_foreground_uv_x_bounds.1,
-                    },
+                    healthbar.clone(),
                     rect,
-                    Transform::default(),
-                    GlobalTransform::default(),
-                    Visibility::Hidden,
-                    ComputedVisibility::default(),
-                    NoFrustumCulling,
+                    NameTagBundle {
+                        visibility: if can_show_full_name_tag(
+                            player.as_ref().map(|it| it.entity),
+                            player.as_ref().and_then(|it| it.party_info),
+                            object.entity,
+                            Some(object.client_entity),
+                            false,
+                            name_tag_type,
+                            Some(HealthBarQueryItem {
+                                foreground: Some(&healthbar),
+                                background: None,
+                            }),
+                            &config,
+                        ) {
+                            Visibility::Inherited
+                        } else {
+                            Visibility::Hidden
+                        },
+                        ..default()
+                    },
                 ))
                 .set_parent(name_tag_entity);
         }
