@@ -34,13 +34,13 @@ jobs:
           command: build
           args: --release
       - name: 'Upload Artifact (Windows)'
-        if: matrix.os == 'windows-latest' && github.ref == 'refs/heads/main'
+        if: matrix.os == 'windows-latest'
         uses: actions/upload-artifact@v4
         with:
           name: rose-offline-client-${{ matrix.os }}
           path: target/release/rose-offline-client.exe
       - name: 'Upload Artifact (Ubuntu, MacOS)'
-        if: matrix.os != 'windows-latest' && github.ref == 'refs/heads/main'
+        if: matrix.os != 'windows-latest'
         uses: actions/upload-artifact@v4
         with:
           name: rose-offline-client-${{ matrix.os }}
