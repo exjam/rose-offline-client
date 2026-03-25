@@ -4,7 +4,8 @@ use rose_data::ZoneId;
 use crate::{
     audio::{AudioSource, GlobalSound},
     components::SoundCategory,
-    resources::{CurrentZone, GameData, SoundSettings, ZoneTime, ZoneTimeState},
+    resources::{CurrentZone, GameData, ZoneTime, ZoneTimeState},
+    Config,
 };
 
 #[derive(Default)]
@@ -31,8 +32,10 @@ pub fn background_music_system(
     current_zone: Option<Res<CurrentZone>>,
     game_data: Res<GameData>,
     zone_time: Res<ZoneTime>,
-    sound_settings: Res<SoundSettings>,
+    config: Res<Config>,
 ) {
+    let sound_settings = &config.sound;
+
     if let Some(current_zone) = current_zone {
         if background_music.zone != Some(current_zone.id) {
             if let Some(entity) = background_music.entity.take() {

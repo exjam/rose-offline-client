@@ -84,9 +84,7 @@ impl DrawWidget for RadioButton {
 
         if ui.is_rect_visible(rect) {
             let mut label_colour = egui::Color32::WHITE;
-            let sprite = if !enabled {
-                self.normal_sprite.as_ref()
-            } else if *selected == self.id || response.is_pointer_button_down_on() {
+            let sprite = if *selected == self.id || response.is_pointer_button_down_on() {
                 label_colour = egui::Color32::YELLOW;
                 self.down_sprite.as_ref()
             } else if response.hovered() || response.has_focus() {

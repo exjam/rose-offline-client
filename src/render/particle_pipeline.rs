@@ -581,7 +581,7 @@ fn batch_copy<T: Pod>(src: &[T], dst: &mut BufferVec<T>) {
     }
 }
 
-fn bind_buffer<T: Pod>(buffer: &BufferVec<T>, count: u64) -> BindingResource {
+fn bind_buffer<T: Pod>(buffer: &BufferVec<T>, count: u64) -> BindingResource<'_> {
     BindingResource::Buffer(BufferBinding {
         buffer: buffer.buffer().expect("missing buffer"),
         offset: 0,

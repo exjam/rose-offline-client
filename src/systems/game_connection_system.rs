@@ -7,7 +7,6 @@ use bevy::{
         Mut, NextState, Res, ResMut, State, Transform, Visibility, World,
     },
 };
-
 use rose_data::{
     AbilityType, EquipmentItem, Item, ItemReference, ItemSlotBehaviour, ItemType, SkillCooldown,
     StatusEffectType,
@@ -41,7 +40,8 @@ use crate::{
     },
     events::{
         BankEvent, ChatboxEvent, ClientEntityEvent, GameConnectionEvent, LoadZoneEvent,
-        MessageBoxEvent, PartyEvent, PersonalStoreEvent, QuestTriggerEvent, UseItemEvent,
+        MessageBoxEvent, PartyEvent, PersonalStoreEvent, PlayerCommandEvent, QuestTriggerEvent,
+        UseItemEvent,
     },
     resources::{AppState, ClientEntityList, GameConnection, GameData, WorldRates, WorldTime},
 };
@@ -137,6 +137,7 @@ pub fn game_connection_system(
     mut personal_store_events: EventWriter<PersonalStoreEvent>,
     mut quest_trigger_events: EventWriter<QuestTriggerEvent>,
     mut message_box_events: EventWriter<MessageBoxEvent>,
+    mut player_command_events: EventWriter<PlayerCommandEvent>,
 ) {
     let Some(game_connection) = game_connection else {
         return;
@@ -1089,39 +1090,12 @@ pub fn game_connection_system(
             }
             Ok(ServerMessage::PickupDropItem { drop_entity_id: _, item_slot, item }) => {
                 if let Some(player_entity) = client_entity_list.player_entity {
-                    if let Some(item_data) =
-                        game_data.items.get_base_item(item.get_item_reference())
-                    {
-                        chatbox_events.send(ChatboxEvent::System(format!(
-                            "You have earned {}.",
-                            item_data.name
-                        )));
-                    }
-
-                    commands.add(move |world: &mut World| {
-                        let mut player = world.entity_mut(player_entity);
-                        if let Some(mut inventory) = player.get_mut::<Inventory>() {
-                            if let Some(inventory_slot) = inventory.get_item_slot_mut(item_slot)
-                            {
-                                *inventory_slot = Some(item);
-                            }
-                        }
-                    });
+                    player_command_events.send(PlayerCommandEvent::PickupDropItem(item, player_entity, item_slot));
                 }
             }
             Ok(ServerMessage::PickupDropMoney { drop_entity_id: _, money }) => {
                 if let Some(player_entity) = client_entity_list.player_entity {
-                    chatbox_events.send(ChatboxEvent::System(format!(
-                        "You have earned {} Zuly.",
-                        money.0
-                    )));
-
-                    commands.add(move |world: &mut World| {
-                        let mut player = world.entity_mut(player_entity);
-                        if let Some(mut inventory) = player.get_mut::<Inventory>() {
-                            inventory.try_add_money(money).ok();
-                        }
-                    });
+                    player_command_events.send(PlayerCommandEvent::PickupDropMoney(money, player_entity));
                 }
             }
             Ok(ServerMessage::PickupDropError { drop_entity_id: _, error }) => match error{
@@ -1622,6 +1596,7 @@ pub fn game_connection_system(
                         owner: PartyOwner::Player,
                         ..Default::default()
                     });
+                    party_events.send(PartyEvent::Created);
                 }
             }
             Ok(ServerMessage::PartyAcceptInvite { .. }) => {
@@ -1630,6 +1605,7 @@ pub fn game_connection_system(
                         owner: PartyOwner::Unknown,
                         ..Default::default()
                     });
+                    party_events.send(PartyEvent::Created);
 
                     commands.add(move |world: &mut World| {
                         if let Some(player_entity_name) =
@@ -1713,6 +1689,7 @@ pub fn game_connection_system(
             }
             Ok(ServerMessage::PartyDelete) => {
                 if let Some(player_entity) = client_entity_list.player_entity {
+                    party_events.send(PartyEvent::Deleted);
                     commands.entity(player_entity).remove::<PartyInfo>();
                     chatbox_events.send(ChatboxEvent::System("You have left the party.".into()));
                 }
@@ -1727,13 +1704,17 @@ pub fn game_connection_system(
                     commands.add(move |world: &mut World| {
                         let mut player = world.entity_mut(player_entity);
 
-                        if !player.contains::<PartyInfo>() {
+                        let joined = if !player.contains::<PartyInfo>() {
                             player.insert(PartyInfo {
                                 item_sharing,
                                 xp_sharing,
                                 ..Default::default()
                             });
-                        }
+
+                            true
+                        } else {
+                            false
+                        };
 
                         let mut party_info = player.get_mut::<PartyInfo>().unwrap();
                         if matches!(party_info.owner, PartyOwner::Unknown) {
@@ -1750,6 +1731,12 @@ pub fn game_connection_system(
                         let mut chatbox_events = world.resource_mut::<Events<ChatboxEvent>>();
                         for message in messages {
                             chatbox_events.send(ChatboxEvent::System(message));
+                        }
+
+                        if joined {
+                            world
+                                .resource_mut::<Events<PartyEvent>>()
+                                .send(PartyEvent::Joined);
                         }
                     });
                 }
@@ -2306,13 +2293,11 @@ pub fn game_connection_system(
                 log::warn!("Received unimplemented ServerMessage::RepairedItemUsingNpc");
             }
             Ok(ServerMessage::LogoutSuccess) => {
-                log::warn!("Received unimplemented ServerMessage::LogoutSuccess");
+                commands.remove_resource::<GameConnection>();
+                break Ok(());
             }
             Ok(ServerMessage::LogoutFailed { .. }) => {
                 log::warn!("Received unimplemented ServerMessage::LogoutFailed");
-            }
-            Ok(ServerMessage::ReturnToCharacterSelect) => {
-                log::warn!("Received unimplemented ServerMessage::ReturnToCharacterSelect");
             }
             Ok(ServerMessage::LoginError { .. }) |
             Ok(ServerMessage::LoginSuccess { .. }) |
@@ -2328,7 +2313,8 @@ pub fn game_connection_system(
             Ok(ServerMessage::SelectCharacterError { .. }) |
             Ok(ServerMessage::DeleteCharacterStart { .. }) |
             Ok(ServerMessage::DeleteCharacterCancel { .. }) |
-            Ok(ServerMessage::DeleteCharacterError { .. }) => {
+            Ok(ServerMessage::DeleteCharacterError { .. }) |
+            Ok(ServerMessage::ReturnToCharacterSelect) => {
                 // These should only be login / world server packets, not game server
                 log::warn!("Received unexpected game server message");
             }
