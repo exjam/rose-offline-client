@@ -13,5 +13,17 @@ pub struct ServerListWorldServer {
 
 #[derive(Resource)]
 pub struct ServerList {
+    pub selected_server: Option<usize>,
+    pub selected_channel: Option<usize>,
     pub world_servers: Vec<ServerListWorldServer>,
+}
+
+impl From<Vec<ServerListWorldServer>> for ServerList {
+    fn from(value: Vec<ServerListWorldServer>) -> Self {
+        ServerList {
+            selected_server: None,
+            selected_channel: None,
+            world_servers: value,
+        }
+    }
 }

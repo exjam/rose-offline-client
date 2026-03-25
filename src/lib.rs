@@ -9,8 +9,8 @@ use bevy::{
     prelude::{
         apply_deferred, in_state, AddAsset, App, AssetServer, Assets, Camera, Camera3dBundle,
         Color, Commands, IntoSystemConfigs, IntoSystemSetConfigs, Msaa, OnEnter, OnExit,
-        PluginGroup, PostStartup, PostUpdate, PreUpdate, Quat, Res, ResMut, Startup, State,
-        SystemSet, Transform, Update, Vec3,
+        OnTransition, PluginGroup, PostStartup, PostUpdate, PreUpdate, Quat, Res, ResMut, Resource,
+        Startup, State, SystemSet, Transform, Update, Vec3,
     },
     render::{render_resource::WgpuFeatures, settings::WgpuSettings},
     transform::TransformSystem,
@@ -18,18 +18,19 @@ use bevy::{
 };
 use bevy_egui::{egui, EguiContexts, EguiSet};
 use bevy_rapier3d::plugin::PhysicsSet;
-use enum_map::enum_map;
+use enum_map::{enum_map, EnumMap};
 use exe_resource_loader::{ExeResourceCursor, ExeResourceLoader};
-use serde::Deserialize;
-use std::{
-    path::{Path, PathBuf},
-    sync::Arc,
-};
-
 use rose_data::{CharacterMotionDatabaseOptions, NpcDatabaseOptions, ZoneId};
 use rose_file_readers::{
     AruaVfsIndex, HostFilesystemDevice, IrosePhVfsIndex, LtbFile, StbFile, TitanVfsIndex, VfsIndex,
     VirtualFilesystem, VirtualFilesystemDevice, ZscFile,
+};
+use rose_game_common::components::{InventoryPageType, INVENTORY_PAGE_SIZE};
+use serde::{Deserialize, Serialize};
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+    sync::Arc,
 };
 
 pub mod animation;
@@ -63,9 +64,10 @@ use model_loader::ModelLoader;
 use render::{DamageDigitMaterial, RoseRenderPlugin};
 use resources::{
     load_ui_resources, run_network_thread, ui_requested_cursor_apply_system, update_ui_resources,
-    AppState, ClientEntityList, DamageDigitsSpawner, DebugRenderConfig, GameData, NameTagSettings,
-    NetworkThread, NetworkThreadMessage, RenderConfiguration, SelectedTarget, ServerConfiguration,
-    SoundCache, SoundSettings, SpecularTexture, VfsResource, WorldTime, ZoneTime,
+    AppState, AutoLogin, ClientEntityList, DamageDigitsSpawner, DebugRenderConfig, GameData,
+    HotkeysConfig, InterfaceConfig, NameTagCache, NetworkThread, NetworkThreadMessage,
+    RenderConfiguration, SelectedTarget, ServerConfiguration, SoundCache, SoundConfig,
+    SpecularTexture, VfsResource, WorldTime, ZoneTime,
 };
 use scripting::RoseScriptingPlugin;
 use systems::{
@@ -79,23 +81,23 @@ use systems::{
     debug_render_collider_system, debug_render_directional_light_system,
     debug_render_skeleton_system, directional_light_system, effect_system, facing_direction_system,
     free_camera_system, game_connection_system, game_mouse_input_system, game_state_enter_system,
-    game_zone_change_system, hit_event_system, item_drop_model_add_collider_system,
-    item_drop_model_system, login_connection_system, login_event_system, login_state_enter_system,
-    login_state_exit_system, login_system, model_viewer_enter_system, model_viewer_exit_system,
-    model_viewer_system, move_destination_effect_system, name_tag_system,
-    name_tag_update_color_system, name_tag_update_healthbar_system, name_tag_visibility_system,
-    network_thread_system, npc_idle_sound_system, npc_model_add_collider_system,
-    npc_model_update_system, orbit_camera_system, particle_sequence_system,
-    passive_recovery_system, pending_damage_system, pending_skill_effect_system,
-    personal_store_model_add_collider_system, personal_store_model_system, player_command_system,
-    projectile_system, quest_trigger_system, spawn_effect_system, spawn_projectile_system,
-    status_effect_system, system_func_event_system, update_position_system, use_item_event_system,
-    vehicle_model_system, vehicle_sound_system, visible_status_effects_system,
-    world_connection_system, world_time_system, zone_time_system, zone_viewer_enter_system,
-    DebugInspectorPlugin,
+    game_state_exit_system, game_zone_change_system, hit_event_system,
+    item_drop_model_add_collider_system, item_drop_model_system, login_connection_system,
+    login_event_system, login_state_enter_system, login_state_exit_system, login_system,
+    model_viewer_enter_system, model_viewer_exit_system, model_viewer_system,
+    move_destination_effect_system, name_tag_system, name_tag_update_color_system,
+    name_tag_update_healthbar_system, name_tag_visibility_system, network_thread_system,
+    npc_idle_sound_system, npc_model_add_collider_system, npc_model_update_system,
+    orbit_camera_system, particle_sequence_system, passive_recovery_system, pending_damage_system,
+    pending_skill_effect_system, personal_store_model_add_collider_system,
+    personal_store_model_system, player_command_system, projectile_system, quest_trigger_system,
+    sound_trigger_system, spawn_effect_system, spawn_projectile_system, status_effect_system,
+    system_func_event_system, update_position_system, use_item_event_system, vehicle_model_system,
+    vehicle_sound_system, visible_status_effects_system, world_connection_system,
+    world_time_system, zone_time_system, zone_viewer_enter_system, DebugInspectorPlugin,
 };
 use ui::{
-    load_dialog_sprites_system, ui_bank_system, ui_character_create_system,
+    init_window_system, load_dialog_sprites_system, ui_bank_system, ui_character_create_system,
     ui_character_info_system, ui_character_select_name_tag_system, ui_character_select_system,
     ui_chatbox_system, ui_clan_system, ui_create_clan_system, ui_debug_camera_info_system,
     ui_debug_client_entity_list_system, ui_debug_command_viewer_system,
@@ -103,29 +105,45 @@ use ui::{
     ui_debug_entity_inspector_system, ui_debug_item_list_system, ui_debug_menu_system,
     ui_debug_npc_list_system, ui_debug_physics_system, ui_debug_render_system,
     ui_debug_skill_list_system, ui_debug_zone_lighting_system, ui_debug_zone_list_system,
-    ui_debug_zone_time_system, ui_drag_and_drop_system, ui_game_menu_system, ui_hotbar_system,
-    ui_inventory_system, ui_item_drop_name_system, ui_login_system, ui_message_box_system,
-    ui_minimap_system, ui_npc_store_system, ui_number_input_dialog_system, ui_party_option_system,
-    ui_party_system, ui_personal_store_system, ui_player_info_system, ui_quest_list_system,
-    ui_respawn_system, ui_selected_target_system, ui_server_select_system, ui_settings_system,
-    ui_skill_list_system, ui_skill_tree_system, ui_sound_event_system, ui_status_effects_system,
-    ui_window_sound_system, widgets::Dialog, DialogLoader, UiSoundEvent, UiStateDebugWindows,
-    UiStateDragAndDrop, UiStateWindows,
+    ui_debug_zone_time_system, ui_drag_and_drop_system, ui_exit_system, ui_game_menu_system,
+    ui_hotbar_system, ui_inventory_system, ui_item_drop_name_system, ui_login_system,
+    ui_message_box_system, ui_minimap_system, ui_npc_store_system, ui_number_input_dialog_system,
+    ui_party_option_system, ui_party_system, ui_personal_store_system, ui_player_info_system,
+    ui_quest_list_system, ui_respawn_system, ui_selected_target_system, ui_server_select_system,
+    ui_settings_system, ui_skill_list_system, ui_skill_tree_system, ui_sound_event_system,
+    ui_status_effects_system, ui_window_sound_system, ui_window_system, widgets::Dialog,
+    DialogLoader, UiSoundEvent, UiStateDebugWindows, UiStateDragAndDrop, UiStateWindows,
 };
 use vfs_asset_io::VfsAssetIo;
 use zms_asset_loader::{ZmsAssetLoader, ZmsMaterialNumFaces, ZmsNoSkinAssetLoader};
 use zone_loader::{zone_loader_system, ZoneLoader, ZoneLoaderAsset};
 
-use crate::components::SoundCategory;
-
-#[derive(Default, Deserialize)]
+#[derive(Default, Deserialize, Serialize, Clone)]
 #[serde(default)]
 pub struct AccountConfig {
     pub username: String,
     pub password: String,
 }
 
-#[derive(Default, Deserialize)]
+#[derive(Deserialize, Serialize, Clone)]
+#[serde(default)]
+pub struct CharacterConfig {
+    slots: EnumMap<InventoryPageType, Vec<(InventoryPageType, usize)>>,
+}
+
+impl Default for CharacterConfig {
+    fn default() -> Self {
+        Self {
+            slots: enum_map! {
+                page_type => (0..INVENTORY_PAGE_SIZE)
+                .map(|index| (page_type, index))
+                .collect(),
+            },
+        }
+    }
+}
+
+#[derive(Default, Deserialize, Serialize, Clone)]
 #[serde(default)]
 pub struct AutoLoginConfig {
     pub enabled: bool,
@@ -134,7 +152,7 @@ pub struct AutoLoginConfig {
     pub character_name: Option<String>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize, Clone)]
 #[serde(tag = "type", content = "path")]
 pub enum FilesystemDeviceConfig {
     #[serde(rename = "vfs")]
@@ -149,9 +167,11 @@ pub enum FilesystemDeviceConfig {
     IrosePh(String),
 }
 
-#[derive(Default, Deserialize)]
+#[derive(Default, Deserialize, Serialize, Clone)]
 #[serde(default)]
 pub struct FilesystemConfig {
+    #[serde(skip)]
+    pub config_path: String,
     pub devices: Vec<FilesystemDeviceConfig>,
 }
 
@@ -240,7 +260,7 @@ impl FilesystemConfig {
     }
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize, Clone)]
 #[serde(default)]
 pub struct ServerConfig {
     pub ip: String,
@@ -256,7 +276,7 @@ impl Default for ServerConfig {
     }
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize, Clone)]
 #[serde(default)]
 pub struct GameConfig {
     pub data_version: String,
@@ -274,7 +294,7 @@ impl Default for GameConfig {
     }
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize, Clone, PartialEq)]
 #[serde(tag = "type")]
 pub enum GraphicsModeConfig {
     #[serde(rename = "window")]
@@ -283,9 +303,11 @@ pub enum GraphicsModeConfig {
     Fullscreen,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize, Clone)]
 #[serde(default)]
 pub struct GraphicsConfig {
+    #[serde(skip)]
+    pub resolutions: Vec<(u32, u32)>,
     pub mode: GraphicsModeConfig,
     pub passthrough_terrain_textures: bool,
     pub trail_effect_duration_multiplier: f32,
@@ -295,6 +317,7 @@ pub struct GraphicsConfig {
 impl Default for GraphicsConfig {
     fn default() -> Self {
         Self {
+            resolutions: Vec::default(),
             mode: GraphicsModeConfig::Window {
                 width: 1920.0,
                 height: 1080.0,
@@ -306,60 +329,33 @@ impl Default for GraphicsConfig {
     }
 }
 
-#[derive(Deserialize)]
-#[serde(default)]
-pub struct SoundVolumeConfig {
-    pub global: f32,
-    pub background_music: f32,
-    pub player_footstep: f32,
-    pub player_combat: f32,
-    pub other_footstep: f32,
-    pub other_combat: f32,
-    pub npc_sounds: f32,
-    pub ui_sounds: f32,
-}
-
-impl Default for SoundVolumeConfig {
-    fn default() -> Self {
-        Self {
-            global: 0.6,
-            background_music: 0.15,
-            player_footstep: 0.9,
-            player_combat: 1.0,
-            other_footstep: 0.5,
-            other_combat: 0.5,
-            npc_sounds: 0.6,
-            ui_sounds: 0.5,
-        }
-    }
-}
-
-#[derive(Deserialize)]
-#[serde(default)]
-pub struct SoundConfig {
-    pub enabled: bool,
-    pub volume: SoundVolumeConfig,
-}
-
-impl Default for SoundConfig {
-    fn default() -> Self {
-        Self {
-            enabled: true,
-            volume: SoundVolumeConfig::default(),
-        }
-    }
-}
-
-#[derive(Default, Deserialize)]
+#[derive(Default, Deserialize, Serialize, Resource, Clone)]
 #[serde(default)]
 pub struct Config {
     pub account: AccountConfig,
+    pub character: HashMap<String, CharacterConfig>,
     pub auto_login: AutoLoginConfig,
     pub filesystem: FilesystemConfig,
     pub game: GameConfig,
     pub graphics: GraphicsConfig,
     pub server: ServerConfig,
     pub sound: SoundConfig,
+    pub interface: InterfaceConfig,
+    pub hotkeys: HotkeysConfig,
+}
+
+impl Config {
+    pub fn get_inventory_slots(
+        &mut self,
+        username: String,
+        page: InventoryPageType,
+    ) -> &mut Vec<(InventoryPageType, usize)> {
+        &mut self
+            .character
+            .entry(username)
+            .or_insert_with(|| CharacterConfig::default())
+            .slots[page]
+    }
 }
 
 pub fn load_config(path: &Path) -> Config {
@@ -388,6 +384,23 @@ pub fn load_config(path: &Path) -> Config {
             );
             Config::default()
         }
+    }
+}
+
+pub fn save_config(config: &Config, path: &Path) {
+    let toml_string = match toml::to_string(config) {
+        Ok(toml_string) => toml_string,
+        Err(error) => {
+            println!("Failed to serialize configuration with error: {}", error);
+            return;
+        }
+    };
+
+    if let Err(error) = std::fs::write(path, &toml_string) {
+        println!(
+            "Failed to write configuration from {} with error: {}",
+            toml_string, error,
+        );
     }
 }
 
@@ -555,30 +568,26 @@ fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsC
             port: format!("{}", config.server.port),
             preset_username: Some(config.account.username.clone()),
             preset_password: Some(config.account.password.clone()),
-            preset_server_id: config.auto_login.server_id,
-            preset_channel_id: config.auto_login.channel_id,
-            preset_character_name: config.auto_login.character_name.clone(),
-            auto_login: config.auto_login.enabled,
         })
-        .insert_resource(SoundSettings {
-            enabled: config.sound.enabled,
-            global_gain: config.sound.volume.global,
-            gains: enum_map! {
-                SoundCategory::BackgroundMusic => config.sound.volume.background_music,
-                SoundCategory::PlayerFootstep => config.sound.volume.player_footstep,
-                SoundCategory::PlayerCombat => config.sound.volume.player_combat,
-                SoundCategory::OtherFootstep => config.sound.volume.other_footstep,
-                SoundCategory::OtherCombat => config.sound.volume.other_combat,
-                SoundCategory::NpcSounds => config.sound.volume.npc_sounds,
-                SoundCategory::Ui => config.sound.volume.ui_sounds,
-            },
-        })
+        .insert_resource(config.clone())
+        .add_systems(Startup, init_window_system)
+        .add_systems(Update, ui_window_system)
         .add_plugins((
             RoseAnimationPlugin,
             RoseRenderPlugin,
             RoseScriptingPlugin,
             DebugInspectorPlugin,
         ));
+
+    if config.auto_login.enabled {
+        app.insert_resource(AutoLogin {
+            preset_username: Some(config.account.username.clone()),
+            preset_password: Some(config.account.password.clone()),
+            preset_server_id: config.auto_login.server_id,
+            preset_channel_id: config.auto_login.channel_id,
+            preset_character_name: config.auto_login.character_name.clone(),
+        });
+    }
 
     // Setup state
     app.add_state::<AppState>()
@@ -624,7 +633,8 @@ fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsC
         Update,
         (free_camera_system, orbit_camera_system).in_set(GameSystemSets::UpdateCamera),
     );
-    app.add_systems(
+
+    app.insert_resource(NameTagCache::default()).add_systems(
         Update,
         (
             (
@@ -705,6 +715,7 @@ fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsC
         (
             ui_window_sound_system.before(ui_sound_event_system),
             ui_sound_event_system,
+            ui_exit_system,
         )
             .after(UiSystemSets::UiLast),
     );
@@ -785,6 +796,11 @@ fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsC
             .before(EguiSet::ProcessOutput), // model_viewer_system renders UI so must be before egui
     );
 
+    app.add_systems(
+        Update,
+        ui_settings_system.run_if(in_state(AppState::ModelViewer)),
+    );
+
     // Game Login
     app.add_systems(OnEnter(AppState::GameLogin), login_state_enter_system)
         .add_systems(OnExit(AppState::GameLogin), login_state_exit_system);
@@ -846,10 +862,24 @@ fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsC
         .init_resource::<DebugRenderConfig>()
         .init_resource::<WorldTime>()
         .init_resource::<ZoneTime>()
-        .init_resource::<SelectedTarget>()
-        .init_resource::<NameTagSettings>();
+        .init_resource::<SelectedTarget>();
 
-    app.add_systems(OnEnter(AppState::Game), game_state_enter_system);
+    app.add_systems(OnEnter(AppState::Game), game_state_enter_system)
+        // Don't run exit when transitioning from model or zone viewer
+        .add_systems(
+            OnTransition {
+                from: AppState::Game,
+                to: AppState::GameLogin,
+            },
+            game_state_exit_system,
+        )
+        .add_systems(
+            OnTransition {
+                from: AppState::Game,
+                to: AppState::GameCharacterSelect,
+            },
+            game_state_exit_system,
+        );
 
     app.add_systems(
         Update,
@@ -874,6 +904,7 @@ fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsC
             passive_recovery_system,
             quest_trigger_system,
             game_mouse_input_system.after(GameSystemSets::Ui),
+            sound_trigger_system,
         )
             .run_if(in_state(AppState::Game)),
     );

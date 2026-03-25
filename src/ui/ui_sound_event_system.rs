@@ -5,7 +5,8 @@ use rose_data::SoundId;
 use crate::{
     audio::GlobalSound,
     components::SoundCategory,
-    resources::{GameData, SoundCache, SoundSettings},
+    resources::{GameData, SoundCache},
+    Config,
 };
 
 #[derive(Event)]
@@ -23,7 +24,7 @@ pub fn ui_sound_event_system(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     mut ui_sound_events: EventReader<UiSoundEvent>,
-    sound_settings: Res<SoundSettings>,
+    config: Res<Config>,
     game_data: Res<GameData>,
     sound_cache: ResMut<SoundCache>,
 ) {
@@ -31,7 +32,7 @@ pub fn ui_sound_event_system(
         if let Some(sound_data) = game_data.sounds.get_sound(event.sound_id) {
             commands.spawn((
                 SoundCategory::Ui,
-                sound_settings.gain(SoundCategory::Ui),
+                config.sound.gain(SoundCategory::Ui),
                 GlobalSound::new(sound_cache.load(sound_data, &asset_server)),
             ));
         }

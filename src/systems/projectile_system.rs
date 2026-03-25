@@ -100,8 +100,13 @@ pub fn projectile_system(
             {
                 if let Some(skill_id) = projectile.skill_id {
                     hit_events.send(
-                        HitEvent::with_skill_damage(projectile.source, target_entity, skill_id)
-                            .apply_damage(projectile.apply_damage),
+                        HitEvent::with_skill_damage(
+                            projectile.source,
+                            target_entity,
+                            skill_id,
+                            projectile.sound_id,
+                        )
+                        .apply_damage(projectile.apply_damage),
                     );
                 } else {
                     hit_events.send(
@@ -109,6 +114,7 @@ pub fn projectile_system(
                             projectile.source,
                             target_entity,
                             projectile.effect_id,
+                            projectile.sound_id,
                         )
                         .apply_damage(projectile.apply_damage),
                     );

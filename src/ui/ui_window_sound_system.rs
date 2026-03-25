@@ -88,4 +88,9 @@ pub fn ui_window_sound_system(
         next.create_clan_open,
         &ui_resources.dialog_create_clan,
     );
+    play_dialog_sound(
+        &mut state.exit_open,
+        next.exit_open,
+        &ui_resources.dialog_exit,
+    );
 }
