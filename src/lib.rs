@@ -358,7 +358,7 @@ impl Config {
     }
 }
 
-pub fn load_config(path: &Path) -> Config {
+pub fn load_config(path: &PathBuf) -> Config {
     let toml_str = match std::fs::read_to_string(path) {
         Ok(toml_str) => toml_str,
         Err(error) => {

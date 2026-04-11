@@ -1,9 +1,17 @@
-use std::path::Path;
-
+use directories::ProjectDirs;
+use lazy_static::lazy_static;
 use rose_data::ZoneId;
 use rose_offline_client::{
     load_config, run_game, run_model_viewer, run_zone_viewer, FilesystemDeviceConfig, SystemsConfig,
 };
+use std::path::{Path, PathBuf};
+
+lazy_static! {
+    pub static ref LOCAL_STORAGE_DIR: PathBuf = {
+        let project = ProjectDirs::from("", "", "rose-offline-client").unwrap();
+        PathBuf::from(project.data_local_dir())
+    };
+}
 
 fn main() {
     let command = clap::Command::new("rose-offline-client")
@@ -145,9 +153,23 @@ fn main() {
         );
     let matches = command.get_matches();
 
-    let config_path = matches.value_of("config").unwrap_or("./config.toml");
-    let mut config = load_config(Path::new(config_path));
-    config.filesystem.config_path = String::from(config_path);
+    let result = std::fs::create_dir_all(LOCAL_STORAGE_DIR.as_path());
+    if let Err(error) = result {
+        log::warn!(
+            "Failed to create storage directory {}\n{}",
+            LOCAL_STORAGE_DIR.to_string_lossy(),
+            error
+        )
+    };
+
+    let config_path = matches
+        .value_of("config")
+        .map_or(LOCAL_STORAGE_DIR.join("config.toml"), |path| {
+            PathBuf::from(path)
+        });
+
+    let mut config = load_config(&config_path);
+    config.filesystem.config_path = String::from(config_path.to_string_lossy());
 
     if let Some(ip) = matches.value_of("ip") {
         config.server.ip = ip.into();
