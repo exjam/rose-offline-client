@@ -1,3 +1,6 @@
+use crate::components::{
+    COLLISION_FILTER_COLLIDABLE, COLLISION_FILTER_MOVEABLE, COLLISION_GROUP_PHYSICS_TOY,
+};
 use bevy::{
     input::{
         mouse::{MouseMotion, MouseScrollUnit, MouseWheel},
@@ -16,10 +19,7 @@ use bevy_rapier3d::{
     prelude::{Collider, CollisionGroups, QueryFilter},
 };
 use dolly::prelude::{Arm, CameraRig, LeftHanded, Position, Smooth, YawPitch};
-
-use crate::components::{
-    COLLISION_FILTER_COLLIDABLE, COLLISION_FILTER_MOVEABLE, COLLISION_GROUP_PHYSICS_TOY,
-};
+use glam::EulerRot;
 
 #[derive(Component)]
 pub struct OrbitCamera {
@@ -46,8 +46,8 @@ impl OrbitCamera {
             follow_entity,
             follow_offset,
             follow_distance,
-            min_distance: 1.0,
-            max_distance: 1000.0,
+            min_distance: 3.0,
+            max_distance: 50.0,
             current_distance: Default::default(),
         }
     }
@@ -56,7 +56,6 @@ impl OrbitCamera {
 #[derive(Default)]
 pub struct CameraControlState {
     pub is_dragging: bool,
-    pub saved_cursor_position: Option<Vec2>,
 }
 
 pub fn orbit_camera_system(
@@ -79,13 +78,7 @@ pub fn orbit_camera_system(
         (a, b)
     } else {
         if control_state.is_dragging {
-            // Restore cursor state
-            if let Some(saved_cursor_position) = control_state.saved_cursor_position.take() {
-                window.set_cursor_position(Some(saved_cursor_position));
-            }
-
             window.cursor.grab_mode = CursorGrabMode::None;
-            window.cursor.visible = true;
             control_state.is_dragging = false;
         }
 
@@ -119,21 +112,14 @@ pub fn orbit_camera_system(
             }
 
             if !control_state.is_dragging {
-                window.cursor.grab_mode = CursorGrabMode::Locked;
-                window.cursor.visible = false;
-                control_state.saved_cursor_position = window.cursor_position();
+                window.cursor.grab_mode = CursorGrabMode::Confined;
             }
         }
 
         control_state.is_dragging = true;
     } else {
         if control_state.is_dragging {
-            if let Some(saved_cursor_position) = control_state.saved_cursor_position.take() {
-                window.set_cursor_position(Some(saved_cursor_position));
-            }
-
             window.cursor.grab_mode = CursorGrabMode::None;
-            window.cursor.visible = true;
         }
 
         control_state.is_dragging = false;
@@ -175,11 +161,17 @@ pub fn orbit_camera_system(
 
     // Rotate with mouse drag
     if right_pressed {
-        let sensitivity = 0.1;
+        let sensitivity = 0.3;
+        // Moving too fast causes a "bounce"
+        let max_degrees = 1000.0 * time.delta_seconds();
+
+        let degrees_x = (-sensitivity * drag_delta.x).clamp(-max_degrees, max_degrees);
+        let degrees_y = (-sensitivity * drag_delta.y).clamp(-max_degrees, max_degrees);
+
         orbit_camera
             .rig
             .driver_mut::<YawPitch>()
-            .rotate_yaw_pitch(-sensitivity * drag_delta.x, -sensitivity * drag_delta.y);
+            .rotate_yaw_pitch(degrees_x, degrees_y);
     }
 
     // Adjust zoom with mouse wheel
@@ -203,10 +195,15 @@ pub fn orbit_camera_system(
         orbit_camera.rig.driver_mut::<Arm>().offset.z = arm_distance;
     }
 
+    // Prevent camera roll
+    let (_, _, roll) = camera_transform.rotation.to_euler(EulerRot::YXZ);
+
     // Update camera
     let calculated_transform = orbit_camera.rig.update(time.delta_seconds());
+    let (yaw, pitch, _) = calculated_transform.rotation.to_euler(EulerRot::YXZ);
+
     camera_transform.translation = calculated_transform.position;
-    camera_transform.rotation = calculated_transform.rotation;
+    camera_transform.rotation = Quat::from_euler(EulerRot::YXZ, yaw, pitch, roll);
 }
 
 pub trait Interpolate {
