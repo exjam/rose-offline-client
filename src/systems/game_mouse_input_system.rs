@@ -109,7 +109,16 @@ pub fn game_mouse_input_system(
                             ui_requested_cursor.world_cursor = UiCursorType::User
                         }
                         ClientEntityType::Monster => {
-                            ui_requested_cursor.world_cursor = UiCursorType::Attack
+                            let is_ally = match hit_team {
+                                Some(hit_team) => hit_team.id == player.team.id,
+                                None => false,
+                            };
+
+                            if is_ally {
+                                ui_requested_cursor.world_cursor = UiCursorType::Npc
+                            } else {
+                                ui_requested_cursor.world_cursor = UiCursorType::Attack
+                            }
                         }
                         ClientEntityType::Npc => {
                             ui_requested_cursor.world_cursor = UiCursorType::Npc
