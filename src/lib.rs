@@ -49,6 +49,7 @@ pub mod zms_asset_loader;
 pub mod zone_loader;
 
 use audio::OddioPlugin;
+use components::SoundCategory;
 use events::{
     BankEvent, CharacterSelectEvent, ChatboxEvent, ClanDialogEvent, ClientEntityEvent,
     ConversationDialogEvent, GameConnectionEvent, HitEvent, LoadZoneEvent, LoginEvent,
