@@ -61,10 +61,10 @@ use model_loader::ModelLoader;
 use render::{DamageDigitMaterial, RoseRenderPlugin};
 use resources::{
     load_ui_resources, run_network_thread, ui_requested_cursor_apply_system, update_ui_resources,
-    AppState, ClientEntityList, DamageDigitsSpawner, DebugRenderConfig, GameData, InterfaceConfig,
-    NameTagCache, NetworkThread, NetworkThreadMessage, RenderConfiguration, SelectedTarget,
-    ServerConfiguration, SoundCache, SoundConfig, SpecularTexture, VfsResource, WorldTime,
-    ZoneTime,
+    AppState, ClientEntityList, DamageDigitsSpawner, DebugRenderConfig, GameData, HotkeysConfig,
+    InterfaceConfig, NameTagCache, NetworkThread, NetworkThreadMessage, RenderConfiguration,
+    SelectedTarget, ServerConfiguration, SoundCache, SoundConfig, SpecularTexture, VfsResource,
+    WorldTime, ZoneTime,
 };
 use scripting::RoseScriptingPlugin;
 use systems::{
@@ -316,6 +316,7 @@ pub struct Config {
     pub server: ServerConfig,
     pub sound: SoundConfig,
     pub interface: InterfaceConfig,
+    pub hotkeys: HotkeysConfig,
 }
 
 pub fn load_config(path: &PathBuf) -> Config {
