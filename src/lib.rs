@@ -61,9 +61,10 @@ use model_loader::ModelLoader;
 use render::{DamageDigitMaterial, RoseRenderPlugin};
 use resources::{
     load_ui_resources, run_network_thread, ui_requested_cursor_apply_system, update_ui_resources,
-    AppState, ClientEntityList, DamageDigitsSpawner, DebugRenderConfig, GameData, NameTagSettings,
-    NetworkThread, NetworkThreadMessage, RenderConfiguration, SelectedTarget, ServerConfiguration,
-    SoundCache, SoundConfig, SpecularTexture, VfsResource, WorldTime, ZoneTime,
+    AppState, ClientEntityList, DamageDigitsSpawner, DebugRenderConfig, GameData, InterfaceConfig,
+    NameTagCache, NetworkThread, NetworkThreadMessage, RenderConfiguration, SelectedTarget,
+    ServerConfiguration, SoundCache, SoundConfig, SpecularTexture, VfsResource, WorldTime,
+    ZoneTime,
 };
 use scripting::RoseScriptingPlugin;
 use systems::{
@@ -314,6 +315,7 @@ pub struct Config {
     pub graphics: GraphicsConfig,
     pub server: ServerConfig,
     pub sound: SoundConfig,
+    pub interface: InterfaceConfig,
 }
 
 pub fn load_config(path: &PathBuf) -> Config {
@@ -583,7 +585,7 @@ fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsC
         Update,
         (free_camera_system, orbit_camera_system).in_set(GameSystemSets::UpdateCamera),
     );
-    app.add_systems(
+    app.insert_resource(NameTagCache::default()).add_systems(
         Update,
         (
             (
@@ -744,6 +746,11 @@ fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsC
             .before(EguiSet::ProcessOutput), // model_viewer_system renders UI so must be before egui
     );
 
+    app.add_systems(
+        Update,
+        ui_settings_system.run_if(in_state(AppState::ModelViewer)),
+    );
+
     // Game Login
     app.add_systems(OnEnter(AppState::GameLogin), login_state_enter_system)
         .add_systems(OnExit(AppState::GameLogin), login_state_exit_system);
@@ -805,8 +812,7 @@ fn run_client(config: &Config, app_state: AppState, mut systems_config: SystemsC
         .init_resource::<DebugRenderConfig>()
         .init_resource::<WorldTime>()
         .init_resource::<ZoneTime>()
-        .init_resource::<SelectedTarget>()
-        .init_resource::<NameTagSettings>();
+        .init_resource::<SelectedTarget>();
 
     app.add_systems(OnEnter(AppState::Game), game_state_enter_system);
 
