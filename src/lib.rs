@@ -18,14 +18,17 @@ use bevy::{
 };
 use bevy_egui::{egui, EguiContexts, EguiSet};
 use bevy_rapier3d::plugin::PhysicsSet;
+use enum_map::{enum_map, EnumMap};
 use exe_resource_loader::{ExeResourceCursor, ExeResourceLoader};
 use rose_data::{CharacterMotionDatabaseOptions, NpcDatabaseOptions, ZoneId};
 use rose_file_readers::{
     AruaVfsIndex, HostFilesystemDevice, IrosePhVfsIndex, LtbFile, StbFile, TitanVfsIndex, VfsIndex,
     VirtualFilesystem, VirtualFilesystemDevice, ZscFile,
 };
+use rose_game_common::components::{InventoryPageType, INVENTORY_PAGE_SIZE};
 use serde::{Deserialize, Serialize};
 use std::{
+    collections::HashMap,
     path::{Path, PathBuf},
     sync::Arc,
 };
@@ -120,6 +123,24 @@ use zone_loader::{zone_loader_system, ZoneLoader, ZoneLoaderAsset};
 pub struct AccountConfig {
     pub username: String,
     pub password: String,
+}
+
+#[derive(Deserialize, Serialize, Clone)]
+#[serde(default)]
+pub struct CharacterConfig {
+    slots: EnumMap<InventoryPageType, Vec<(InventoryPageType, usize)>>,
+}
+
+impl Default for CharacterConfig {
+    fn default() -> Self {
+        Self {
+            slots: enum_map! {
+                page_type => (0..INVENTORY_PAGE_SIZE)
+                .map(|index| (page_type, index))
+                .collect(),
+            },
+        }
+    }
 }
 
 #[derive(Default, Deserialize, Serialize, Clone)]
@@ -312,6 +333,7 @@ impl Default for GraphicsConfig {
 #[serde(default)]
 pub struct Config {
     pub account: AccountConfig,
+    pub character: HashMap<String, CharacterConfig>,
     pub auto_login: AutoLoginConfig,
     pub filesystem: FilesystemConfig,
     pub game: GameConfig,
@@ -320,6 +342,20 @@ pub struct Config {
     pub sound: SoundConfig,
     pub interface: InterfaceConfig,
     pub hotkeys: HotkeysConfig,
+}
+
+impl Config {
+    pub fn get_inventory_slots(
+        &mut self,
+        username: String,
+        page: InventoryPageType,
+    ) -> &mut Vec<(InventoryPageType, usize)> {
+        &mut self
+            .character
+            .entry(username)
+            .or_insert_with(|| CharacterConfig::default())
+            .slots[page]
+    }
 }
 
 pub fn load_config(path: &PathBuf) -> Config {
