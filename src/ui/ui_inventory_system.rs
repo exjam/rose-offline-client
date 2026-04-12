@@ -52,6 +52,7 @@ pub struct UiStateInventory {
     current_vehicle_tab: i32,
     current_inventory_tab: i32,
     minimised: bool,
+    config_changed: bool,
 }
 
 impl Default for UiStateInventory {
@@ -62,6 +63,7 @@ impl Default for UiStateInventory {
             current_vehicle_tab: IID_TAB_INVEN_PAT,
             current_inventory_tab: IID_TAB_INVEN_EQUIP,
             minimised: false,
+            config_changed: false,
         }
     }
 }
@@ -217,6 +219,7 @@ fn ui_add_inventory_slot(
     player_tooltip_data: Option<&PlayerTooltipQueryItem>,
     game_data: &GameData,
     ui_resources: &UiResources,
+    config_changed: &mut bool,
     ui_state_dnd: &mut UiStateDragAndDrop,
     player_command_events: &mut EventWriter<PlayerCommandEvent>,
     config: &mut Config,
@@ -437,12 +440,11 @@ fn ui_add_inventory_slot(
             let destination_index = inventory_map
                 .iter()
                 .position(|slot| slot == &(page_b, slot_b));
+
             if let (Some(source_index), Some(destination_index)) = (source_index, destination_index)
             {
                 inventory_map.swap(source_index, destination_index);
-
-                let path = config.filesystem.config_path.clone();
-                save_config(config, Path::new(&path));
+                *config_changed = true;
             }
         }
     }
@@ -549,6 +551,7 @@ pub fn ui_inventory_system(
                                         player_tooltip_data.as_ref(),
                                         &game_data,
                                         &ui_resources,
+                                        &mut ui_state_inventory.config_changed,
                                         &mut ui_state_dnd,
                                         &mut player_command_events,
                                         &mut config,
@@ -580,6 +583,7 @@ pub fn ui_inventory_system(
                                         player_tooltip_data.as_ref(),
                                         &game_data,
                                         &ui_resources,
+                                        &mut ui_state_inventory.config_changed,
                                         &mut ui_state_dnd,
                                         &mut player_command_events,
                                         &mut config,
@@ -617,6 +621,7 @@ pub fn ui_inventory_system(
                                 player_tooltip_data.as_ref(),
                                 &game_data,
                                 &ui_resources,
+                                &mut ui_state_inventory.config_changed,
                                 &mut ui_state_dnd,
                                 &mut player_command_events,
                                 &mut config,
@@ -641,6 +646,13 @@ pub fn ui_inventory_system(
                 },
             );
         });
+
+    if !ui_state_windows.inventory_open && ui_state_inventory.config_changed {
+        let path = config.filesystem.config_path.clone();
+        save_config(&config, Path::new(&path));
+
+        ui_state_inventory.config_changed = false;
+    }
 
     if response_close_button.map_or(false, |r| r.clicked()) {
         ui_state_windows.inventory_open = false;
