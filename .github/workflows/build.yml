@@ -1,6 +1,13 @@
-on: [push, pull_request]
-
 name: Build
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+on:
+  push:
+    branches: [main]
+  pull_request: {}
 
 jobs:
   release:
@@ -14,7 +21,7 @@ jobs:
           - windows-latest
     steps:
       - name: 'Checkout'
-        uses: actions/checkout@v2
+        uses: actions/checkout@v6
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
