@@ -13,7 +13,7 @@ use bevy::{
 use bevy_egui::{egui, EguiContexts};
 use bevy_rapier3d::prelude::{CollisionGroups, QueryFilter, RapierContext};
 
-use rose_data::{CharacterMotionAction, ZoneId};
+use rose_data::{CharacterMotionAction, EquipmentIndex, ZoneId};
 use rose_game_common::messages::{client::ClientMessage, server::CreateCharacterError};
 
 use crate::{
@@ -119,9 +119,16 @@ pub fn character_select_models_system(
 
             // If the character list has changed, recreate model
             if model_list.models[index].0.as_ref() != Some(&character.info.name) {
+                // Hide weapon and subweapon
+                let mut equipment = character.equipment.clone();
+                let mut equipped_items = equipment.equipped_items;
+                equipped_items[EquipmentIndex::Weapon] = None;
+                equipped_items[EquipmentIndex::SubWeapon] = None;
+                equipment.equipped_items = equipped_items;
+
                 commands
                     .entity(model_list.models[index].1)
-                    .insert((character.info.clone(), character.equipment.clone()));
+                    .insert((character.info.clone(), equipment));
                 model_list.models[index].0 = Some(character.info.name.clone());
             }
 
