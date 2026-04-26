@@ -114,7 +114,7 @@ pub fn ui_game_menu_system(
     }
 
     if response_button_exit.map_or(false, |r| r.clicked()) {
-        // TODO: Exit dialog
+        ui_state_windows.exit_open = !ui_state_windows.exit_open;
     }
 
     if !egui_context.ctx_mut().wants_keyboard_input() {
@@ -141,6 +141,10 @@ pub fn ui_game_menu_system(
 
             if input.consume_shortcut(&config.hotkeys.settings) {
                 ui_state_windows.settings_open = !ui_state_windows.settings_open;
+            }
+
+            if input.consume_shortcut(&config.hotkeys.exit) {
+                ui_state_windows.exit_open = !ui_state_windows.exit_open;
             }
         });
     }

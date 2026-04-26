@@ -16,6 +16,8 @@ pub struct HotkeysConfig {
     pub clan: KeyboardShortcut,
     #[serde(with = "KeyboardShortcutDef")]
     pub settings: KeyboardShortcut,
+    #[serde(with = "KeyboardShortcutDef")]
+    pub exit: KeyboardShortcut,
 
     #[serde(with = "KeyboardShortcutDef")]
     pub hotbar_1: KeyboardShortcut,
@@ -44,6 +46,7 @@ impl Default for HotkeysConfig {
             quests: KeyboardShortcut::new(Modifiers::ALT, Key::Q),
             clan: KeyboardShortcut::new(Modifiers::ALT, Key::N),
             settings: KeyboardShortcut::new(Modifiers::ALT, Key::O),
+            exit: KeyboardShortcut::new(Modifiers::ALT, Key::X),
 
             hotbar_1: KeyboardShortcut::new(Modifiers::NONE, Key::F1),
             hotbar_2: KeyboardShortcut::new(Modifiers::NONE, Key::F2),
