@@ -554,34 +554,30 @@ pub fn ui_add_item_tooltip(
                     add_equipment_item_life_durability(ui, game_data, equipment_item);
                     add_item_defence(ui, game_data, item_data, grade_data);
 
-                    if matches!(equipment_item.item.item_type, ItemType::Feet) {
-                        if let Some(move_speed) = game_data
+                    let move_speed = if matches!(equipment_item.item.item_type, ItemType::Feet) {
+                        game_data
                             .items
                             .get_feet_item(equipment_item.item.item_number)
                             .map(|feet_item_data| feet_item_data.move_speed)
-                        {
-                            ui.colored_label(
-                                POSITIVE_EFFECT_COLOR,
-                                format!(
-                                    "[{} {}]",
-                                    game_data.client_strings.item_move_speed, move_speed
-                                ),
-                            );
-                        }
+                            .unwrap_or(0)
                     } else if matches!(equipment_item.item.item_type, ItemType::Back) {
-                        if let Some(move_speed) = game_data
+                        game_data
                             .items
                             .get_back_item(equipment_item.item.item_number)
                             .map(|back_item_data| back_item_data.move_speed)
-                        {
-                            ui.colored_label(
-                                POSITIVE_EFFECT_COLOR,
-                                format!(
-                                    "[{} {}]",
-                                    game_data.client_strings.item_move_speed, move_speed
-                                ),
-                            );
-                        }
+                            .unwrap_or(0)
+                    } else {
+                        0
+                    };
+
+                    if move_speed > 0 {
+                        ui.colored_label(
+                            POSITIVE_EFFECT_COLOR,
+                            format!(
+                                "[{} {}]",
+                                game_data.client_strings.item_move_speed, move_speed
+                            ),
+                        );
                     }
 
                     add_item_add_ability(ui, game_data, item_data);

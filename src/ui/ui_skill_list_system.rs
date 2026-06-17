@@ -4,21 +4,23 @@ use bevy::{
 };
 use bevy_egui::{egui, EguiContexts};
 
-use rose_data::AbilityType;
-use rose_data_irose::{IroseSkillPageType, SKILL_PAGE_SIZE};
-use rose_game_common::components::{CharacterInfo, SkillList, SkillPoints, SkillSlot};
-
 use crate::{
     bundles::ability_values_get_value,
     components::{Cooldowns, PlayerCharacter},
     events::PlayerCommandEvent,
-    resources::{GameData, UiResources},
+    resources::{GameConnection, GameData, UiResources},
     ui::{
         tooltips::{PlayerTooltipQuery, PlayerTooltipQueryItem, SkillTooltipType},
         ui_add_skill_tooltip,
         widgets::{DataBindings, Dialog, DrawText, Widget},
         DragAndDropId, DragAndDropSlot, UiSoundEvent, UiStateDragAndDrop, UiStateWindows,
     },
+};
+use rose_data::AbilityType;
+use rose_data_irose::{IroseSkillPageType, SKILL_PAGE_SIZE};
+use rose_game_common::{
+    components::{CharacterInfo, SkillList, SkillPoints, SkillSlot},
+    messages::client::ClientMessage,
 };
 
 const IID_BTN_CLOSE: i32 = 10;
@@ -136,6 +138,7 @@ pub fn ui_skill_list_system(
     game_data: Res<GameData>,
     ui_resources: Res<UiResources>,
     dialog_assets: Res<Assets<Dialog>>,
+    game_connection: Option<Res<GameConnection>>,
 ) {
     let ui_state_skill_list = &mut *ui_state_skill_list;
     let dialog = if let Some(dialog) = dialog_assets.get(&ui_resources.dialog_skill_list) {
@@ -252,6 +255,48 @@ pub fn ui_skill_list_system(
                                 );
                             }
 
+                            if let Some(mut sprite) =
+                                ui_resources.get_sprite(0, "UI09_BTN_PLUS_NORMAL")
+                            {
+                                ui.allocate_ui_at_rect(
+                                    egui::Rect::from_min_size(
+                                        ui.min_rect().min
+                                            + egui::vec2(start_x + 155.0, start_y + 25.0),
+                                        egui::vec2(sprite.width, sprite.height),
+                                    ),
+                                    |ui| {
+                                        let (rect, response) = ui.allocate_exact_size(
+                                            egui::vec2(ui.available_width(), ui.available_height()),
+                                            egui::Sense::click(),
+                                        );
+
+                                        if response.clicked() {
+                                            if let Some(game_connection) = game_connection.as_ref()
+                                            {
+                                                game_connection
+                                                    .client_message_tx
+                                                    .send(ClientMessage::LevelUpSkill {
+                                                        skill_slot,
+                                                    })
+                                                    .ok();
+                                            }
+                                        } else if response.is_pointer_button_down_on() {
+                                            sprite = ui_resources
+                                                .get_sprite(0, "UI09_BTN_PLUS_DOWN")
+                                                .unwrap();
+                                        } else if response.hovered() {
+                                            sprite = ui_resources
+                                                .get_sprite(0, "UI09_BTN_PLUS_OVER")
+                                                .unwrap();
+                                        };
+
+                                        if ui.is_rect_visible(rect) {
+                                            sprite.draw(ui, rect.min);
+                                        }
+                                    },
+                                );
+                            }
+
                             // Skill use ability values
                             if !skill_data.use_ability.is_empty() {
                                 ui.allocate_ui_at_rect(
@@ -329,8 +374,6 @@ pub fn ui_skill_list_system(
                                 );
                             }
                         }
-
-                        // TODO: Skill level up button
 
                         ui_add_skill_list_slot(
                             ui,
