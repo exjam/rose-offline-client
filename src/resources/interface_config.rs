@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 pub struct InterfaceConfig {
     pub targeting: TargetingType,
     pub name_tag_settings: NameTagSettings,
+    pub party_hp_gauge: bool,
 }
 
 impl Default for InterfaceConfig {
@@ -13,6 +14,7 @@ impl Default for InterfaceConfig {
         Self {
             targeting: TargetingType::DoubleClick,
             name_tag_settings: NameTagSettings::default(),
+            party_hp_gauge: true,
         }
     }
 }

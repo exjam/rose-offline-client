@@ -23,14 +23,14 @@ pub struct NameTagName;
 #[derive(Component)]
 pub struct NameTagTargetMark;
 
-#[derive(Component)]
+#[derive(Clone, Component)]
 pub struct NameTagHealthbarForeground {
     pub uv_min_x: f32,
     pub uv_max_x: f32,
     pub full_width: f32,
 }
 
-#[derive(Component)]
+#[derive(Clone, Component)]
 pub struct NameTagHealthbarBackground;
 
 #[derive(Component, Deref, DerefMut)]

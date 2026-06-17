@@ -22,30 +22,27 @@ jobs:
     steps:
       - name: 'Checkout'
         uses: actions/checkout@v6
-      - uses: actions-rs/toolchain@v1
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          profile: minimal
           toolchain: stable
           override: true
-      - uses: Swatinem/rust-cache@v1
+      - uses: Swatinem/rust-cache@v2
       - name: 'Install Dependencies (Ubuntu)'
         if: matrix.os == 'ubuntu-latest'
         run: |
+          sudo apt-get update
           sudo apt-get install -y libasound2-dev libudev-dev
       - name: 'Build (Release)'
-        uses: actions-rs/cargo@v1
-        with:
-          command: build
-          args: --release
+        run: cargo build --release
       - name: 'Upload Artifact (Windows)'
         if: matrix.os == 'windows-latest'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: rose-offline-client-${{ matrix.os }}
           path: target/release/rose-offline-client.exe
       - name: 'Upload Artifact (Ubuntu, MacOS)'
         if: matrix.os != 'windows-latest'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: rose-offline-client-${{ matrix.os }}
           path: target/release/rose-offline-client

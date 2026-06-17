@@ -3,7 +3,7 @@ use serde::Deserialize;
 
 use crate::resources::UiResources;
 
-use super::{DataBindings, DrawWidget, LoadWidget, Tab, TabButton, Widget};
+use super::{DataBindings, DrawWidget, LoadWidget, Tab, Widget};
 
 #[derive(Clone, Default, Deserialize)]
 #[serde(rename = "TABBEDPANE")]
@@ -40,35 +40,6 @@ impl LoadWidget for TabbedPane {
                 }
             }
         }
-    }
-}
-
-struct DrawTabButton<'a> {
-    tab_button: &'a TabButton,
-    selected: bool,
-}
-
-impl<'a> egui::Widget for DrawTabButton<'a> {
-    fn ui(self, ui: &mut egui::Ui) -> egui::Response {
-        let rect = self.tab_button.widget_rect(ui.min_rect().min);
-        let response = ui.allocate_rect(rect, egui::Sense::click());
-
-        if ui.is_rect_visible(rect) {
-            let sprite = if self.selected || response.is_pointer_button_down_on() {
-                self.tab_button.down_sprite.as_ref()
-            } else if response.hovered() || response.has_focus() {
-                self.tab_button.over_sprite.as_ref()
-            } else {
-                None
-            }
-            .or(self.tab_button.normal_sprite.as_ref());
-
-            if let Some(sprite) = sprite {
-                sprite.draw(ui, rect.min);
-            }
-        }
-
-        response
     }
 }
 
