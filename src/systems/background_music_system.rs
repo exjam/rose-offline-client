@@ -1,12 +1,11 @@
-use bevy::prelude::{AssetServer, Commands, Entity, Handle, Local, Res};
-use rose_data::ZoneId;
-
 use crate::{
     audio::{AudioSource, GlobalSound},
     components::SoundCategory,
     resources::{CurrentZone, GameData, ZoneTime, ZoneTimeState},
     Config,
 };
+use bevy::prelude::{AssetServer, Commands, Entity, Handle, Local, Res};
+use rose_data::ZoneId;
 
 #[derive(Default)]
 pub enum BackgroundMusicState {
@@ -36,83 +35,96 @@ pub fn background_music_system(
 ) {
     let sound_settings = &config.sound;
 
-    if let Some(current_zone) = current_zone {
-        if background_music.zone != Some(current_zone.id) {
+    let current_zone = match current_zone {
+        None => {
             if let Some(entity) = background_music.entity.take() {
                 commands.entity(entity).despawn();
             }
-            background_music.state = BackgroundMusicState::None;
 
-            if let Some(zone_data) = game_data.zone_list.get_zone(current_zone.id) {
-                background_music.day_audio_source = zone_data
-                    .background_music_day
-                    .as_ref()
-                    .map(|path| asset_server.load(path.path()));
-                background_music.night_audio_source = zone_data
-                    .background_music_night
-                    .as_ref()
-                    .map(|path| asset_server.load(path.path()));
-            } else {
-                background_music.day_audio_source = None;
-                background_music.night_audio_source = None;
-            }
+            return;
+        }
+        Some(it) => it,
+    };
 
-            background_music.zone = Some(current_zone.id);
+    if background_music.zone != Some(current_zone.id) {
+        if let Some(entity) = background_music.entity.take() {
+            commands.entity(entity).despawn();
+        }
+        background_music.state = BackgroundMusicState::None;
+
+        if let Some(zone_data) = game_data.zone_list.get_zone(current_zone.id) {
+            background_music.day_audio_source = zone_data
+                .background_music_day
+                .as_ref()
+                .map(|path| asset_server.load(path.path()));
+            background_music.night_audio_source = zone_data
+                .background_music_night
+                .as_ref()
+                .map(|path| asset_server.load(path.path()));
+        } else {
+            background_music.day_audio_source = None;
+            background_music.night_audio_source = None;
         }
 
-        match zone_time.state {
-            ZoneTimeState::Morning | ZoneTimeState::Day => {
-                match background_music.state {
-                    BackgroundMusicState::None | BackgroundMusicState::PlayingNight => {
-                        // TODO: Should probably cross fade between the tracks
-                        if let Some(entity) = background_music.entity.take() {
-                            commands.entity(entity).despawn();
-                        }
+        background_music.zone = Some(current_zone.id);
+    }
 
-                        if let Some(audio_source) = background_music.night_audio_source.as_ref() {
-                            background_music.entity = Some(
-                                commands
-                                    .spawn((
-                                        SoundCategory::BackgroundMusic,
-                                        GlobalSound::new_repeating(audio_source.clone()),
-                                        sound_settings.gain(SoundCategory::BackgroundMusic),
-                                    ))
-                                    .id(),
-                            );
-                        }
+    if background_music.day_audio_source == background_music.night_audio_source
+        && background_music.entity.is_some()
+    {
+        return;
+    }
 
-                        background_music.state = BackgroundMusicState::PlayingDay;
+    match zone_time.state {
+        ZoneTimeState::Morning | ZoneTimeState::Day => {
+            match background_music.state {
+                BackgroundMusicState::None | BackgroundMusicState::PlayingNight => {
+                    // TODO: Should probably cross fade between the tracks
+                    if let Some(entity) = background_music.entity.take() {
+                        commands.entity(entity).despawn();
                     }
-                    BackgroundMusicState::PlayingDay => {}
-                }
-            }
-            ZoneTimeState::Evening | ZoneTimeState::Night => {
-                match background_music.state {
-                    BackgroundMusicState::None | BackgroundMusicState::PlayingDay => {
-                        // TODO: Should probably cross fade between the tracks
-                        if let Some(entity) = background_music.entity.take() {
-                            commands.entity(entity).despawn();
-                        }
 
-                        if let Some(audio_source) = background_music.night_audio_source.as_ref() {
-                            background_music.entity = Some(
-                                commands
-                                    .spawn((
-                                        SoundCategory::BackgroundMusic,
-                                        GlobalSound::new_repeating(audio_source.clone()),
-                                        sound_settings.gain(SoundCategory::BackgroundMusic),
-                                    ))
-                                    .id(),
-                            );
-                        }
-
-                        background_music.state = BackgroundMusicState::PlayingNight;
+                    if let Some(audio_source) = background_music.day_audio_source.as_ref() {
+                        background_music.entity = Some(
+                            commands
+                                .spawn((
+                                    SoundCategory::BackgroundMusic,
+                                    GlobalSound::new_repeating(audio_source.clone()),
+                                    sound_settings.gain(SoundCategory::BackgroundMusic),
+                                ))
+                                .id(),
+                        );
                     }
-                    BackgroundMusicState::PlayingNight => {}
+
+                    background_music.state = BackgroundMusicState::PlayingDay;
                 }
+                BackgroundMusicState::PlayingDay => {}
             }
         }
-    } else if let Some(entity) = background_music.entity.take() {
-        commands.entity(entity).despawn();
+        ZoneTimeState::Evening | ZoneTimeState::Night => {
+            match background_music.state {
+                BackgroundMusicState::None | BackgroundMusicState::PlayingDay => {
+                    // TODO: Should probably cross fade between the tracks
+                    if let Some(entity) = background_music.entity.take() {
+                        commands.entity(entity).despawn();
+                    }
+
+                    if let Some(audio_source) = background_music.night_audio_source.as_ref() {
+                        background_music.entity = Some(
+                            commands
+                                .spawn((
+                                    SoundCategory::BackgroundMusic,
+                                    GlobalSound::new_repeating(audio_source.clone()),
+                                    sound_settings.gain(SoundCategory::BackgroundMusic),
+                                ))
+                                .id(),
+                        );
+                    }
+
+                    background_music.state = BackgroundMusicState::PlayingNight;
+                }
+                BackgroundMusicState::PlayingNight => {}
+            }
+        }
     }
 }
