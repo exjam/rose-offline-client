@@ -50,7 +50,7 @@ pub use name_tag_settings::NameTagSettings;
 pub use network_thread::{run_network_thread, NetworkThread, NetworkThreadMessage};
 pub use render_configuration::RenderConfiguration;
 pub use selected_target::SelectedTarget;
-pub use server_configuration::ServerConfiguration;
+pub use server_configuration::{AutoLogin, ServerConfiguration};
 pub use server_list::{ServerList, ServerListGameServer, ServerListWorldServer};
 pub use sound_cache::SoundCache;
 pub use sound_config::SoundConfig;

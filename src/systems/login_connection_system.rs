@@ -60,7 +60,7 @@ pub fn login_connection_system(
                         game_servers: Vec::new(),
                     });
                 }
-                commands.insert_resource(ServerList { world_servers });
+                commands.insert_resource(ServerList::from(world_servers));
             }
             Ok(ServerMessage::LoginError { error }) => {
                 break Err(error.into());

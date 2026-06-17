@@ -24,11 +24,27 @@ use crate::{
     },
     events::{CharacterSelectEvent, GameConnectionEvent, LoadZoneEvent, WorldConnectionEvent},
     resources::{
-        AppState, CharacterList, CharacterSelectState, GameData, NameTagCache, ServerConfiguration,
+        AppState, AutoLogin, CharacterList, CharacterSelectState, GameData, NameTagCache,
         WorldConnection,
     },
-    systems::{FreeCamera, OrbitCamera},
+    systems::{login_system::ZONE_LOGIN, FreeCamera, OrbitCamera},
 };
+
+pub struct CharacterSelect {
+    initial_load: bool,
+    join_zone_id: Option<ZoneId>,
+    last_selected_time: Option<Instant>,
+}
+
+impl Default for CharacterSelect {
+    fn default() -> Self {
+        Self {
+            initial_load: true,
+            join_zone_id: None,
+            last_selected_time: None,
+        }
+    }
+}
 
 #[derive(Component)]
 pub struct CharacterSelectCharacter {
@@ -44,10 +60,13 @@ pub struct CharacterSelectModelList {
 pub fn character_select_enter_system(
     mut commands: Commands,
     mut query_window: Query<&mut Window, With<PrimaryWindow>>,
+    mut loaded_zone: EventWriter<LoadZoneEvent>,
     query_cameras: Query<Entity, With<Camera3d>>,
     asset_server: Res<AssetServer>,
     game_data: Res<GameData>,
+    world_connection: Res<WorldConnection>,
 ) {
+    // Ensure cursor is not locked
     if let Ok(mut window) = query_window.get_single_mut() {
         window.cursor.grab_mode = CursorGrabMode::None;
         window.cursor.visible = true;
@@ -81,10 +100,18 @@ pub fn character_select_enter_system(
             .id();
         models.push((None, entity));
     }
+
     commands.insert_resource(CharacterSelectModelList {
         models,
         select_motion: asset_server.load("3DDATA/MOTION/AVATAR/EVENT_SELECT_M1.ZMO"),
     });
+
+    world_connection
+        .client_message_tx
+        .send(ClientMessage::GetCharacterList)
+        .ok();
+
+    loaded_zone.send(LoadZoneEvent::new(ZoneId::new(ZONE_LOGIN).unwrap()));
 }
 
 pub fn character_select_exit_system(
@@ -162,14 +189,14 @@ pub fn character_select_system(
     mut game_connection_events: EventReader<GameConnectionEvent>,
     mut world_connection_events: EventReader<WorldConnectionEvent>,
     mut load_zone_events: EventWriter<LoadZoneEvent>,
-    mut join_zone_id: Local<Option<ZoneId>>,
+    mut character_select: Local<CharacterSelect>,
     query_camera: Query<
         (Entity, &Camera, &GlobalTransform, Option<&CameraAnimation>),
         With<Camera3d>,
     >,
     world_connection: Option<Res<WorldConnection>>,
     mut character_list: Option<ResMut<CharacterList>>,
-    server_configuration: Res<ServerConfiguration>,
+    auto_login: Option<Res<AutoLogin>>,
     asset_server: Res<AssetServer>,
 ) {
     let character_select_state = &mut *character_select_state;
@@ -260,7 +287,7 @@ pub fn character_select_system(
         CharacterSelectState::Entering => {
             let (_, _, _, camera_motion) = query_camera.single();
             if camera_motion.map_or(true, |animation| animation.completed())
-                || server_configuration.auto_login
+                || (auto_login.is_some() && character_select.initial_load)
             {
                 *character_select_state = CharacterSelectState::CharacterSelect(None);
             }
@@ -293,17 +320,21 @@ pub fn character_select_system(
                 ));
 
                 *character_select_state = CharacterSelectState::Leaving;
-                *join_zone_id = Some(zone_id);
+                character_select.join_zone_id = Some(zone_id);
             }
         }
         CharacterSelectState::Leaving => {
             let (_, _, _, camera_motion) = query_camera.single();
             if camera_motion.map_or(true, |animation| animation.completed())
-                || server_configuration.auto_login
+                || (auto_login.is_some() && character_select.initial_load)
             {
+                character_select.initial_load = false;
+
                 // Wait until camera motion complete, then load the zone!
                 *character_select_state = CharacterSelectState::Loading;
-                load_zone_events.send(LoadZoneEvent::new(join_zone_id.take().unwrap()));
+                load_zone_events.send(LoadZoneEvent::new(
+                    character_select.join_zone_id.take().unwrap(),
+                ));
             }
         }
         CharacterSelectState::Loading => {}
@@ -311,9 +342,9 @@ pub fn character_select_system(
 }
 
 pub fn character_select_event_system(
-    mut commands: Commands,
     mut character_select_state: ResMut<CharacterSelectState>,
     mut character_select_events: EventReader<CharacterSelectEvent>,
+    mut app_state_next: ResMut<NextState<AppState>>,
     character_list: Option<Res<CharacterList>>,
     world_connection: Option<Res<WorldConnection>>,
 ) {
@@ -376,7 +407,7 @@ pub fn character_select_event_system(
                 }
             }
             CharacterSelectEvent::Disconnect => {
-                commands.remove_resource::<WorldConnection>();
+                app_state_next.set(AppState::GameLogin);
             }
         }
     }
@@ -388,7 +419,7 @@ pub fn character_select_input_system(
     mut egui_ctx: EguiContexts,
     mouse_button_input: Res<Input<MouseButton>>,
     rapier_context: Res<RapierContext>,
-    mut last_selected_time: Local<Option<Instant>>,
+    mut character_select: Local<CharacterSelect>,
     query_camera: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
     query_collider_parent: Query<&ColliderParent>,
     query_select_character: Query<&CharacterSelectCharacter>,
@@ -438,7 +469,7 @@ pub fn character_select_input_system(
                         let now = Instant::now();
 
                         if *selected_character_index == Some(select_character.index) {
-                            if let Some(last_selected_time) = *last_selected_time {
+                            if let Some(last_selected_time) = character_select.last_selected_time {
                                 if now - last_selected_time < Duration::from_millis(250) {
                                     character_select_events
                                         .send(CharacterSelectEvent::PlaySelected);
@@ -447,7 +478,7 @@ pub fn character_select_input_system(
                         }
 
                         *selected_character_index = Some(select_character.index);
-                        *last_selected_time = Some(now);
+                        character_select.last_selected_time = Some(now);
                     }
                 }
             }

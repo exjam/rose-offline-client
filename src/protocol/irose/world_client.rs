@@ -120,7 +120,11 @@ impl WorldClient {
                 };
                 self.server_message_tx.send(message).ok();
             }
-            // ServerPackets::ReturnToCharacterSelect -> ServerMessage::ReturnToCharacterSelect
+            Some(ServerPackets::ReturnToCharacterSelect) => {
+                self.server_message_tx
+                    .send(ServerMessage::ReturnToCharacterSelect)
+                    .ok();
+            }
             _ => log::info!("Unhandled WorldClient packet {:?}", packet),
         }
 

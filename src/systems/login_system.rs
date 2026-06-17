@@ -12,9 +12,13 @@ use rose_game_common::messages::client::ClientMessage;
 use crate::{
     animation::CameraAnimation,
     events::{LoadZoneEvent, LoginEvent, NetworkEvent},
-    resources::{Account, LoginConnection, LoginState, ServerConfiguration, ServerList},
+    resources::{
+        Account, LoginConnection, LoginState, ServerConfiguration, ServerList, WorldConnection,
+    },
     systems::{FreeCamera, OrbitCamera},
 };
+
+pub const ZONE_LOGIN: u16 = 4;
 
 pub fn login_state_enter_system(
     mut commands: Commands,
@@ -41,10 +45,11 @@ pub fn login_state_enter_system(
             ));
     }
 
+    commands.remove_resource::<WorldConnection>();
     commands.remove_resource::<Account>();
     commands.insert_resource(LoginState::Input);
 
-    loaded_zone.send(LoadZoneEvent::new(ZoneId::new(4).unwrap()));
+    loaded_zone.send(LoadZoneEvent::new(ZoneId::new(ZONE_LOGIN).unwrap()));
 }
 
 pub fn login_state_exit_system(mut commands: Commands) {
@@ -95,6 +100,7 @@ pub fn login_event_system(
     mut login_events: EventReader<LoginEvent>,
     login_connection: Option<Res<LoginConnection>>,
     server_configuration: Res<ServerConfiguration>,
+    mut server_list: Option<ResMut<ServerList>>,
     mut network_events: EventWriter<NetworkEvent>,
 ) {
     for event in login_events.iter() {
@@ -118,6 +124,11 @@ pub fn login_event_system(
                 server_id,
                 channel_id,
             } => {
+                if let Some(ref mut server_list) = server_list {
+                    server_list.selected_server = Some(server_id);
+                    server_list.selected_channel = Some(channel_id);
+                }
+
                 if let Some(login_connection) = &login_connection {
                     login_connection
                         .client_message_tx

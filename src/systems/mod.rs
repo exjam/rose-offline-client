@@ -95,7 +95,7 @@ pub use facing_direction_system::facing_direction_system;
 pub use free_camera_system::{free_camera_system, FreeCamera};
 pub use game_connection_system::game_connection_system;
 pub use game_mouse_input_system::game_mouse_input_system;
-pub use game_system::{game_state_enter_system, game_zone_change_system};
+pub use game_system::{game_state_enter_system, game_state_exit_system, game_zone_change_system};
 pub use hit_event_system::hit_event_system;
 pub use item_drop_model_system::{item_drop_model_add_collider_system, item_drop_model_system};
 pub use login_connection_system::login_connection_system;

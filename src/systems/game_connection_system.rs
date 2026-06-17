@@ -7,7 +7,6 @@ use bevy::{
         Mut, NextState, Res, ResMut, State, Transform, Visibility, World,
     },
 };
-
 use rose_data::{
     AbilityType, EquipmentItem, Item, ItemReference, ItemSlotBehaviour, ItemType, SkillCooldown,
     StatusEffectType,
@@ -2281,13 +2280,11 @@ pub fn game_connection_system(
                 log::warn!("Received unimplemented ServerMessage::RepairedItemUsingNpc");
             }
             Ok(ServerMessage::LogoutSuccess) => {
-                log::warn!("Received unimplemented ServerMessage::LogoutSuccess");
+                commands.remove_resource::<GameConnection>();
+                break Ok(());
             }
             Ok(ServerMessage::LogoutFailed { .. }) => {
                 log::warn!("Received unimplemented ServerMessage::LogoutFailed");
-            }
-            Ok(ServerMessage::ReturnToCharacterSelect) => {
-                log::warn!("Received unimplemented ServerMessage::ReturnToCharacterSelect");
             }
             Ok(ServerMessage::LoginError { .. }) |
             Ok(ServerMessage::LoginSuccess { .. }) |
@@ -2303,7 +2300,8 @@ pub fn game_connection_system(
             Ok(ServerMessage::SelectCharacterError { .. }) |
             Ok(ServerMessage::DeleteCharacterStart { .. }) |
             Ok(ServerMessage::DeleteCharacterCancel { .. }) |
-            Ok(ServerMessage::DeleteCharacterError { .. }) => {
+            Ok(ServerMessage::DeleteCharacterError { .. }) |
+            Ok(ServerMessage::ReturnToCharacterSelect) => {
                 // These should only be login / world server packets, not game server
                 log::warn!("Received unexpected game server message");
             }

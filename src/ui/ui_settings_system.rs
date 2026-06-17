@@ -310,6 +310,7 @@ pub fn ui_settings_system(
                             add_shortcut_setting(ui, "Quest Log", &mut config.hotkeys.quests);
                             add_shortcut_setting(ui, "Clan", &mut config.hotkeys.clan);
                             add_shortcut_setting(ui, "Settings", &mut config.hotkeys.settings);
+                            add_shortcut_setting(ui, "Exit", &mut config.hotkeys.exit);
 
                             ui.end_row();
 

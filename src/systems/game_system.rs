@@ -1,6 +1,7 @@
 use bevy::{
+    hierarchy::DespawnRecursiveExt,
     math::Vec3,
-    prelude::{Camera3d, Commands, Entity, EventReader, Query, Res, With},
+    prelude::{Camera3d, Commands, Entity, EventReader, Query, Res, ResMut, With},
 };
 use rose_game_common::messages::client::ClientMessage;
 
@@ -8,7 +9,7 @@ use crate::{
     animation::CameraAnimation,
     components::PlayerCharacter,
     events::ZoneEvent,
-    resources::GameConnection,
+    resources::{ClientEntityList, GameConnection},
     systems::{FreeCamera, OrbitCamera},
 };
 
@@ -30,6 +31,22 @@ pub fn game_state_enter_system(
                 15.0,
             ));
     }
+}
+
+pub fn game_state_exit_system(
+    mut commands: Commands,
+    mut client_entity_list: ResMut<ClientEntityList>,
+) {
+    // Despawn entities
+    for entity in client_entity_list.client_entities.iter() {
+        let entity = match entity {
+            Some(entity) => entity,
+            None => continue,
+        };
+
+        commands.entity(*entity).despawn_recursive();
+    }
+    *client_entity_list = ClientEntityList::default();
 }
 
 #[allow(clippy::too_many_arguments)]

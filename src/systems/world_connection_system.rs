@@ -1,17 +1,18 @@
 use bevy::prelude::{Commands, EventWriter, NextState, Res, ResMut, State};
 
-use rose_game_common::messages::{client::ClientMessage, server::ServerMessage};
+use rose_game_common::messages::server::ServerMessage;
 use rose_network_common::ConnectionError;
 
 use crate::{
     events::{NetworkEvent, WorldConnectionEvent},
-    resources::{Account, AppState, CharacterList, WorldConnection},
+    resources::{Account, AppState, AutoLogin, CharacterList, ServerList, WorldConnection},
 };
 
 pub fn world_connection_system(
     mut commands: Commands,
     world_connection: Option<Res<WorldConnection>>,
     account: Option<Res<Account>>,
+    server_list: Option<Res<ServerList>>,
     app_state_current: Res<State<AppState>>,
     mut app_state_next: ResMut<NextState<AppState>>,
     mut network_events: EventWriter<NetworkEvent>,
@@ -34,10 +35,7 @@ pub fn world_connection_system(
             Ok(ServerMessage::ConnectionRequestSuccess {
                 packet_sequence_id: _,
             }) => {
-                world_connection
-                    .client_message_tx
-                    .send(ClientMessage::GetCharacterList)
-                    .ok();
+                app_state_next.set(AppState::GameCharacterSelect);
             }
             Ok(ServerMessage::ConnectionRequestError { error: _ }) => {
                 break Err(ConnectionError::ConnectionLost.into());
@@ -85,7 +83,20 @@ pub fn world_connection_system(
             Ok(ServerMessage::DeleteCharacterError { name }) => {
                 world_connection_events.send(WorldConnectionEvent::DeleteCharacterError { name });
             }
-            // ServerMessage::ReturnToCharacterSelect
+            Ok(ServerMessage::ReturnToCharacterSelect) => {
+                commands.remove_resource::<ServerList>();
+                commands.insert_resource(AutoLogin {
+                    preset_username: Some(account.username.clone()),
+                    preset_password: Some(account.password.clone()),
+                    preset_server_id: server_list.as_ref().and_then(|it| it.selected_server),
+                    preset_channel_id: server_list.as_ref().and_then(|it| it.selected_channel),
+                    preset_character_name: None,
+                });
+
+                // This is a hack, it should just work by going to GameCharacterSelect
+                // game_state_exit_system despawns all client entities which causes the player model to no longer be visible
+                app_state_next.set(AppState::GameLogin);
+            }
             Ok(message) => {
                 log::warn!("Received unexpected world server message: {:#?}", message);
             }
@@ -99,6 +110,6 @@ pub fn world_connection_system(
     if let Err(error) = result {
         // TODO: Store error somewhere to display to user
         log::warn!("World server connection error: {}", error);
-        commands.remove_resource::<WorldConnection>();
+        app_state_next.set(AppState::GameLogin);
     }
 }
