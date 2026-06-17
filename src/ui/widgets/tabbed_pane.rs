@@ -3,7 +3,7 @@ use serde::Deserialize;
 
 use crate::resources::UiResources;
 
-use super::{DataBindings, DrawWidget, LoadWidget, Tab, TabButton, Widget};
+use super::{DataBindings, DrawWidget, LoadWidget, Tab, Widget};
 
 #[derive(Clone, Default, Deserialize)]
 #[serde(rename = "TABBEDPANE")]

@@ -1,5 +1,6 @@
 #![allow(clippy::type_complexity)]
 #![allow(clippy::too_many_arguments)]
+#![allow(dead_code)] // Bug in encase, fixed in 0.11.1 but we are stuck on old version
 
 use animation::RoseAnimationPlugin;
 use bevy::{
