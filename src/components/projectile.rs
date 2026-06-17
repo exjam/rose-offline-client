@@ -3,7 +3,7 @@ use bevy::{
     prelude::{Component, Entity},
 };
 
-use rose_data::{EffectBulletMoveType, EffectId, SkillId};
+use rose_data::{EffectBulletMoveType, EffectId, SkillId, SoundId};
 
 #[derive(Copy, Clone)]
 pub enum ProjectileTarget {
@@ -27,6 +27,7 @@ pub struct Projectile {
 
     pub effect_id: Option<EffectId>,
     pub skill_id: Option<SkillId>,
+    pub sound_id: Option<SoundId>,
 
     pub move_type: EffectBulletMoveType,
     pub move_speed: f32,

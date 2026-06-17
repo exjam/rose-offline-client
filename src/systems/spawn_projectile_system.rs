@@ -59,6 +59,7 @@ pub fn spawn_projectile_system(
                     source: event.source,
                     effect_id: Some(event.effect_id),
                     skill_id: event.source_skill_id,
+                    sound_id: event.hit_sound_id,
                     move_type: event.move_type,
                     move_speed: event.move_speed,
                     apply_damage: event.apply_damage,
